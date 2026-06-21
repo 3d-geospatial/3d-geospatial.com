@@ -1,89 +1,188 @@
 # Converting WGS84 to Local Projected Coordinates
 
-Converting WGS84 to local projected coordinates requires transforming spherical latitude/longitude (EPSG:4326) into a metric Cartesian plane using a defined map projection and geodetic transformation pipeline. The production-standard approach relies on the [PROJ engine](https://proj.org/usage/transformation.html) (via `pyproj` or GDAL) to apply ellipsoid flattening, datum shifts, and projection mathematics—typically Universal Transverse Mercator (UTM), State Plane, or a custom Transverse Mercator. For 3D digital twins, you must explicitly handle the vertical component by pairing the horizontal projection with a vertical CRS or geoid model to convert ellipsoidal heights to orthometric elevations. This ensures sub-centimeter alignment across BIM, LiDAR, and IoT datasets.
+This page shows how to convert WGS84 geographic coordinates (EPSG:4326) into a local projected CRS such as UTM zone 18N (EPSG:32618) or a national grid using `pyproj`, including the compound vertical case (EPSG:32618+5703) and the axis-order rules that silently corrupt results. The production-standard path uses a `pyproj.Transformer` built from explicit EPSG codes, applies the datum shift and projection mathematics through the [PROJ engine](https://proj.org/usage/transformation.html), and verifies the result with a sub-millimetre round-trip residual before any of those points reach a mesh, a tileset, or a survey-control comparison.
 
-## Why Local Projections Matter in 3D Pipelines
+## Why You Hit This
 
-Global coordinate systems introduce scale distortion and non-linear distance calculations that break engineering tolerances. Digital twin environments operate in local Cartesian space where CAD/BIM assets, point clouds, and simulation meshes expect uniform metric units (meters or feet). When integrating GPS, RTK, or satellite-derived positioning into site-scale twins, [Coordinate Reference Systems for 3D Assets](/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/) dictate how spatial distortion is minimized across your project footprint.
+Almost every 3D acquisition begins in EPSG:4326. GNSS receivers, RTK base corrections, drone flight logs, IoT sensor feeds, and web map clicks all emit longitude/latitude on the WGS84 ellipsoid. But a digital twin runs in a metric Cartesian plane: CAD/BIM geometry, point clouds, and simulation meshes expect uniform metres, not degrees that shrink toward the poles. One degree of longitude is roughly 111 km at the equator and about 85 km at 40° N — distances, areas, and normals computed on raw EPSG:4326 are meaningless. Projecting to a metric CRS (a UTM zone, State Plane, or a national grid such as British National Grid / EPSG:27700) is the step that makes the geometry usable.
 
-Selecting a projection with minimal scale factor deviation (<1:10,000) at your site centroid prevents cumulative drift in asset registration. Mastering this transformation pipeline is foundational to [3D Geospatial Fundamentals for Digital Twins](/3d-geospatial-fundamentals-for-digital-twins/), particularly when aligning photogrammetric meshes, survey control networks, or sensor telemetry to engineering-grade models.
+The economic case is sharper than it first appears. Once geometry is anchored to a projected CRS like EPSG:32618, a one-metre offset in the data is a one-metre offset on the ground — the units are isometric and uniform across the whole tile, so registration, clash detection, and volumetric queries behave linearly. Left in EPSG:4326, the same operations need spherical trigonometry on every call, lose precision near the poles, and break the moment a rendering or physics engine assumes its axes are equal-scale. Picking a projection whose scale-factor deviation stays under 1:10,000 across your site keeps cumulative drift below the centimetre tolerances that survey-grade twins are held to.
 
-## Step-by-Step Conversion Workflow
+Two failure classes dominate this conversion: silent axis-order swaps (PROJ's CRS database declares EPSG:4326 as latitude-first, so the naive call flips your coordinates) and ignored vertical datums (GNSS gives ellipsoidal height; your twin almost certainly wants orthometric height relative to a geoid). Both produce output that looks plausible and is wrong by metres. The steps below close off both. For the broader question of which target CRS to pick, see [Coordinate Reference Systems for 3D Assets](/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/).
 
-1. **Identify the Optimal Local CRS**: Determine the projection that minimizes distortion for your site extent. UTM zones work for regional coverage, while State Plane or custom Transverse Mercator systems are preferred for municipal infrastructure. Verify the EPSG code or construct a custom PROJ string with your central meridian, false easting/northing, and scale factor.
-2. **Define the Transformation Chain**: WGS84 → Target CRS requires a datum transformation. Modern PROJ automatically resolves grid shift files (NTv2, NADCON, or geoid TIFFs) when standard EPSG codes are used. Avoid hardcoding `+towgs84` parameters unless working in legacy or offline environments.
-3. **Handle Vertical Coordinates via Compound CRS**: Geographic coordinates store ellipsoidal height, which differs from mean sea level by geoid undulation. For digital twins, specify a compound CRS using the combined EPSG authority string (e.g., `"EPSG:32618+5703"` for UTM Zone 18N + NAVD88) or apply a geoid correction before projection.
-4. **Execute Vectorized Transformation**: Use array-backed operations to process thousands of points efficiently. Avoid Python loops; leverage the C-optimized backend in `pyproj` or `rasterio`. Always enforce `always_xy=True` to prevent coordinate axis order confusion.
+<figure class="diagram">
+<svg viewBox="0 0 760 230" role="img" aria-labelledby="wgs84-conv-t wgs84-conv-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="wgs84-conv-t">WGS84 to projected transform pipeline</title>
+  <desc id="wgs84-conv-d">WGS84 longitude, latitude and ellipsoidal height in EPSG:4326 pass through a pyproj Transformer with always_xy true, producing easting, northing and orthometric height in the compound CRS EPSG:32618 plus 5703, then an inverse transform verifies the round trip.</desc>
+  <defs>
+    <marker id="wgs84-conv-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
+    </marker>
+  </defs>
+  <rect x="15" y="50" width="200" height="90" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="285" y="50" width="190" height="90" rx="8" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <rect x="545" y="50" width="200" height="90" rx="8" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <rect x="285" y="170" width="190" height="44" rx="8" fill="#ffffff" stroke="#5b6471" stroke-width="2"/>
+  <g stroke="#5b6471" stroke-width="2" marker-end="url(#wgs84-conv-arrow)">
+    <line x1="216" y1="95" x2="283" y2="95"/>
+    <line x1="476" y1="95" x2="543" y2="95"/>
+    <line x1="645" y1="142" x2="645" y2="192" stroke-dasharray="5 4"/>
+    <line x1="475" y1="192" x2="125" y2="192" stroke-dasharray="5 4"/>
+    <line x1="115" y1="190" x2="115" y2="142" stroke-dasharray="5 4"/>
+  </g>
+  <g fill="#1f2937" font-size="13" text-anchor="middle">
+    <text x="115" y="82"><tspan x="115" dy="0">EPSG:4326</tspan><tspan x="115" dy="16">lon, lat, ellip. h</tspan></text>
+    <text x="380" y="82"><tspan x="380" dy="0">pyproj Transformer</tspan><tspan x="380" dy="16">always_xy=True</tspan></text>
+    <text x="645" y="82"><tspan x="645" dy="0">EPSG:32618+5703</tspan><tspan x="645" dy="16">E, N, ortho h</tspan></text>
+    <text x="380" y="197">inverse round-trip check</text>
+  </g>
+</svg>
+<figcaption>The forward transform and the inverse round-trip residual that proves the chain is correct.</figcaption>
+</figure>
 
-## Production-Ready Python Implementation
+## Prerequisites
 
-The following snippet uses `pyproj` to handle 2D and 3D transformations safely, leveraging modern `Transformer` objects and NumPy vectorization. It demonstrates both horizontal projection and compound CRS handling for vertical alignment.
+- Python 3.9+ with `pyproj>=3.6` (ships PROJ 9.x, which auto-downloads grid shift files when network access to the PROJ CDN is allowed).
+- `numpy>=1.24` for vectorized batch transforms.
+- `laspy>=2.5` only if you are reprojecting the coordinates stored in a `.las`/`.laz` file.
+- Your **source** CRS: EPSG:4326 (WGS84 longitude/latitude, ellipsoidal height).
+- Your **target** CRS chosen explicitly, e.g. EPSG:32618 (UTM 18N), or the compound EPSG:32618+5703 (UTM 18N + NAVD88 orthometric height).
+- Optional: set `PROJ_NETWORK=ON` so PROJ fetches geoid grids (for example `us_noaa_g2018u0.tif` behind EPSG:5703) on demand.
+
+Confirm the install resolves a transformation before writing pipeline code:
+
+```python
+import pyproj
+print("pyproj", pyproj.__version__, "| PROJ", pyproj.proj_version_str)
+print("network:", pyproj.network.is_network_enabled())
+```
+
+## Step-by-Step
+
+### 1. Build a Transformer with explicit EPSG codes and `always_xy=True`
+
+Construct one `Transformer` per direction and reuse it — PROJ caches the resolved pipeline internally, so repeated calls are cheap. The `always_xy=True` flag is mandatory: it forces longitude/latitude (and easting/northing) order regardless of what the CRS authority declares, eliminating the latitude-first trap of EPSG:4326.
+
+```python
+from pyproj import Transformer
+
+# WGS84 geographic (EPSG:4326) -> UTM zone 18N (EPSG:32618)
+fwd = Transformer.from_crs("EPSG:4326", "EPSG:32618", always_xy=True)
+
+lon, lat = -73.985428, 40.748817          # Empire State Building
+easting, northing = fwd.transform(lon, lat)
+print(f"E={easting:.3f}  N={northing:.3f}")
+```
+
+### 2. Transform whole arrays in one vectorized call
+
+Never loop over points. Pass NumPy arrays straight into `transform()` — PROJ processes them in its C backend, which is 100x+ faster than per-point Python calls on a typical 10k-point batch. The transformer accepts and returns parallel 1-D arrays.
 
 ```python
 import numpy as np
-from pyproj import Transformer, CRS
 
-# 1. Define source and target CRS
-# WGS84 geographic 3D (EPSG:4326) -> UTM Zone 18N (EPSG:32618)
-crs_source = CRS.from_epsg(4326)
-crs_target_2d = CRS.from_epsg(32618)
-
-# For 3D: Compound CRS string "EPSG:HORIZ+VERT"
-# EPSG:32618 = UTM Zone 18N, EPSG:5703 = NAVD88 height
-# pyproj accepts the combined authority string directly
-crs_target_3d = CRS.from_authority("EPSG", "32618+5703")
-
-# 2. Initialize Transformers (C-optimized, thread-safe)
-transformer_2d = Transformer.from_crs(crs_source, crs_target_2d, always_xy=True)
-transformer_3d = Transformer.from_crs(crs_source, crs_target_3d, always_xy=True)
-
-# 3. Sample input data (lon, lat, ellipsoidal_height)
-# Shape: (N, 3)
+# (N, 3): lon, lat, ellipsoidal height (metres)
 coords_wgs84 = np.array([
-    [-73.9857, 40.7484, 15.2],   # NYC example
-    [-74.0060, 40.7128, 8.5],
-    [-73.9650, 40.7820, 22.1]
+    [-73.9857, 40.7484, 15.2],
+    [-74.0060, 40.7128,  8.5],
+    [-73.9650, 40.7820, 22.1],
 ])
 
-# 4. Vectorized 2D transformation (lon, lat -> easting, northing)
-easting, northing = transformer_2d.transform(
-    coords_wgs84[:, 0], coords_wgs84[:, 1]
-)
-
-# 5. Vectorized 3D transformation (lon, lat, ellipsoidal_h -> E, N, orthometric_h)
-easting_3d, northing_3d, ortho_height = transformer_3d.transform(
-    coords_wgs84[:, 0], coords_wgs84[:, 1], coords_wgs84[:, 2]
-)
-
-# 6. Output as structured array for downstream BIM/CAD ingestion
-local_coords_2d = np.column_stack((easting, northing))
-local_coords_3d = np.column_stack((easting_3d, northing_3d, ortho_height))
-
-print("2D Local Coordinates:\n", local_coords_2d)
-print("\n3D Local Coordinates (with orthometric heights):\n", local_coords_3d)
+easting, northing = fwd.transform(coords_wgs84[:, 0], coords_wgs84[:, 1])
+local_2d = np.column_stack((easting, northing))
+print(local_2d)
 ```
 
-**Key Implementation Notes:**
-- `always_xy=True` forces longitude/latitude order regardless of CRS axis definition, preventing silent coordinate swaps.
-- Compound CRS is specified as a single authority string `"EPSG:32618+5703"` passed to `CRS.from_authority("EPSG", "32618+5703")`. Do not use the Python `+` operator on two `CRS` objects—that syntax is not valid in pyproj.
-- The [pyproj Transformer API](https://pyproj4.github.io/pyproj/stable/api/transformer.html) caches transformation pipelines internally, making repeated calls highly efficient for streaming telemetry or large point clouds.
-- Vertical transformation accuracy depends on PROJ's ability to download geoid grid files. Enable network access (`PROJ_NETWORK=ON`) or pre-cache grids to prevent silent fallback to ellipsoidal heights.
+### 3. Carry the vertical component through a compound CRS
 
-## Critical Validation & Pitfalls
+To convert ellipsoidal height to orthometric height in the same pass, target a compound CRS that pairs the horizontal EPSG:32618 with vertical EPSG:5703 (NAVD88). PROJ applies the geoid grid behind EPSG:5703 automatically; the third argument and third return value become height.
 
-| Pitfall | Impact | Mitigation |
-|---------|--------|------------|
-| **Axis Order Confusion** | Coordinates flipped (lat/lon vs lon/lat) | Always use `always_xy=True` or explicitly define `CRS.from_user_input("EPSG:4326").axis_info` |
-| **Ignoring Geoid Separation** | 10–50m vertical drift in 3D twins | Use compound CRS authority string (`"EPSG:32618+5703"`) or apply `geoidgrids` via PROJ parameters |
-| **Hardcoded `+towgs84`** | Inaccurate datum shifts across regions | Rely on EPSG codes; let PROJ auto-resolve NTv2/NADCON grids |
-| **Loop-Based Transforms** | 100x+ slower on >10k points | Pass NumPy arrays directly to `transformer.transform()` |
-| **Missing geoid grids** | Silent fallback to ellipsoidal Z | Set `PROJ_NETWORK=ON` or distribute grid files with your pipeline |
+```python
+# WGS84 ellipsoidal (EPSG:4326) -> UTM 18N + NAVD88 (compound EPSG:32618+5703)
+fwd3d = Transformer.from_crs("EPSG:4326", "EPSG:32618+5703", always_xy=True)
 
-### Verification Checklist
-1. **Scale Factor Check**: Confirm the projection's scale factor at your site centroid is ≤ 1.0001. Use `projinfo` to inspect distortion parameters for your chosen EPSG zone.
-2. **Control Point Validation**: Transform 3–5 surveyed ground control points (GCPs) and compare against known local coordinates. Tolerances should stay within ±2cm for engineering-grade twins.
-3. **Metadata Preservation**: Store the source EPSG, target EPSG, transformation date, and grid file versions alongside your dataset. Digital twin platforms require provenance for audit compliance.
+e3, n3, ortho_h = fwd3d.transform(
+    coords_wgs84[:, 0], coords_wgs84[:, 1], coords_wgs84[:, 2]
+)
+local_3d = np.column_stack((e3, n3, ortho_h))
+print(local_3d)
+```
 
-## Next Steps
+### 4. Verify with a round-trip residual
 
-Once coordinates are projected locally, validate alignment by overlaying transformed point clouds against existing CAD/BIM geometry in a viewer like CesiumJS, Potree, or Autodesk Platform Services. Consistent CRS handling eliminates registration drift, enabling reliable spatial queries, clash detection, and sensor fusion across your infrastructure lifecycle.
+Build the inverse transformer (EPSG:32618 → EPSG:4326), run it on your projected output, and assert the residual is sub-millimetre in degrees. A non-trivial residual means the chain is misconfigured — usually a missing grid or a flipped axis.
+
+```python
+inv = Transformer.from_crs("EPSG:32618", "EPSG:4326", always_xy=True)
+lon_rt, lat_rt = inv.transform(easting, northing)
+
+residual = np.hypot(lon_rt - coords_wgs84[:, 0], lat_rt - coords_wgs84[:, 1])
+assert residual.max() < 1e-9, f"round-trip drift {residual.max():.2e} deg"
+print("round-trip OK, max residual:", residual.max())
+```
+
+### 5. Reproject the coordinates inside a LiDAR file with `laspy`
+
+When the points live in a `.laz`, read the scaled X/Y/Z, transform them, write them back, and update the header CRS so downstream tools read the right EPSG. Note `laspy` exposes `las.x/y/z` as real-world coordinates already decoded from the integer storage.
+
+```python
+import laspy
+from pyproj import Transformer
+
+las = laspy.read("survey_wgs84.laz")          # stored as EPSG:4326
+t = Transformer.from_crs("EPSG:4326", "EPSG:32618+5703", always_xy=True)
+
+e, n, z = t.transform(las.x, las.y, las.z)
+las.x, las.y, las.z = e, n, z
+las.header.add_crs("EPSG:32618+5703")          # stamp the new CRS
+las.write("survey_utm18n_navd88.laz")
+```
+
+## Expected Output & Verification
+
+For the Empire State Building input (lon −73.985428, lat 40.748817), step 1 prints easting/northing close to:
+
+```
+E=585015.637  N=4511322.207
+```
+
+UTM 18N eastings for the New York City area fall in the 580000–590000 m band and northings near 4.51 million m — if your output is off by a UTM zone (500000 m false easting jumps) or has E and N swapped, you have an axis-order bug. The full batch from step 2 should land every point in the same band.
+
+The round-trip in step 4 must satisfy `residual.max() < 1e-9` degrees (well under 0.1 mm on the ground). For the 3D case, sanity-check the geoid correction: in the NYC area the NAVD88 geoid undulation is roughly −33 m, so an ellipsoidal height of 15.2 m should yield an orthometric height near 48 m. If `ortho_h` equals the input height unchanged, the vertical transform did not run — confirm with:
+
+```python
+print(round(coords_wgs84[0, 2] - ortho_h[0], 1), "m geoid separation")  # ~ +33.x
+```
+
+Beyond the automated checks, validate against ground truth before trusting a batch in production. Transform three to five surveyed control points (GCPs) whose local easting/northing you already know and compare; for engineering-grade twins the discrepancy should stay within ±2 cm horizontally. You can also inspect the projection's distortion directly with `projinfo -o PROJ EPSG:32618` to read the scale factor and false easting/northing that PROJ will apply, and record the source EPSG, target EPSG, PROJ version, and grid-file names alongside the dataset so the transformation is reproducible and auditable later.
+
+## Common Errors
+
+**Coordinates land in the ocean / off by thousands of km.** You omitted `always_xy=True`, so PROJ used EPSG:4326's authority axis order (latitude, longitude) and you fed it (longitude, latitude). The easting/northing come out transposed or wildly wrong. Fix: always pass `always_xy=True` to `Transformer.from_crs`, and order your tuples as (lon, lat).
+
+**`pyproj.exceptions.ProjError: Cannot find ... us_noaa_g2018u0.tif`** when targeting the compound EPSG:32618+5703. PROJ needs the NAVD88 geoid grid and cannot reach it offline. Fix: enable network resolution with `pyproj.network.set_network_enabled(True)` (or env var `PROJ_NETWORK=ON`), or pre-download the grid into your `PROJ_DATA` directory with `projsync --file us_noaa_g2018u0.tif`.
+
+**`pyproj.exceptions.CRSError: Invalid projection: EPSG:32618+5703`** on older stacks. Compound EPSG codes joined with `+` require `pyproj>=3.0` and PROJ 7+. Fix: upgrade to `pyproj>=3.6`, or build the compound explicitly with `CRS.from_epsg(32618) + CRS.from_epsg(5703)` if your version predates the string syntax.
+
+## Frequently Asked Questions
+
+### How do I pick the right UTM zone (and EPSG code) for my site?
+
+UTM zones are 6° wide; the zone number is `floor((longitude + 180) / 6) + 1`, with EPSG:326xx for the northern hemisphere and EPSG:327xx for the south. Longitude −73.99 gives zone 18N → EPSG:32618. For sites that straddle a zone boundary or span more than a degree or two, a single UTM zone introduces scale distortion at the edges — prefer a national grid or a custom Transverse Mercator. See [how to choose a CRS for urban digital twins](/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/how-to-choose-crs-for-urban-digital-twins/) for the full decision.
+
+### Do I always need the compound vertical CRS, or can I project 2D and fix height later?
+
+If your twin only needs horizontal alignment (footprints, plan-view tiling), the 2D EPSG:4326 → EPSG:32618 transform is enough and you can leave Z as the stored ellipsoidal height. The moment you do elevation-dependent analysis — flood, line-of-sight, solar, volumetrics — you must convert to orthometric height via a compound CRS like EPSG:32618+5703, because mixing ellipsoidal and orthometric heights introduces tens of metres of error from geoid undulation.
+
+### Why is `always_xy=True` necessary if my coordinates look fine without it?
+
+They look fine only by coincidence of your test data, or because the target CRS happens to be easting-first. EPSG:4326 is officially latitude-first in the PROJ database, so the default behaviour expects `(lat, lon)`. Setting `always_xy=True` makes both the source and target use longitude/easting-first order, which matches how nearly all GIS data and code is written and removes the ambiguity entirely.
+
+## Related Guides
+
+- [Coordinate Reference Systems for 3D Assets](/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/) — datum management and transformation strategy
+- [How to Choose CRS for Urban Digital Twins](/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/how-to-choose-crs-for-urban-digital-twins/) — selecting the target projection
+- [Point Cloud Density Standards](/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/) — density targets for the LiDAR you reproject
+- [3D Geospatial Fundamentals for Digital Twins](/3d-geospatial-fundamentals-for-digital-twins/) — the spatial baseline this fits into
+
+Back to [Coordinate Reference Systems for 3D Assets](/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/).

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 
   <title>Fixing Non-Manifold Edges in 3D Meshes — 3D Geospatial</title>
-  <meta name="description" content="Fix non-manifold edges in 3D meshes: detect T-junctions and &gt;2-face sharing, classify violations, and apply tolerance-aware topological repair for digital twins.">
+  <meta name="description" content="Detect and repair non-manifold edges (edges shared by !=2 faces) in 3D meshes with trimesh and open3d, then re-validate with the Euler V-E+F invariant.">
   <meta name="keywords" content="3D geospatial, digital twin, point cloud, mesh pipeline, LOD, 3D Tiles, Cesium, PDAL, Open3D, Python, CI/CD">
   <meta name="author" content="3D Geospatial &amp; Digital Twin Automation">
   <meta name="theme-color" content="#1f6b8a">
@@ -38,7 +38,7 @@
   
   <meta property="og:type" content="article">
   <meta property="og:title" content="Fixing Non-Manifold Edges in 3D Meshes — 3D Geospatial">
-  <meta property="og:description" content="Fix non-manifold edges in 3D meshes: detect T-junctions and &gt;2-face sharing, classify violations, and apply tolerance-aware topological repair for digital twins.">
+  <meta property="og:description" content="Detect and repair non-manifold edges (edges shared by !=2 faces) in 3D meshes with trimesh and open3d, then re-validate with the Euler V-E+F invariant.">
   <meta property="og:url" content="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/fixing-non-manifold-edges-in-3d-meshes/">
   <meta property="og:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
   <meta property="og:image:width" content="1200">
@@ -47,23 +47,23 @@
   <meta property="og:site_name" content="3D Geospatial &amp; Digital Twin Automation">
   <meta property="og:locale" content="en_US">
   
-  <meta property="article:published_time" content="2026-06-02T12:51:35.821Z">
-  <meta property="article:modified_time" content="2026-06-02T12:51:35.821Z">
+  <meta property="article:published_time" content="2026-06-21T13:18:57.268Z">
+  <meta property="article:modified_time" content="2026-06-21T13:18:57.268Z">
   <meta property="article:publisher" content="https://www.3d-geospatial.com/">
   
 
   
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Fixing Non-Manifold Edges in 3D Meshes — 3D Geospatial">
-  <meta name="twitter:description" content="Fix non-manifold edges in 3D meshes: detect T-junctions and &gt;2-face sharing, classify violations, and apply tolerance-aware topological repair for digital twins.">
+  <meta name="twitter:description" content="Detect and repair non-manifold edges (edges shared by !=2 faces) in 3D meshes with trimesh and open3d, then re-validate with the Euler V-E+F invariant.">
   <meta name="twitter:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
   <meta name="twitter:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
 
   
-  <link rel="preload" href="/assets/css/styles.css?v=059cbae548" as="style">
+  <link rel="preload" href="/assets/css/styles.css?v=b928bf35e6" as="style">
   
 
-  <link rel="stylesheet" href="/assets/css/styles.css?v=059cbae548">
+  <link rel="stylesheet" href="/assets/css/styles.css?v=b928bf35e6">
 
   
   <script type="application/ld+json">
@@ -101,12 +101,12 @@
       },
       "headline": "Fixing Non-Manifold Edges in 3D Meshes",
       "name": "Fixing Non-Manifold Edges in 3D Meshes",
-      "description": "Fix non-manifold edges in 3D meshes: detect T-junctions and >2-face sharing, classify violations, and apply tolerance-aware topological repair for digital twins.",
+      "description": "Detect and repair non-manifold edges (edges shared by !=2 faces) in 3D meshes with trimesh and open3d, then re-validate with the Euler V-E+F invariant.",
       "url": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/fixing-non-manifold-edges-in-3d-meshes/",
       "mainEntityOfPage": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/fixing-non-manifold-edges-in-3d-meshes/",
       "inLanguage": "en",
-      "datePublished": "2026-06-02T12:51:35.821Z",
-      "dateModified": "2026-06-02T12:51:35.821Z",
+      "datePublished": "2026-06-21T13:18:57.268Z",
+      "dateModified": "2026-06-21T13:18:57.268Z",
       "author": {
         "@id": "https://www.3d-geospatial.com/#organization"
       },
@@ -255,91 +255,157 @@
   <div class="content-page">
     <article class="article">
       <h1 id="fixing-non-manifold-edges-in-3d-meshes" tabindex="-1"><a class="heading-link" href="#fixing-non-manifold-edges-in-3d-meshes"><span>Fixing non-manifold edges in 3D meshes</span></a></h1>
-<p>Fixing non-manifold edges in 3D meshes requires isolating edges shared by more than two faces or vertices with inconsistent adjacency, then applying deterministic topological surgery. The standard repair sequence is: (1) detect defects via adjacency graph traversal, (2) classify the violation (T-junctions, &gt;2-face sharing, dangling faces, or zero-thickness shells), and (3) apply tolerance-aware repair that preserves coordinate precision while enforcing manifold topology. In geospatial and digital twin workflows, non-manifold geometry breaks watertight validation, prevents accurate volumetric analysis, and causes silent failures in spatial indexing and physics simulation.</p>
-<h2 id="why-non-manifold-edges-break-geospatial-pipelines" tabindex="-1"><a class="heading-link" href="#why-non-manifold-edges-break-geospatial-pipelines"><span>Why Non-Manifold Edges Break Geospatial Pipelines</span></a></h2>
-<p>Digital twin automation relies on predictable Euler characteristics (<code>V - E + F = 2</code> for closed genus-0 meshes). Non-manifold edges violate this invariant by introducing ambiguous surface normals, undefined interior/exterior boundaries, and broken half-edge traversals. When municipal GIS teams merge LiDAR-derived meshes, CAD exports, and photogrammetry tiles, coordinate rounding and overlapping boundaries routinely generate T-junctions and multi-face edges. These defects propagate through spatial databases, causing invalid CityGML topology, failed Boolean operations, and incorrect shadow casting.</p>
-<p>Reviewing <a href="/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics</a> clarifies how half-edge data structures and manifold constraints dictate which algorithmic approaches preserve spatial accuracy versus those that introduce geometric distortion. Automated repair must prioritize conservative face deletion over aggressive hole-filling to avoid generating phantom geometry that misrepresents real-world infrastructure.</p>
-<h2 id="detection-classification-workflow" tabindex="-1"><a class="heading-link" href="#detection-classification-workflow"><span>Detection &amp; Classification Workflow</span></a></h2>
-<p>Before applying automated fixes, classify the defect type to select the appropriate repair strategy:</p>
+<p>Fixing non-manifold edges in 3D meshes means finding every edge that is shared by a number of faces other than exactly two — the formal manifold rule is that each interior edge belongs to precisely two faces — and then merging, splitting, or removing the offending geometry until the count is exactly two everywhere. This page walks through detecting those edges with <code>trimesh</code> and <code>open3d</code>, repairing them with <code>numpy</code>-driven topological surgery, and re-validating the result with <code>is_watertight</code> and the Euler characteristic <code>V − E + F</code>.</p>
+<p>You hit non-manifold edges constantly when assembling a digital twin from heterogeneous sources: LiDAR-derived surfaces stitched against CAD exports, photogrammetry tiles meeting at a shared boundary, or two building shells fused at a wall. Wherever three faces collapse onto one edge — or a single dangling face leaves an edge with only one — the mesh stops being a clean two-sided surface. The root cause is almost always coordinate rounding and overlapping boundaries: when two tiles in EPSG:32618 are clipped along a shared seam, vertices that are nominally identical land a few microns apart, and a third face welds to the same edge instead of pairing cleanly with the second.</p>
+<p>That single defect breaks watertightness, so <code>is_watertight</code> returns <code>False</code>; it makes Boolean operations (union, difference for footprint clipping) produce garbage because the algorithm cannot decide which side of the surface is interior; it crashes slicers when you 3D-print a model for fabrication review; and it leaves CityGML LOD2 ingestion rejecting the geometry outright, since the OGC schema requires manifold solids for building volumes. Downstream, the same ambiguity corrupts ray-casting for shadow and line-of-sight analysis, because a ray crossing a triple-shared edge has no well-defined entry or exit. The fix is cheap at mesh time and expensive once the twin is in production, so it belongs in your ingestion gate, not your incident backlog.</p>
+<figure class="diagram">
+<svg viewBox="0 0 520 260" role="img" aria-labelledby="nme-t nme-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="nme-t">A non-manifold edge shared by three faces</title>
+  <desc id="nme-d">A manifold edge on the left is shared by exactly two faces, while a non-manifold edge on the right has a third face joined along the same edge, making it shared by three faces.</desc>
+  <defs>
+    <marker id="nme-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
+    </marker>
+  </defs>
+  <polygon points="60,40 60,180 150,150 150,70" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <polygon points="60,40 60,180 -30,150 -30,70" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2" transform="translate(120,0)"/>
+  <line x1="60" y1="40" x2="60" y2="180" stroke="#1f2937" stroke-width="4"/>
+  <polygon points="370,40 370,180 460,150 460,70" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <polygon points="370,40 370,180 280,150 280,70" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <polygon points="370,40 370,180 420,250 420,110" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <line x1="370" y1="40" x2="370" y2="180" stroke="#c46a3d" stroke-width="4"/>
+  <text x="148" y="215" fill="#1f2937" font-size="13" text-anchor="middle">Manifold: edge in 2 faces</text>
+  <text x="370" y="30" fill="#1f2937" font-size="13" text-anchor="middle">Non-manifold: edge in 3 faces</text>
+</svg>
+<figcaption>Left: a clean edge shared by exactly two faces. Right: a third face joined along the same edge raises the shared-face count to three, violating the manifold rule.</figcaption>
+</figure>
+<p>This guide sits under <a href="/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics</a>, which covers the half-edge data structures and manifold constraints these repairs rely on.</p>
+<h2 id="prerequisites" tabindex="-1"><a class="heading-link" href="#prerequisites"><span>Prerequisites</span></a></h2>
+<p>You need Python 3.10+ and the following packages, pinned to versions whose APIs match the snippets below:</p>
+<div class="codeblock" data-lang="bash"><div class="codeblock__bar"><span class="codeblock__lang">bash</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-bash" tabindex="0" role="group" aria-label="bash code sample"><code class="language-bash">pip <span class="token function">install</span> <span class="token string">"trimesh==4.4.*"</span> <span class="token string">"open3d==0.18.*"</span> <span class="token string">"numpy>=1.26,&lt;2.1"</span>
+</code></pre></div>
+<p>Inputs and assumptions:</p>
 <ul>
-<li><strong>T-junctions:</strong> A vertex lies on an edge but isn’t shared by adjacent faces. Resolved via vertex merging.</li>
-<li><strong>Non-manifold edges:</strong> Three or more faces share a single edge. Requires edge splitting or conservative face removal.</li>
-<li><strong>Non-manifold vertices:</strong> Faces meet at a vertex but don’t form a single disk topology. Often indicates overlapping shells.</li>
-<li><strong>Zero-thickness shells:</strong> Two coplanar faces share an edge but point in opposite directions, creating an internal void. Detected via normal inversion checks.</li>
+<li>A triangle mesh in <code>.ply</code>, <code>.obj</code>, or <code>.stl</code> — the routines assume triangulated faces (quads must be triangulated first with <code>mesh.triangulate()</code> or an upstream step).</li>
+<li>The mesh carries projected, metric coordinates (for example UTM zone 18N, EPSG:32618). Large eastings/northings (hundreds of thousands of metres) lose precision when hashed as float32, so plan to subtract a <code>crs_offset</code> before repair and add it back afterward.</li>
+<li>Vertical heights are orthometric in EPSG:32618+5703 if you care about volumetrics, but topology repair itself is CRS-agnostic once coordinates are metric and origin-shifted.</li>
 </ul>
-<p>Detection relies on building an edge-to-face adjacency map. Edges with <code>count != 2</code> or vertices with disconnected face loops are flagged. The <a href="https://www.ogc.org/standard/citygml/">OGC CityGML 3.0 Specification</a> explicitly requires manifold geometry for Level of Detail (LOD) 2+ building models, making automated validation mandatory before database ingestion.</p>
-<h2 id="programmatic-repair-with-python-trimesh" tabindex="-1"><a class="heading-link" href="#programmatic-repair-with-python-trimesh"><span>Programmatic Repair with Python &amp; trimesh</span></a></h2>
-<p>The following routine uses <code>trimesh</code> to detect, isolate, and conservatively repair non-manifold edges while maintaining geospatial coordinate fidelity. It prioritizes vertex merging and degenerate face removal before applying targeted face deletion for persistent violations.</p>
+<h2 id="step-by-step" tabindex="-1"><a class="heading-link" href="#step-by-step"><span>Step-by-Step</span></a></h2>
+<h3 id="1-detect-non-manifold-edges-by-counting-face-adjacency" tabindex="-1"><a class="heading-link" href="#1-detect-non-manifold-edges-by-counting-face-adjacency"><span>1. Detect non-manifold edges by counting face adjacency</span></a></h3>
+<p>The definition is mechanical: build the edge-to-face map, count faces per edge, and flag every edge whose count is not 2. <code>trimesh</code> exposes the raw <code>(3 * n_faces, 2)</code> edge array; sorting each edge’s vertex pair makes opposite-direction half-edges hash identically.</p>
 <div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> trimesh
 <span class="token keyword">import</span> numpy <span class="token keyword">as</span> np
 
-<span class="token keyword">def</span> <span class="token function">fix_non_manifold_edges</span><span class="token punctuation">(</span>input_path<span class="token punctuation">,</span> output_path<span class="token punctuation">,</span> merge_tol<span class="token operator">=</span><span class="token number">1e-4</span><span class="token punctuation">,</span> crs_offset<span class="token operator">=</span><span class="token boolean">None</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
-    <span class="token triple-quoted-string string">"""
-    Detects and repairs non-manifold edges in 3D meshes.
-    Returns a watertight, manifold mesh suitable for digital twin ingestion.
-    """</span>
-    <span class="token comment"># Load without automatic processing to preserve raw topology</span>
-    mesh <span class="token operator">=</span> trimesh<span class="token punctuation">.</span>load<span class="token punctuation">(</span>input_path<span class="token punctuation">,</span> force<span class="token operator">=</span><span class="token string">'mesh'</span><span class="token punctuation">,</span> process<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">)</span>
-    
-    <span class="token comment"># Shift large GIS coordinates to origin to avoid float32 precision loss</span>
-    <span class="token keyword">if</span> crs_offset <span class="token keyword">is</span> <span class="token keyword">not</span> <span class="token boolean">None</span><span class="token punctuation">:</span>
-        mesh<span class="token punctuation">.</span>vertices <span class="token operator">-=</span> crs_offset
-        
-    <span class="token comment"># 1. Merge near-identical vertices (resolves ~70% of T-junctions)</span>
-    mesh<span class="token punctuation">.</span>merge_vertices<span class="token punctuation">(</span><span class="token punctuation">)</span>
-    
-    <span class="token comment"># 2. Remove zero-area/degenerate faces</span>
-    mesh<span class="token punctuation">.</span>update_faces<span class="token punctuation">(</span>mesh<span class="token punctuation">.</span>nondegenerate_faces<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
-    
-    <span class="token comment"># 3. Identify non-manifold edges via unique edge-face mapping</span>
-    <span class="token comment"># mesh.edges returns an (N_faces * 3, 2) array</span>
-    edges <span class="token operator">=</span> mesh<span class="token punctuation">.</span>edges
-    sorted_edges <span class="token operator">=</span> np<span class="token punctuation">.</span>sort<span class="token punctuation">(</span>edges<span class="token punctuation">,</span> axis<span class="token operator">=</span><span class="token number">1</span><span class="token punctuation">)</span>
-    unique_edges<span class="token punctuation">,</span> inverse <span class="token operator">=</span> np<span class="token punctuation">.</span>unique<span class="token punctuation">(</span>sorted_edges<span class="token punctuation">,</span> axis<span class="token operator">=</span><span class="token number">0</span><span class="token punctuation">,</span> return_inverse<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
-    
-    <span class="token comment"># Count how many faces share each unique edge</span>
-    edge_counts <span class="token operator">=</span> np<span class="token punctuation">.</span>bincount<span class="token punctuation">(</span>inverse<span class="token punctuation">)</span>
-    
-    <span class="token comment"># Edges shared by != 2 faces violate manifold topology</span>
-    non_manifold_mask <span class="token operator">=</span> edge_counts <span class="token operator">!=</span> <span class="token number">2</span>
-    non_manifold_ids <span class="token operator">=</span> np<span class="token punctuation">.</span>where<span class="token punctuation">(</span>non_manifold_mask<span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span>
-    
-    <span class="token keyword">if</span> <span class="token builtin">len</span><span class="token punctuation">(</span>non_manifold_ids<span class="token punctuation">)</span> <span class="token operator">></span> <span class="token number">0</span><span class="token punctuation">:</span>
-        <span class="token comment"># Map back to original edge array indices</span>
-        bad_edge_indices <span class="token operator">=</span> np<span class="token punctuation">.</span>where<span class="token punctuation">(</span>np<span class="token punctuation">.</span>isin<span class="token punctuation">(</span>inverse<span class="token punctuation">,</span> non_manifold_ids<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span>
-        <span class="token comment"># Convert edge-array indices to face indices (3 edges per face)</span>
-        bad_face_indices <span class="token operator">=</span> np<span class="token punctuation">.</span>unique<span class="token punctuation">(</span>bad_edge_indices <span class="token operator">//</span> <span class="token number">3</span><span class="token punctuation">)</span>
-        
-        <span class="token comment"># Conservative deletion: remove offending faces to restore manifold topology</span>
-        valid_mask <span class="token operator">=</span> np<span class="token punctuation">.</span>ones<span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>mesh<span class="token punctuation">.</span>faces<span class="token punctuation">)</span><span class="token punctuation">,</span> dtype<span class="token operator">=</span><span class="token builtin">bool</span><span class="token punctuation">)</span>
-        valid_mask<span class="token punctuation">[</span>bad_face_indices<span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token boolean">False</span>
-        mesh<span class="token punctuation">.</span>update_faces<span class="token punctuation">(</span>valid_mask<span class="token punctuation">)</span>
-        
-    <span class="token comment"># 4. Final topology cleanup</span>
-    mesh<span class="token punctuation">.</span>update_faces<span class="token punctuation">(</span>mesh<span class="token punctuation">.</span>unique_faces<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
-    mesh<span class="token punctuation">.</span>fix_normals<span class="token punctuation">(</span><span class="token punctuation">)</span>
-    
-    <span class="token comment"># Restore original coordinates</span>
-    <span class="token keyword">if</span> crs_offset <span class="token keyword">is</span> <span class="token keyword">not</span> <span class="token boolean">None</span><span class="token punctuation">:</span>
-        mesh<span class="token punctuation">.</span>vertices <span class="token operator">+=</span> crs_offset
-        
-    mesh<span class="token punctuation">.</span>export<span class="token punctuation">(</span>output_path<span class="token punctuation">)</span>
-    <span class="token keyword">return</span> mesh<span class="token punctuation">.</span>is_watertight
+mesh <span class="token operator">=</span> trimesh<span class="token punctuation">.</span>load<span class="token punctuation">(</span><span class="token string">"building_block.ply"</span><span class="token punctuation">,</span> force<span class="token operator">=</span><span class="token string">"mesh"</span><span class="token punctuation">,</span> process<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">)</span>
+
+<span class="token comment"># Shift large GIS coordinates to the origin to protect float precision.</span>
+crs_offset <span class="token operator">=</span> mesh<span class="token punctuation">.</span>vertices<span class="token punctuation">.</span>mean<span class="token punctuation">(</span>axis<span class="token operator">=</span><span class="token number">0</span><span class="token punctuation">)</span>
+mesh<span class="token punctuation">.</span>vertices <span class="token operator">-=</span> crs_offset
+
+sorted_edges <span class="token operator">=</span> np<span class="token punctuation">.</span>sort<span class="token punctuation">(</span>mesh<span class="token punctuation">.</span>edges<span class="token punctuation">,</span> axis<span class="token operator">=</span><span class="token number">1</span><span class="token punctuation">)</span>
+unique_edges<span class="token punctuation">,</span> inverse <span class="token operator">=</span> np<span class="token punctuation">.</span>unique<span class="token punctuation">(</span>sorted_edges<span class="token punctuation">,</span> axis<span class="token operator">=</span><span class="token number">0</span><span class="token punctuation">,</span> return_inverse<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+edge_counts <span class="token operator">=</span> np<span class="token punctuation">.</span>bincount<span class="token punctuation">(</span>inverse<span class="token punctuation">)</span>
+
+non_manifold <span class="token operator">=</span> unique_edges<span class="token punctuation">[</span>edge_counts <span class="token operator">!=</span> <span class="token number">2</span><span class="token punctuation">]</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"non-manifold edges: </span><span class="token interpolation"><span class="token punctuation">{</span><span class="token builtin">len</span><span class="token punctuation">(</span>non_manifold<span class="token punctuation">)</span><span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"  boundary (1 face): </span><span class="token interpolation"><span class="token punctuation">{</span><span class="token punctuation">(</span>edge_counts <span class="token operator">==</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"  over-shared (>2):  </span><span class="token interpolation"><span class="token punctuation">{</span><span class="token punctuation">(</span>edge_counts <span class="token operator">></span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
 </code></pre></div>
-<h3 id="key-implementation-notes" tabindex="-1"><a class="heading-link" href="#key-implementation-notes"><span>Key Implementation Notes</span></a></h3>
+<p>Edges with count 1 are open boundaries (holes or dangling faces); edges with count <code>&gt;2</code> are the classic non-manifold over-sharing the diagram shows. Both must reach exactly 2 before the mesh is watertight.</p>
+<h3 id="2-merge-coincident-vertices-and-drop-degenerate-faces" tabindex="-1"><a class="heading-link" href="#2-merge-coincident-vertices-and-drop-degenerate-faces"><span>2. Merge coincident vertices and drop degenerate faces</span></a></h3>
+<p>The most common cause of phantom non-manifold edges is duplicate vertices: two faces that <em>look</em> like they share an edge actually reference different vertex indices at the same coordinate, so the adjacency map never pairs them. <code>merge_vertices()</code> welds vertices within a tolerance, collapsing those duplicates. Removing zero-area (degenerate) faces eliminates edges that exist only because of a sliver triangle.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python">mesh<span class="token punctuation">.</span>merge_vertices<span class="token punctuation">(</span>digits_vertex<span class="token operator">=</span><span class="token number">5</span><span class="token punctuation">)</span>          <span class="token comment"># weld near-coincident vertices</span>
+mesh<span class="token punctuation">.</span>update_faces<span class="token punctuation">(</span>mesh<span class="token punctuation">.</span>nondegenerate_faces<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token comment"># drop zero-area slivers</span>
+
+sorted_edges <span class="token operator">=</span> np<span class="token punctuation">.</span>sort<span class="token punctuation">(</span>mesh<span class="token punctuation">.</span>edges<span class="token punctuation">,</span> axis<span class="token operator">=</span><span class="token number">1</span><span class="token punctuation">)</span>
+_<span class="token punctuation">,</span> inverse <span class="token operator">=</span> np<span class="token punctuation">.</span>unique<span class="token punctuation">(</span>sorted_edges<span class="token punctuation">,</span> axis<span class="token operator">=</span><span class="token number">0</span><span class="token punctuation">,</span> return_inverse<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"remaining non-manifold:"</span><span class="token punctuation">,</span> <span class="token punctuation">(</span>np<span class="token punctuation">.</span>bincount<span class="token punctuation">(</span>inverse<span class="token punctuation">)</span> <span class="token operator">!=</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>In typical photogrammetry-meets-CAD merges this step alone resolves the majority of defects, because most were T-junctions and split seams rather than true triple-shared edges.</p>
+<h3 id="3-remove-duplicate-faces-and-conservatively-delete-true-over-sharing" tabindex="-1"><a class="heading-link" href="#3-remove-duplicate-faces-and-conservatively-delete-true-over-sharing"><span>3. Remove duplicate faces and conservatively delete true over-sharing</span></a></h3>
+<p>Duplicate faces — the same triangle stored twice, common after a naive shell union — push an edge’s count to 3 or 4. Drop them first with <code>unique_faces()</code>. For edges still shared by more than two faces, conservative face deletion guarantees manifold validity at the cost of a little surface area, which is acceptable for geospatial bounding volumes.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python">mesh<span class="token punctuation">.</span>update_faces<span class="token punctuation">(</span>mesh<span class="token punctuation">.</span>unique_faces<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>        <span class="token comment"># remove exact duplicate triangles</span>
+
+sorted_edges <span class="token operator">=</span> np<span class="token punctuation">.</span>sort<span class="token punctuation">(</span>mesh<span class="token punctuation">.</span>edges<span class="token punctuation">,</span> axis<span class="token operator">=</span><span class="token number">1</span><span class="token punctuation">)</span>
+unique_edges<span class="token punctuation">,</span> inverse <span class="token operator">=</span> np<span class="token punctuation">.</span>unique<span class="token punctuation">(</span>sorted_edges<span class="token punctuation">,</span> axis<span class="token operator">=</span><span class="token number">0</span><span class="token punctuation">,</span> return_inverse<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+edge_counts <span class="token operator">=</span> np<span class="token punctuation">.</span>bincount<span class="token punctuation">(</span>inverse<span class="token punctuation">)</span>
+
+over_shared <span class="token operator">=</span> np<span class="token punctuation">.</span>where<span class="token punctuation">(</span>edge_counts <span class="token operator">></span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span>
+<span class="token keyword">if</span> <span class="token builtin">len</span><span class="token punctuation">(</span>over_shared<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    bad_edge_rows <span class="token operator">=</span> np<span class="token punctuation">.</span>where<span class="token punctuation">(</span>np<span class="token punctuation">.</span>isin<span class="token punctuation">(</span>inverse<span class="token punctuation">,</span> over_shared<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span>
+    bad_faces <span class="token operator">=</span> np<span class="token punctuation">.</span>unique<span class="token punctuation">(</span>bad_edge_rows <span class="token operator">//</span> <span class="token number">3</span><span class="token punctuation">)</span>  <span class="token comment"># 3 edges per face</span>
+    keep <span class="token operator">=</span> np<span class="token punctuation">.</span>ones<span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>mesh<span class="token punctuation">.</span>faces<span class="token punctuation">)</span><span class="token punctuation">,</span> dtype<span class="token operator">=</span><span class="token builtin">bool</span><span class="token punctuation">)</span>
+    keep<span class="token punctuation">[</span>bad_faces<span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token boolean">False</span>
+    mesh<span class="token punctuation">.</span>update_faces<span class="token punctuation">(</span>keep<span class="token punctuation">)</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"removed </span><span class="token interpolation"><span class="token punctuation">{</span><span class="token builtin">len</span><span class="token punctuation">(</span>bad_faces<span class="token punctuation">)</span><span class="token punctuation">}</span></span><span class="token string"> faces on over-shared edges"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<h3 id="4-fill-the-resulting-boundary-holes" tabindex="-1"><a class="heading-link" href="#4-fill-the-resulting-boundary-holes"><span>4. Fill the resulting boundary holes</span></a></h3>
+<p>Deleting faces (and any pre-existing dangling triangles) leaves count-1 boundary edges. <code>trimesh.repair</code> fills small holes by triangulating their loops; combined with consistent normal orientation this restores the closed surface.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python">trimesh<span class="token punctuation">.</span>repair<span class="token punctuation">.</span>fill_holes<span class="token punctuation">(</span>mesh<span class="token punctuation">)</span>
+trimesh<span class="token punctuation">.</span>repair<span class="token punctuation">.</span>fix_normals<span class="token punctuation">(</span>mesh<span class="token punctuation">)</span>              <span class="token comment"># outward-facing, winding-consistent</span>
+
+mesh<span class="token punctuation">.</span>vertices <span class="token operator">+=</span> crs_offset                    <span class="token comment"># restore real-world coordinates</span>
+</code></pre></div>
+<p>Only fill holes whose area is below a sane threshold (for example <code>&lt; 0.5 m²</code> for a building footprint). A gaping hole signals missing input data, not a topology defect, and triangulating it fabricates geometry that misrepresents the real asset.</p>
+<h3 id="5-re-validate-with-the-euler-characteristic-v-e-f" tabindex="-1"><a class="heading-link" href="#5-re-validate-with-the-euler-characteristic-v-e-f"><span>5. Re-validate with the Euler characteristic V − E + F</span></a></h3>
+<p>A closed, genus-0 manifold satisfies <code>V − E + F = 2</code>. Computing it from the deduplicated edge set is an independent check that no over-sharing survived — <code>is_watertight</code> can be fooled by some pathologies, but the Euler count cannot be if you build it from unique edges.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python">V <span class="token operator">=</span> <span class="token builtin">len</span><span class="token punctuation">(</span>mesh<span class="token punctuation">.</span>vertices<span class="token punctuation">)</span>
+F <span class="token operator">=</span> <span class="token builtin">len</span><span class="token punctuation">(</span>mesh<span class="token punctuation">.</span>faces<span class="token punctuation">)</span>
+E <span class="token operator">=</span> <span class="token builtin">len</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>unique<span class="token punctuation">(</span>np<span class="token punctuation">.</span>sort<span class="token punctuation">(</span>mesh<span class="token punctuation">.</span>edges<span class="token punctuation">,</span> axis<span class="token operator">=</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span> axis<span class="token operator">=</span><span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+euler <span class="token operator">=</span> V <span class="token operator">-</span> E <span class="token operator">+</span> F
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"V=</span><span class="token interpolation"><span class="token punctuation">{</span>V<span class="token punctuation">}</span></span><span class="token string"> E=</span><span class="token interpolation"><span class="token punctuation">{</span>E<span class="token punctuation">}</span></span><span class="token string"> F=</span><span class="token interpolation"><span class="token punctuation">{</span>F<span class="token punctuation">}</span></span><span class="token string">  ->  V-E+F = </span><span class="token interpolation"><span class="token punctuation">{</span>euler<span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+<span class="token keyword">assert</span> euler <span class="token operator">==</span> <span class="token number">2</span><span class="token punctuation">,</span> <span class="token string-interpolation"><span class="token string">f"expected Euler 2 for closed genus-0, got </span><span class="token interpolation"><span class="token punctuation">{</span>euler<span class="token punctuation">}</span></span><span class="token string">"</span></span>
+mesh<span class="token punctuation">.</span>export<span class="token punctuation">(</span><span class="token string">"building_block_repaired.ply"</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>A cross-check in <code>open3d</code> is worth running for a second opinion, since it computes non-manifold edges with an independent half-edge implementation:</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> open3d <span class="token keyword">as</span> o3d
+
+m <span class="token operator">=</span> o3d<span class="token punctuation">.</span>io<span class="token punctuation">.</span>read_triangle_mesh<span class="token punctuation">(</span><span class="token string">"building_block_repaired.ply"</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"non-manifold edges:"</span><span class="token punctuation">,</span> <span class="token builtin">len</span><span class="token punctuation">(</span>m<span class="token punctuation">.</span>get_non_manifold_edges<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"watertight:"</span><span class="token punctuation">,</span> m<span class="token punctuation">.</span>is_watertight<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<h2 id="expected-output-verification" tabindex="-1"><a class="heading-link" href="#expected-output-verification"><span>Expected Output &amp; Verification</span></a></h2>
+<p>Running the full sequence on a defective building shell produces something like this:</p>
+<div class="codeblock" data-lang="text"><div class="codeblock__bar"><span class="codeblock__lang">text</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-text" tabindex="0" role="group" aria-label="text code sample"><code class="language-text">non-manifold edges: 47
+  boundary (1 face): 12
+  over-shared (>2):  35
+remaining non-manifold: 8
+removed 8 faces on over-shared edges
+V=2184 E=6546 F=4364  ->  V-E+F = 2
+non-manifold edges: 0
+watertight: True
+</code></pre></div>
+<p>The pass criteria are unambiguous:</p>
 <ul>
-<li><strong>CRS Offset Handling:</strong> Large UTM coordinates cause floating-point precision loss during adjacency hashing. Shifting to the origin before repair and restoring afterward prevents vertex snapping artifacts.</li>
-<li><strong>Conservative Deletion:</strong> The script removes faces attached to non-manifold edges rather than attempting to split them. This guarantees topological validity at the cost of minor surface area loss, which is acceptable for geospatial bounding volumes.</li>
-<li><strong>Modern <code>trimesh</code> API:</strong> <code>mesh.nondegenerate_faces()</code> and <code>mesh.unique_faces()</code> produce boolean masks that you feed into <code>mesh.update_faces(...)</code>, replacing the older <code>remove_degenerate_faces()</code> and <code>remove_duplicate_faces()</code> calls. See the <a href="https://trimesh.org/trimesh.repair.html">trimesh Repair Documentation</a> for version-specific method signatures.</li>
+<li><code>len(mesh.get_non_manifold_edges()) == 0</code> in <code>open3d</code>, and <code>(np.bincount(inverse) != 2).sum() == 0</code> in <code>trimesh</code>.</li>
+<li><code>mesh.is_watertight</code> is <code>True</code>.</li>
+<li><code>V − E + F == 2</code> for a single closed genus-0 shell (for a model with <code>h</code> handles/tunnels the target is <code>2 − 2h</code>, so a torus correctly yields 0).</li>
 </ul>
-<h2 id="validation-post-repair-checks" tabindex="-1"><a class="heading-link" href="#validation-post-repair-checks"><span>Validation &amp; Post-Repair Checks</span></a></h2>
-<p>After running the repair routine, validate the output before pipeline ingestion:</p>
-<ol>
-<li><strong>Watertight Verification:</strong> <code>mesh.is_watertight</code> must return <code>True</code>. If <code>False</code>, run <code>mesh.fill_holes()</code> only if the missing area is below a defined threshold (e.g., <code>&lt; 0.5 m²</code> for building footprints).</li>
-<li><strong>Normal Consistency:</strong> Run <code>mesh.fix_normals()</code> to ensure outward-facing orientation. Inconsistent normals break volumetric calculations and ray-casting in rendering engines.</li>
-<li><strong>Coordinate Integrity:</strong> Verify that the restored CRS offset matches the original bounding box within <code>±1e-6</code> tolerance. Drift indicates precision loss during vertex merging.</li>
-</ol>
-<p>For production digital twin pipelines, wrap this routine in a validation loop that retries with tighter merge tolerances (<code>1e-5</code> → <code>1e-6</code>) if watertightness fails. Always log defect counts pre- and post-repair for audit trails. Understanding <a href="/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals for Digital Twins</a> ensures repair thresholds align with municipal accuracy standards and downstream simulation requirements.</p>
+<p>A compact assertion block you can drop straight into a CI gate:</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python">edges <span class="token operator">=</span> np<span class="token punctuation">.</span>sort<span class="token punctuation">(</span>mesh<span class="token punctuation">.</span>edges<span class="token punctuation">,</span> axis<span class="token operator">=</span><span class="token number">1</span><span class="token punctuation">)</span>
+counts <span class="token operator">=</span> np<span class="token punctuation">.</span>bincount<span class="token punctuation">(</span>np<span class="token punctuation">.</span>unique<span class="token punctuation">(</span>edges<span class="token punctuation">,</span> axis<span class="token operator">=</span><span class="token number">0</span><span class="token punctuation">,</span> return_inverse<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+<span class="token keyword">assert</span> <span class="token punctuation">(</span>counts <span class="token operator">!=</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token string">"non-manifold edges remain"</span>
+<span class="token keyword">assert</span> mesh<span class="token punctuation">.</span>is_watertight<span class="token punctuation">,</span> <span class="token string">"mesh is not watertight"</span>
+</code></pre></div>
+<h2 id="common-errors" tabindex="-1"><a class="heading-link" href="#common-errors"><span>Common Errors</span></a></h2>
+<p><strong><code>numpy.core._exceptions._ArrayMemoryError</code> (or vertices snapping together) on large UTM meshes.</strong> Coordinates like <code>(583204.71, 4507811.93, 41.2)</code> lose ~2–3 cm of precision in float32, so <code>merge_vertices()</code> either welds vertices that should stay separate or fails to weld true duplicates, leaving the non-manifold count stubbornly above zero. Fix: subtract <code>crs_offset = mesh.vertices.mean(axis=0)</code> before repair and add it back after export, exactly as in step 1.</p>
+<p><strong><code>AttributeError: 'Trimesh' object has no attribute 'remove_duplicate_faces'</code>.</strong> <code>trimesh</code> 4.x removed the old in-place <code>remove_duplicate_faces()</code> and <code>remove_degenerate_faces()</code> methods. Use the boolean-mask form instead: <code>mesh.update_faces(mesh.unique_faces())</code> and <code>mesh.update_faces(mesh.nondegenerate_faces())</code>.</p>
+<p><strong><code>is_watertight</code> stays <code>False</code> after <code>fill_holes</code>, even with zero non-manifold edges.</strong> This usually means non-manifold <em>vertices</em> — a bow-tie where two shells touch at a single point without sharing an edge. <code>fill_holes</code> cannot resolve these. Split the surface first with <code>mesh.split(only_watertight=False)</code>, repair each component, and recombine, or call <code>open3d</code>’s <code>remove_non_manifold_edges()</code> followed by <code>remove_unreferenced_vertices()</code>.</p>
+<h2 id="frequently-asked-questions" tabindex="-1"><a class="heading-link" href="#frequently-asked-questions"><span>Frequently Asked Questions</span></a></h2>
+<h3 id="why-count-faces-per-edge-instead-of-trusting-is_watertight" tabindex="-1"><a class="heading-link" href="#why-count-faces-per-edge-instead-of-trusting-is_watertight"><span>Why count faces per edge instead of trusting <code>is_watertight</code>?</span></a></h3>
+<p><code>is_watertight</code> answers a yes/no question and can be misled by certain non-manifold-vertex pathologies, whereas counting faces per unique edge tells you exactly how many edges are wrong and whether they are boundaries (count 1) or over-shared (count &gt;2). That breakdown drives which repair to apply — hole-filling versus face deletion — so the count is both the diagnosis and the verification.</p>
+<h3 id="should-i-delete-faces-or-split-the-edge-to-fix-over-sharing" tabindex="-1"><a class="heading-link" href="#should-i-delete-faces-or-split-the-edge-to-fix-over-sharing"><span>Should I delete faces or split the edge to fix over-sharing?</span></a></h3>
+<p>Edge splitting preserves surface area but can introduce new T-junctions and is hard to make deterministic across an automated pipeline. For digital twin bounding volumes, where minor area loss is irrelevant to volumetrics and analysis, conservative face deletion followed by <code>fill_holes</code> is the safer, reproducible choice. Reserve splitting for cases where every triangle is semantically meaningful, such as textured heritage models.</p>
+<h3 id="what-euler-value-should-an-open-or-multi-tunnel-mesh-have" tabindex="-1"><a class="heading-link" href="#what-euler-value-should-an-open-or-multi-tunnel-mesh-have"><span>What Euler value should an open or multi-tunnel mesh have?</span></a></h3>
+<p>The <code>V − E + F == 2</code> test assumes a single closed surface with no handles. An open surface (a terrain patch with a boundary) will not equal 2 and that is correct — use the non-manifold edge count, not Euler, to validate it. A closed surface with <code>h</code> tunnels satisfies <code>V − E + F = 2 − 2h</code>, so a single-handle (torus-like) shell yields 0. Confirm the expected genus before asserting a specific number.</p>
+<h2 id="related-guides" tabindex="-1"><a class="heading-link" href="#related-guides"><span>Related Guides</span></a></h2>
+<ul>
+<li><a href="/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics</a> — manifold rules, half-edge structures, and normal validation</li>
+<li><a href="/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/poisson-surface-reconstruction-parameters/">Poisson Surface Reconstruction Parameters</a> — generating meshes that need less repair</li>
+<li><a href="/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/">Automated Mesh Decimation for Digital Twins</a> — reducing triangle count after topology is clean</li>
+<li><a href="/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals for Digital Twins</a> — where mesh integrity fits in the wider ingestion contract</li>
+</ul>
+<p>Back to <a href="/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics for Digital Twins</a>.</p>
 
 
       

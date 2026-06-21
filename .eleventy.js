@@ -74,7 +74,9 @@ const defaultTableOpen = md.renderer.rules.table_open || function (tokens, idx, 
   return self.renderToken(tokens, idx, options);
 };
 md.renderer.rules.table_open = function (tokens, idx, options, env, self) {
-  return `<div class="table-wrap">` + defaultTableOpen(tokens, idx, options, env, self);
+  // tabindex makes the horizontal-scroll wrapper keyboard-accessible (WCAG
+  // scrollable-region-focusable) for wide tables that overflow on small screens.
+  return `<div class="table-wrap" tabindex="0" role="group" aria-label="Table, scroll horizontally to see more">` + defaultTableOpen(tokens, idx, options, env, self);
 };
 const defaultTableClose = md.renderer.rules.table_close || function (tokens, idx, options, env, self) {
   return self.renderToken(tokens, idx, options);

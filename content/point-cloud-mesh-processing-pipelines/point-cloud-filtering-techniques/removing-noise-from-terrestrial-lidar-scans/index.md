@@ -1,86 +1,171 @@
-# Removing Noise from Terrestrial LiDAR Scans: Production Pipeline & Tuning Guide
+# Removing Noise from Terrestrial LiDAR Scans
 
-**Removing noise from terrestrial LiDAR scans** requires a staged filtering pipeline that isolates sensor artifacts, atmospheric scatter, and multipath reflections before downstream mesh generation or digital twin ingestion. The most reliable production approach combines statistical outlier removal (SOR) with radius-based neighborhood filtering, followed by voxel grid downsampling to normalize point density. Implement this via Open3D or PDAL, ensuring coordinate reference system (CRS) integrity and preserving structural edges critical for infrastructure modeling. Avoid single-pass aggressive filters; they erase fine architectural details and degrade registration accuracy.
+Removing noise from terrestrial LiDAR (TLS) scans means stripping atmospheric scatter, multipath ghosts, and edge fringe out of a `.laz`/`.ply` scan with statistical outlier removal (SOR) and radius outlier removal in `open3d`, while keeping the surviving points in their original projected coordinate reference system. This page walks the exact `remove_statistical_outlier(nb_neighbors=sor_k, std_ratio=sor_std)` and `remove_radius_outlier` calls, how to load a scan with `laspy` so coordinates stay in metres, and how to verify that you retained a sane fraction of the original points instead of accidentally erasing real geometry.
 
-### Noise Taxonomy & Filtering Strategy
-Terrestrial laser scanners (TLS) generate three primary noise categories that require distinct handling:
-- **Atmospheric/Particulate Scatter:** Rain, fog, or dust creates sparse, randomly distributed points with high variance in return intensity.
-- **Multipath/Edge Fringe:** Beam splitting at sharp corners, glass facades, or metallic surfaces produces ghost points offset from true geometry.
-- **Sensor/Registration Artifacts:** Misaligned scan stations, IMU drift, or target misplacement introduce systematic planar offsets or striping.
+You hit this because a raw TLS station is never clean. A Faro, Leica, or Riegl scanner fires millions of pulses per second, and every pulse that clips a glass facade, passes through fog, or splits at a sharp corner returns a point that does not belong to any real surface. Feed those points straight into [Poisson surface reconstruction](/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/poisson-surface-reconstruction-parameters/) and the mesh balloons with floating blobs and spiky artifacts; feed them into registration and the alignment drifts. Cleaning is the cheapest stage to get right and the most expensive to skip — these broader [point cloud filtering techniques](/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/) are the precondition for everything downstream.
 
-Addressing these requires [Point Cloud Filtering Techniques](/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/) that balance aggressive cleanup with geometric fidelity preservation. A robust pipeline processes data sequentially: SOR removes global statistical outliers, radius filtering eliminates isolated clusters, and voxel downsampling enforces uniform sampling density. For digital twin automation, preserve intensity and RGB attributes during filtering to support material classification downstream.
+TLS noise is not one phenomenon, and that is why a single filter never does the job. Atmospheric and particulate scatter — rain, fog, dust, snow — shows up as a sparse diffuse haze scattered evenly through the air, with no local structure. Multipath and edge fringe is the opposite: where the laser beam straddles a sharp edge or reflects off glass or polished metal, returns split between the near and far surface, producing small but internally dense clumps of ghost points offset a few centimetres from the real geometry. Statistical outlier removal is built for the first kind and radius outlier removal for the second, which is why the production answer is a two-stage pass rather than one aggressive filter. The third category — registration and sensor artifacts such as station misalignment or IMU drift — is not noise in the per-point sense and is not solved here; it belongs to the alignment stage, where ICP with robust rejection handles systematic offsets between scan stations.
 
-### Production Pipeline (Python/Open3D)
-The following script implements a memory-aware, parameterized cleaning routine optimized for structural and urban infrastructure scans. It includes validation, sequential filtering, and normal estimation for subsequent meshing. Open3D natively handles PLY/OBJ formats; for LAS/LAZ workflows with strict CRS requirements, pipe data through PDAL before ingestion.
+<figure class="diagram">
+<svg viewBox="0 0 760 220" role="img" aria-labelledby="tlsnoise-t tlsnoise-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="tlsnoise-t">TLS noise removal stages</title>
+  <desc id="tlsnoise-d">A raw scan flows through statistical outlier removal to drop atmospheric scatter, then radius outlier removal to drop isolated multipath clusters, producing a cleaned cloud in the same projected CRS.</desc>
+  <defs>
+    <marker id="tlsnoise-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
+    </marker>
+  </defs>
+  <rect x="15" y="70" width="170" height="80" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="245" y="70" width="170" height="80" rx="8" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <rect x="475" y="70" width="140" height="80" rx="8" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <rect x="645" y="70" width="100" height="80" rx="8" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <g stroke="#5b6471" stroke-width="2" marker-end="url(#tlsnoise-arrow)">
+    <line x1="186" y1="110" x2="243" y2="110"/>
+    <line x1="416" y1="110" x2="473" y2="110"/>
+    <line x1="616" y1="110" x2="643" y2="110"/>
+  </g>
+  <g fill="#1f2937" font-size="13" text-anchor="middle">
+    <text x="100" y="105"><tspan x="100" dy="0">Raw TLS scan</tspan><tspan x="100" dy="16">EPSG:32633</tspan></text>
+    <text x="330" y="105"><tspan x="330" dy="0">Statistical</tspan><tspan x="330" dy="16">outlier (SOR)</tspan></text>
+    <text x="545" y="105"><tspan x="545" dy="0">Radius</tspan><tspan x="545" dy="16">outlier</tspan></text>
+    <text x="695" y="105"><tspan x="695" dy="0">Cleaned</tspan><tspan x="695" dy="16">cloud</tspan></text>
+  </g>
+</svg>
+<figcaption>SOR removes diffuse atmospheric scatter; radius filtering removes isolated multipath clusters; the CRS is preserved throughout.</figcaption>
+</figure>
+
+## Prerequisites
+
+- Python 3.10+ with `open3d==0.18.0`, `laspy==2.5.4` (install with `pip install "laspy[lazrs]"` for `.laz` support), and `numpy==1.26.4`.
+- A terrestrial scan as `.laz`, `.las`, `.ply`, or `.xyz`. The examples assume a `.laz` station already in a projected, metric CRS — UTM zone 33N (EPSG:32633) is used throughout. If your scan is in geographic WGS84 (EPSG:4326), reproject to a metric CRS first, because SOR and radius thresholds are expressed in metres and are meaningless in degrees.
+- Knowledge of your scanner's nominal point spacing at the working range (typically 0.005–0.02 m for TLS). This sets the `radius` parameter.
+- Roughly 4–6 GB of free RAM per 50 M points; the radius query builds a KD-tree over every surviving point.
+
+## Step-by-Step
+
+### 1. Load the scan and keep coordinates in metres
+
+`open3d` readers discard CRS metadata and choke on `.laz`, so load with `laspy` and hand `open3d` a `numpy` array of projected XYZ in metres. Record the EPSG code yourself — it does not survive the round trip.
 
 ```python
+import laspy
+import numpy as np
 import open3d as o3d
-import sys
 
-def clean_terrestrial_lidar(input_path, output_path, 
-                            sor_k=20, sor_std=2.0,
-                            radius=0.05, min_neighbors=10,
-                            voxel_size=0.01):
-    """
-    Removes noise from terrestrial LiDAR scans using SOR + Radius + Voxel filtering.
-    Preserves RGB/Intensity attributes when present.
-    Compatible with PLY/OBJ/XYZ formats. Use PDAL for LAS/LAZ + CRS transforms.
-    """
-    print(f"Loading: {input_path}")
-    pcd = o3d.io.read_point_cloud(input_path)
-    if not pcd.has_points():
-        raise ValueError("Empty point cloud loaded. Verify file path and format.")
-    
-    original_count = len(pcd.points)
-    print(f"Initial points: {original_count:,}")
+SRC_EPSG = "EPSG:32633"  # UTM zone 33N, metres — record it; laspy/open3d won't carry it
 
-    # 1. Statistical Outlier Removal (global scatter/atmospheric noise)
-    print("Applying SOR...")
-    cl_sor, ind_sor = pcd.remove_statistical_outlier(nb_neighbors=sor_k, std_ratio=sor_std)
-    pcd = pcd.select_by_index(ind_sor)
-    print(f"Post-SOR points: {len(pcd.points):,} ({len(pcd.points)/original_count:.1%} retained)")
+las = laspy.read("station_07.laz")
+xyz = np.vstack((las.x, las.y, las.z)).T.astype(np.float64)  # already metres in EPSG:32633
 
-    # 2. Radius Outlier Removal (isolated clusters/multipath fringe)
-    print("Applying Radius Filter...")
-    cl_rad, ind_rad = pcd.remove_radius_outlier(nb_points=min_neighbors, radius=radius)
-    pcd = pcd.select_by_index(ind_rad)
-    print(f"Post-Radius points: {len(pcd.points):,} ({len(pcd.points)/original_count:.1%} retained)")
-
-    # 3. Voxel Downsampling (normalize density for meshing)
-    print(f"Applying Voxel Grid (size={voxel_size}m)...")
-    pcd = pcd.voxel_down_sample(voxel_size)
-    print(f"Final points: {len(pcd.points):,}")
-
-    # 4. Normal Estimation (prep for Poisson/TSDF meshing)
-    print("Estimating normals...")
-    pcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(
-        radius=voxel_size * 3, max_nn=30))
-    pcd.orient_normals_consistent_tangent_plane(100)
-
-    # Export
-    o3d.io.write_point_cloud(output_path, pcd)
-    print(f"Saved cleaned cloud to: {output_path}")
-    return pcd
-
-if __name__ == "__main__":
-    if len(sys.argv) != 3:
-        print("Usage: python clean_lidar.py <input.ply> <output.ply>")
-        sys.exit(1)
-    clean_terrestrial_lidar(sys.argv[1], sys.argv[2])
+# Shift to a local origin so float32 KD-tree math stays precise on large UTM eastings.
+origin = xyz.min(axis=0)
+pcd = o3d.geometry.PointCloud()
+pcd.points = o3d.utility.Vector3dVector(xyz - origin)
+original_count = len(pcd.points)
+print(f"Loaded {original_count:,} points in {SRC_EPSG}")
 ```
 
-### Parameter Tuning for TLS Data
-Default parameters rarely generalize across varying scan resolutions or environmental conditions. Tune iteratively using a 10% data subset before full execution:
-- **`sor_k` (Neighbors):** 15–30 for high-density TLS. Lower values increase false positives on thin edges like rebar or conduit.
-- **`sor_std` (Std Dev Ratio):** 1.5–2.5. Values `<1.0` aggressively prune valid surface points; `>3.0` leaves atmospheric scatter intact. Reference the [Open3D Statistical Outlier Removal documentation](https://www.open3d.org/docs/release/tutorial/geometry/pointcloud.html#Statistical-Outlier-Removal) for algorithmic behavior.
-- **`radius` & `min_neighbors`:** Set `radius` to 2–3× your target voxel size. `min_neighbors` should be 5–15 to remove floating debris without clipping architectural details.
-- **`voxel_size`:** Match to your scanner’s nominal point spacing (typically 0.005–0.02 m for TLS). Oversampling degrades performance; undersampling blunts structural edges.
+### 2. Statistical outlier removal (`sor_k`, `sor_std`)
 
-Validate output by overlaying the cleaned cloud against raw data in CloudCompare or QGIS. Check for missing façade details, stair nosings, or bolt heads. If critical features disappear, increase `sor_std` or reduce `voxel_size` before reprocessing.
+SOR computes each point's mean distance to its `sor_k` nearest neighbours, then drops any point whose mean distance lies more than `sor_std` standard deviations above the global average. This sweeps out diffuse atmospheric scatter — fog, rain, dust — that sits sparsely off the surface.
 
-### CRS Integrity & Downstream Integration
-Open3D strips coordinate metadata during standard I/O. For geospatial workflows, maintain CRS integrity by transforming coordinates to a local projected system (e.g., UTM or State Plane) before filtering. PDAL’s `filters.reprojection` and `filters.outlier` modules handle LAS/LAZ natively while preserving GeoTIFF tags and ASPRS-compliant point records. See the [PDAL Outlier Filter documentation](https://pdal.io/en/latest/stages/filters.outlier.html) for parameter mapping.
+```python
+sor_k = 20      # neighbours per point; 15–30 for dense TLS
+sor_std = 2.0   # std-dev multiplier; 1.5–2.5 typical, <1.0 over-prunes
 
-After cleaning, export to PLY or LAZ for ingestion into [Point Cloud & Mesh Processing Pipelines](/point-cloud-mesh-processing-pipelines/) where Poisson surface reconstruction or Delaunay triangulation converts filtered points into watertight digital twins. Always retain intensity, RGB, and classification fields during filtering. These attributes drive downstream semantic segmentation and material mapping. When preparing for mesh generation, run `estimate_normals` with a search radius 2–3× your voxel size, then enforce consistent orientation using tangent-plane alignment. This prevents inverted faces and non-manifold geometry in automated reconstruction workflows.
+pcd_sor, keep_sor = pcd.remove_statistical_outlier(nb_neighbors=sor_k,
+                                                   std_ratio=sor_std)
+removed_sor = original_count - len(pcd_sor.points)
+print(f"SOR removed {removed_sor:,} points "
+      f"({len(pcd_sor.points)/original_count:.1%} retained)")
+```
 
-For large-scale urban scans, chunk data into overlapping tiles, filter independently, and merge using ICP or feature-based registration. Monitor memory usage with `psutil` or Open3D’s `o3d.core.Tensor` backend to avoid swapping during radius calculations.
+`remove_statistical_outlier` returns the filtered cloud and the indices it kept (`keep_sor`). Apply the same index list to intensity or RGB arrays so attributes stay aligned with the points. The two parameters trade off against each other: `sor_k` sets how many neighbours define "local", so a larger value smooths over local density variation and is more forgiving on sparsely sampled facades, while a smaller value reacts to every thin protrusion. `sor_std` sets the cut line on the resulting distribution. On dense, evenly-sampled indoor scans you can run `sor_k=20, sor_std=2.0` confidently; on long-range outdoor stations where point spacing grows with distance, raise `sor_k` toward 30 so the far field is not mistaken for outliers. Tune both on a 10% random subset of the scan first — the statistics are stable enough that subset behaviour predicts full-scan behaviour, and you avoid waiting minutes per iteration on a 15 M-point cloud.
+
+### 3. Radius outlier removal
+
+SOR leaves behind small dense clumps — multipath ghosts at corners and on glass that are internally consistent but isolated from real geometry. Radius filtering drops any point with fewer than `min_neighbors` points inside a sphere of `radius` metres.
+
+```python
+radius = 0.04        # metres; set to 2–3x nominal point spacing
+min_neighbors = 8    # 5–15; lower keeps thin features like rebar
+
+pcd_clean, keep_rad = pcd_sor.remove_radius_outlier(nb_points=min_neighbors,
+                                                    radius=radius)
+removed_rad = len(pcd_sor.points) - len(pcd_clean.points)
+print(f"Radius filter removed {removed_rad:,} points "
+      f"({len(pcd_clean.points)/original_count:.1%} of original retained)")
+```
+
+Because `radius` is in metres, this step is only correct on a metric CRS — another reason to reproject geographic scans before filtering. Set `radius` to roughly two to three times your scanner's nominal point spacing at the working range: a TLS station sampling at 0.01 m wants a `radius` near 0.03 m, so a genuine surface point reliably finds its `min_neighbors` while an isolated ghost a few centimetres off the wall does not. Keep `min_neighbors` modest (5–15). Pushing it higher does remove more fringe, but it also clips genuinely thin features — handrails, rebar, conduit, sign posts — that legitimately have few neighbours within the sphere. When in doubt, prefer a slightly larger `radius` over a larger `min_neighbors`; the former tolerates sparse-but-real geometry, the latter punishes it.
+
+### 4. Restore the origin shift and save
+
+Add the local origin back so the saved points sit at their true EPSG:32633 coordinates, then write out. Use `laspy` to keep a georeferenced `.laz`; use `open3d` for a quick `.ply` headed into meshing.
+
+```python
+cleaned_xyz = np.asarray(pcd_clean.points) + origin  # back to absolute EPSG:32633
+
+# Option A: georeferenced .laz via laspy (preserves the LAS header / scaling)
+out = laspy.LasData(las.header)
+out.x, out.y, out.z = cleaned_xyz[:, 0], cleaned_xyz[:, 1], cleaned_xyz[:, 2]
+out.write("station_07_clean.laz")
+
+# Option B: .ply for downstream Open3D meshing
+pcd_clean.points = o3d.utility.Vector3dVector(cleaned_xyz)
+o3d.io.write_point_cloud("station_07_clean.ply", pcd_clean)
+print(f"Saved {len(cleaned_xyz):,} points (EPSG:32633 recorded separately)")
+```
+
+## Expected Output & Verification
+
+A correctly tuned pass on a clean indoor or facade scan removes roughly 1–5% of points; an outdoor scan shot in fog or rain can lose 10–20%. If you are dropping more than ~30%, the filter is too aggressive and is eating real surfaces. The console trace should look like this:
+
+```text
+Loaded 14,820,331 points in EPSG:32633
+SOR removed 412,556 points (97.2% retained)
+Radius filter removed 188,004 points (95.9% of original retained)
+Saved 14,219,771 points (EPSG:32633 recorded separately)
+```
+
+Assert the invariants in code so a bad parameter set fails loudly instead of shipping a hollowed-out cloud:
+
+```python
+retained_ratio = len(pcd_clean.points) / original_count
+assert 0.0 < retained_ratio < 1.0, "filter must remove some but not all points"
+assert retained_ratio > 0.70, f"over-pruned: only {retained_ratio:.1%} retained"
+print(f"Removed {original_count - len(pcd_clean.points):,} points, "
+      f"retained {retained_ratio:.1%}")
+```
+
+For a visual check, write the removed points to a second file (`pcd.select_by_index(keep_sor, invert=True)`) and overlay both in CloudCompare or QGIS. Real noise looks like a diffuse halo and isolated specks; if the removed set traces stair nosings, bolt heads, or window mullions, raise `sor_std` and re-run. This inverted-set inspection is the single most useful diagnostic in tuning — the retained cloud rarely reveals what you have over-removed, but the discarded cloud does so immediately. Keep the removed file from each run so you can compare parameter sets side by side instead of judging from memory.
+
+Quantify the result rather than eyeballing it where you can. If you have surveyed control points or a known planar reference (a flat wall, a calibration board), fit a plane to the cleaned points in that region with `numpy.linalg.lstsq` and check that the residual standard deviation has dropped versus the raw cloud and now sits near the scanner's rated range noise. A clean facade pass should leave plane residuals in the low millimetres; if they are still centimetre-scale, scatter survived the filter and `sor_std` is too high.
+
+## Common Errors
+
+**`RuntimeError: [Open3D ERROR] ... read_point_cloud ... Unknown file extension for file (station_07.laz)`** — `open3d` cannot read `.laz`/`.las`. Load with `laspy.read()` and build the `PointCloud` from a `numpy` array as in Step 1, rather than calling `o3d.io.read_point_cloud` on the LAS file directly.
+
+**`ModuleNotFoundError: No module named 'lazrs'`** (or `laspy.errors.LaspyException: No LazBackend selected`) — plain `laspy` reads `.las` but not compressed `.laz`. Reinstall with a backend: `pip install "laspy[lazrs]"` or `pip install "laspy[laszip]"`.
+
+**Filter removes almost nothing, or removes nearly everything.** If `removed_sor` is near zero, your coordinates are probably not in metres — a scan still in EPSG:4326 has neighbour distances of ~1e-5 degrees, so `std_ratio` thresholds never trigger. If it removes the bulk of the cloud, the local-origin shift in Step 1 was skipped and large UTM eastings (~500000 m) lost float precision in the KD-tree. Reproject to a metric CRS and subtract the origin before filtering.
+
+## Frequently Asked Questions
+
+### What is the difference between sor_std values below and above 1.0?
+`sor_std` (the `std_ratio`) is how many standard deviations above the mean neighbour-distance a point may sit before it is dropped. Below 1.0 you are pruning points that are barely above average — that includes valid surface points on thin or sparsely-sampled features, so detail vanishes. Above ~3.0 you only catch extreme outliers and leave most atmospheric scatter behind. Start at 2.0 and tune on a subset.
+
+### Should I run SOR or radius removal first?
+Run SOR first. SOR is a global statistical pass that clears the broad haze of scatter cheaply, which shrinks the cloud before the more expensive per-point radius query runs. Radius removal then mops up the dense isolated clumps SOR leaves intact. Reversing the order works but wastes time building a KD-tree over points SOR would have deleted anyway.
+
+### How do I keep intensity and RGB aligned after filtering?
+Both `remove_statistical_outlier` and `remove_radius_outlier` return the kept indices as their second value. Apply those same indices to your `numpy` attribute arrays — `intensity = intensity[keep_sor][keep_rad]` — so every attribute row still matches its point. If you save via `laspy`, slice the original `las.intensity`/`las.red` arrays by the composed index before writing.
+
+## Related Guides
+
+- [Point Cloud Filtering Techniques](/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/) — the full filtering toolkit this fits into
+- [Poisson Surface Reconstruction Parameters](/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/poisson-surface-reconstruction-parameters/) — the meshing step a cleaned cloud feeds
+- [Point Cloud Density Standards](/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/) — choosing the density your filter should preserve
+- [Point Cloud & Mesh Processing Pipelines](/point-cloud-mesh-processing-pipelines/) — the processing pillar this belongs to
+
+Back to [Point Cloud Filtering Techniques](/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/).

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 
   <title>Implementing Quadtree LOD for Urban Models — 3D Geospatial</title>
-  <meta name="description" content="Implement quadtree LOD for urban 3D models: recursive 2D partitioning, geometry tiers per node, screen-space error thresholds, and CRS-aligned tile trees.">
+  <meta name="description" content="Build a quadtree LOD index for urban 3D models in Python with numpy and shapely: recursive subdivision, geometricError per level, and viewport queries.">
   <meta name="keywords" content="3D geospatial, digital twin, point cloud, mesh pipeline, LOD, 3D Tiles, Cesium, PDAL, Open3D, Python, CI/CD">
   <meta name="author" content="3D Geospatial &amp; Digital Twin Automation">
   <meta name="theme-color" content="#1f6b8a">
@@ -38,7 +38,7 @@
   
   <meta property="og:type" content="article">
   <meta property="og:title" content="Implementing Quadtree LOD for Urban Models — 3D Geospatial">
-  <meta property="og:description" content="Implement quadtree LOD for urban 3D models: recursive 2D partitioning, geometry tiers per node, screen-space error thresholds, and CRS-aligned tile trees.">
+  <meta property="og:description" content="Build a quadtree LOD index for urban 3D models in Python with numpy and shapely: recursive subdivision, geometricError per level, and viewport queries.">
   <meta property="og:url" content="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/implementing-quadtree-lod-for-urban-models/">
   <meta property="og:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
   <meta property="og:image:width" content="1200">
@@ -47,23 +47,23 @@
   <meta property="og:site_name" content="3D Geospatial &amp; Digital Twin Automation">
   <meta property="og:locale" content="en_US">
   
-  <meta property="article:published_time" content="2026-06-02T12:50:37.378Z">
-  <meta property="article:modified_time" content="2026-06-02T12:50:37.378Z">
+  <meta property="article:published_time" content="2026-06-21T13:19:00.583Z">
+  <meta property="article:modified_time" content="2026-06-21T13:19:00.583Z">
   <meta property="article:publisher" content="https://www.3d-geospatial.com/">
   
 
   
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Implementing Quadtree LOD for Urban Models — 3D Geospatial">
-  <meta name="twitter:description" content="Implement quadtree LOD for urban 3D models: recursive 2D partitioning, geometry tiers per node, screen-space error thresholds, and CRS-aligned tile trees.">
+  <meta name="twitter:description" content="Build a quadtree LOD index for urban 3D models in Python with numpy and shapely: recursive subdivision, geometricError per level, and viewport queries.">
   <meta name="twitter:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
   <meta name="twitter:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
 
   
-  <link rel="preload" href="/assets/css/styles.css?v=059cbae548" as="style">
+  <link rel="preload" href="/assets/css/styles.css?v=b928bf35e6" as="style">
   
 
-  <link rel="stylesheet" href="/assets/css/styles.css?v=059cbae548">
+  <link rel="stylesheet" href="/assets/css/styles.css?v=b928bf35e6">
 
   
   <script type="application/ld+json">
@@ -101,12 +101,12 @@
       },
       "headline": "Implementing Quadtree LOD for Urban Models",
       "name": "Implementing Quadtree LOD for Urban Models",
-      "description": "Implement quadtree LOD for urban 3D models: recursive 2D partitioning, geometry tiers per node, screen-space error thresholds, and CRS-aligned tile trees.",
+      "description": "Build a quadtree LOD index for urban 3D models in Python with numpy and shapely: recursive subdivision, geometricError per level, and viewport queries.",
       "url": "https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/implementing-quadtree-lod-for-urban-models/",
       "mainEntityOfPage": "https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/implementing-quadtree-lod-for-urban-models/",
       "inLanguage": "en",
-      "datePublished": "2026-06-02T12:50:37.378Z",
-      "dateModified": "2026-06-02T12:50:37.378Z",
+      "datePublished": "2026-06-21T13:19:00.583Z",
+      "dateModified": "2026-06-21T13:19:00.583Z",
       "author": {
         "@id": "https://www.3d-geospatial.com/#organization"
       },
@@ -255,108 +255,219 @@
   <div class="content-page">
     <article class="article">
       <h1 id="implementing-quadtree-lod-for-urban-models" tabindex="-1"><a class="heading-link" href="#implementing-quadtree-lod-for-urban-models"><span>Implementing quadtree LOD for urban models</span></a></h1>
-<p>Implementing quadtree LOD for urban models requires recursively partitioning a projected 2D bounding extent into four quadrants, generating pre-computed geometry tiers per node, and switching between levels at runtime using camera distance or screen-space error thresholds. The pipeline relies on planar coordinate inputs, deterministic mesh decimation, and strict bounding-box validation to prevent popping artifacts when streaming digital twin assets. Success hinges on aligning spatial subdivision with rendering engine tile boundaries and enforcing consistent coordinate reference systems (CRS) before tree construction.</p>
-<h2 id="core-architecture-workflow" tabindex="-1"><a class="heading-link" href="#core-architecture-workflow"><span>Core Architecture &amp; Workflow</span></a></h2>
-<p>Urban environments combine terrain, building envelopes, road networks, and utility corridors. A quadtree manages this heterogeneity by treating the city footprint as a root node and recursively splitting it until a stopping condition is met: maximum depth, minimum tile area, or feature complexity threshold. Each leaf node stores multiple LOD tiers (typically 3–5), where higher tiers retain architectural details and lower tiers use simplified bounding geometry or impostor meshes.</p>
-<p>The implementation follows three deterministic phases:</p>
-<ol>
-<li><strong>Spatial Partitioning:</strong> Project geographic coordinates to a metric CRS using libraries like <a href="https://proj.org/">PROJ</a> to ensure uniform subdivision. Build the quadtree by halving X/Y extents at each recursion level, guaranteeing that every node maps to a predictable geographic footprint. Typical urban deployments use a 10–50 meter minimum tile area to isolate street-level assets from district-scale blocks.</li>
-<li><strong>LOD Generation:</strong> Export node extents to a mesh processing pipeline. Use automated decimation—vertex clustering, edge collapse, or normal-preserving simplification—to create tiered assets. Store each tier with explicit bounding volumes, metadata, and texture atlases to minimize draw calls. Maintain strict parent-child size ratios to prevent geometric discontinuities during streaming.</li>
-<li><strong>Runtime Evaluation:</strong> Calculate screen-space coverage or distance-to-camera per frame. Swap nodes when the projected error exceeds a tolerance threshold, prioritizing parent-to-child transitions to maintain visual continuity. This approach directly supports modern <a href="/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring</a> by enforcing parent-child visibility inheritance and predictable memory budgets.</li>
-</ol>
-<h2 id="python-implementation-quadtree-builder-lod-selector" tabindex="-1"><a class="heading-link" href="#python-implementation-quadtree-builder-lod-selector"><span>Python Implementation: Quadtree Builder &amp; LOD Selector</span></a></h2>
-<p>The following Python snippet demonstrates spatial partitioning and runtime LOD evaluation. It uses <code>shapely</code> for geometry operations and <code>numpy</code> for vectorized distance calculations. The builder enforces depth and area limits, while the selector computes a screen-space error proxy for real-time tier switching.</p>
+<p>This guide builds a quadtree LOD index for urban 3D models in Python using <code>numpy</code> and <code>shapely</code> — recursively subdividing a projected city extent into four quadrants per level, assigning a <code>geometricError</code> to each depth, and querying the visible nodes for a viewport. The result is the spatial backbone that drives runtime detail selection: a tree where every node maps to a deterministic ground footprint and carries the screen-space error budget a renderer needs to decide whether to draw it or descend into its children.</p>
+<p>You hit this problem the moment a digital twin outgrows a single mesh. A city covers tens of square kilometres, and you cannot ship every building at full detail to a browser or game engine — you need an index that answers “which tiles matter for <em>this</em> camera” in microseconds. A quadtree gives you that index, but only if it is built in a metric CRS, with a <code>geometricError</code> ladder that decreases predictably toward the leaves and bounding boxes that strictly nest. Get any of those wrong and you inherit popping artifacts, distorted tiles, or a 3D Tiles tileset the validator rejects. This page walks the construction end to end so the tree you produce is directly compatible with <a href="/lod-management-optimization-strategies/hierarchical-lod-structuring/">hierarchical LOD structuring</a> and the <a href="https://www.ogc.org/standard/3dtiles/">OGC 3D Tiles</a> <code>geometricError</code> model.</p>
+<figure class="diagram">
+<svg viewBox="0 0 760 300" role="img" aria-labelledby="qtlod-t qtlod-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="qtlod-t">Quadtree subdivision and geometricError ladder</title>
+  <desc id="qtlod-d">A square root node subdivides into four quadrants, each of which subdivides again, while the geometricError value drops by half at each deeper level from root to leaf.</desc>
+  <defs>
+    <marker id="qtlod-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
+    </marker>
+  </defs>
+  <rect x="40" y="40" width="220" height="220" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <line x1="150" y1="40" x2="150" y2="260" stroke="#1f6b8a" stroke-width="2"/>
+  <line x1="40" y1="150" x2="260" y2="150" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="40" y="40" width="110" height="110" rx="4" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <line x1="95" y1="40" x2="95" y2="150" stroke="#c46a3d" stroke-width="2"/>
+  <line x1="40" y1="95" x2="150" y2="95" stroke="#c46a3d" stroke-width="2"/>
+  <g stroke="#5b6471" stroke-width="2" marker-end="url(#qtlod-arrow)">
+    <line x1="470" y1="70" x2="470" y2="120"/>
+    <line x1="470" y1="155" x2="470" y2="205"/>
+  </g>
+  <rect x="360" y="45" width="320" height="30" rx="8" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <rect x="360" y="125" width="320" height="30" rx="8" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <rect x="360" y="210" width="320" height="30" rx="8" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <g fill="#1f2937" font-size="13" text-anchor="middle">
+    <text x="150" y="285">Recursive 2D subdivision</text>
+    <text x="520" y="65">depth 0 · geometricError 512 m</text>
+    <text x="520" y="145">depth 2 · geometricError 128 m</text>
+    <text x="520" y="230">depth 4 (leaf) · geometricError 32 m</text>
+  </g>
+</svg>
+<figcaption>Each level splits a node into four quadrants while the geometricError budget halves, giving the renderer a per-depth detail threshold.</figcaption>
+</figure>
+<h2 id="prerequisites" tabindex="-1"><a class="heading-link" href="#prerequisites"><span>Prerequisites</span></a></h2>
+<ul>
+<li>Python 3.10+ with <code>numpy</code> (1.24+) and <code>shapely</code> (2.0+): <code>pip install &quot;numpy&gt;=1.24&quot; &quot;shapely&gt;=2.0&quot;</code>. Shapely 2.0 changed several APIs, so pin it.</li>
+<li>An urban extent already in a <strong>projected, metric CRS</strong>. The examples use EPSG:25832 (ETRS89 / UTM zone 32N), the standard grid for much of central Europe; for a US twin substitute EPSG:32618 (WGS 84 / UTM zone 18N). Never build the tree in geographic EPSG:4326 — degrees are not metres, and a degree of longitude shrinks toward the poles, so quadrant areas and distance thresholds become meaningless.</li>
+<li>A set of building or tile meshes whose 2D footprints you can express as <code>shapely</code> geometries (a centroid plus a bounding box is enough). If your meshes carry coordinates, confirm they share the same EPSG code as the extent before you start.</li>
+<li>Familiarity with the 3D Tiles notion of <code>geometricError</code>: the world-space error, in metres, introduced by rendering a node instead of its children. The renderer descends when the on-screen projection of that error exceeds a pixel threshold.</li>
+</ul>
+<h2 id="step-by-step" tabindex="-1"><a class="heading-link" href="#step-by-step"><span>Step-by-Step</span></a></h2>
+<h3 id="1-define-the-city-bounds-in-a-projected-crs" tabindex="-1"><a class="heading-link" href="#1-define-the-city-bounds-in-a-projected-crs"><span>1. Define the city bounds in a projected CRS</span></a></h3>
+<p>Start from an explicit extent in EPSG:25832. Snapping the root to a square keeps every quadrant a square, which is what makes the depth-to-size relationship and the <code>geometricError</code> ladder clean.</p>
 <div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> numpy <span class="token keyword">as</span> np
-<span class="token keyword">from</span> shapely<span class="token punctuation">.</span>geometry <span class="token keyword">import</span> box<span class="token punctuation">,</span> Polygon
-<span class="token keyword">from</span> dataclasses <span class="token keyword">import</span> dataclass<span class="token punctuation">,</span> field
+<span class="token keyword">from</span> shapely<span class="token punctuation">.</span>geometry <span class="token keyword">import</span> box
+
+<span class="token comment"># Munich-area extent, ETRS89 / UTM zone 32N (EPSG:25832), metres.</span>
+MINX<span class="token punctuation">,</span> MINY<span class="token punctuation">,</span> MAXX<span class="token punctuation">,</span> MAXY <span class="token operator">=</span> <span class="token number">690_000.0</span><span class="token punctuation">,</span> <span class="token number">5_330_000.0</span><span class="token punctuation">,</span> <span class="token number">698_192.0</span><span class="token punctuation">,</span> <span class="token number">5_338_192.0</span>
+CRS_EPSG <span class="token operator">=</span> <span class="token number">25832</span>
+
+<span class="token comment"># Force a square root so quadrant areas stay uniform across the tree.</span>
+side <span class="token operator">=</span> <span class="token builtin">max</span><span class="token punctuation">(</span>MAXX <span class="token operator">-</span> MINX<span class="token punctuation">,</span> MAXY <span class="token operator">-</span> MINY<span class="token punctuation">)</span>
+root_bounds <span class="token operator">=</span> box<span class="token punctuation">(</span>MINX<span class="token punctuation">,</span> MINY<span class="token punctuation">,</span> MINX <span class="token operator">+</span> side<span class="token punctuation">,</span> MINY <span class="token operator">+</span> side<span class="token punctuation">)</span>
+
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"root side = </span><span class="token interpolation"><span class="token punctuation">{</span>side<span class="token punctuation">:</span><span class="token format-spec">.0f</span><span class="token punctuation">}</span></span><span class="token string"> m  area = </span><span class="token interpolation"><span class="token punctuation">{</span>root_bounds<span class="token punctuation">.</span>area <span class="token operator">/</span> <span class="token number">1e6</span><span class="token punctuation">:</span><span class="token format-spec">.2f</span><span class="token punctuation">}</span></span><span class="token string"> km^2  EPSG:</span><span class="token interpolation"><span class="token punctuation">{</span>CRS_EPSG<span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>A side of 8192 m (<code>2**13</code>) is deliberate: a power-of-two extent halves cleanly at every level, so leaf tiles land on round metric sizes instead of accumulating floating-point drift.</p>
+<h3 id="2-build-the-quadtree-by-recursive-subdivision" tabindex="-1"><a class="heading-link" href="#2-build-the-quadtree-by-recursive-subdivision"><span>2. Build the quadtree by recursive subdivision</span></a></h3>
+<p>The builder halves the X and Y extents at each recursion, stopping at a maximum depth or a minimum tile area. Each node records its depth so later steps can derive <code>geometricError</code> and select detail.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">from</span> dataclasses <span class="token keyword">import</span> dataclass<span class="token punctuation">,</span> field
+<span class="token keyword">from</span> shapely<span class="token punctuation">.</span>geometry <span class="token keyword">import</span> Polygon
 <span class="token keyword">from</span> typing <span class="token keyword">import</span> List<span class="token punctuation">,</span> Tuple
 
 <span class="token decorator annotation punctuation">@dataclass</span>
 <span class="token keyword">class</span> <span class="token class-name">QuadNode</span><span class="token punctuation">:</span>
     bounds<span class="token punctuation">:</span> Polygon
     depth<span class="token punctuation">:</span> <span class="token builtin">int</span>
-    lod_level<span class="token punctuation">:</span> <span class="token builtin">int</span>
     center<span class="token punctuation">:</span> Tuple<span class="token punctuation">[</span><span class="token builtin">float</span><span class="token punctuation">,</span> <span class="token builtin">float</span><span class="token punctuation">]</span>
-    children<span class="token punctuation">:</span> List<span class="token punctuation">[</span><span class="token string">'QuadNode'</span><span class="token punctuation">]</span> <span class="token operator">=</span> field<span class="token punctuation">(</span>default_factory<span class="token operator">=</span><span class="token builtin">list</span><span class="token punctuation">)</span>
-    is_leaf<span class="token punctuation">:</span> <span class="token builtin">bool</span> <span class="token operator">=</span> <span class="token boolean">True</span>
+    geometric_error<span class="token punctuation">:</span> <span class="token builtin">float</span> <span class="token operator">=</span> <span class="token number">0.0</span>
+    mesh_ids<span class="token punctuation">:</span> List<span class="token punctuation">[</span><span class="token builtin">int</span><span class="token punctuation">]</span> <span class="token operator">=</span> field<span class="token punctuation">(</span>default_factory<span class="token operator">=</span><span class="token builtin">list</span><span class="token punctuation">)</span>
+    children<span class="token punctuation">:</span> List<span class="token punctuation">[</span><span class="token string">"QuadNode"</span><span class="token punctuation">]</span> <span class="token operator">=</span> field<span class="token punctuation">(</span>default_factory<span class="token operator">=</span><span class="token builtin">list</span><span class="token punctuation">)</span>
 
-<span class="token keyword">def</span> <span class="token function">build_quadtree</span><span class="token punctuation">(</span>
-    bounds<span class="token punctuation">:</span> Polygon<span class="token punctuation">,</span>
-    max_depth<span class="token punctuation">:</span> <span class="token builtin">int</span> <span class="token operator">=</span> <span class="token number">5</span><span class="token punctuation">,</span>
-    min_area<span class="token punctuation">:</span> <span class="token builtin">float</span> <span class="token operator">=</span> <span class="token number">250.0</span><span class="token punctuation">,</span>
-    current_depth<span class="token punctuation">:</span> <span class="token builtin">int</span> <span class="token operator">=</span> <span class="token number">0</span>
-<span class="token punctuation">)</span> <span class="token operator">-</span><span class="token operator">></span> QuadNode<span class="token punctuation">:</span>
-    <span class="token triple-quoted-string string">"""Recursively partition urban extents into a quadtree with LOD tiers."""</span>
-    lod_level <span class="token operator">=</span> max_depth <span class="token operator">-</span> current_depth
+    <span class="token decorator annotation punctuation">@property</span>
+    <span class="token keyword">def</span> <span class="token function">is_leaf</span><span class="token punctuation">(</span>self<span class="token punctuation">)</span> <span class="token operator">-</span><span class="token operator">></span> <span class="token builtin">bool</span><span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token keyword">not</span> self<span class="token punctuation">.</span>children
+
+<span class="token keyword">def</span> <span class="token function">build_quadtree</span><span class="token punctuation">(</span>bounds<span class="token punctuation">:</span> Polygon<span class="token punctuation">,</span> max_depth<span class="token punctuation">:</span> <span class="token builtin">int</span> <span class="token operator">=</span> <span class="token number">5</span><span class="token punctuation">,</span>
+                   min_area<span class="token punctuation">:</span> <span class="token builtin">float</span> <span class="token operator">=</span> <span class="token number">250.0</span><span class="token punctuation">,</span> depth<span class="token punctuation">:</span> <span class="token builtin">int</span> <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token operator">-</span><span class="token operator">></span> QuadNode<span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Recursively partition a projected urban extent into a quadtree."""</span>
     minx<span class="token punctuation">,</span> miny<span class="token punctuation">,</span> maxx<span class="token punctuation">,</span> maxy <span class="token operator">=</span> bounds<span class="token punctuation">.</span>bounds
-    center <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token punctuation">(</span>minx <span class="token operator">+</span> maxx<span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token number">2</span><span class="token punctuation">,</span> <span class="token punctuation">(</span>miny <span class="token operator">+</span> maxy<span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token number">2</span><span class="token punctuation">)</span>
-    node <span class="token operator">=</span> QuadNode<span class="token punctuation">(</span>bounds<span class="token operator">=</span>bounds<span class="token punctuation">,</span> depth<span class="token operator">=</span>current_depth<span class="token punctuation">,</span> lod_level<span class="token operator">=</span>lod_level<span class="token punctuation">,</span> center<span class="token operator">=</span>center<span class="token punctuation">)</span>
+    cx<span class="token punctuation">,</span> cy <span class="token operator">=</span> <span class="token punctuation">(</span>minx <span class="token operator">+</span> maxx<span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token number">2</span><span class="token punctuation">,</span> <span class="token punctuation">(</span>miny <span class="token operator">+</span> maxy<span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token number">2</span>
+    node <span class="token operator">=</span> QuadNode<span class="token punctuation">(</span>bounds<span class="token operator">=</span>bounds<span class="token punctuation">,</span> depth<span class="token operator">=</span>depth<span class="token punctuation">,</span> center<span class="token operator">=</span><span class="token punctuation">(</span>cx<span class="token punctuation">,</span> cy<span class="token punctuation">)</span><span class="token punctuation">)</span>
 
-    <span class="token comment"># Stop conditions</span>
-    <span class="token keyword">if</span> current_depth <span class="token operator">>=</span> max_depth <span class="token keyword">or</span> bounds<span class="token punctuation">.</span>area <span class="token operator">&lt;=</span> min_area<span class="token punctuation">:</span>
-        <span class="token keyword">return</span> node
+    <span class="token keyword">if</span> depth <span class="token operator">>=</span> max_depth <span class="token keyword">or</span> bounds<span class="token punctuation">.</span>area <span class="token operator">&lt;=</span> min_area<span class="token punctuation">:</span>
+        <span class="token keyword">return</span> node  <span class="token comment"># leaf</span>
 
-    <span class="token comment"># Split into four quadrants</span>
-    mid_x<span class="token punctuation">,</span> mid_y <span class="token operator">=</span> center
     quadrants <span class="token operator">=</span> <span class="token punctuation">[</span>
-        box<span class="token punctuation">(</span>minx<span class="token punctuation">,</span> miny<span class="token punctuation">,</span> mid_x<span class="token punctuation">,</span> mid_y<span class="token punctuation">)</span><span class="token punctuation">,</span>
-        box<span class="token punctuation">(</span>mid_x<span class="token punctuation">,</span> miny<span class="token punctuation">,</span> maxx<span class="token punctuation">,</span> mid_y<span class="token punctuation">)</span><span class="token punctuation">,</span>
-        box<span class="token punctuation">(</span>mid_x<span class="token punctuation">,</span> mid_y<span class="token punctuation">,</span> maxx<span class="token punctuation">,</span> maxy<span class="token punctuation">)</span><span class="token punctuation">,</span>
-        box<span class="token punctuation">(</span>minx<span class="token punctuation">,</span> mid_y<span class="token punctuation">,</span> mid_x<span class="token punctuation">,</span> maxy<span class="token punctuation">)</span>
+        box<span class="token punctuation">(</span>minx<span class="token punctuation">,</span> miny<span class="token punctuation">,</span> cx<span class="token punctuation">,</span> cy<span class="token punctuation">)</span><span class="token punctuation">,</span>   <span class="token comment"># SW</span>
+        box<span class="token punctuation">(</span>cx<span class="token punctuation">,</span> miny<span class="token punctuation">,</span> maxx<span class="token punctuation">,</span> cy<span class="token punctuation">)</span><span class="token punctuation">,</span>   <span class="token comment"># SE</span>
+        box<span class="token punctuation">(</span>cx<span class="token punctuation">,</span> cy<span class="token punctuation">,</span> maxx<span class="token punctuation">,</span> maxy<span class="token punctuation">)</span><span class="token punctuation">,</span>   <span class="token comment"># NE</span>
+        box<span class="token punctuation">(</span>minx<span class="token punctuation">,</span> cy<span class="token punctuation">,</span> cx<span class="token punctuation">,</span> maxy<span class="token punctuation">)</span><span class="token punctuation">,</span>   <span class="token comment"># NW</span>
     <span class="token punctuation">]</span>
-
     node<span class="token punctuation">.</span>children <span class="token operator">=</span> <span class="token punctuation">[</span>
-        build_quadtree<span class="token punctuation">(</span>q<span class="token punctuation">,</span> max_depth<span class="token punctuation">,</span> min_area<span class="token punctuation">,</span> current_depth <span class="token operator">+</span> <span class="token number">1</span><span class="token punctuation">)</span>
-        <span class="token keyword">for</span> q <span class="token keyword">in</span> quadrants
+        build_quadtree<span class="token punctuation">(</span>q<span class="token punctuation">,</span> max_depth<span class="token punctuation">,</span> min_area<span class="token punctuation">,</span> depth <span class="token operator">+</span> <span class="token number">1</span><span class="token punctuation">)</span> <span class="token keyword">for</span> q <span class="token keyword">in</span> quadrants
     <span class="token punctuation">]</span>
-    node<span class="token punctuation">.</span>is_leaf <span class="token operator">=</span> <span class="token boolean">False</span>
     <span class="token keyword">return</span> node
 
-<span class="token keyword">def</span> <span class="token function">evaluate_lod</span><span class="token punctuation">(</span>
-    node<span class="token punctuation">:</span> QuadNode<span class="token punctuation">,</span>
-    camera_pos<span class="token punctuation">:</span> np<span class="token punctuation">.</span>ndarray<span class="token punctuation">,</span>
-    screen_error_threshold<span class="token punctuation">:</span> <span class="token builtin">float</span> <span class="token operator">=</span> <span class="token number">10.0</span><span class="token punctuation">,</span>
-    fov_degrees<span class="token punctuation">:</span> <span class="token builtin">float</span> <span class="token operator">=</span> <span class="token number">60.0</span>
-<span class="token punctuation">)</span> <span class="token operator">-</span><span class="token operator">></span> <span class="token builtin">int</span><span class="token punctuation">:</span>
-    <span class="token triple-quoted-string string">"""
-    Calculate the optimal LOD tier based on camera distance and screen-space error.
-    Returns the target LOD index (0 = highest detail, max_depth = lowest).
-    """</span>
-    dist <span class="token operator">=</span> np<span class="token punctuation">.</span>linalg<span class="token punctuation">.</span>norm<span class="token punctuation">(</span>np<span class="token punctuation">.</span>array<span class="token punctuation">(</span>node<span class="token punctuation">.</span>center<span class="token punctuation">)</span> <span class="token operator">-</span> camera_pos<span class="token punctuation">)</span>
-    <span class="token keyword">if</span> dist <span class="token operator">==</span> <span class="token number">0</span><span class="token punctuation">:</span>
-        dist <span class="token operator">=</span> <span class="token number">0.1</span>
-
-    <span class="token comment"># Approximate screen-space coverage (simplified perspective projection)</span>
-    node_size <span class="token operator">=</span> np<span class="token punctuation">.</span>sqrt<span class="token punctuation">(</span>node<span class="token punctuation">.</span>bounds<span class="token punctuation">.</span>area<span class="token punctuation">)</span>
-    screen_coverage <span class="token operator">=</span> <span class="token punctuation">(</span>node_size <span class="token operator">/</span> dist<span class="token punctuation">)</span> <span class="token operator">*</span> <span class="token punctuation">(</span><span class="token number">1.0</span> <span class="token operator">/</span> np<span class="token punctuation">.</span>tan<span class="token punctuation">(</span>np<span class="token punctuation">.</span>radians<span class="token punctuation">(</span>fov_degrees <span class="token operator">/</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
-
-    <span class="token comment"># Higher coverage = closer = needs higher detail (lower LOD index)</span>
-    <span class="token keyword">if</span> screen_coverage <span class="token operator">></span> screen_error_threshold <span class="token keyword">and</span> <span class="token keyword">not</span> node<span class="token punctuation">.</span>is_leaf<span class="token punctuation">:</span>
-        <span class="token comment"># Select closest child and recurse</span>
-        child_dists <span class="token operator">=</span> <span class="token punctuation">[</span>np<span class="token punctuation">.</span>linalg<span class="token punctuation">.</span>norm<span class="token punctuation">(</span>np<span class="token punctuation">.</span>array<span class="token punctuation">(</span>c<span class="token punctuation">.</span>center<span class="token punctuation">)</span> <span class="token operator">-</span> camera_pos<span class="token punctuation">)</span> <span class="token keyword">for</span> c <span class="token keyword">in</span> node<span class="token punctuation">.</span>children<span class="token punctuation">]</span>
-        closest_idx <span class="token operator">=</span> <span class="token builtin">int</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>argmin<span class="token punctuation">(</span>child_dists<span class="token punctuation">)</span><span class="token punctuation">)</span>
-        <span class="token keyword">return</span> evaluate_lod<span class="token punctuation">(</span>node<span class="token punctuation">.</span>children<span class="token punctuation">[</span>closest_idx<span class="token punctuation">]</span><span class="token punctuation">,</span> camera_pos<span class="token punctuation">,</span> screen_error_threshold<span class="token punctuation">,</span> fov_degrees<span class="token punctuation">)</span>
-    
-    <span class="token keyword">return</span> node<span class="token punctuation">.</span>lod_level
+root <span class="token operator">=</span> build_quadtree<span class="token punctuation">(</span>root_bounds<span class="token punctuation">,</span> max_depth<span class="token operator">=</span><span class="token number">5</span><span class="token punctuation">,</span> min_area<span class="token operator">=</span><span class="token number">250.0</span><span class="token punctuation">)</span>
 </code></pre></div>
-<h2 id="runtime-integration-streaming-considerations" tabindex="-1"><a class="heading-link" href="#runtime-integration-streaming-considerations"><span>Runtime Integration &amp; Streaming Considerations</span></a></h2>
-<p>Translating a static quadtree into a live streaming system requires careful synchronization between spatial indexing and GPU memory. Modern engines like Unreal Engine, Unity, or WebGL-based viewers rely on asynchronous asset loading. When the evaluator requests a higher-detail child node, the engine must:</p>
+<p>The four-quadrant order (SW, SE, NE, NW) is fixed so a Morton/Z-order tile key can be derived later if you export to a tiled format.</p>
+<h3 id="3-assign-geometricerror-by-depth" tabindex="-1"><a class="heading-link" href="#3-assign-geometricerror-by-depth"><span>3. Assign geometricError by depth</span></a></h3>
+<p><code>geometricError</code> should fall geometrically from root to leaf so that descending one level roughly halves the visible error. A clean rule ties it to tile size: the root carries the largest error, and each child gets half its parent’s. Walk the tree once and stamp the value in.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">assign_geometric_error</span><span class="token punctuation">(</span>node<span class="token punctuation">:</span> QuadNode<span class="token punctuation">,</span> root_error<span class="token punctuation">:</span> <span class="token builtin">float</span> <span class="token operator">=</span> <span class="token number">512.0</span><span class="token punctuation">)</span> <span class="token operator">-</span><span class="token operator">></span> <span class="token boolean">None</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""geometricError halves at each deeper level: root_error / 2**depth."""</span>
+    node<span class="token punctuation">.</span>geometric_error <span class="token operator">=</span> root_error <span class="token operator">/</span> <span class="token punctuation">(</span><span class="token number">2</span> <span class="token operator">**</span> node<span class="token punctuation">.</span>depth<span class="token punctuation">)</span>
+    <span class="token keyword">for</span> child <span class="token keyword">in</span> node<span class="token punctuation">.</span>children<span class="token punctuation">:</span>
+        assign_geometric_error<span class="token punctuation">(</span>child<span class="token punctuation">,</span> root_error<span class="token punctuation">)</span>
+
+assign_geometric_error<span class="token punctuation">(</span>root<span class="token punctuation">,</span> root_error<span class="token operator">=</span><span class="token number">512.0</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Leaves should reach a <code>geometric_error</code> near 0 only if they hold final, full-detail geometry; with <code>root_error=512.0</code> and <code>max_depth=5</code>, depth-5 leaves carry 512 / 32 = 16 m. Set the leaf to <code>0.0</code> explicitly if a leaf is genuinely the most detailed representation, because a non-zero leaf error tells the renderer there is still finer geometry to fetch — and there is not.</p>
+<h3 id="4-assign-meshes-to-nodes-by-footprint" tabindex="-1"><a class="heading-link" href="#4-assign-meshes-to-nodes-by-footprint"><span>4. Assign meshes to nodes by footprint</span></a></h3>
+<p>Each mesh drops into the deepest node whose bounds fully contain its footprint. Containment (not mere intersection) keeps a building inside exactly one branch, so it never renders twice across a quadrant seam. <code>numpy</code> vectorizes the centroid math when you have thousands of footprints.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">assign_mesh</span><span class="token punctuation">(</span>node<span class="token punctuation">:</span> QuadNode<span class="token punctuation">,</span> mesh_id<span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">,</span> footprint<span class="token punctuation">:</span> Polygon<span class="token punctuation">)</span> <span class="token operator">-</span><span class="token operator">></span> <span class="token builtin">bool</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Place a mesh in the deepest node that fully contains its footprint."""</span>
+    <span class="token keyword">if</span> <span class="token keyword">not</span> node<span class="token punctuation">.</span>bounds<span class="token punctuation">.</span>contains<span class="token punctuation">(</span>footprint<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token boolean">False</span>
+    <span class="token keyword">for</span> child <span class="token keyword">in</span> node<span class="token punctuation">.</span>children<span class="token punctuation">:</span>
+        <span class="token keyword">if</span> assign_mesh<span class="token punctuation">(</span>child<span class="token punctuation">,</span> mesh_id<span class="token punctuation">,</span> footprint<span class="token punctuation">)</span><span class="token punctuation">:</span>
+            <span class="token keyword">return</span> <span class="token boolean">True</span>
+    node<span class="token punctuation">.</span>mesh_ids<span class="token punctuation">.</span>append<span class="token punctuation">(</span>mesh_id<span class="token punctuation">)</span>  <span class="token comment"># deepest container</span>
+    <span class="token keyword">return</span> <span class="token boolean">True</span>
+
+<span class="token comment"># Example footprints (centroids + 30 m boxes), all in EPSG:25832.</span>
+rng <span class="token operator">=</span> np<span class="token punctuation">.</span>random<span class="token punctuation">.</span>default_rng<span class="token punctuation">(</span><span class="token number">42</span><span class="token punctuation">)</span>
+centers <span class="token operator">=</span> rng<span class="token punctuation">.</span>uniform<span class="token punctuation">(</span><span class="token punctuation">[</span>MINX<span class="token punctuation">,</span> MINY<span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token punctuation">[</span>MINX <span class="token operator">+</span> side<span class="token punctuation">,</span> MINY <span class="token operator">+</span> side<span class="token punctuation">]</span><span class="token punctuation">,</span> size<span class="token operator">=</span><span class="token punctuation">(</span><span class="token number">2000</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+footprints <span class="token operator">=</span> <span class="token punctuation">[</span>box<span class="token punctuation">(</span>x <span class="token operator">-</span> <span class="token number">15</span><span class="token punctuation">,</span> y <span class="token operator">-</span> <span class="token number">15</span><span class="token punctuation">,</span> x <span class="token operator">+</span> <span class="token number">15</span><span class="token punctuation">,</span> y <span class="token operator">+</span> <span class="token number">15</span><span class="token punctuation">)</span> <span class="token keyword">for</span> x<span class="token punctuation">,</span> y <span class="token keyword">in</span> centers<span class="token punctuation">]</span>
+
+placed <span class="token operator">=</span> <span class="token builtin">sum</span><span class="token punctuation">(</span>assign_mesh<span class="token punctuation">(</span>root<span class="token punctuation">,</span> i<span class="token punctuation">,</span> fp<span class="token punctuation">)</span> <span class="token keyword">for</span> i<span class="token punctuation">,</span> fp <span class="token keyword">in</span> <span class="token builtin">enumerate</span><span class="token punctuation">(</span>footprints<span class="token punctuation">)</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"placed </span><span class="token interpolation"><span class="token punctuation">{</span>placed<span class="token punctuation">}</span></span><span class="token string">/</span><span class="token interpolation"><span class="token punctuation">{</span><span class="token builtin">len</span><span class="token punctuation">(</span>footprints<span class="token punctuation">)</span><span class="token punctuation">}</span></span><span class="token string"> meshes"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Footprints that straddle a quadrant boundary settle at a higher (coarser) node — the deepest one that still contains them whole — which is the correct behaviour: a building spanning two tiles belongs to their shared parent.</p>
+<h3 id="5-query-the-visible-nodes-for-a-viewport" tabindex="-1"><a class="heading-link" href="#5-query-the-visible-nodes-for-a-viewport"><span>5. Query the visible nodes for a viewport</span></a></h3>
+<p>At runtime you walk the tree, skip nodes outside the viewport rectangle (frustum culling, simplified to a 2D extent here), and descend while the projected <code>geometric_error</code> exceeds a pixel tolerance. The screen-space error proxy uses <code>numpy</code> for the distance and projection math.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">query_visible</span><span class="token punctuation">(</span>node<span class="token punctuation">:</span> QuadNode<span class="token punctuation">,</span> viewport<span class="token punctuation">:</span> Polygon<span class="token punctuation">,</span> camera<span class="token punctuation">:</span> np<span class="token punctuation">.</span>ndarray<span class="token punctuation">,</span>
+                  px_tolerance<span class="token punctuation">:</span> <span class="token builtin">float</span> <span class="token operator">=</span> <span class="token number">16.0</span><span class="token punctuation">,</span> screen_height_px<span class="token punctuation">:</span> <span class="token builtin">int</span> <span class="token operator">=</span> <span class="token number">1080</span><span class="token punctuation">,</span>
+                  fov_deg<span class="token punctuation">:</span> <span class="token builtin">float</span> <span class="token operator">=</span> <span class="token number">60.0</span><span class="token punctuation">)</span> <span class="token operator">-</span><span class="token operator">></span> List<span class="token punctuation">[</span>QuadNode<span class="token punctuation">]</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Return the nodes a renderer should draw for this viewport."""</span>
+    <span class="token keyword">if</span> <span class="token keyword">not</span> node<span class="token punctuation">.</span>bounds<span class="token punctuation">.</span>intersects<span class="token punctuation">(</span>viewport<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>  <span class="token comment"># frustum cull</span>
+
+    dist <span class="token operator">=</span> <span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>linalg<span class="token punctuation">.</span>norm<span class="token punctuation">(</span>np<span class="token punctuation">.</span>array<span class="token punctuation">(</span>node<span class="token punctuation">.</span>center<span class="token punctuation">)</span> <span class="token operator">-</span> camera<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token keyword">or</span> <span class="token number">0.1</span>
+    <span class="token comment"># Project world-space geometricError to pixels.</span>
+    px_per_metre <span class="token operator">=</span> screen_height_px <span class="token operator">/</span> <span class="token punctuation">(</span><span class="token number">2.0</span> <span class="token operator">*</span> dist <span class="token operator">*</span> np<span class="token punctuation">.</span>tan<span class="token punctuation">(</span>np<span class="token punctuation">.</span>radians<span class="token punctuation">(</span>fov_deg <span class="token operator">/</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    screen_error <span class="token operator">=</span> node<span class="token punctuation">.</span>geometric_error <span class="token operator">*</span> px_per_metre
+
+    <span class="token keyword">if</span> node<span class="token punctuation">.</span>is_leaf <span class="token keyword">or</span> screen_error <span class="token operator">&lt;=</span> px_tolerance<span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token punctuation">[</span>node<span class="token punctuation">]</span>  <span class="token comment"># this node is good enough — draw it</span>
+
+    drawn<span class="token punctuation">:</span> List<span class="token punctuation">[</span>QuadNode<span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    <span class="token keyword">for</span> child <span class="token keyword">in</span> node<span class="token punctuation">.</span>children<span class="token punctuation">:</span>
+        drawn <span class="token operator">+=</span> query_visible<span class="token punctuation">(</span>child<span class="token punctuation">,</span> viewport<span class="token punctuation">,</span> camera<span class="token punctuation">,</span> px_tolerance<span class="token punctuation">,</span>
+                               screen_height_px<span class="token punctuation">,</span> fov_deg<span class="token punctuation">)</span>
+    <span class="token keyword">return</span> drawn
+
+camera <span class="token operator">=</span> np<span class="token punctuation">.</span>array<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token number">694_096.0</span><span class="token punctuation">,</span> <span class="token number">5_334_096.0</span><span class="token punctuation">]</span><span class="token punctuation">)</span>          <span class="token comment"># EPSG:25832</span>
+viewport <span class="token operator">=</span> box<span class="token punctuation">(</span><span class="token number">693_000</span><span class="token punctuation">,</span> <span class="token number">5_333_000</span><span class="token punctuation">,</span> <span class="token number">695_200</span><span class="token punctuation">,</span> <span class="token number">5_335_200</span><span class="token punctuation">)</span>  <span class="token comment"># 2.2 km window</span>
+visible <span class="token operator">=</span> query_visible<span class="token punctuation">(</span>root<span class="token punctuation">,</span> viewport<span class="token punctuation">,</span> camera<span class="token punctuation">,</span> px_tolerance<span class="token operator">=</span><span class="token number">16.0</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span><span class="token builtin">len</span><span class="token punctuation">(</span>visible<span class="token punctuation">)</span><span class="token punctuation">}</span></span><span class="token string"> nodes selected for the viewport"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>This is the same descent logic 3D Tiles runtimes use, so the tree slots straight into the broader <a href="/lod-management-optimization-strategies/">LOD management workflow</a> and the related <a href="/lod-management-optimization-strategies/automated-tile-generation/">automated tile generation</a> and <a href="/lod-management-optimization-strategies/streaming-sync-patterns/">streaming sync patterns</a>.</p>
+<h2 id="expected-output-verification" tabindex="-1"><a class="heading-link" href="#expected-output-verification"><span>Expected Output &amp; Verification</span></a></h2>
+<p>For a 5-level tree, node counts per depth follow the quadtree series 4^depth, and the <code>geometric_error</code> ladder halves each level. Verify both with a single traversal:</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">from</span> collections <span class="token keyword">import</span> defaultdict
+
+<span class="token keyword">def</span> <span class="token function">summarize</span><span class="token punctuation">(</span>node<span class="token punctuation">,</span> per_depth<span class="token operator">=</span><span class="token boolean">None</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    per_depth <span class="token operator">=</span> per_depth <span class="token keyword">if</span> per_depth <span class="token keyword">is</span> <span class="token keyword">not</span> <span class="token boolean">None</span> <span class="token keyword">else</span> defaultdict<span class="token punctuation">(</span><span class="token keyword">lambda</span><span class="token punctuation">:</span> <span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">0.0</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    per_depth<span class="token punctuation">[</span>node<span class="token punctuation">.</span>depth<span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span> <span class="token operator">+=</span> <span class="token number">1</span>
+    per_depth<span class="token punctuation">[</span>node<span class="token punctuation">.</span>depth<span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span> <span class="token operator">=</span> node<span class="token punctuation">.</span>geometric_error
+    <span class="token keyword">for</span> c <span class="token keyword">in</span> node<span class="token punctuation">.</span>children<span class="token punctuation">:</span>
+        summarize<span class="token punctuation">(</span>c<span class="token punctuation">,</span> per_depth<span class="token punctuation">)</span>
+    <span class="token keyword">return</span> per_depth
+
+<span class="token keyword">for</span> depth<span class="token punctuation">,</span> <span class="token punctuation">(</span>count<span class="token punctuation">,</span> ge<span class="token punctuation">)</span> <span class="token keyword">in</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span>summarize<span class="token punctuation">(</span>root<span class="token punctuation">)</span><span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">assert</span> count <span class="token operator">==</span> <span class="token number">4</span> <span class="token operator">**</span> depth<span class="token punctuation">,</span> <span class="token string-interpolation"><span class="token string">f"depth </span><span class="token interpolation"><span class="token punctuation">{</span>depth<span class="token punctuation">}</span></span><span class="token string">: expected </span><span class="token interpolation"><span class="token punctuation">{</span><span class="token number">4</span><span class="token operator">**</span>depth<span class="token punctuation">}</span></span><span class="token string"> nodes"</span></span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"depth </span><span class="token interpolation"><span class="token punctuation">{</span>depth<span class="token punctuation">}</span></span><span class="token string">: </span><span class="token interpolation"><span class="token punctuation">{</span>count<span class="token punctuation">:</span><span class="token format-spec">>4</span><span class="token punctuation">}</span></span><span class="token string"> nodes  geometricError = </span><span class="token interpolation"><span class="token punctuation">{</span>ge<span class="token punctuation">:</span><span class="token format-spec">6.1f</span><span class="token punctuation">}</span></span><span class="token string"> m"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Expected output:</p>
+<div class="codeblock" data-lang="text"><div class="codeblock__bar"><span class="codeblock__lang">text</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-text" tabindex="0" role="group" aria-label="text code sample"><code class="language-text">depth 0:    1 nodes  geometricError =  512.0 m
+depth 1:    4 nodes  geometricError =  256.0 m
+depth 2:   16 nodes  geometricError =  128.0 m
+depth 3:   64 nodes  geometricError =   64.0 m
+depth 4:  256 nodes  geometricError =   32.0 m
+depth 5: 1024 nodes  geometricError =   16.0 m
+</code></pre></div>
+<p>Three invariants must hold. First, total nodes for <code>max_depth=5</code> is (4^6 − 1) / 3 = 1365. Second, every child’s <code>geometric_error</code> is exactly half its parent’s. Third, every node’s bounds must be contained by its parent’s — assert it explicitly, because a containment break silently corrupts the viewport query:</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">check_containment</span><span class="token punctuation">(</span>node<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">for</span> c <span class="token keyword">in</span> node<span class="token punctuation">.</span>children<span class="token punctuation">:</span>
+        <span class="token keyword">assert</span> node<span class="token punctuation">.</span>bounds<span class="token punctuation">.</span>contains<span class="token punctuation">(</span>c<span class="token punctuation">.</span>bounds<span class="token punctuation">.</span><span class="token builtin">buffer</span><span class="token punctuation">(</span><span class="token number">1e-6</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"child escapes parent"</span>
+        check_containment<span class="token punctuation">(</span>c<span class="token punctuation">)</span>
+check_containment<span class="token punctuation">(</span>root<span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"containment OK; total nodes:"</span><span class="token punctuation">,</span> <span class="token builtin">sum</span><span class="token punctuation">(</span>c <span class="token keyword">for</span> _<span class="token punctuation">,</span> <span class="token punctuation">(</span>c<span class="token punctuation">,</span> _<span class="token punctuation">)</span> <span class="token keyword">in</span> summarize<span class="token punctuation">(</span>root<span class="token punctuation">)</span><span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<h2 id="common-errors" tabindex="-1"><a class="heading-link" href="#common-errors"><span>Common Errors</span></a></h2>
+<p><strong><code>TopologyException: side location conflict</code> (or empty viewport results).</strong> Building the tree from EPSG:4326 coordinates, then querying with EPSG:25832 camera positions, mixes degrees and metres. <code>node.bounds.intersects(viewport)</code> returns <code>False</code> everywhere because the geometries occupy disjoint numeric ranges. Fix: reproject the extent, footprints, and camera to one projected EPSG code (here EPSG:25832) before any tree operation, and assert the ranges overlap.</p>
+<p><strong><code>AssertionError: child escapes parent</code> from the containment check.</strong> This appears when the root is non-square and you split on the geometric center: rectangular quadrants accumulate rounding error and a child box can poke past the parent edge by a few microns. Fix: snap the root to a square power-of-two side (step 1) so halving is exact, or wrap the containment assert in a small <code>buffer(1e-6)</code> tolerance as shown.</p>
+<p><strong><code>RecursionError: maximum recursion depth exceeded</code>.</strong> A <code>min_area</code> of <code>0</code> (or a <code>max_depth</code> above ~12) lets subdivision run until floating-point area underflows, blowing the Python stack. A 14-level tree is 4^14 ≈ 268 million leaves — never intended. Fix: cap <code>max_depth</code> to 6–8 for city blocks and keep <code>min_area</code> at the smallest meaningful tile (250 m² isolates street-level assets in the original deployment).</p>
+<h2 id="frequently-asked-questions" tabindex="-1"><a class="heading-link" href="#frequently-asked-questions"><span>Frequently Asked Questions</span></a></h2>
+<h3 id="why-a-quadtree-instead-of-an-octree-for-urban-models" tabindex="-1"><a class="heading-link" href="#why-a-quadtree-instead-of-an-octree-for-urban-models"><span>Why a quadtree instead of an octree for urban models?</span></a></h3>
+<p>Cities are overwhelmingly 2.5D: buildings sit on a terrain surface and rarely stack into independent vertical layers, so subdividing the Z axis wastes nodes on empty air. A quadtree partitions only the ground plane (X/Y) and lets each node hold the full-height geometry above its footprint, which matches how 3D Tiles structures most city tilesets. Reserve octrees for genuinely volumetric data — dense point clouds, subsurface utilities, or interiors with many floors — where vertical subdivision earns its keep.</p>
+<h3 id="how-do-i-pick-the-root-geometricerror-and-pixel-tolerance" tabindex="-1"><a class="heading-link" href="#how-do-i-pick-the-root-geometricerror-and-pixel-tolerance"><span>How do I pick the root geometricError and pixel tolerance?</span></a></h3>
+<p>Set <code>root_error</code> to roughly the diagonal extent of your largest renderable feature at the root — a few hundred metres for a city block tree, which is why 512 m works for an 8192 m extent. The pixel tolerance (<code>px_tolerance</code>) is a quality dial: 16 px is a common default, lower values force deeper descent and sharper images at higher bandwidth, higher values trade fidelity for fewer draw calls. Tune the tolerance per device class rather than rebuilding the tree.</p>
+<h3 id="can-i-export-this-tree-directly-to-a-3d-tiles-tileset" tabindex="-1"><a class="heading-link" href="#can-i-export-this-tree-directly-to-a-3d-tiles-tileset"><span>Can I export this tree directly to a 3D Tiles tileset?</span></a></h3>
+<p>Yes — the structure maps one-to-one. Each <code>QuadNode</code> becomes a tile with a <code>boundingVolume</code> (its <code>bounds</code> reprojected to EPSG:4326 region coordinates or kept as a box), the <code>geometric_error</code> you assigned, and a <code>content</code> URI pointing at the node’s decimated mesh (the <code>mesh_ids</code> you placed in step 4). The descent rule in step 5 is exactly the <code>geometricError</code> refinement 3D Tiles runtimes apply, so a tileset built this way refines predictably. See <a href="/lod-management-optimization-strategies/automated-tile-generation/">automated tile generation</a> for the export mechanics.</p>
+<h2 id="related-guides" tabindex="-1"><a class="heading-link" href="#related-guides"><span>Related Guides</span></a></h2>
 <ul>
-<li><strong>Pre-fetch adjacent tiles:</strong> Load neighboring quadrants slightly ahead of the camera trajectory to mask network latency and prevent edge tearing.</li>
-<li><strong>Enforce transition blending:</strong> Use alpha fading, geometric morphing, or depth-buffer-aware crossfading between LOD tiers to eliminate hard popping.</li>
-<li><strong>Cap concurrent requests:</strong> Limit active downloads to prevent bandwidth saturation during rapid camera movement or fly-throughs.</li>
-<li><strong>Integrate frustum culling:</strong> Skip evaluation for nodes entirely outside the camera’s view volume or occluded by terrain/buildings.</li>
+<li><a href="/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring for Digital Twins</a> — the broader tree-design patterns this index plugs into</li>
+<li><a href="/lod-management-optimization-strategies/automated-tile-generation/">Automated Tile Generation for 3D Geospatial</a> — turning quadtree nodes into a streamable tileset</li>
+<li><a href="/lod-management-optimization-strategies/streaming-sync-patterns/">Streaming Sync Patterns for 3D Geospatial</a> — fetching and evicting tiles as the camera moves</li>
+<li><a href="/lod-management-optimization-strategies/">LOD Management &amp; Optimization Strategies</a> — the optimization area overall</li>
+<li><a href="/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems for 3D Assets</a> — picking and enforcing the projected CRS the tree depends on</li>
 </ul>
-<p>Aligning your subdivision logic with established <a href="/lod-management-optimization-strategies/">LOD Management &amp; Optimization Strategies</a> ensures that memory pools remain stable under heavy urban workloads. For production deployments, consider adopting the <a href="https://www.ogc.org/standard/3dtiles/">OGC 3D Tiles</a> specification, which standardizes spatial indexing, metadata packaging, and streaming protocols for massive geospatial datasets.</p>
-<h2 id="validation-common-pitfalls" tabindex="-1"><a class="heading-link" href="#validation-common-pitfalls"><span>Validation &amp; Common Pitfalls</span></a></h2>
-<ul>
-<li><strong>CRS Misalignment:</strong> Building quadtrees in unprojected lat/lon space causes severe distortion at higher latitudes, breaking distance-based thresholds. Always transform to a local metric projection (e.g., UTM) before partitioning.</li>
-<li><strong>Inconsistent Bounding Volumes:</strong> If a child node’s bounding box exceeds its parent’s, screen-space error calculations will fail. Validate containment during tree construction and clamp extents to parent boundaries.</li>
-<li><strong>Decimation Artifacts:</strong> Aggressive mesh simplification can collapse critical urban features like narrow alleys, utility poles, or rooftop HVAC units. Implement feature-aware decimation that preserves semantic boundaries, height profiles, and material IDs.</li>
-<li><strong>Thread Safety &amp; Frame Pacing:</strong> Runtime LOD evaluation often competes with the main render thread. Offload distance calculations, tile requests, and mesh loading to worker pools or compute shaders to maintain stable frame rates.</li>
-<li><strong>Z-Fighting &amp; Depth Popping:</strong> When transitioning between LODs with mismatched vertex densities, depth buffer precision can cause flickering. Use consistent base geometry scaling and enable depth-bias offsets during crossfade windows.</li>
-</ul>
-<p>By enforcing strict geometric validation, leveraging deterministic decimation pipelines, and aligning spatial subdivision with engine-specific streaming boundaries, you can deploy scalable quadtree LOD systems that handle city-scale digital twins without compromising visual fidelity or performance.</p>
+<p>Back to <a href="/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring for Digital Twins</a>.</p>
 
 
       

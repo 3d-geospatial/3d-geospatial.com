@@ -1,98 +1,204 @@
 # Fixing non-manifold edges in 3D meshes
 
-Fixing non-manifold edges in 3D meshes requires isolating edges shared by more than two faces or vertices with inconsistent adjacency, then applying deterministic topological surgery. The standard repair sequence is: (1) detect defects via adjacency graph traversal, (2) classify the violation (T-junctions, >2-face sharing, dangling faces, or zero-thickness shells), and (3) apply tolerance-aware repair that preserves coordinate precision while enforcing manifold topology. In geospatial and digital twin workflows, non-manifold geometry breaks watertight validation, prevents accurate volumetric analysis, and causes silent failures in spatial indexing and physics simulation.
+Fixing non-manifold edges in 3D meshes means finding every edge that is shared by a number of faces other than exactly two — the formal manifold rule is that each interior edge belongs to precisely two faces — and then merging, splitting, or removing the offending geometry until the count is exactly two everywhere. This page walks through detecting those edges with `trimesh` and `open3d`, repairing them with `numpy`-driven topological surgery, and re-validating the result with `is_watertight` and the Euler characteristic `V − E + F`.
 
-## Why Non-Manifold Edges Break Geospatial Pipelines
+You hit non-manifold edges constantly when assembling a digital twin from heterogeneous sources: LiDAR-derived surfaces stitched against CAD exports, photogrammetry tiles meeting at a shared boundary, or two building shells fused at a wall. Wherever three faces collapse onto one edge — or a single dangling face leaves an edge with only one — the mesh stops being a clean two-sided surface. The root cause is almost always coordinate rounding and overlapping boundaries: when two tiles in EPSG:32618 are clipped along a shared seam, vertices that are nominally identical land a few microns apart, and a third face welds to the same edge instead of pairing cleanly with the second.
 
-Digital twin automation relies on predictable Euler characteristics (`V - E + F = 2` for closed genus-0 meshes). Non-manifold edges violate this invariant by introducing ambiguous surface normals, undefined interior/exterior boundaries, and broken half-edge traversals. When municipal GIS teams merge LiDAR-derived meshes, CAD exports, and photogrammetry tiles, coordinate rounding and overlapping boundaries routinely generate T-junctions and multi-face edges. These defects propagate through spatial databases, causing invalid CityGML topology, failed Boolean operations, and incorrect shadow casting.
+That single defect breaks watertightness, so `is_watertight` returns `False`; it makes Boolean operations (union, difference for footprint clipping) produce garbage because the algorithm cannot decide which side of the surface is interior; it crashes slicers when you 3D-print a model for fabrication review; and it leaves CityGML LOD2 ingestion rejecting the geometry outright, since the OGC schema requires manifold solids for building volumes. Downstream, the same ambiguity corrupts ray-casting for shadow and line-of-sight analysis, because a ray crossing a triple-shared edge has no well-defined entry or exit. The fix is cheap at mesh time and expensive once the twin is in production, so it belongs in your ingestion gate, not your incident backlog.
 
-Reviewing [Mesh Topology Basics](/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/) clarifies how half-edge data structures and manifold constraints dictate which algorithmic approaches preserve spatial accuracy versus those that introduce geometric distortion. Automated repair must prioritize conservative face deletion over aggressive hole-filling to avoid generating phantom geometry that misrepresents real-world infrastructure.
+<figure class="diagram">
+<svg viewBox="0 0 520 260" role="img" aria-labelledby="nme-t nme-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="nme-t">A non-manifold edge shared by three faces</title>
+  <desc id="nme-d">A manifold edge on the left is shared by exactly two faces, while a non-manifold edge on the right has a third face joined along the same edge, making it shared by three faces.</desc>
+  <defs>
+    <marker id="nme-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
+    </marker>
+  </defs>
+  <polygon points="60,40 60,180 150,150 150,70" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <polygon points="60,40 60,180 -30,150 -30,70" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2" transform="translate(120,0)"/>
+  <line x1="60" y1="40" x2="60" y2="180" stroke="#1f2937" stroke-width="4"/>
+  <polygon points="370,40 370,180 460,150 460,70" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <polygon points="370,40 370,180 280,150 280,70" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <polygon points="370,40 370,180 420,250 420,110" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <line x1="370" y1="40" x2="370" y2="180" stroke="#c46a3d" stroke-width="4"/>
+  <text x="148" y="215" fill="#1f2937" font-size="13" text-anchor="middle">Manifold: edge in 2 faces</text>
+  <text x="370" y="30" fill="#1f2937" font-size="13" text-anchor="middle">Non-manifold: edge in 3 faces</text>
+</svg>
+<figcaption>Left: a clean edge shared by exactly two faces. Right: a third face joined along the same edge raises the shared-face count to three, violating the manifold rule.</figcaption>
+</figure>
 
-## Detection & Classification Workflow
+This guide sits under [Mesh Topology Basics](/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/), which covers the half-edge data structures and manifold constraints these repairs rely on.
 
-Before applying automated fixes, classify the defect type to select the appropriate repair strategy:
+## Prerequisites
 
-- **T-junctions:** A vertex lies on an edge but isn't shared by adjacent faces. Resolved via vertex merging.
-- **Non-manifold edges:** Three or more faces share a single edge. Requires edge splitting or conservative face removal.
-- **Non-manifold vertices:** Faces meet at a vertex but don't form a single disk topology. Often indicates overlapping shells.
-- **Zero-thickness shells:** Two coplanar faces share an edge but point in opposite directions, creating an internal void. Detected via normal inversion checks.
+You need Python 3.10+ and the following packages, pinned to versions whose APIs match the snippets below:
 
-Detection relies on building an edge-to-face adjacency map. Edges with `count != 2` or vertices with disconnected face loops are flagged. The [OGC CityGML 3.0 Specification](https://www.ogc.org/standard/citygml/) explicitly requires manifold geometry for Level of Detail (LOD) 2+ building models, making automated validation mandatory before database ingestion.
+```bash
+pip install "trimesh==4.4.*" "open3d==0.18.*" "numpy>=1.26,<2.1"
+```
 
-## Programmatic Repair with Python & trimesh
+Inputs and assumptions:
 
-The following routine uses `trimesh` to detect, isolate, and conservatively repair non-manifold edges while maintaining geospatial coordinate fidelity. It prioritizes vertex merging and degenerate face removal before applying targeted face deletion for persistent violations.
+- A triangle mesh in `.ply`, `.obj`, or `.stl` — the routines assume triangulated faces (quads must be triangulated first with `mesh.triangulate()` or an upstream step).
+- The mesh carries projected, metric coordinates (for example UTM zone 18N, EPSG:32618). Large eastings/northings (hundreds of thousands of metres) lose precision when hashed as float32, so plan to subtract a `crs_offset` before repair and add it back afterward.
+- Vertical heights are orthometric in EPSG:32618+5703 if you care about volumetrics, but topology repair itself is CRS-agnostic once coordinates are metric and origin-shifted.
+
+## Step-by-Step
+
+### 1. Detect non-manifold edges by counting face adjacency
+
+The definition is mechanical: build the edge-to-face map, count faces per edge, and flag every edge whose count is not 2. `trimesh` exposes the raw `(3 * n_faces, 2)` edge array; sorting each edge's vertex pair makes opposite-direction half-edges hash identically.
 
 ```python
 import trimesh
 import numpy as np
 
-def fix_non_manifold_edges(input_path, output_path, merge_tol=1e-4, crs_offset=None):
-    """
-    Detects and repairs non-manifold edges in 3D meshes.
-    Returns a watertight, manifold mesh suitable for digital twin ingestion.
-    """
-    # Load without automatic processing to preserve raw topology
-    mesh = trimesh.load(input_path, force='mesh', process=False)
-    
-    # Shift large GIS coordinates to origin to avoid float32 precision loss
-    if crs_offset is not None:
-        mesh.vertices -= crs_offset
-        
-    # 1. Merge near-identical vertices (resolves ~70% of T-junctions)
-    mesh.merge_vertices()
-    
-    # 2. Remove zero-area/degenerate faces
-    # nondegenerate_faces() returns a boolean mask in trimesh >= 3.x
-    mesh.update_faces(mesh.nondegenerate_faces(height=1e-8))
+mesh = trimesh.load("building_block.ply", force="mesh", process=False)
 
-    # 3. Identify non-manifold edges via unique edge-face mapping
-    # mesh.edges returns an (N_faces * 3, 2) array
-    edges = mesh.edges
-    sorted_edges = np.sort(edges, axis=1)
-    unique_edges, inverse = np.unique(sorted_edges, axis=0, return_inverse=True)
-    
-    # Count how many faces share each unique edge
-    edge_counts = np.bincount(inverse)
-    
-    # Edges shared by != 2 faces violate manifold topology
-    non_manifold_mask = edge_counts != 2
-    non_manifold_ids = np.where(non_manifold_mask)[0]
-    
-    if len(non_manifold_ids) > 0:
-        # Map back to original edge array indices
-        bad_edge_indices = np.where(np.isin(inverse, non_manifold_ids))[0]
-        # Convert edge-array indices to face indices (3 edges per face)
-        bad_face_indices = np.unique(bad_edge_indices // 3)
-        
-        # Conservative deletion: remove offending faces to restore manifold topology
-        valid_mask = np.ones(len(mesh.faces), dtype=bool)
-        valid_mask[bad_face_indices] = False
-        mesh.update_faces(valid_mask)
-        
-    # 4. Final topology cleanup — drop duplicate faces (trimesh 4.x API)
-    mesh.update_faces(mesh.unique_faces())
-    mesh.fix_normals()
-    
-    # Restore original coordinates
-    if crs_offset is not None:
-        mesh.vertices += crs_offset
-        
-    mesh.export(output_path)
-    return mesh.is_watertight
+# Shift large GIS coordinates to the origin to protect float precision.
+crs_offset = mesh.vertices.mean(axis=0)
+mesh.vertices -= crs_offset
+
+sorted_edges = np.sort(mesh.edges, axis=1)
+unique_edges, inverse = np.unique(sorted_edges, axis=0, return_inverse=True)
+edge_counts = np.bincount(inverse)
+
+non_manifold = unique_edges[edge_counts != 2]
+print(f"non-manifold edges: {len(non_manifold)}")
+print(f"  boundary (1 face): {(edge_counts == 1).sum()}")
+print(f"  over-shared (>2):  {(edge_counts > 2).sum()}")
 ```
 
-### Key Implementation Notes
-- **CRS Offset Handling:** Large UTM coordinates cause floating-point precision loss during adjacency hashing. Shifting to the origin before repair and restoring afterward prevents vertex snapping artifacts.
-- **Conservative Deletion:** The script removes faces attached to non-manifold edges rather than attempting to split them. This guarantees topological validity at the cost of minor surface area loss, which is acceptable for geospatial bounding volumes.
-- **trimesh API notes:** `mesh.nondegenerate_faces(height=...)` returns a boolean mask suitable for `mesh.update_faces(...)`. In trimesh 4.x the older `remove_duplicate_faces()` helper was removed; filter duplicates with `mesh.update_faces(mesh.unique_faces())` instead. See the [trimesh Repair Documentation](https://trimesh.org/trimesh.repair.html) for version-specific method signatures.
+Edges with count 1 are open boundaries (holes or dangling faces); edges with count `>2` are the classic non-manifold over-sharing the diagram shows. Both must reach exactly 2 before the mesh is watertight.
 
-## Validation & Post-Repair Checks
+### 2. Merge coincident vertices and drop degenerate faces
 
-After running the repair routine, validate the output before pipeline ingestion:
+The most common cause of phantom non-manifold edges is duplicate vertices: two faces that *look* like they share an edge actually reference different vertex indices at the same coordinate, so the adjacency map never pairs them. `merge_vertices()` welds vertices within a tolerance, collapsing those duplicates. Removing zero-area (degenerate) faces eliminates edges that exist only because of a sliver triangle.
 
-1. **Watertight Verification:** `mesh.is_watertight` must return `True`. If `False`, run `mesh.fill_holes()` only if the missing area is below a defined threshold (e.g., `< 0.5 m²` for building footprints).
-2. **Normal Consistency:** Run `mesh.fix_normals()` to ensure outward-facing orientation. Inconsistent normals break volumetric calculations and ray-casting in rendering engines.
-3. **Coordinate Integrity:** Verify that the restored CRS offset matches the original bounding box within `±1e-6` tolerance. Drift indicates precision loss during vertex merging.
+```python
+mesh.merge_vertices(digits_vertex=5)          # weld near-coincident vertices
+mesh.update_faces(mesh.nondegenerate_faces()) # drop zero-area slivers
 
-For production digital twin pipelines, wrap this routine in a validation loop that retries with tighter merge tolerances (`1e-5` → `1e-6`) if watertightness fails. Always log defect counts pre- and post-repair for audit trails. Understanding [3D Geospatial Fundamentals for Digital Twins](/3d-geospatial-fundamentals-for-digital-twins/) ensures repair thresholds align with municipal accuracy standards and downstream simulation requirements.
+sorted_edges = np.sort(mesh.edges, axis=1)
+_, inverse = np.unique(sorted_edges, axis=0, return_inverse=True)
+print("remaining non-manifold:", (np.bincount(inverse) != 2).sum())
+```
+
+In typical photogrammetry-meets-CAD merges this step alone resolves the majority of defects, because most were T-junctions and split seams rather than true triple-shared edges.
+
+### 3. Remove duplicate faces and conservatively delete true over-sharing
+
+Duplicate faces — the same triangle stored twice, common after a naive shell union — push an edge's count to 3 or 4. Drop them first with `unique_faces()`. For edges still shared by more than two faces, conservative face deletion guarantees manifold validity at the cost of a little surface area, which is acceptable for geospatial bounding volumes.
+
+```python
+mesh.update_faces(mesh.unique_faces())        # remove exact duplicate triangles
+
+sorted_edges = np.sort(mesh.edges, axis=1)
+unique_edges, inverse = np.unique(sorted_edges, axis=0, return_inverse=True)
+edge_counts = np.bincount(inverse)
+
+over_shared = np.where(edge_counts > 2)[0]
+if len(over_shared):
+    bad_edge_rows = np.where(np.isin(inverse, over_shared))[0]
+    bad_faces = np.unique(bad_edge_rows // 3)  # 3 edges per face
+    keep = np.ones(len(mesh.faces), dtype=bool)
+    keep[bad_faces] = False
+    mesh.update_faces(keep)
+    print(f"removed {len(bad_faces)} faces on over-shared edges")
+```
+
+### 4. Fill the resulting boundary holes
+
+Deleting faces (and any pre-existing dangling triangles) leaves count-1 boundary edges. `trimesh.repair` fills small holes by triangulating their loops; combined with consistent normal orientation this restores the closed surface.
+
+```python
+trimesh.repair.fill_holes(mesh)
+trimesh.repair.fix_normals(mesh)              # outward-facing, winding-consistent
+
+mesh.vertices += crs_offset                    # restore real-world coordinates
+```
+
+Only fill holes whose area is below a sane threshold (for example `< 0.5 m²` for a building footprint). A gaping hole signals missing input data, not a topology defect, and triangulating it fabricates geometry that misrepresents the real asset.
+
+### 5. Re-validate with the Euler characteristic V − E + F
+
+A closed, genus-0 manifold satisfies `V − E + F = 2`. Computing it from the deduplicated edge set is an independent check that no over-sharing survived — `is_watertight` can be fooled by some pathologies, but the Euler count cannot be if you build it from unique edges.
+
+```python
+V = len(mesh.vertices)
+F = len(mesh.faces)
+E = len(np.unique(np.sort(mesh.edges, axis=1), axis=0))
+euler = V - E + F
+print(f"V={V} E={E} F={F}  ->  V-E+F = {euler}")
+assert euler == 2, f"expected Euler 2 for closed genus-0, got {euler}"
+mesh.export("building_block_repaired.ply")
+```
+
+A cross-check in `open3d` is worth running for a second opinion, since it computes non-manifold edges with an independent half-edge implementation:
+
+```python
+import open3d as o3d
+
+m = o3d.io.read_triangle_mesh("building_block_repaired.ply")
+print("non-manifold edges:", len(m.get_non_manifold_edges()))
+print("watertight:", m.is_watertight())
+```
+
+## Expected Output & Verification
+
+Running the full sequence on a defective building shell produces something like this:
+
+```text
+non-manifold edges: 47
+  boundary (1 face): 12
+  over-shared (>2):  35
+remaining non-manifold: 8
+removed 8 faces on over-shared edges
+V=2184 E=6546 F=4364  ->  V-E+F = 2
+non-manifold edges: 0
+watertight: True
+```
+
+The pass criteria are unambiguous:
+
+- `len(mesh.get_non_manifold_edges()) == 0` in `open3d`, and `(np.bincount(inverse) != 2).sum() == 0` in `trimesh`.
+- `mesh.is_watertight` is `True`.
+- `V − E + F == 2` for a single closed genus-0 shell (for a model with `h` handles/tunnels the target is `2 − 2h`, so a torus correctly yields 0).
+
+A compact assertion block you can drop straight into a CI gate:
+
+```python
+edges = np.sort(mesh.edges, axis=1)
+counts = np.bincount(np.unique(edges, axis=0, return_inverse=True)[1])
+assert (counts != 2).sum() == 0, "non-manifold edges remain"
+assert mesh.is_watertight, "mesh is not watertight"
+```
+
+## Common Errors
+
+**`numpy.core._exceptions._ArrayMemoryError` (or vertices snapping together) on large UTM meshes.** Coordinates like `(583204.71, 4507811.93, 41.2)` lose ~2–3 cm of precision in float32, so `merge_vertices()` either welds vertices that should stay separate or fails to weld true duplicates, leaving the non-manifold count stubbornly above zero. Fix: subtract `crs_offset = mesh.vertices.mean(axis=0)` before repair and add it back after export, exactly as in step 1.
+
+**`AttributeError: 'Trimesh' object has no attribute 'remove_duplicate_faces'`.** `trimesh` 4.x removed the old in-place `remove_duplicate_faces()` and `remove_degenerate_faces()` methods. Use the boolean-mask form instead: `mesh.update_faces(mesh.unique_faces())` and `mesh.update_faces(mesh.nondegenerate_faces())`.
+
+**`is_watertight` stays `False` after `fill_holes`, even with zero non-manifold edges.** This usually means non-manifold *vertices* — a bow-tie where two shells touch at a single point without sharing an edge. `fill_holes` cannot resolve these. Split the surface first with `mesh.split(only_watertight=False)`, repair each component, and recombine, or call `open3d`'s `remove_non_manifold_edges()` followed by `remove_unreferenced_vertices()`.
+
+## Frequently Asked Questions
+
+### Why count faces per edge instead of trusting `is_watertight`?
+`is_watertight` answers a yes/no question and can be misled by certain non-manifold-vertex pathologies, whereas counting faces per unique edge tells you exactly how many edges are wrong and whether they are boundaries (count 1) or over-shared (count >2). That breakdown drives which repair to apply — hole-filling versus face deletion — so the count is both the diagnosis and the verification.
+
+### Should I delete faces or split the edge to fix over-sharing?
+Edge splitting preserves surface area but can introduce new T-junctions and is hard to make deterministic across an automated pipeline. For digital twin bounding volumes, where minor area loss is irrelevant to volumetrics and analysis, conservative face deletion followed by `fill_holes` is the safer, reproducible choice. Reserve splitting for cases where every triangle is semantically meaningful, such as textured heritage models.
+
+### What Euler value should an open or multi-tunnel mesh have?
+The `V − E + F == 2` test assumes a single closed surface with no handles. An open surface (a terrain patch with a boundary) will not equal 2 and that is correct — use the non-manifold edge count, not Euler, to validate it. A closed surface with `h` tunnels satisfies `V − E + F = 2 − 2h`, so a single-handle (torus-like) shell yields 0. Confirm the expected genus before asserting a specific number.
+
+## Related Guides
+
+- [Mesh Topology Basics](/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/) — manifold rules, half-edge structures, and normal validation
+- [Poisson Surface Reconstruction Parameters](/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/poisson-surface-reconstruction-parameters/) — generating meshes that need less repair
+- [Automated Mesh Decimation for Digital Twins](/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/) — reducing triangle count after topology is clean
+- [3D Geospatial Fundamentals for Digital Twins](/3d-geospatial-fundamentals-for-digital-twins/) — where mesh integrity fits in the wider ingestion contract
+
+Back to [Mesh Topology Basics for Digital Twins](/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/).
