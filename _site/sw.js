@@ -7,14 +7,16 @@
    - All other GETs: stale-while-revalidate as a sensible default.
 */
 
-const VERSION = "v1.0.0";
+const VERSION = "v1.0.1";
 const SHELL_CACHE = `shell-${VERSION}`;
 const RUNTIME_CACHE = `runtime-${VERSION}`;
 
+// CSS/JS are intentionally NOT precached here: they ship under stable filenames
+// but are referenced with a content-hash query (?v=…), so they're cached fresh
+// at runtime (stale-while-revalidate) keyed by the versioned URL. Precaching the
+// bare URLs would just pull a copy that the pages never request.
 const SHELL_ASSETS = [
   "/",
-  "/assets/css/styles.css",
-  "/assets/js/site.js",
   "/assets/img/logo.svg",
   "/assets/img/logo-mark.svg",
   "/assets/img/icon-192.png",
