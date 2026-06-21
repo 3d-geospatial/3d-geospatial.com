@@ -1,3 +1,7 @@
+---
+title: "Automated Mesh Decimation for Digital Twins"
+description: "Automated mesh decimation for geospatial pipelines: reduce polygon density with quadric edge-collapse while preserving topology, CRS alignment, and visual fidelity."
+---
 # Automated Mesh Decimation for Geospatial Digital Twins
 
 Raw photogrammetric and LiDAR-derived meshes routinely exceed tens or hundreds of millions of triangles, making them computationally prohibitive for real-time digital twin environments, web-based GIS viewers, and edge-deployed infrastructure models. **Automated Mesh Decimation** resolves this bottleneck by algorithmically reducing polygon density while preserving topological integrity, geospatial alignment, and visual fidelity. When integrated into a broader [Point Cloud & Mesh Processing Pipelines](/point-cloud-mesh-processing-pipelines/) architecture, decimation becomes a deterministic, repeatable step that bridges high-fidelity survey data with production-ready 3D assets.

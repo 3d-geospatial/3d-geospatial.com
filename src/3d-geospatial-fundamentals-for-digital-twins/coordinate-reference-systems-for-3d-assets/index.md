@@ -1,3 +1,7 @@
+---
+title: "Coordinate Reference Systems for 3D Assets"
+description: "Master CRS for 3D digital twins: horizontal projections, vertical datums, pyproj transformations, and CRS validation for LiDAR, BIM, and spatial pipelines."
+---
 # Coordinate Reference Systems for 3D Assets
 
 Coordinate Reference Systems for 3D Assets form the mathematical foundation of spatial accuracy in modern digital twin environments. Unlike traditional 2D GIS workflows, 3D asset pipelines must simultaneously resolve horizontal positioning, vertical datums, unit scaling, and temporal drift. Misalignment at this layer propagates through rendering engines, spatial analytics, and automated simulation pipelines, often resulting in costly rework or degraded model fidelity. This guide establishes production-ready patterns for defining, validating, and transforming 3D spatial references across engineering, urban planning, and infrastructure automation workflows.

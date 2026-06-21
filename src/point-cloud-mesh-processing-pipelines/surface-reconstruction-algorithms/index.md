@@ -1,3 +1,7 @@
+---
+title: "Surface Reconstruction for Geospatial Twins"
+description: "Surface reconstruction algorithms for digital twins: Poisson, Ball Pivoting, and alpha shapes for watertight mesh generation from LiDAR and photogrammetry."
+---
 # Surface Reconstruction Algorithms for Geospatial Digital Twins
 
 Surface reconstruction algorithms transform unstructured 3D point clouds into continuous, watertight mesh representations. In digital twin automation and urban infrastructure modeling, this conversion bridges raw LiDAR or photogrammetric captures with analysis-ready geometry. Unlike naive triangulation, modern reconstruction methods infer implicit surfaces, handle occlusions, and preserve topological consistency across complex built environments. For GIS developers and spatial engineers, selecting and tuning these algorithms directly impacts downstream simulation accuracy, asset tracking, and automated change detection.

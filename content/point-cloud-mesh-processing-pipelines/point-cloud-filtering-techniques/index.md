@@ -14,10 +14,10 @@ Before implementing filtering routines, ensure your development environment meet
 
 Install dependencies via:
 ```bash
-pip install open3d pdal numpy laspy pyproj
+pip install open3d numpy laspy pyproj
 ```
 
-Verify PDAL plugin availability, as many enterprise pipelines rely on its filter pipeline architecture for batch processing. Consult the official [PDAL Pipeline Documentation](https://pdal.io/en/stable/pipeline.html) for JSON schema validation and plugin routing. Similarly, review [Open3D Point Cloud Tutorials](https://www.open3d.org/docs/release/tutorial/geometry/pointcloud.html) to understand memory-backed tensor operations that accelerate geometric computations.
+Note: `pdal` has its own installation pathway (typically via conda or system packages). Consult the official [PDAL Pipeline Documentation](https://pdal.io/en/stable/pipeline.html) for JSON schema validation and plugin routing. Similarly, review [Open3D Point Cloud Tutorials](https://www.open3d.org/docs/release/tutorial/geometry/pointcloud.html) to understand memory-backed tensor operations that accelerate geometric computations.
 
 ## Core Filtering Workflow
 
@@ -35,16 +35,25 @@ import numpy as np
 def normalize_crs(input_path: str, target_epsg: int = 32633) -> np.ndarray:
     with laspy.open(input_path) as f:
         points = f.read()
-        header = f.header
-        
-    # Extract XYZ and verify units
+
+    # Extract XYZ — laspy 2.x applies scale + offset automatically via .x/.y/.z
     xyz = np.vstack((points.x, points.y, points.z)).T.astype(np.float64)
-    
-    # Transform if source is geographic (WGS84)
-    if header.global_encoding & 0x10:  # Check for WKT or geographic flag
-        transformer = pyproj.Transformer.from_crs("EPSG:4326", f"EPSG:{target_epsg}", always_xy=True)
+
+    # Transform if source is geographic (WGS84 lat/lon)
+    # Check VLR for CRS and compare against the target projection
+    src_crs = None
+    for vlr in points.header.vlrs:
+        if vlr.record_id in (2111, 2112):  # WKT or GeoKeyDirectory VLR
+            # In production, parse the embedded WKT/GeoKey to determine source CRS
+            src_crs = "EPSG:4326"  # Replace with parsed value
+            break
+
+    if src_crs and src_crs != f"EPSG:{target_epsg}":
+        transformer = pyproj.Transformer.from_crs(
+            src_crs, f"EPSG:{target_epsg}", always_xy=True
+        )
         xyz[:, 0], xyz[:, 1] = transformer.transform(xyz[:, 0], xyz[:, 1])
-        
+
     return xyz
 ```
 
@@ -60,10 +69,10 @@ import open3d as o3d
 def apply_sor_filter(xyz: np.ndarray, nb_neighbors: int = 20, std_ratio: float = 2.0):
     pcd = o3d.geometry.PointCloud()
     pcd.points = o3d.utility.Vector3dVector(xyz)
-    
+
     # Execute Statistical Outlier Removal
     cl, ind = pcd.remove_statistical_outlier(nb_neighbors=nb_neighbors, std_ratio=std_ratio)
-    
+
     # Return filtered points and indices for audit logging
     filtered_xyz = np.asarray(cl.points)
     return filtered_xyz, ind
@@ -76,17 +85,17 @@ def apply_sor_filter(xyz: np.ndarray, nb_neighbors: int = 20, std_ratio: float =
 
 ### Step 3: Attribute & Classification Filtering
 
-Leverage intensity, return number, classification codes, and scan angle to isolate ground, building, or vegetation classes. Intensity normalization is critical when merging multi-sensor datasets, as raw values vary by scanner manufacturer and atmospheric conditions. For rigorous quality control, consult Validating LiDAR intensity values in processing pipelines to implement histogram equalization and sensor-specific gain correction.
+Leverage intensity, return number, classification codes, and scan angle to isolate ground, building, or vegetation classes. Intensity normalization is critical when merging multi-sensor datasets, as raw values vary by scanner manufacturer and atmospheric conditions. Validate intensity distributions against known reference targets or calibration panels before applying gain corrections.
 
 ```python
-def filter_by_classification_and_return(xyz: np.ndarray, classifications: np.ndarray, 
+def filter_by_classification_and_return(xyz: np.ndarray, classifications: np.ndarray,
                                         returns: np.ndarray, target_classes: list = [2, 6]):
     # ASPRS Standard: 2=Ground, 6=Building
     class_mask = np.isin(classifications, target_classes)
-    
+
     # Prefer first returns for structural clarity
     return_mask = (returns == 1) | (returns == 2)
-    
+
     combined_mask = class_mask & return_mask
     return xyz[combined_mask]
 ```

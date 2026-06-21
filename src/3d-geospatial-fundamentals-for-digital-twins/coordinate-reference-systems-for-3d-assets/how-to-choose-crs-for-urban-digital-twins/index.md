@@ -1,3 +1,7 @@
+---
+title: "How to Choose CRS for Urban Digital Twins"
+description: "Choose the right CRS for urban digital twins: local projected systems vs WGS84, geoid-referenced vertical datums, EPSG selection, and ingestion-time transforms."
+---
 # How to choose CRS for urban digital twins
 
 Choose a **local projected coordinate system** (UTM, State Plane, or national grid) paired with a **geoid-referenced vertical datum** (orthometric height) to maintain sub-meter accuracy across both horizontal and vertical axes. Never use global geographic coordinates (WGS84 lat/lon) for core geometry storage in city-scale twins. Angular units introduce non-linear scale distortion, break spatial indexing, and cause floating-point precision loss when coordinates exceed 10⁶ meters. Store data in a single authoritative EPSG, transform on ingestion, and convert to 3D geographic only at the rendering or tiling layer.

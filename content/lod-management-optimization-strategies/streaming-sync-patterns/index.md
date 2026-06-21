@@ -8,7 +8,7 @@ This methodology directly extends foundational [LOD Management & Optimization St
 
 Before deploying a streaming sync pipeline, your spatial infrastructure must satisfy several architectural constraints. These ensure deterministic behavior under variable network conditions and prevent memory leaks during prolonged viewport navigation.
 
-- **Tiled Spatial Indexing:** Data must be partitioned into a predictable hierarchical grid (e.g., quadtree, octree, or geohash). The [OGC 3D Tiles specification](https://www.ogc.org/standards/3dtiles) provides a standardized approach to bounding volume hierarchies and metadata packaging that aligns well with streaming architectures.
+- **Tiled Spatial Indexing:** Data must be partitioned into a predictable hierarchical grid (e.g., quadtree, octree, or geohash). The [OGC 3D Tiles specification](https://www.ogc.org/standard/3dtiles/) provides a standardized approach to bounding volume hierarchies and metadata packaging that aligns well with streaming architectures.
 - **Async I/O Runtime:** Python 3.9+ with `asyncio` or Node.js with native async streams is required to handle concurrent tile requests without blocking the event loop. Synchronous HTTP clients will bottleneck under high-framerate viewport telemetry.
 - **Viewport State Telemetry:** Client-side access to camera position, orientation, field of view, and projection matrix at ≥30 Hz. This telemetry drives the spatial query engine.
 - **Priority Queue Infrastructure:** A mechanism to rank tile candidates by camera distance, frustum intersection, and LOD priority. The queue must support dynamic reordering as the viewport moves.
@@ -36,11 +36,11 @@ The reconciliation layer diffs incoming tiles against the current render state. 
 
 Streaming geospatial data introduces unique failure modes: partial tile downloads, network timeouts, and API rate limiting. Production systems must implement defensive patterns to maintain viewport stability.
 
-Network volatility is the most common cause of visual degradation. When bandwidth drops below sustainable thresholds, the sync layer should automatically downgrade LOD targets and throttle concurrent requests rather than failing outright. Engineers dealing with intermittent connectivity should review strategies for Debugging streaming stalls in low-bandwidth environments to implement adaptive bitrate logic and predictive prefetching.
+Network volatility is the most common cause of visual degradation. When bandwidth drops below sustainable thresholds, the sync layer should automatically downgrade LOD targets and throttle concurrent requests rather than failing outright. Implement adaptive bitrate logic: monitor moving-average latency and reduce `max_concurrent` requests when the 95th-percentile tile fetch time exceeds your frame budget (16ms at 60 fps).
 
-API failures require explicit circuit breaker patterns. If a tile registry endpoint returns repeated 5xx errors or exceeds timeout thresholds, the sync pipeline must temporarily halt requests to that shard, fall back to cached lower-LOD geometry, and schedule exponential backoff retries. Properly Implementing circuit breakers for tile API failures prevents cascade failures that can crash WebGL contexts or exhaust client memory.
+API failures require explicit circuit breaker patterns. If a tile registry endpoint returns repeated 5xx errors or exceeds timeout thresholds, the sync pipeline must temporarily halt requests to that shard, fall back to cached lower-LOD geometry, and schedule exponential backoff retries. This prevents cascade failures that can crash WebGL contexts or exhaust client memory.
 
-Finally, latency optimization cannot rely solely on client-side logic. Geographic distribution of tile assets through edge networks dramatically reduces time-to-first-byte (TTFB) for global digital twin deployments. Optimizing 3D asset delivery via CDN edge caching ensures that high-frequency tile requests are served from regional nodes, reducing origin server load and stabilizing frame pacing across distributed user bases.
+Geographic distribution of tile assets through edge networks dramatically reduces time-to-first-byte (TTFB) for global digital twin deployments. Serving tile files from regional CDN nodes reduces origin load and stabilizes frame pacing across distributed user bases. Configure `Cache-Control: max-age=31536000, immutable` headers on immutable tile files and use versioned paths to bust stale cache entries when tilesets are regenerated.
 
 ## Code Reliability & State Management
 

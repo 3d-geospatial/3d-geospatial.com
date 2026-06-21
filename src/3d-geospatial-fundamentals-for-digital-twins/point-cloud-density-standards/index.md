@@ -1,3 +1,7 @@
+---
+title: "Point Cloud Density Standards"
+description: "Point cloud density standards for 3D pipelines: minimum pts/m² targets per asset class, classification accuracy, and density validation for digital twins."
+---
 # Point Cloud Density Standards
 
 ## Strategic Context & Core Definitions

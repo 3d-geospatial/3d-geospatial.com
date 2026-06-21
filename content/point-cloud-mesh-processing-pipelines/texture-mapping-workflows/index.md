@@ -81,15 +81,11 @@ def prepare_and_project(mesh_path, image_path, output_path, texture_size=(2048, 
     # Load and preprocess texture
     img = Image.open(image_path).convert('RGB')
     img_resized = img.resize(texture_size, Image.LANCZOS)
-    
+
     # Assign texture and export
-    material = trimesh.visual.material.SimpleMaterial(
-        image=img_resized,
-        diffuse=None,
-        ambient=None,
-        specular=None,
-        glossiness=None
-    )
+    # SimpleMaterial accepts an image and optional PBR scalars
+    material = trimesh.visual.material.SimpleMaterial(image=img_resized)
+    # TextureVisuals maps per-vertex UVs to the material
     mesh.visual = trimesh.visual.TextureVisuals(uv=uv_coords, material=material)
     
     # Export with embedded texture

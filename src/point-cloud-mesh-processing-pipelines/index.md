@@ -1,3 +1,7 @@
+---
+title: "Point Cloud & Mesh Processing Pipelines"
+description: "End-to-end pipelines for 3D digital twins: LiDAR ingestion, point cloud filtering, surface reconstruction, mesh decimation, texturing, and CI/CD export."
+---
 # Point Cloud & Mesh Processing Pipelines for Digital Twin Automation
 
 Modern digital twin initiatives, urban infrastructure modeling, and geospatial intelligence platforms rely on high-fidelity 3D representations of the physical world. At the core of these systems are **Point Cloud & Mesh Processing Pipelines**: automated, scalable workflows that transform raw sensor data into analysis-ready, visualization-optimized, and semantically enriched 3D assets. For digital twin engineers, GIS developers, and spatial Python practitioners, building robust pipelines is no longer optional—it is the foundational requirement for reproducible, production-grade geospatial automation.

@@ -11,7 +11,7 @@ Before implementing 3D CRS workflows, validate your environment against these ba
 - **Python 3.9+** with `pyproj>=3.4`, `rasterio>=1.3`, `laspy>=2.4`, and `numpy`
 - Access to authoritative EPSG definitions and vertical datum grids (e.g., EGM2008, NAVD88, or local geoid models)
 - Source 3D assets in standardized formats (LAS/LAZ, OBJ/FBX with embedded geotags, GeoTIFF, CityGML, or 3D Tiles)
-- Familiarity with compound CRS syntax (`EPSG:XXXX+YYYY`) and PROJ transformation pipelines
+- Familiarity with compound CRS syntax (`"EPSG:XXXX+YYYY"`) and PROJ transformation pipelines
 - Validation tools for spatial integrity (e.g., `fiona`, `pdal`, or QGIS 3.34+ with 3D view)
 
 Ensure your execution environment can fetch and cache geoid grids automatically. The [PROJ documentation](https://proj.org/en/latest/usage/network.html) provides detailed guidance on configuring CDN-based grid downloads, which prevents silent fallback to ellipsoidal heights when orthometric precision is required. Network-enabled grid resolution is non-negotiable in production pipelines where vertical accuracy directly impacts clearance calculations and flood simulation.
@@ -54,36 +54,37 @@ def validate_compound_crs(crs_string: str) -> bool:
 ```
 
 ### Transforming with Grid-Aware Pipelines
-When [Converting WGS84 to local projected coordinates](/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/converting-wgs84-to-local-projected-coordinates/), always specify `always_xy=True` to prevent axis-order ambiguity between geographic and projected systems. For vertical transformations, explicitly attach the geoid grid to avoid ellipsoidal-to-orthometric drift.
+When [Converting WGS84 to local projected coordinates](/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/converting-wgs84-to-local-projected-coordinates/), always specify `always_xy=True` to prevent axis-order ambiguity between geographic and projected systems. For vertical transformations, specify a compound CRS using the combined authority string format to ensure geoid grids are applied.
 
 ```python
 import numpy as np
-from pyproj import Transformer
+from pyproj import Transformer, CRS
 
-# EPSG:4326 (WGS84) -> EPSG:32633 (UTM 33N) + EPSG:5712 (EGM2008)
+# EPSG:4326 (WGS84 geographic) -> EPSG:32633 (UTM 33N) with EPSG:5712 (EGM96) vertical
+# Use the combined authority string to specify a compound target CRS
 transformer = Transformer.from_crs(
-    "EPSG:4326+5773",
-    "EPSG:32633+5712",
+    "EPSG:4326",
+    CRS.from_authority("EPSG", "32633+5712"),
     always_xy=True,
 )
 
 # Replace with your real survey points
 lon_array = np.array([12.4924, 12.4830])
 lat_array = np.array([41.8902, 41.8986])
-height_array = np.array([21.5, 18.7])
+height_array = np.array([21.5, 18.7])  # ellipsoidal heights
 
 # Batch transform point cloud coordinates
 x_out, y_out, z_out = transformer.transform(lon_array, lat_array, height_array)
 ```
 
 ### Coordinate Epoch & Temporal Alignment
-Modern survey-grade assets often reference dynamic datums that shift over time due to tectonic movement or crustal deformation. Static transformations applied to NAD83(2011) or ETRS89 data without epoch awareness introduce millimeter-to-centimeter drift. Use `pyproj`'s epoch-aware transformation capabilities or PDAL's `filters.transformation` with explicit `--epoch` flags when processing multi-year datasets. Version your spatial references alongside asset releases to guarantee reproducibility.
+Modern survey-grade assets often reference dynamic datums that shift over time due to tectonic movement or crustal deformation. Static transformations applied to NAD83(2011) or ETRS89 data without epoch awareness introduce millimeter-to-centimeter drift. Use `pyproj`'s epoch-aware transformation capabilities or PDAL's `filters.transformation` with explicit epoch flags when processing multi-year datasets. Version your spatial references alongside asset releases to guarantee reproducibility.
 
 ## Integrating CRS with Downstream 3D Formats
 
 Coordinate systems must survive the transition from raw survey data to optimized 3D formats. Each format handles spatial metadata differently, requiring explicit binding during export.
 
-- **Point Clouds (LAS/LAZ)**: Store CRS in the Variable Length Record (VLR) header. Use `laspy` to inject EPSG codes directly into the `global_encoding` or `vlr` fields before writing. The [OGC LAS specification](https://www.ogc.org/standards/las) mandates explicit CRS tagging for interoperability.
+- **Point Clouds (LAS/LAZ)**: Store CRS in the Variable Length Record (VLR) header. Use `laspy` to inject EPSG codes directly into the `vlr` list before writing. The [OGC LAS specification](https://www.ogc.org/standard/las/) mandates explicit CRS tagging for interoperability.
 - **Meshes & CAD (OBJ/FBX/GLTF)**: These formats lack native CRS support. Embed spatial references as custom metadata blocks or companion `.prj`/`.json` files. Always document the local origin offset and axis convention.
 - **Rasters & DEMs**: GeoTIFF headers natively support compound CRS. When generating terrain surfaces, align your [Digital Elevation Model Workflows](/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/) with the same vertical datum used in your point cloud ingestion to prevent Z-axis shearing.
 
@@ -96,14 +97,14 @@ Production environments frequently encounter spatial misalignment due to implici
 1. **Z-Axis Inversion**: CAD/BIM systems often use a right-handed coordinate system with Z-up, while GIS defaults to Y-up or Z-down depending on the renderer. Normalize axes during ingestion and document the transformation matrix.
 2. **Unit Scaling Mismatches**: Mixing meters, US survey feet, and international feet in a single pipeline causes catastrophic scale errors. Always normalize to SI units (meters) before transformation and validate with known control points.
 3. **Silent Fallback to Ellipsoidal Heights**: When geoid grids are unavailable, transformation libraries default to ellipsoidal heights. This introduces 30–100m vertical offsets in regions with significant geoid undulation. Implement strict grid validation and fail-fast logging.
-4. **Implicit Re-projection in Rendering Engines**: WebGL and game engines often assume local Cartesian coordinates. When Handling projection mismatches in multi-source twins, establish a canonical target CRS early in the architecture. Route all external datasets through a unified transformation service rather than applying ad-hoc conversions at the ingestion layer.
+4. **Implicit Re-projection in Rendering Engines**: WebGL and game engines often assume local Cartesian coordinates. Establish a canonical target CRS early in the architecture and route all external datasets through a unified transformation service rather than applying ad-hoc conversions at the ingestion layer.
 
 ## Production Checklist & Validation Protocol
 
 Before deploying a 3D asset pipeline to production, verify the following:
 
 - [ ] Source CRS explicitly defined in asset headers or companion metadata
-- [ ] Compound CRS syntax validated (`EPSG:XXXX+YYYY`)
+- [ ] Compound CRS syntax validated (`"EPSG:XXXX+YYYY"` authority string)
 - [ ] Vertical datum grids cached and accessible in the execution environment
 - [ ] Axis order explicitly handled (`always_xy=True` in transformation calls)
 - [ ] Unit normalization applied (meters for Z, consistent horizontal units)

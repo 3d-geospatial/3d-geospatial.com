@@ -1,3 +1,7 @@
+---
+title: "Point Cloud Filtering Techniques"
+description: "Production point cloud filtering for digital twins: remove LiDAR noise, atmospheric scatter, and sensor drift using SOR, radius, and voxel methods in PDAL."
+---
 # Point Cloud Filtering Techniques for Digital Twin Pipelines
 
 Point cloud filtering techniques form the foundational quality gate for any automated 3D geospatial pipeline. Raw LiDAR, photogrammetric, or terrestrial laser scanning (TLS) datasets invariably contain acquisition artifacts, atmospheric scatter, vegetation penetration noise, and sensor calibration drift. Without systematic filtering, downstream processes such as mesh generation, semantic segmentation, and digital twin synchronization will propagate errors, inflate storage costs, and degrade spatial accuracy. This guide outlines production-ready filtering strategies tailored for digital twin engineers, GIS developers, and Python spatial teams. For broader context on how these routines integrate into larger geospatial architectures, refer to the [Point Cloud & Mesh Processing Pipelines](/point-cloud-mesh-processing-pipelines/) framework.

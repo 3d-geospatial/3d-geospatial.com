@@ -1,3 +1,7 @@
+---
+title: "Automated Tile Generation for 3D Geospatial"
+description: "Automated tile generation for digital twins: partition LiDAR and photogrammetry into OGC 3D Tiles, quadtrees, and multi-resolution streaming tile sets."
+---
 # Automated Tile Generation for 3D Geospatial Data & Digital Twin Automation
 
 Automated tile generation is the foundational process that transforms raw, monolithic geospatial datasets into spatially partitioned, multi-resolution assets optimized for real-time rendering and network delivery. In digital twin engineering, this pipeline replaces manual preprocessing with deterministic, scalable workflows that produce standardized tile sets (e.g., OGC 3D Tiles, Cesium Ion, or custom mesh/point cloud quadtrees). When integrated into broader [LOD Management & Optimization Strategies](/lod-management-optimization-strategies/), automated tiling ensures that massive urban-scale or infrastructure-grade datasets load predictably across heterogeneous client environments without overwhelming bandwidth or GPU memory.

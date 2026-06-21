@@ -21,8 +21,8 @@ Before deploying density validation or optimization routines, engineering teams 
 
 Global geospatial authorities publish tiered density classifications that map directly to use-case requirements. Understanding these frameworks prevents over-engineering and ensures compliance with procurement specifications. The ASPRS LiDAR Accuracy Standards provide the baseline methodology for evaluating vertical and horizontal accuracy relative to point spacing, while the [USGS 3DEP Lidar Base Specification](https://pubs.usgs.gov/tm/11b4/) defines explicit Quality Levels (QL0–QL4) that dictate minimum pulse densities for federal and municipal projects.
 
-| Quality Level | Nominal Pulse Density (ppm) | Primary Application |
-|---------------|-----------------------------|---------------------|
+| Quality Level | Nominal Pulse Density (ppsm) | Primary Application |
+|---------------|------------------------------|---------------------|
 | QL0 | 30+ | High-precision engineering, corridor mapping |
 | QL1 | 8.0 | Floodplain mapping, urban modeling |
 | QL2 | 4.0 | Regional topography, watershed analysis |

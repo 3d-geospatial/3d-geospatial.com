@@ -1,3 +1,7 @@
+---
+title: "Align Photogrammetry Textures with Point Clouds"
+description: "Align photogrammetry textures with point clouds: unify CRS, extract camera poses, apply projective UV mapping, and use GCP constraints for sub-centimeter accuracy."
+---
 # Aligning Photogrammetry Textures with Point Clouds: A Technical Guide
 
 Aligning photogrammetry textures with point clouds requires unifying disparate coordinate reference systems (CRS), extracting accurate camera poses, and applying projective texture mapping with depth-aware occlusion handling. The most reliable workflow transforms both datasets into a shared metric space, computes per-point UV coordinates via perspective projection matrices, and assigns RGB values using multi-view blending. When camera metadata is georeferenced, direct projection achieves sub-centimeter alignment; when metadata drifts, iterative registration or ground control point (GCP) constraints must precede texture baking.

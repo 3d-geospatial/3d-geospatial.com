@@ -1,3 +1,7 @@
+---
+title: "3D Geospatial Fundamentals for Digital Twins"
+description: "Technical baseline for digital twins: coordinate reference systems, terrain modeling, point cloud classification, mesh topology, and format interoperability."
+---
 # 3D Geospatial Fundamentals for Digital Twins
 
 Digital twins have evolved from conceptual 3D visualizations into mission-critical infrastructure for urban planning, asset management, and environmental simulation. However, a digital twin is only as reliable as the spatial data that anchors it. Without rigorous adherence to **3D Geospatial Fundamentals for Digital Twins**, models suffer from positional drift, analytical inaccuracies, and interoperability bottlenecks that break automated workflows.

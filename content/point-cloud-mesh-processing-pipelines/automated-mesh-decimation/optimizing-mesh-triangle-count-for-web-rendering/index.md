@@ -88,6 +88,6 @@ Before pushing optimized assets to production, verify the following:
 2. **Coordinate Verification:** Ensure all vertex coordinates fall within `[-1000, 1000]` relative to the local origin. Values outside this range reintroduce precision loss.
 3. **Normal Consistency:** Check for inverted or missing normals using `open3d.visualization.draw_geometries([mesh])`. Inconsistent normals cause backface culling errors in WebGL.
 4. **Texture/UV Alignment:** Decimation can distort UV islands. Run a UV unwrap pass or use `mesh.compute_vertex_normals()` with `split_sharps=True` if material seams appear broken.
-5. **Mobile Load Test:** Profile on mid-tier devices (e.g., iPhone 12, Pixel 6). Target <3 seconds to interactive state and <150 MB peak VRAM usage.
+5. **Mobile Load Test:** Profile on mid-tier devices (e.g., iPhone 15, Pixel 8a). Target <3 seconds to interactive state and <150 MB peak VRAM usage.
 
 Implementing [Automated Mesh Decimation](/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/) at ingestion eliminates manual cleanup, enforces consistent LOD tiers, and guarantees that your digital twin scales gracefully across desktop, tablet, and mobile viewports.

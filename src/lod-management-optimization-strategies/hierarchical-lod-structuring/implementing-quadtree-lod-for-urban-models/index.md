@@ -1,3 +1,7 @@
+---
+title: "Implementing Quadtree LOD for Urban Models"
+description: "Implement quadtree LOD for urban 3D models: recursive 2D partitioning, geometry tiers per node, screen-space error thresholds, and CRS-aligned tile trees."
+---
 # Implementing quadtree LOD for urban models
 
 Implementing quadtree LOD for urban models requires recursively partitioning a projected 2D bounding extent into four quadrants, generating pre-computed geometry tiers per node, and switching between levels at runtime using camera distance or screen-space error thresholds. The pipeline relies on planar coordinate inputs, deterministic mesh decimation, and strict bounding-box validation to prevent popping artifacts when streaming digital twin assets. Success hinges on aligning spatial subdivision with rendering engine tile boundaries and enforcing consistent coordinate reference systems (CRS) before tree construction.

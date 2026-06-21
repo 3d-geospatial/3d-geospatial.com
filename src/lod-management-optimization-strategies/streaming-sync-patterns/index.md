@@ -1,3 +1,7 @@
+---
+title: "Streaming Sync Patterns for 3D Geospatial"
+description: "Streaming sync patterns for digital twins: viewport-driven tile delivery, camera-adaptive streaming, network resilience, and state reconciliation in Python."
+---
 # Streaming Sync Patterns for 3D Geospatial Data & Digital Twin Automation
 
 Real-time spatial synchronization is the operational backbone of modern digital twins. When urban infrastructure models, BIM integrations, or large-scale terrain datasets routinely exceed client memory thresholds, static batch downloads become untenable. **Streaming Sync Patterns** solve this by establishing a continuous, state-aware pipeline between the client viewport and the server-side tile registry. Rather than treating geospatial delivery as a discrete request/response cycle, these patterns treat spatial data as a live, adaptive stream that responds dynamically to camera motion, network volatility, and rendering priorities.

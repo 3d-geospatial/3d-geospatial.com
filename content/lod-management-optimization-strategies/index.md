@@ -56,11 +56,9 @@ Core streaming mechanics:
 
 Synchronization extends beyond geometry. Attribute updates, real-time sensor feeds, and IoT telemetry must align with the correct LOD level. Mismatched temporal and spatial states cause analytical drift, particularly in simulation or monitoring workflows.
 
-## Memory Limit Management & Resource Allocation
+## Memory Budget & Resource Allocation
 
 Geospatial LOD systems operate within strict hardware budgets. Unchecked tile loading, uncompressed textures, and unbounded attribute caches quickly exhaust VRAM and system RAM, triggering garbage collection stalls or out-of-memory crashes.
-
-Memory Limit Management outlines the budgeting, compression, and lifecycle strategies required to maintain stable performance across desktop, mobile, and web deployments.
 
 Essential resource controls:
 - **VRAM Budgeting:** Allocate fixed pools for geometry buffers, texture memory, and instance data. Implement soft and hard limits that trigger tile unloading before the GPU driver intervenes.
@@ -70,11 +68,9 @@ Essential resource controls:
 
 Memory management is not a post-processing step. It must be architected into the tile request lifecycle, with strict accounting at ingestion, streaming, and rendering phases.
 
-## Compute Acceleration & GPU Offloading Techniques
+## GPU Offloading & Compute Acceleration
 
 As digital twins incorporate real-time simulation, physics, and AI-driven analytics, CPU-bound LOD processing becomes a bottleneck. Offloading computational work to the GPU unlocks parallel throughput and reduces main-thread contention.
-
-GPU Offloading Techniques explores how compute shaders, WebGPU pipelines, and async processing architectures can accelerate LOD generation, culling, and transition smoothing.
 
 High-impact acceleration patterns:
 - **GPU-Driven Culling:** Move bounding volume intersection tests and SSE calculations to compute shaders. The GPU evaluates thousands of tiles in parallel, returning only the visible subset to the render queue.

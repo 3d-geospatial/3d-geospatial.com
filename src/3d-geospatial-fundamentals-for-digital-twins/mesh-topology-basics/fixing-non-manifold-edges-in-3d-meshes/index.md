@@ -1,3 +1,7 @@
+---
+title: "Fixing Non-Manifold Edges in 3D Meshes"
+description: "Fix non-manifold edges in 3D meshes: detect T-junctions and >2-face sharing, classify violations, and apply tolerance-aware topological repair for digital twins."
+---
 # Fixing non-manifold edges in 3D meshes
 
 Fixing non-manifold edges in 3D meshes requires isolating edges shared by more than two faces or vertices with inconsistent adjacency, then applying deterministic topological surgery. The standard repair sequence is: (1) detect defects via adjacency graph traversal, (2) classify the violation (T-junctions, >2-face sharing, dangling faces, or zero-thickness shells), and (3) apply tolerance-aware repair that preserves coordinate precision while enforcing manifold topology. In geospatial and digital twin workflows, non-manifold geometry breaks watertight validation, prevents accurate volumetric analysis, and causes silent failures in spatial indexing and physics simulation.

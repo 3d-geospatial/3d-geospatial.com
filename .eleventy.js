@@ -49,7 +49,7 @@ md.renderer.rules.fence = function (tokens, idx) {
         `<span class="codeblock__lang">${langLabel}</span>` +
         `<button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button>` +
       `</div>` +
-      `<pre class="codeblock__pre language-${langLabel}"><code class="language-${langLabel}">${highlighted}</code></pre>` +
+      `<pre class="codeblock__pre language-${langLabel}" tabindex="0" role="group" aria-label="${langLabel} code sample"><code class="language-${langLabel}">${highlighted}</code></pre>` +
     `</div>\n`
   );
 };
@@ -67,7 +67,7 @@ md.use(markdownItAnchor, {
       .replace(/\s+/g, "-"),
 });
 md.use(markdownItAttrs);
-md.use(markdownItTaskLists, { enabled: true, label: false });
+md.use(markdownItTaskLists, { enabled: true, label: true });
 
 // Wrap tables so they scroll horizontally on small screens.
 const defaultTableOpen = md.renderer.rules.table_open || function (tokens, idx, options, env, self) {

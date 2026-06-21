@@ -1,3 +1,7 @@
+---
+title: "Converting WGS84 to Local Projected Coordinates"
+description: "Convert WGS84 to local projected coordinates for 3D digital twins: pyproj PROJ pipeline, UTM/State Plane transforms, and vertical datum handling for LiDAR."
+---
 # Converting WGS84 to Local Projected Coordinates
 
 Converting WGS84 to local projected coordinates requires transforming spherical latitude/longitude (EPSG:4326) into a metric Cartesian plane using a defined map projection and geodetic transformation pipeline. The production-standard approach relies on the [PROJ engine](https://proj.org/usage/transformation.html) (via `pyproj` or GDAL) to apply ellipsoid flattening, datum shifts, and projection mathematics—typically Universal Transverse Mercator (UTM), State Plane, or a custom Transverse Mercator. For 3D digital twins, you must explicitly handle the vertical component by pairing the horizontal projection with a vertical CRS or geoid model to convert ellipsoidal heights to orthometric elevations. This ensures sub-centimeter alignment across BIM, LiDAR, and IoT datasets.

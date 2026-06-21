@@ -119,7 +119,7 @@ Automate validation using `rasterstats` for zonal statistics and `whitebox` or `
 
 ## Export & Real-Time Integration
 
-Once validated, optimize the DEM for consumption by game engines, web viewers, and simulation platforms. Standard GeoTIFFs are rarely suitable for direct real-time use due to file size and lack of streaming capabilities. Convert outputs to Cloud Optimized GeoTIFF (COG) for web mapping, or to 3D Tiles/glTF for native 3D engine integration. The [OGC GeoTIFF Standard](https://www.ogc.org/standards/geotiff) defines the baseline for interoperable raster exchange, while 3D Tiles enable level-of-detail (LOD) streaming for massive terrain meshes.
+Once validated, optimize the DEM for consumption by game engines, web viewers, and simulation platforms. Standard GeoTIFFs are rarely suitable for direct real-time use due to file size and lack of streaming capabilities. Convert outputs to Cloud Optimized GeoTIFF (COG) for web mapping, or to 3D Tiles/glTF for native 3D engine integration. The [OGC GeoTIFF Standard](https://www.ogc.org/standard/geotiff/) defines the baseline for interoperable raster exchange, while 3D Tiles enable level-of-detail (LOD) streaming for massive terrain meshes.
 
 Key export considerations:
 - **Bit Depth:** Downsample to 16-bit signed integers for most visualization use cases. Reserve 32-bit float for scientific simulation.

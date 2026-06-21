@@ -36,27 +36,27 @@ def reconstruct_geospatial_mesh(pcd_path, voxel_size=0.05, knn=30, poisson_depth
     # 1. Load and downsample
     pcd = o3d.io.read_point_cloud(pcd_path)
     voxel_pcd = pcd.voxel_down_sample(voxel_size)
-    
+
     # 2. Estimate normals (critical for implicit methods)
     voxel_pcd.estimate_normals(
         search_param=o3d.geometry.KDTreeSearchParamKNN(knn=knn)
     )
     voxel_pcd.orient_normals_consistent_tangent_plane(knn)
-    
+
     # 3. Run Poisson reconstruction
     mesh, densities = o3d.geometry.TriangleMesh.create_from_point_cloud_poisson(
         voxel_pcd, depth=poisson_depth
     )
-    
+
     # 4. Filter low-density vertices (removes floating artifacts)
     vertices_to_remove = densities < np.quantile(densities, 0.01)
     mesh.remove_vertices_by_mask(vertices_to_remove)
-    
+
     # 5. Clean topology
     mesh.remove_degenerate_triangles()
     mesh.remove_duplicated_vertices()
     mesh.remove_non_manifold_edges()
-    
+
     return mesh
 ```
 
@@ -75,7 +75,7 @@ Reconstructed meshes rarely ship directly to production without validation and o
 1. **Watertightness Verification:** Use Euler characteristic checks (`V - E + F = 2` for closed genus-0 meshes) to confirm topological closure. Non-manifold edges indicate failed hole-filling or self-intersections.
 2. **Automated Mesh Decimation:** High-polygon outputs strain GIS viewers and simulation engines. Apply quadric error metric decimation to reduce triangle counts by 60–80% while preserving silhouette accuracy. Refer to our [Automated Mesh Decimation](/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/) guide for parameterized reduction strategies that maintain geospatial precision.
 3. **Coordinate Validation:** Re-project meshes to the original CRS and verify bounding box extents against source point clouds. Scaling drift often occurs during normal estimation or octree construction.
-4. **Standard Compliance:** Export to OGC 3D Tiles or CityGML formats for interoperability. The [OGC 3D Tiles Specification](https://www.ogc.org/standards/3dtiles) defines tiling, LOD, and metadata requirements for web-scale spatial delivery.
+4. **Standard Compliance:** Export to OGC 3D Tiles or CityGML formats for interoperability. The [OGC 3D Tiles Specification](https://www.ogc.org/standard/3dtiles/) defines tiling, LOD, and metadata requirements for web-scale spatial delivery.
 
 ## Common Failure Modes & Troubleshooting
 
@@ -85,10 +85,10 @@ Even well-prepared datasets encounter reconstruction failures. Recognizing failu
 |--------------|------------|-------------|
 | **Holes in facades/roofs** | Insufficient point density or severe occlusion | Increase scan overlap, apply multi-view fusion, or lower Poisson depth to encourage surface closure |
 | **Floating islands / noise meshes** | Unfiltered outliers or aggressive normal estimation | Tighten statistical outlier removal, increase density threshold filtering, or raise `np.quantile` cutoff |
-| **Self-intersecting geometry** | Overlapping scan passes or inverted normals | Run `mesh.remove_self_intersections()`, verify normal orientation consistency, and apply Laplacian smoothing |
+| **Self-intersecting geometry** | Overlapping scan passes or inverted normals | Run `mesh.remove_non_manifold_edges()`, verify normal orientation consistency, and apply Laplacian smoothing |
 | **Excessive polygon count** | High octree depth or unoptimized decimation | Reduce `poisson_depth` to 8–9, apply quadric decimation, and validate against target LOD budgets |
 
-When automated pipelines generate persistent artifacts, systematic isolation of the preprocessing step usually reveals the bottleneck. For advanced debugging workflows and topology repair heuristics, consult Handling mesh artifacts from automated reconstruction.
+When automated pipelines generate persistent artifacts, systematic isolation of the preprocessing step usually reveals the bottleneck. Incrementally tighten SOR parameters, verify normal consistency with `mesh.is_winding_consistent`, and reduce octree depth to rule out overfitting before adjusting other variables.
 
 ## Scaling to Production Pipelines
 

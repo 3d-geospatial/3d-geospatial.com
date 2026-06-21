@@ -1,3 +1,7 @@
+---
+title: "Optimizing Mesh Triangle Count for Web"
+description: "Optimize mesh triangle count for WebGL digital twins: target 50k–200k triangles per asset, apply quadric decimation, and stream via 3D Tiles for web rendering."
+---
 # Optimizing Mesh Triangle Count for Web Rendering
 
 Optimizing mesh triangle count for web rendering requires targeting **50,000–200,000 triangles per visible asset**, enforcing quadric edge-collapse decimation, and pairing geometry reduction with WebGL-compatible coordinate normalization. For geospatial digital twins, raw photogrammetric or LiDAR-derived meshes must be processed through automated pipelines that preserve topology, maintain georeferencing accuracy, and stream via tile-based formats. Exceeding ~2 million triangles per scene triggers WebGL buffer exhaustion, mobile GPU throttling, and unacceptable initial load times.

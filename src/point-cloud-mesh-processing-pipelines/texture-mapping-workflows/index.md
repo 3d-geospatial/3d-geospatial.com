@@ -1,3 +1,7 @@
+---
+title: "Texture Mapping Workflows for Digital Twins"
+description: "Texture mapping for geospatial digital twins: deterministic UV projection, CRS-aware alignment, multi-view blending, and automated photogrammetry workflows."
+---
 # Texture Mapping Workflows for Geospatial Digital Twins
 
 Texture mapping bridges the gap between metrically accurate geometry and photorealistic visualization. In the context of urban digital twins and infrastructure automation, **Texture Mapping Workflows** must preserve geospatial fidelity, minimize visual artifacts, and scale across municipal datasets. Unlike entertainment pipelines that prioritize artistic control, geospatial pipelines demand deterministic projection, coordinate-aware alignment, and automated validation. This guide outlines production-grade patterns for mapping aerial, terrestrial, and satellite-derived imagery onto reconstructed meshes.

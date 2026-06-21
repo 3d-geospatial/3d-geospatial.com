@@ -1,3 +1,7 @@
+---
+title: "Digital Elevation Model Workflows"
+description: "Build DEM pipelines for digital twins: ingest raw elevation data, generate validated surfaces, and export optimized terrain for real-time 3D environments."
+---
 # Digital Elevation Model Workflows
 
 Digital Elevation Model Workflows form the foundational terrain layer for any production-grade digital twin. Whether simulating flood propagation, optimizing drone flight corridors, or anchoring BIM assets to real-world topography, the accuracy, resolution, and spatial consistency of your DEM directly dictate downstream simulation fidelity. This guide outlines a repeatable, automation-ready pipeline for ingesting raw elevation data, generating validated surfaces, and exporting optimized assets for real-time 3D environments.

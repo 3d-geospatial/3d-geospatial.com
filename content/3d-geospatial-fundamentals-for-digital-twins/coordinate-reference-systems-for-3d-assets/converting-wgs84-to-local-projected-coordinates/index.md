@@ -12,7 +12,7 @@ Selecting a projection with minimal scale factor deviation (<1:10,000) at your s
 
 1. **Identify the Optimal Local CRS**: Determine the projection that minimizes distortion for your site extent. UTM zones work for regional coverage, while State Plane or custom Transverse Mercator systems are preferred for municipal infrastructure. Verify the EPSG code or construct a custom PROJ string with your central meridian, false easting/northing, and scale factor.
 2. **Define the Transformation Chain**: WGS84 → Target CRS requires a datum transformation. Modern PROJ automatically resolves grid shift files (NTv2, NADCON, or geoid TIFFs) when standard EPSG codes are used. Avoid hardcoding `+towgs84` parameters unless working in legacy or offline environments.
-3. **Handle Vertical Coordinates via Compound CRS**: Geographic coordinates store ellipsoidal height, which differs from mean sea level by geoid undulation. For digital twins, pair your horizontal EPSG with a vertical EPSG (e.g., `EPSG:32618+5703` for UTM Zone 18N + NAVD88) or apply a geoid correction before projection.
+3. **Handle Vertical Coordinates via Compound CRS**: Geographic coordinates store ellipsoidal height, which differs from mean sea level by geoid undulation. For digital twins, specify a compound CRS using the combined EPSG authority string (e.g., `"EPSG:32618+5703"` for UTM Zone 18N + NAVD88) or apply a geoid correction before projection.
 4. **Execute Vectorized Transformation**: Use array-backed operations to process thousands of points efficiently. Avoid Python loops; leverage the C-optimized backend in `pyproj` or `rasterio`. Always enforce `always_xy=True` to prevent coordinate axis order confusion.
 
 ## Production-Ready Python Implementation
@@ -24,12 +24,14 @@ import numpy as np
 from pyproj import Transformer, CRS
 
 # 1. Define source and target CRS
-# WGS84 (EPSG:4326) -> UTM Zone 18N (EPSG:32618)
+# WGS84 geographic 3D (EPSG:4326) -> UTM Zone 18N (EPSG:32618)
 crs_source = CRS.from_epsg(4326)
 crs_target_2d = CRS.from_epsg(32618)
 
-# For 3D: Compound CRS (Horizontal UTM + Vertical NAVD88)
-crs_target_3d = CRS.from_epsg(32618) + CRS.from_epsg(5703)
+# For 3D: Compound CRS string "EPSG:HORIZ+VERT"
+# EPSG:32618 = UTM Zone 18N, EPSG:5703 = NAVD88 height
+# pyproj accepts the combined authority string directly
+crs_target_3d = CRS.from_authority("EPSG", "32618+5703")
 
 # 2. Initialize Transformers (C-optimized, thread-safe)
 transformer_2d = Transformer.from_crs(crs_source, crs_target_2d, always_xy=True)
@@ -63,20 +65,22 @@ print("\n3D Local Coordinates (with orthometric heights):\n", local_coords_3d)
 
 **Key Implementation Notes:**
 - `always_xy=True` forces longitude/latitude order regardless of CRS axis definition, preventing silent coordinate swaps.
-- Compound CRS syntax (`+`) automatically chains horizontal projection and vertical geoid transformation in a single pass.
+- Compound CRS is specified as a single authority string `"EPSG:32618+5703"` passed to `CRS.from_authority("EPSG", "32618+5703")`. Do not use the Python `+` operator on two `CRS` objects—that syntax is not valid in pyproj.
 - The [pyproj Transformer API](https://pyproj4.github.io/pyproj/stable/api/transformer.html) caches transformation pipelines internally, making repeated calls highly efficient for streaming telemetry or large point clouds.
+- Vertical transformation accuracy depends on PROJ's ability to download geoid grid files. Enable network access (`PROJ_NETWORK=ON`) or pre-cache grids to prevent silent fallback to ellipsoidal heights.
 
 ## Critical Validation & Pitfalls
 
 | Pitfall | Impact | Mitigation |
 |---------|--------|------------|
 | **Axis Order Confusion** | Coordinates flipped (lat/lon vs lon/lat) | Always use `always_xy=True` or explicitly define `CRS.from_user_input("EPSG:4326").axis_info` |
-| **Ignoring Geoid Separation** | 10–50m vertical drift in 3D twins | Use compound CRS or apply `geoidgrids` via PROJ parameters (`+geoidgrids=us_nga_egm2008_1.tif`) |
+| **Ignoring Geoid Separation** | 10–50m vertical drift in 3D twins | Use compound CRS authority string (`"EPSG:32618+5703"`) or apply `geoidgrids` via PROJ parameters |
 | **Hardcoded `+towgs84`** | Inaccurate datum shifts across regions | Rely on EPSG codes; let PROJ auto-resolve NTv2/NADCON grids |
 | **Loop-Based Transforms** | 100x+ slower on >10k points | Pass NumPy arrays directly to `transformer.transform()` |
+| **Missing geoid grids** | Silent fallback to ellipsoidal Z | Set `PROJ_NETWORK=ON` or distribute grid files with your pipeline |
 
 ### Verification Checklist
-1. **Scale Factor Check**: Confirm the projection's scale factor at your site centroid is ≤ 1.0001. Use `projinfo --include-geodesic` to inspect distortion parameters.
+1. **Scale Factor Check**: Confirm the projection's scale factor at your site centroid is ≤ 1.0001. Use `projinfo` to inspect distortion parameters for your chosen EPSG zone.
 2. **Control Point Validation**: Transform 3–5 surveyed ground control points (GCPs) and compare against known local coordinates. Tolerances should stay within ±2cm for engineering-grade twins.
 3. **Metadata Preservation**: Store the source EPSG, target EPSG, transformation date, and grid file versions alongside your dataset. Digital twin platforms require provenance for audit compliance.
 

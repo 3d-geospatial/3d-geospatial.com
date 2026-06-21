@@ -21,7 +21,7 @@ Modular design ensures that individual stages can be swapped, parallelized, or s
 
 Raw 3D data arrives in heterogeneous formats: LAS/LAZ for airborne LiDAR, E57 for terrestrial scanners, and dense PLY/OBJ outputs from photogrammetry engines. The first pipeline stage must normalize these inputs into a unified spatial reference system.
 
-Coordinate alignment requires strict handling of horizontal datums (EPSG codes), vertical datums (orthometric vs. ellipsoidal heights), and sensor-specific offsets. Misalignment at this stage propagates as systematic drift downstream, corrupting volumetric calculations and spatial queries. Tools like the [Point Data Abstraction Library (PDAL)](https://pdal.io/pipeline.html) provide pipeline-driven translation, reprojection, and metadata extraction without loading entire datasets into memory.
+Coordinate alignment requires strict handling of horizontal datums (EPSG codes), vertical datums (orthometric vs. ellipsoidal heights), and sensor-specific offsets. Misalignment at this stage propagates as systematic drift downstream, corrupting volumetric calculations and spatial queries. Tools like the [Point Data Abstraction Library (PDAL)](https://pdal.io/en/stable/pipeline.html) provide pipeline-driven translation, reprojection, and metadata extraction without loading entire datasets into memory.
 
 ```json
 {
@@ -30,7 +30,7 @@ Coordinate alignment requires strict handling of horizontal datums (EPSG codes),
     {
       "type": "filters.reprojection",
       "in_srs": "EPSG:32633",
-      "out_srs": "EPSG:32633+EGM96"
+      "out_srs": "EPSG:32633+5773"
     },
     {
       "type": "filters.sort",
@@ -93,7 +93,7 @@ Semantic enrichment transforms visual models into queryable digital twins. Class
 
 The final pipeline stage converts optimized, textured, and semantically enriched meshes into deployment-ready formats. Standardization ensures interoperability across visualization platforms, simulation engines, and spatial databases.
 
-Industry adoption of open standards like [OGC 3D Tiles](https://www.ogc.org/standards/3dtiles) has streamlined streaming and rendering of massive geospatial datasets. Export pipelines should support:
+Industry adoption of open standards like [OGC 3D Tiles](https://www.ogc.org/standard/3dtiles/) has streamlined streaming and rendering of massive geospatial datasets. Export pipelines should support:
 - **glTF/GLB**: For web-based visualization and real-time rendering engines.
 - **3D Tiles / i3s**: For cloud-native streaming and LOD management.
 - **CityGML / IFC**: For BIM integration and semantic querying.

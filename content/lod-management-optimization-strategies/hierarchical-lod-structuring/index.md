@@ -125,7 +125,7 @@ def partition_quadtree(points: np.ndarray,
 | **Memory Leaks During Streaming** | Unbounded tile cache or missing eviction hooks | Implement LRU cache with strict VRAM limits; monitor `performance.memory` in WebGL contexts |
 | **CRS Drift & Tile Misalignment** | Mixing WGS84 lat/lon with projected meters during partitioning | Normalize to EPSG:3857 or local UTM before tree construction; validate with `pyproj` transformations |
 | **Network Stalls & Frame Drops** | Synchronous tile requests blocking the main thread | Use Web Workers for tile parsing; implement progressive loading with placeholder geometries |
-| **Inconsistent Transition Pop-in** | Hard LOD thresholds without crossfading or morphing | Automating LOD transition thresholds based on FPS provides runtime heuristics that blend levels dynamically based on frame budget |
+| **Inconsistent Transition Pop-in** | Hard LOD thresholds without crossfading or morphing | Crossfade or geometrically morph between levels, and drive transition thresholds dynamically from the frame budget (FPS) so detail blends in rather than popping |
 
 ## Operational Best Practices
 

@@ -1,3 +1,7 @@
+---
+title: "Mesh Topology Basics for Digital Twins"
+description: "Understand mesh topology for 3D digital twins: vertices, edges, faces, watertight surfaces, manifold integrity, and Python repair workflows."
+---
 # Mesh Topology Basics
 
 In the architecture of modern digital twins, geometric fidelity is only as reliable as the underlying structural rules that define it. **Mesh Topology Basics** govern how vertices, edges, and faces interconnect to form watertight, computationally stable surfaces. For digital twin engineers and spatial developers, understanding these rules is not optional; it is the foundation for reliable spatial analysis, real-time rendering, and automated geospatial processing pipelines. When topology breaks, downstream operations fail: spatial queries return nulls, physics simulations crash, and coordinate transformations introduce catastrophic drift.

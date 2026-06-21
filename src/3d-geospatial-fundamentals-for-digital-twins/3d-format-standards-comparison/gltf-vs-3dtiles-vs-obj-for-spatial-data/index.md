@@ -1,3 +1,7 @@
+---
+title: "glTF vs 3D Tiles vs OBJ for Spatial Data"
+description: "Compare glTF, 3D Tiles, and OBJ for digital twin spatial data: streaming scale, CRS preservation, rendering engine compatibility, and conversion best practices."
+---
 # glTF vs 3DTiles vs OBJ for Spatial Data in Digital Twin Pipelines
 
 For spatial data in digital twin pipelines, **3D Tiles** is the definitive choice for large-scale, coordinate-accurate geospatial streaming. **glTF** excels at high-fidelity, asset-level rendering with physically based materials and web-native performance. **OBJ** should be restricted to legacy CAD exchange or isolated static meshes where geospatial context is irrelevant. The decision hinges on three technical constraints: scene scale, coordinate reference system (CRS) preservation, and target rendering engine requirements.

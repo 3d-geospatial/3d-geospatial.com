@@ -1,3 +1,7 @@
+---
+title: "Hierarchical LOD Structuring for Digital Twins"
+description: "Hierarchical LOD structuring for 3D platforms: quadtrees, octrees, bounding volume hierarchies, geometric error metrics, and viewport-dependent streaming."
+---
 # Hierarchical LOD Structuring for 3D Geospatial Data & Digital Twin Automation
 
 Hierarchical LOD Structuring serves as the architectural backbone of scalable digital twin pipelines. Unlike flat level-of-detail systems that swap entire models at arbitrary distances, hierarchical approaches organize geospatial assets into nested spatial partitions—typically quadtrees for terrain and urban footprints, or octrees for volumetric infrastructure. Each node in the hierarchy contains a progressively refined representation of the geometry, enabling viewport-dependent streaming, predictable memory footprints, and seamless transitions across city-scale datasets.

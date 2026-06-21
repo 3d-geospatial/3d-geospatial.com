@@ -43,8 +43,9 @@ def fix_non_manifold_edges(input_path, output_path, merge_tol=1e-4, crs_offset=N
     mesh.merge_vertices()
     
     # 2. Remove zero-area/degenerate faces
-    mesh.update_faces(mesh.nondegenerate_faces())
-    
+    # nondegenerate_faces() returns a boolean mask in trimesh >= 3.x
+    mesh.update_faces(mesh.nondegenerate_faces(height=1e-8))
+
     # 3. Identify non-manifold edges via unique edge-face mapping
     # mesh.edges returns an (N_faces * 3, 2) array
     edges = mesh.edges
@@ -69,7 +70,7 @@ def fix_non_manifold_edges(input_path, output_path, merge_tol=1e-4, crs_offset=N
         valid_mask[bad_face_indices] = False
         mesh.update_faces(valid_mask)
         
-    # 4. Final topology cleanup
+    # 4. Final topology cleanup — drop duplicate faces (trimesh 4.x API)
     mesh.update_faces(mesh.unique_faces())
     mesh.fix_normals()
     
@@ -84,7 +85,7 @@ def fix_non_manifold_edges(input_path, output_path, merge_tol=1e-4, crs_offset=N
 ### Key Implementation Notes
 - **CRS Offset Handling:** Large UTM coordinates cause floating-point precision loss during adjacency hashing. Shifting to the origin before repair and restoring afterward prevents vertex snapping artifacts.
 - **Conservative Deletion:** The script removes faces attached to non-manifold edges rather than attempting to split them. This guarantees topological validity at the cost of minor surface area loss, which is acceptable for geospatial bounding volumes.
-- **Modern `trimesh` API:** `mesh.nondegenerate_faces()` and `mesh.unique_faces()` produce boolean masks that you feed into `mesh.update_faces(...)`, replacing the older `remove_degenerate_faces()` and `remove_duplicate_faces()` calls. See the [trimesh Repair Documentation](https://trimesh.org/trimesh.repair.html) for version-specific method signatures.
+- **trimesh API notes:** `mesh.nondegenerate_faces(height=...)` returns a boolean mask suitable for `mesh.update_faces(...)`. In trimesh 4.x the older `remove_duplicate_faces()` helper was removed; filter duplicates with `mesh.update_faces(mesh.unique_faces())` instead. See the [trimesh Repair Documentation](https://trimesh.org/trimesh.repair.html) for version-specific method signatures.
 
 ## Validation & Post-Repair Checks
 

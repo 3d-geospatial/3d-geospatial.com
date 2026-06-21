@@ -1,3 +1,7 @@
+---
+title: "Poisson Surface Reconstruction Parameters"
+description: "Tune Poisson surface reconstruction for geospatial meshes: depth, point_weight, samples_per_node settings for LiDAR, UAV, and infrastructure digital twins."
+---
 # Poisson Surface Reconstruction Parameters for Geospatial Meshes
 
 **Poisson surface reconstruction parameters** control the implicit function solver that converts unoriented or partially oriented point clouds into watertight, manifold meshes. For digital twin and geospatial automation, tuning these values directly dictates topology quality, semantic segmentation accuracy, and 3D tile streaming performance. The three critical controls are `depth` (octree resolution), `point_weight` (normal confidence scaling), and `samples_per_node` (surface sampling density). Start with `depth=8`, `point_weight=4.0`, and `samples_per_node=1.5` for aerial LiDAR or UAV photogrammetry datasets. Increase `depth` logarithmically for infrastructure-scale detail, and lower `point_weight` when normals are noisy or derived from uncalibrated SfM pipelines. The solver assumes locally consistent normals; improper parameterization produces non-manifold artifacts, floating fragments, or excessive smoothing of sharp architectural edges.

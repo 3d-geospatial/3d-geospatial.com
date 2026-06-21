@@ -1,3 +1,7 @@
+---
+title: "LiDAR Point Density Best Practices"
+description: "LiDAR point density best practices for infrastructure digital twins: asset-specific pts/m² targets for bridges, corridors, terrain, and volumetric validation."
+---
 # Best Practices for LiDAR Point Density in Infrastructure
 
 Infrastructure digital twins require a tiered, asset-specific point density strategy. Target **50–100 pts/m²** for high-precision structural elements (bridges, tunnels, substations), **20–50 pts/m²** for linear corridors (highways, railways, pipelines), and **8–15 pts/m²** for broad terrain or right-of-way mapping. Density targets must align with downstream digital twin accuracy requirements, sensor physics, and processing constraints. Over-sampling inflates storage and compute costs without measurable geometric improvement, while under-sampling introduces aliasing, classification errors, and feature loss.

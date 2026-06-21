@@ -1,3 +1,7 @@
+---
+title: "3D Format Standards Comparison"
+description: "Compare 3D Tiles, glTF, OBJ, CityGML, and IFC for digital twin pipelines: rendering performance, metadata fidelity, streaming, and conversion patterns."
+---
 # 3D Format Standards Comparison for Digital Twin Automation
 
 Selecting the correct spatial data format is an architectural decision that dictates rendering performance, metadata fidelity, and pipeline scalability. A comprehensive **3D Format Standards Comparison** reveals that no single specification dominates every use case; instead, interoperability depends on aligning format capabilities with digital twin requirements such as real-time streaming, semantic querying, or high-fidelity archival. This guide provides a structured evaluation framework, tested conversion patterns, and production-ready validation workflows for engineering teams building automated geospatial pipelines.

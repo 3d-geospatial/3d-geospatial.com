@@ -1,3 +1,7 @@
+---
+title: "Removing Noise from Terrestrial LiDAR Scans"
+description: "Remove noise from terrestrial LiDAR scans: staged SOR + radius filtering, voxel downsampling, Open3D/PDAL implementation, and CRS-preserving pipeline patterns."
+---
 # Removing Noise from Terrestrial LiDAR Scans: Production Pipeline & Tuning Guide
 
 **Removing noise from terrestrial LiDAR scans** requires a staged filtering pipeline that isolates sensor artifacts, atmospheric scatter, and multipath reflections before downstream mesh generation or digital twin ingestion. The most reliable production approach combines statistical outlier removal (SOR) with radius-based neighborhood filtering, followed by voxel grid downsampling to normalize point density. Implement this via Open3D or PDAL, ensuring coordinate reference system (CRS) integrity and preserving structural edges critical for infrastructure modeling. Avoid single-pass aggressive filters; they erase fine architectural details and degrade registration accuracy.

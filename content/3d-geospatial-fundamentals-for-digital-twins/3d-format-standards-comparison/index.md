@@ -50,7 +50,7 @@ Reliable format conversion requires deterministic, idempotent pipelines. A robus
 5. **Publishing:** Upload to object storage, register with a spatial database, and trigger CDN cache invalidation.
 
 ### Validation & Quality Assurance
-Automated validation prevents corrupted assets from reaching production environments. Below is a Python-based validation pattern using `py3dtiles` and `trimesh` to verify tileset integrity and mesh topology:
+Automated validation prevents corrupted assets from reaching production environments. Below is a Python-based validation pattern using `trimesh` to verify mesh topology:
 
 ```python
 import trimesh
@@ -87,7 +87,7 @@ Integrating these checks into CI/CD pipelines ensures that only validated, strea
 Optimizing spatial data delivery requires balancing visual fidelity with network constraints. Key strategies include:
 
 - **Aggressive Compression:** Apply Draco for geometry and Basis Universal for textures. Target a 60-80% size reduction while maintaining sub-pixel accuracy.
-- **Spatial Partitioning:** Use octrees or KD-trees to partition large datasets. Proper spatial indexing drastically reduces query latency and improves frustum culling efficiency. For implementation patterns, see Implementing spatial indexing for fast query rendering.
+- **Spatial Partitioning:** Use octrees or KD-trees to partition large datasets. Proper spatial indexing drastically reduces query latency and improves frustum culling efficiency.
 - **Dynamic LOD Generation:** Pre-compute multiple resolution tiers. Use screen-space error metrics to switch between LODs seamlessly during camera movement.
 - **Metadata Stripping:** Remove unused CAD layers, hidden geometry, and redundant UV channels before packaging. Lean assets reduce memory footprint and accelerate GPU transfer.
 
