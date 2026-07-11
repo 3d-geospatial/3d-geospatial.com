@@ -6,7 +6,7 @@ description: "Bake tangent-space normal and ambient-occlusion maps from a high-p
 
 Baking normal and ambient-occlusion maps means transferring the surface detail of a high-poly mesh onto a decimated low-poly mesh as two textures — a tangent-space normal map that fakes the fine relief the decimation discarded, and an occlusion map that darkens crevices — so a web/glTF asset looks detailed while streaming a fraction of the triangles. This page unwraps the low-poly with `xatlas`, cage-projects and ray-casts against the high-poly with `trimesh` and `numpy`, encodes tangent-space normals, and packs the result into a glTF `normalTexture` and `occlusionTexture`, working throughout in EPSG:32618 (UTM zone 18N).
 
-You hit this the moment [automated mesh decimation](/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/) takes a 40 M-triangle photogrammetric facade down to a web budget and the rooflines, mullions, and stone relief vanish with the triangles. Baking is how that detail survives: it is measured once, at build time, from the high-poly source and stored as an image the GPU samples per pixel, so the low-poly mesh shades as if the geometry were still there. It sits at the end of the [texture mapping workflows](/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/), after the diffuse atlas is produced.
+You hit this the moment [automated mesh decimation](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/) takes a 40 M-triangle photogrammetric facade down to a web budget and the rooflines, mullions, and stone relief vanish with the triangles. Baking is how that detail survives: it is measured once, at build time, from the high-poly source and stored as an image the GPU samples per pixel, so the low-poly mesh shades as if the geometry were still there. It sits at the end of the [texture mapping workflows](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/), after the diffuse atlas is produced.
 
 <figure class="diagram">
 <svg viewBox="0 0 820 300" role="img" aria-labelledby="bake-t bake-d" xmlns="http://www.w3.org/2000/svg">
@@ -46,7 +46,7 @@ You hit this the moment [automated mesh decimation](/point-cloud-mesh-processing
 ## Prerequisites
 
 - Python 3.10+ with `xatlas>=0.0.9`, `trimesh>=4.0`, `numpy>=1.24`, `Pillow>=10.0`: `pip install xatlas "trimesh>=4.0" "numpy>=1.24" Pillow`. Install `rtree` and `pyembree` (or `trimesh[easy]`) so `trimesh`'s ray caster is fast.
-- A high-poly source mesh and a decimated low-poly mesh of the same asset, both in EPSG:32618. Preserve UV seams through decimation first — see [preserving UV seams during mesh decimation](/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/preserving-uv-seams-during-mesh-decimation/) — because the bake writes into the low-poly's UV layout. Shift both to a shared local origin so ray math stays precise on six-figure UTM eastings.
+- A high-poly source mesh and a decimated low-poly mesh of the same asset, both in EPSG:32618. Preserve UV seams through decimation first — see [preserving UV seams during mesh decimation](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/preserving-uv-seams-during-mesh-decimation/) — because the bake writes into the low-poly's UV layout. Shift both to a shared local origin so ray math stays precise on six-figure UTM eastings.
 - Blender's `bpy` is a capable alternative baker (`Cycles` bake type `NORMAL`/`AO`); this page stays in pure Python so the bake runs headless in CI without a Blender install.
 
 ## Step-by-Step
@@ -216,10 +216,10 @@ Validate the container with `gltf-validator facade_baked.glb`; it confirms the `
 
 ## Related Guides
 
-- [Texture Mapping Workflows for Digital Twins](/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/) — the diffuse-atlas pipeline this baking step extends
-- [Aligning Photogrammetry Textures with Point Clouds](/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/aligning-photogrammetry-textures-with-point-clouds/) — projecting source imagery before you bake maps
-- [Preserving UV Seams During Mesh Decimation](/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/preserving-uv-seams-during-mesh-decimation/) — keeping the low-poly UV layout the bake writes into
-- [Optimizing Mesh Triangle Count for Web Rendering](/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/optimizing-mesh-triangle-count-for-web-rendering/) — producing the low-poly the maps rescue
-- [glTF vs 3D Tiles vs OBJ for Spatial Data](/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/gltf-vs-3dtiles-vs-obj-for-spatial-data/) — the container the baked textures ship in
+- [Texture Mapping Workflows for Digital Twins](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/) — the diffuse-atlas pipeline this baking step extends
+- [Aligning Photogrammetry Textures with Point Clouds](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/aligning-photogrammetry-textures-with-point-clouds/) — projecting source imagery before you bake maps
+- [Preserving UV Seams During Mesh Decimation](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/preserving-uv-seams-during-mesh-decimation/) — keeping the low-poly UV layout the bake writes into
+- [Optimizing Mesh Triangle Count for Web Rendering](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/optimizing-mesh-triangle-count-for-web-rendering/) — producing the low-poly the maps rescue
+- [glTF vs 3D Tiles vs OBJ for Spatial Data](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/gltf-vs-3dtiles-vs-obj-for-spatial-data/) — the container the baked textures ship in
 
-Back to [Texture Mapping Workflows for Digital Twins](/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/).
+Back to [Texture Mapping Workflows for Digital Twins](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/).

@@ -1,6 +1,6 @@
 # Optimizing Mesh Triangle Count for Web Rendering
 
-Optimizing mesh triangle count for web rendering means decimating a raw photogrammetric or LiDAR-derived mesh with `open3d` down to a fixed triangle budget, while preserving boundary edges and UV seams and packing vertices as `float32` around a local origin before exporting glTF. This page is the focused, runnable companion to [Automated Mesh Decimation for Digital Twins](/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/): it takes one mesh and one budget and walks the reduction end to end.
+Optimizing mesh triangle count for web rendering means decimating a raw photogrammetric or LiDAR-derived mesh with `open3d` down to a fixed triangle budget, while preserving boundary edges and UV seams and packing vertices as `float32` around a local origin before exporting glTF. This page is the focused, runnable companion to [Automated Mesh Decimation for Digital Twins](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/): it takes one mesh and one budget and walks the reduction end to end.
 
 You hit this problem the moment a digital twin moves from a desktop GIS viewer to a browser. A RealityCapture or Pix4D export can carry 5–20 million triangles per building block — fine for a workstation, fatal for WebGL. Three constraints bite at once. **Draw calls:** every unbatched mesh is a separate GPU draw call, and a few hundred is the practical ceiling on a mobile browser before frame pacing collapses. **GPU memory:** vertex buffers are uploaded whole, and mobile Safari throttles or crashes the WebGL context past roughly 150 MB of resident VRAM — and a triangle at full `float32` position plus normal plus UV costs around 32 bytes of buffer, so two million triangles is already ~64 MB before textures. **Float precision:** WebGL stores positions as IEEE 754 `float32` (~7 significant digits), so a vertex at UTM easting 583,000.214 collapses to centimetre jitter, producing z-fighting and shimmering. Decimation, local-origin shifting, and `float32` packing solve all three in one pass.
 
@@ -197,10 +197,10 @@ Casting under your control surfaces precision problems at build time instead of 
 
 ## Related Guides
 
-- [Automated Mesh Decimation for Digital Twins](/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/) — the full decimation workflow this page drills into
-- [Poisson Surface Reconstruction Parameters](/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/poisson-surface-reconstruction-parameters/) — generating the mesh you are about to decimate
-- [Hierarchical LOD Structuring for Digital Twins](/lod-management-optimization-strategies/hierarchical-lod-structuring/) — fitting decimated tiles into an LOD tree
-- [Automated Tile Generation for 3D Geospatial](/lod-management-optimization-strategies/automated-tile-generation/) — packaging glTF into streamable 3D Tiles
-- [glTF vs 3D Tiles vs OBJ for Spatial Data](/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/gltf-vs-3dtiles-vs-obj-for-spatial-data/) — choosing the export container
+- [Automated Mesh Decimation for Digital Twins](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/) — the full decimation workflow this page drills into
+- [Poisson Surface Reconstruction Parameters](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/poisson-surface-reconstruction-parameters/) — generating the mesh you are about to decimate
+- [Hierarchical LOD Structuring for Digital Twins](https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/) — fitting decimated tiles into an LOD tree
+- [Automated Tile Generation for 3D Geospatial](https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/) — packaging glTF into streamable 3D Tiles
+- [glTF vs 3D Tiles vs OBJ for Spatial Data](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/gltf-vs-3dtiles-vs-obj-for-spatial-data/) — choosing the export container
 
-Back to [Automated Mesh Decimation for Digital Twins](/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/)
+Back to [Automated Mesh Decimation for Digital Twins](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/)

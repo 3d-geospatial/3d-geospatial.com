@@ -1,6 +1,6 @@
 # CI/CD Automation for GDAL, PDAL, and 3D Tiles Spatial Pipelines
 
-A spatial data pipeline that only runs on one engineer's laptop is a liability, not a product. The moment a second person edits a PDAL pipeline, bumps a GDAL version, or tweaks a decimation target, the output drifts — a reprojection lands in the wrong EPSG, a tileset gains a non-monotonic `geometricError`, or a `tileset.json` ships malformed and a client fails to load it in production. Continuous integration and continuous deployment fix this by making the pipeline itself the thing under version control: every change to processing code runs the same ingest → process → validate → publish sequence in a clean container, blocks the merge if any geometry or schema check fails, and promotes only validated artifacts to a CDN or [Cesium ion](https://cesium.com/platform/cesium-ion/). This page is the orchestration blueprint for that system — containerised GitHub Actions runners with pinned `gdal` and `pdal`, matrix jobs fanned out over tiles, caching, secrets handling, and artifact promotion — with the three deep-dive companions ([GitHub Actions GDAL/PDAL jobs](/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/github-actions-gdal-pdal-pipeline-jobs/), [schema validation gates](/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/schema-validation-gates-for-spatial-data/), and [automated deployment to a CDN](/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/automated-3d-tiles-deployment-to-cdn/)) covering each stage in runnable detail.
+A spatial data pipeline that only runs on one engineer's laptop is a liability, not a product. The moment a second person edits a PDAL pipeline, bumps a GDAL version, or tweaks a decimation target, the output drifts — a reprojection lands in the wrong EPSG, a tileset gains a non-monotonic `geometricError`, or a `tileset.json` ships malformed and a client fails to load it in production. Continuous integration and continuous deployment fix this by making the pipeline itself the thing under version control: every change to processing code runs the same ingest → process → validate → publish sequence in a clean container, blocks the merge if any geometry or schema check fails, and promotes only validated artifacts to a CDN or [Cesium ion](https://cesium.com/platform/cesium-ion/). This page is the orchestration blueprint for that system — containerised GitHub Actions runners with pinned `gdal` and `pdal`, matrix jobs fanned out over tiles, caching, secrets handling, and artifact promotion — with the three deep-dive companions ([GitHub Actions GDAL/PDAL jobs](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/github-actions-gdal-pdal-pipeline-jobs/), [schema validation gates](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/schema-validation-gates-for-spatial-data/), and [automated deployment to a CDN](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/automated-3d-tiles-deployment-to-cdn/)) covering each stage in runnable detail.
 
 ## Prerequisites
 
@@ -94,7 +94,7 @@ jobs:
 
 ### 2. Ingest: validate the source header before processing
 
-Never spend runner minutes processing a tile whose header is already wrong. Read the LAS header with `laspy`, confirm the point count and declared CRS, and fail fast. The full ingest checks live in the [GitHub Actions GDAL/PDAL jobs](/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/github-actions-gdal-pdal-pipeline-jobs/) guide.
+Never spend runner minutes processing a tile whose header is already wrong. Read the LAS header with `laspy`, confirm the point count and declared CRS, and fail fast. The full ingest checks live in the [GitHub Actions GDAL/PDAL jobs](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/github-actions-gdal-pdal-pipeline-jobs/) guide.
 
 ```python
 import sys
@@ -134,7 +134,7 @@ process_tile("tile_18_3312")
 
 ### 4. Fan out over tiles with a matrix
 
-A city is thousands of independent tiles. Emit the tile list in one job, then run the process step as a matrix so tiles build in parallel — each shard is isolated, so one bad tile fails only its own leg. This is the same fan-out that the [3D Tiles batch tiling pipelines](/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/) guide parallelises at the encoding layer.
+A city is thousands of independent tiles. Emit the tile list in one job, then run the process step as a matrix so tiles build in parallel — each shard is isolated, so one bad tile fails only its own leg. This is the same fan-out that the [3D Tiles batch tiling pipelines](https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/) guide parallelises at the encoding layer.
 
 ```yaml
   process-tiles:
@@ -155,7 +155,7 @@ A city is thousands of independent tiles. Emit the tile list in one job, then ru
 
 ### 5. Gate: validate and exit non-zero on any failure
 
-The gate is the point of the whole exercise. It runs `3d-tiles-validator` and the CRS/schema assertions, and a non-zero exit is what GitHub converts into a failed required check that blocks the merge. The assertion library is developed in the [schema validation gates](/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/schema-validation-gates-for-spatial-data/) guide.
+The gate is the point of the whole exercise. It runs `3d-tiles-validator` and the CRS/schema assertions, and a non-zero exit is what GitHub converts into a failed required check that blocks the merge. The assertion library is developed in the [schema validation gates](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/schema-validation-gates-for-spatial-data/) guide.
 
 ```yaml
       - name: Validate tileset (blocks merge on failure)
@@ -166,7 +166,7 @@ The gate is the point of the whole exercise. It runs `3d-tiles-validator` and th
 
 ### 6. Promote the validated artifact to the CDN
 
-The deploy job `needs:` the gate, runs only on `push` to `main`, downloads the *validated* artifact, and syncs it. Secrets are injected from the repository store, never hard-coded. The atomic prefix-swap and content-type handling are covered in the [automated deployment to a CDN](/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/automated-3d-tiles-deployment-to-cdn/) guide.
+The deploy job `needs:` the gate, runs only on `push` to `main`, downloads the *validated* artifact, and syncs it. Secrets are injected from the repository store, never hard-coded. The atomic prefix-swap and content-type handling are covered in the [automated deployment to a CDN](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/automated-3d-tiles-deployment-to-cdn/) guide.
 
 ```yaml
   deploy:
@@ -254,7 +254,7 @@ The gate is an ordinary job that exits non-zero when a check fails, which GitHub
 
 ### Can I deploy to Cesium ion instead of my own CDN from CI?
 
-Yes, and the choice is operational, not technical. Self-hosting on S3 or Cloudflare R2 gives you full control of caching, content-type, and atomic prefix swaps, which the CDN deploy guide covers. A managed host removes that maintenance — see [Cesium ion upload automation](/lod-management-optimization-strategies/cesium-ion-upload-automation/) and [automating ion tileset uploads with the REST API](/lod-management-optimization-strategies/cesium-ion-upload-automation/automating-ion-tileset-uploads-with-the-rest-api/) for the managed path. Either way the same validation gate runs first; only the publish step differs.
+Yes, and the choice is operational, not technical. Self-hosting on S3 or Cloudflare R2 gives you full control of caching, content-type, and atomic prefix swaps, which the CDN deploy guide covers. A managed host removes that maintenance — see [Cesium ion upload automation](https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/) and [automating ion tileset uploads with the REST API](https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/automating-ion-tileset-uploads-with-the-rest-api/) for the managed path. Either way the same validation gate runs first; only the publish step differs.
 
 ### How do I keep CI fast on a thousand-tile city?
 
@@ -266,11 +266,11 @@ At both ends. Assert the declared input EPSG during ingest so a mislabelled tile
 
 ## Related Guides
 
-- [GitHub Actions GDAL/PDAL Pipeline Jobs](/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/github-actions-gdal-pdal-pipeline-jobs/) — the containerised process stage in full
-- [Schema Validation Gates for Spatial Data](/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/schema-validation-gates-for-spatial-data/) — the merge-blocking checks in detail
-- [Automated 3D Tiles Deployment to a CDN](/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/automated-3d-tiles-deployment-to-cdn/) — the artifact promotion and CDN sync stage
-- [Automated Tile Generation for 3D Geospatial](/lod-management-optimization-strategies/automated-tile-generation/) — the tiling step this pipeline wraps in CI
-- [3D Tiles Batch Tiling Pipelines](/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/) — parallel encoding inside each matrix leg
-- [Cesium ion Upload Automation](/lod-management-optimization-strategies/cesium-ion-upload-automation/) — the managed-hosting alternative to a self-hosted CDN
+- [GitHub Actions GDAL/PDAL Pipeline Jobs](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/github-actions-gdal-pdal-pipeline-jobs/) — the containerised process stage in full
+- [Schema Validation Gates for Spatial Data](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/schema-validation-gates-for-spatial-data/) — the merge-blocking checks in detail
+- [Automated 3D Tiles Deployment to a CDN](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/automated-3d-tiles-deployment-to-cdn/) — the artifact promotion and CDN sync stage
+- [Automated Tile Generation for 3D Geospatial](https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/) — the tiling step this pipeline wraps in CI
+- [3D Tiles Batch Tiling Pipelines](https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/) — parallel encoding inside each matrix leg
+- [Cesium ion Upload Automation](https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/) — the managed-hosting alternative to a self-hosted CDN
 
-Back to [Point Cloud & Mesh Processing Pipelines](/point-cloud-mesh-processing-pipelines/).
+Back to [Point Cloud & Mesh Processing Pipelines](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/).

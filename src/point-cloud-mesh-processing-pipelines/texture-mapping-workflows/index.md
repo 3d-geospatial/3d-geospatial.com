@@ -4,13 +4,13 @@ description: "Texture mapping for geospatial meshes: pinhole camera projection, 
 ---
 # Texture Mapping Workflows for Geospatial Digital Twins
 
-Texture mapping is where a metrically accurate mesh stops looking like a grey blob and starts looking like a real city — but it is also where a pipeline silently goes wrong. A single sign error in a camera rotation, an unprojected vertex behind the image plane, or a missing occlusion test, and a wall gets painted with the texture of the building behind it. This guide covers the projection math, deterministic UV assignment, atlas baking, occlusion handling, and multi-image blending needed to turn oriented aerial or terrestrial imagery into a textured mesh that survives municipal QA. It sits downstream of the [Point Cloud & Mesh Processing Pipelines](/point-cloud-mesh-processing-pipelines/) reconstruction stages, and assumes you already have clean geometry and calibrated cameras in a single explicit coordinate reference system.
+Texture mapping is where a metrically accurate mesh stops looking like a grey blob and starts looking like a real city — but it is also where a pipeline silently goes wrong. A single sign error in a camera rotation, an unprojected vertex behind the image plane, or a missing occlusion test, and a wall gets painted with the texture of the building behind it. This guide covers the projection math, deterministic UV assignment, atlas baking, occlusion handling, and multi-image blending needed to turn oriented aerial or terrestrial imagery into a textured mesh that survives municipal QA. It sits downstream of the [Point Cloud & Mesh Processing Pipelines](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/) reconstruction stages, and assumes you already have clean geometry and calibrated cameras in a single explicit coordinate reference system.
 
 ## Prerequisites
 
 You need a reconstructed surface mesh, a set of oriented photographs, and the calibration that ties them together. Concretely:
 
-- **Mesh**: a manifold or near-manifold surface in `.ply`, `.obj`, or `.glb`, with consistent outward normals. Run [surface reconstruction](/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/) and topology repair first; non-manifold faces produce ambiguous UVs and texture bleed.
+- **Mesh**: a manifold or near-manifold surface in `.ply`, `.obj`, or `.glb`, with consistent outward normals. Run [surface reconstruction](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/) and topology repair first; non-manifold faces produce ambiguous UVs and texture bleed.
 - **Oriented imagery**: undistorted RGB frames (aerial nadir, oblique, or terrestrial), each with a known camera pose. Lens distortion must already be removed or modelled — projection math below assumes a pinhole model.
 - **Camera parameters**: per-image intrinsics `K` (focal length `fx`, `fy` in pixels; principal point `cx`, `cy`) and extrinsics — a rotation `R` (3×3, world→camera) and translation `t` (3-vector). These come from a bundle adjustment (e.g. COLMAP, Metashape) or from direct georeferencing with IMU/GNSS.
 - **CRS**: mesh vertices and camera centres must live in the *same* metric, projected CRS — for example **EPSG:32633** (UTM zone 33N) for central Europe, or **EPSG:32618** (UTM zone 18N) for the US east coast. Do not texture in geographic EPSG:4326; angular units break the focal-length-in-metres assumptions and the depth comparisons. Reproject cameras with `pyproj` before you start, and record the compound vertical datum (e.g. EPSG:32633+5703) so heights stay consistent.
@@ -286,14 +286,14 @@ A single shared, metric, projected CRS — a UTM zone such as EPSG:32633 or EPSG
 
 ### How dense should the mesh be relative to the imagery?
 
-Match triangle size to the ground sampling distance (GSD) of the source photos. If each pixel covers 3 cm on the ground, triangles much smaller than a few centimetres waste atlas space without adding detail, while triangles spanning many pixels lose resolution and look faceted. Run [automated mesh decimation](/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/) to a target edge length near the GSD before texturing.
+Match triangle size to the ground sampling distance (GSD) of the source photos. If each pixel covers 3 cm on the ground, triangles much smaller than a few centimetres waste atlas space without adding detail, while triangles spanning many pixels lose resolution and look faceted. Run [automated mesh decimation](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/) to a target edge length near the GSD before texturing.
 
 ## Related Guides
 
-- [Aligning Photogrammetry Textures with Point Clouds](/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/aligning-photogrammetry-textures-with-point-clouds/) — registering imagery to 3D point data before projection
-- [Surface Reconstruction for Geospatial Twins](/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/) — generating the mesh you texture
-- [Automated Mesh Decimation for Digital Twins](/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/) — matching triangle density to image GSD
-- [Point Cloud Filtering Techniques](/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/) — cleaning input data so textures don't smear
-- [Coordinate Reference Systems for 3D Assets](/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/) — keeping mesh and cameras in one CRS
+- [Aligning Photogrammetry Textures with Point Clouds](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/aligning-photogrammetry-textures-with-point-clouds/) — registering imagery to 3D point data before projection
+- [Surface Reconstruction for Geospatial Twins](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/) — generating the mesh you texture
+- [Automated Mesh Decimation for Digital Twins](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/) — matching triangle density to image GSD
+- [Point Cloud Filtering Techniques](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/) — cleaning input data so textures don't smear
+- [Coordinate Reference Systems for 3D Assets](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/) — keeping mesh and cameras in one CRS
 
-Back to [Point Cloud & Mesh Processing Pipelines](/point-cloud-mesh-processing-pipelines/).
+Back to [Point Cloud & Mesh Processing Pipelines](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/).

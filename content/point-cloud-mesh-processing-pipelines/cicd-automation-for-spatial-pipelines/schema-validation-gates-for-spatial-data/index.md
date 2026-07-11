@@ -2,7 +2,7 @@
 
 This guide builds the validation gate that stands between a processed tileset and a merge: JSON Schema validation of `tileset.json` and its metadata with `jsonschema`, a `3d-tiles-validator` run, CRS and unit assertions with `pyproj`, LAS header checks with `laspy`, and a runner that exits non-zero so GitHub blocks the pull request. The gate is a plain script whose exit code is the whole point — zero merges, non-zero blocks.
 
-You reach for this the first time a malformed `tileset.json` or a mislabelled EPSG code reaches a client and someone has to explain why the twin loaded underground. A gate turns that class of defect into a red check that never merges. It is the enforcement stage of the [CI/CD automation for spatial pipelines](/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/) workflow, and it complements the [processing job](/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/github-actions-gdal-pdal-pipeline-jobs/) that produces the artifact it inspects.
+You reach for this the first time a malformed `tileset.json` or a mislabelled EPSG code reaches a client and someone has to explain why the twin loaded underground. A gate turns that class of defect into a red check that never merges. It is the enforcement stage of the [CI/CD automation for spatial pipelines](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/) workflow, and it complements the [processing job](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/github-actions-gdal-pdal-pipeline-jobs/) that produces the artifact it inspects.
 
 <figure class="diagram">
 <svg viewBox="0 0 820 320" role="img" aria-labelledby="gate-t gate-d" xmlns="http://www.w3.org/2000/svg">
@@ -105,7 +105,7 @@ def check_3d_tiles_validator(tileset_path: str) -> list[str]:
 
 ### 3. Assert CRS and units with pyproj
 
-A tileset can be structurally perfect and still ship in the wrong coordinate system. Use `pyproj` to confirm the declared CRS is the expected geocentric metric frame — projected or geographic, and crucially in metres, not degrees. The unit check is what stops a EPSG:4326 (degrees) tileset from masquerading as valid. This mirrors the deeper treatment in [asserting CRS and units with pyproj](/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/asserting-crs-and-units-with-pyproj/).
+A tileset can be structurally perfect and still ship in the wrong coordinate system. Use `pyproj` to confirm the declared CRS is the expected geocentric metric frame — projected or geographic, and crucially in metres, not degrees. The unit check is what stops a EPSG:4326 (degrees) tileset from masquerading as valid. This mirrors the deeper treatment in [asserting CRS and units with pyproj](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/asserting-crs-and-units-with-pyproj/).
 
 ```python
 from pyproj import CRS
@@ -196,7 +196,7 @@ VALIDATION FAILED:
 exit 1
 ```
 
-Verify gate *polarity* in the test suite: run the gate against a known-good fixture and a deliberately corrupted one, asserting the exit codes. A gate that never fails is worse than none, so this test is as important as the gate itself. Writing these checks against the reference validator is covered in [writing 3d-tiles-validator checks in CI](/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/writing-3d-tiles-validator-checks-in-ci/).
+Verify gate *polarity* in the test suite: run the gate against a known-good fixture and a deliberately corrupted one, asserting the exit codes. A gate that never fails is worse than none, so this test is as important as the gate itself. Writing these checks against the reference validator is covered in [writing 3d-tiles-validator checks in CI](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/writing-3d-tiles-validator-checks-in-ci/).
 
 ## Common Errors
 
@@ -208,9 +208,9 @@ Verify gate *polarity* in the test suite: run the gate against a known-good fixt
 
 ## Related Guides
 
-- [GitHub Actions GDAL/PDAL Pipeline Jobs](/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/github-actions-gdal-pdal-pipeline-jobs/) — the process stage that produces the artifact this gate inspects
-- [Automated 3D Tiles Deployment to a CDN](/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/automated-3d-tiles-deployment-to-cdn/) — the deploy that runs only after this gate is green
-- [Asserting CRS and Units with pyproj](/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/asserting-crs-and-units-with-pyproj/) — the CRS-assertion patterns in depth
-- [Writing 3D Tiles Validator Checks in CI](/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/writing-3d-tiles-validator-checks-in-ci/) — extending the validator step with custom checks
+- [GitHub Actions GDAL/PDAL Pipeline Jobs](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/github-actions-gdal-pdal-pipeline-jobs/) — the process stage that produces the artifact this gate inspects
+- [Automated 3D Tiles Deployment to a CDN](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/automated-3d-tiles-deployment-to-cdn/) — the deploy that runs only after this gate is green
+- [Asserting CRS and Units with pyproj](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/asserting-crs-and-units-with-pyproj/) — the CRS-assertion patterns in depth
+- [Writing 3D Tiles Validator Checks in CI](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/writing-3d-tiles-validator-checks-in-ci/) — extending the validator step with custom checks
 
-Back to [CI/CD Automation for Spatial Pipelines](/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/).
+Back to [CI/CD Automation for Spatial Pipelines](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/).

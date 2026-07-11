@@ -178,10 +178,10 @@ For delivery, almost never — it has no streaming, no LOD, no compression, and 
 
 ## Related Guides
 
-- [3D Format Standards Comparison](/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/) — the wider format trade-off picture
-- [Converting WGS84 to Local Projected Coordinates](/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/converting-wgs84-to-local-projected-coordinates/) — the reprojection mechanics behind the root transform
-- [Automated Tile Generation for 3D Geospatial](/lod-management-optimization-strategies/automated-tile-generation/) — building tilesets at scale
-- [Mesh Topology Basics for Digital Twins](/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/) — the repair checks behind step 1
-- [3D Geospatial Fundamentals for Digital Twins](/3d-geospatial-fundamentals-for-digital-twins/) — the foundations these formats sit on
+- [3D Format Standards Comparison](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/) — the wider format trade-off picture
+- [Converting WGS84 to Local Projected Coordinates](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/converting-wgs84-to-local-projected-coordinates/) — the reprojection mechanics behind the root transform
+- [Automated Tile Generation for 3D Geospatial](https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/) — building tilesets at scale
+- [Mesh Topology Basics for Digital Twins](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/) — the repair checks behind step 1
+- [3D Geospatial Fundamentals for Digital Twins](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/) — the foundations these formats sit on
 
-Back to [3D Format Standards Comparison](/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/).
+Back to [3D Format Standards Comparison](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/).

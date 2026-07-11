@@ -9,7 +9,7 @@ This page shows how to tune the Poisson surface reconstruction parameters in `op
 ## Prerequisites
 
 - `open3d` 0.18+ and `numpy` 1.24+ (`pip install open3d numpy`), Python 3.9+.
-- An input cloud already filtered for outliers (see [point cloud filtering techniques](/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/)) and reprojected to a **metric** CRS. Poisson works in local Cartesian space, so reproject WGS84 / EPSG:4326 to a projected metric system such as EPSG:32633 (UTM 33N) and subtract the dataset centroid before solving — absolute coordinates above 10⁶ m cause octree quantization error and solver drift.
+- An input cloud already filtered for outliers (see [point cloud filtering techniques](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/)) and reprojected to a **metric** CRS. Poisson works in local Cartesian space, so reproject WGS84 / EPSG:4326 to a projected metric system such as EPSG:32633 (UTM 33N) and subtract the dataset centroid before solving — absolute coordinates above 10⁶ m cause octree quantization error and solver drift.
 - **Oriented normals are mandatory.** Poisson reconstructs from the normal field, not the raw points. Every point needs a unit normal whose direction is globally consistent (all pointing "outward"). A cloud without normals, or with normals that flip between adjacent patches, produces a torn, non-manifold surface regardless of how you tune the rest.
 
 <figure class="diagram">
@@ -152,17 +152,17 @@ A healthy result has a clearly bimodal-leaning density histogram (a low spike of
 Open3D's `create_from_point_cloud_poisson` does not expose a literal `point_weight`; the screened-Poisson interpolation weight is the `width` argument (and `--pointWeight` in Kazhdan's reference C++ tool). Passing `width=0` lets the octree `depth` drive node sizing, which is the common path. When you do set `width` explicitly, treat it like `point_weight`: higher pulls the surface harder onto the data, preserving sharp edges at the cost of amplifying noise.
 
 ### Why does my reconstruction fill holes I wanted left open?
-Poisson always produces a closed, watertight surface — leaving holes is not an option it offers. The low-density "skin" it stretches across genuine gaps is exactly what the density quantile trim removes, so raise the quantile until the unwanted fill disappears. If you need true open boundaries, ball-pivoting or alpha shapes are better fits; compare them in [Surface Reconstruction for Geospatial Twins](/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/).
+Poisson always produces a closed, watertight surface — leaving holes is not an option it offers. The low-density "skin" it stretches across genuine gaps is exactly what the density quantile trim removes, so raise the quantile until the unwanted fill disappears. If you need true open boundaries, ball-pivoting or alpha shapes are better fits; compare them in [Surface Reconstruction for Geospatial Twins](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/).
 
 ### What CRS should the cloud be in before reconstruction?
 A projected metric CRS with coordinates translated to the dataset centroid. Reproject EPSG:4326 to a UTM zone such as EPSG:32633, then subtract the mean XYZ so values stay near the origin. Solving in geographic degrees or with raw million-metre eastings produces octree quantization artifacts and unstable normals.
 
 ## Related Guides
 
-- [Surface Reconstruction for Geospatial Twins](/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/) — Delaunay, ball-pivoting, and Poisson trade-offs
-- [Point Cloud Filtering Techniques](/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/) — outlier removal that precedes reconstruction
-- [Automated Mesh Decimation for Digital Twins](/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/) — bring the dense Poisson mesh down to a polygon budget
-- [Optimizing Mesh Triangle Count for Web](/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/optimizing-mesh-triangle-count-for-web-rendering/) — tile-budget targets for streaming
-- [Point Cloud & Mesh Processing Pipelines](/point-cloud-mesh-processing-pipelines/) — the full processing pillar
+- [Surface Reconstruction for Geospatial Twins](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/) — Delaunay, ball-pivoting, and Poisson trade-offs
+- [Point Cloud Filtering Techniques](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/) — outlier removal that precedes reconstruction
+- [Automated Mesh Decimation for Digital Twins](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/) — bring the dense Poisson mesh down to a polygon budget
+- [Optimizing Mesh Triangle Count for Web](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/optimizing-mesh-triangle-count-for-web-rendering/) — tile-budget targets for streaming
+- [Point Cloud & Mesh Processing Pipelines](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/) — the full processing section
 
-Back to [Surface Reconstruction for Geospatial Twins](/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/).
+Back to [Surface Reconstruction for Geospatial Twins](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/).

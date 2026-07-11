@@ -6,7 +6,7 @@ description: "Stop 3D Tiles popping during camera movement: velocity-based predi
 
 This guide removes the visible snap of 3D Tiles appearing or sharpening a beat too late — using velocity-based predictive prefetch, a lower `maximumScreenSpaceError`, an LOD crossfade blend, and cache tuning that keeps tiles warm — with the prefetch set and screen-space error (SSE) math worked in `numpy` against tile centres in EPSG:4978. You hit this the moment a camera moves quickly through a streamed city twin: the renderer only requests a tile once it is already visible, so a fly-through or a fast orbit constantly outruns the request queue and geometry flashes in after the fact.
 
-Popping and pop-in are two faces of the same lag. Popping is a tile going from absent to present in one frame; pop-in is a coarse tile snapping to a finer LOD as its SSE crosses the refinement threshold. Both are cured by requesting geometry earlier and transitioning it more gently. This walkthrough sits under [streaming and runtime diagnostics](/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/), which shows how to instrument the lag; here we fix it.
+Popping and pop-in are two faces of the same lag. Popping is a tile going from absent to present in one frame; pop-in is a coarse tile snapping to a finer LOD as its SSE crosses the refinement threshold. Both are cured by requesting geometry earlier and transitioning it more gently. This walkthrough sits under [streaming and runtime diagnostics](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/), which shows how to instrument the lag; here we fix it.
 
 ## Prerequisites
 
@@ -200,8 +200,8 @@ prefetch and crossfade verified
 
 ## Related Guides
 
-- [Streaming & Runtime Diagnostics for 3D Tiles](/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/) — instrumenting pop latency and the request queue this fix targets
-- [Streaming Sync Patterns for 3D Geospatial](/lod-management-optimization-strategies/streaming-sync-patterns/) — the prefetch and eviction model in its rendering context
-- [Automated Tile Generation for 3D Geospatial](/lod-management-optimization-strategies/automated-tile-generation/) — producing the geometricError that drives SSE and refinement
+- [Streaming & Runtime Diagnostics for 3D Tiles](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/) — instrumenting pop latency and the request queue this fix targets
+- [Streaming Sync Patterns for 3D Geospatial](https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/) — the prefetch and eviction model in its rendering context
+- [Automated Tile Generation for 3D Geospatial](https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/) — producing the geometricError that drives SSE and refinement
 
-Back to [Streaming & Runtime Diagnostics for 3D Tiles](/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/).
+Back to [Streaming & Runtime Diagnostics for 3D Tiles](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/).

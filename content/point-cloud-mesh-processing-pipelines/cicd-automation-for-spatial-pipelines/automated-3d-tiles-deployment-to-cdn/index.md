@@ -2,7 +2,7 @@
 
 This guide deploys a validated 3D Tiles set from CI to an object store fronted by a CDN — Amazon S3 or Cloudflare R2 — using `boto3` and `aws s3 sync`, setting the correct `Content-Type` and `Content-Encoding` for gzipped `tileset.json` and `.b3dm` payloads, applying long-lived `Cache-Control`, invalidating the edge, and swapping an atomic versioned prefix so clients never see a half-uploaded tileset.
 
-You need this once the tileset is more than a folder you drag into a bucket: browsers refuse to decode a gzipped `.b3dm` served without `Content-Encoding: gzip`, a stale `tileset.json` pins clients to deleted tiles, and a mid-sync deploy shows users a broken tree. This is the publish stage of the [CI/CD automation for spatial pipelines](/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/) workflow, and it runs only after the [schema validation gate](/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/schema-validation-gates-for-spatial-data/) is green.
+You need this once the tileset is more than a folder you drag into a bucket: browsers refuse to decode a gzipped `.b3dm` served without `Content-Encoding: gzip`, a stale `tileset.json` pins clients to deleted tiles, and a mid-sync deploy shows users a broken tree. This is the publish stage of the [CI/CD automation for spatial pipelines](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/) workflow, and it runs only after the [schema validation gate](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/schema-validation-gates-for-spatial-data/) is green.
 
 <figure class="diagram">
 <svg viewBox="0 0 840 280" role="img" aria-labelledby="cdn-t cdn-d" xmlns="http://www.w3.org/2000/svg">
@@ -36,7 +36,7 @@ You need this once the tileset is more than a folder you drag into a bucket: bro
 ## Prerequisites
 
 - Python 3.11 with `boto3>=1.34`, and the AWS CLI v2 (`aws s3 sync`) or `rclone` available on the deploy runner. Cloudflare R2 speaks the S3 API, so the same tools target it via a custom `endpoint_url`.
-- A validated tileset in `dist/` from the [validation gate](/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/schema-validation-gates-for-spatial-data/), containing `tileset.json` and `.b3dm`/`.pnts` payloads. Tiles are geocentric EPSG:4978 for Cesium; the deploy never reprojects — it publishes bytes.
+- A validated tileset in `dist/` from the [validation gate](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/schema-validation-gates-for-spatial-data/), containing `tileset.json` and `.b3dm`/`.pnts` payloads. Tiles are geocentric EPSG:4978 for Cesium; the deploy never reprojects — it publishes bytes.
 - A bucket with a CDN in front (CloudFront over S3, or Cloudflare's cache over R2) and credentials in the CI secret store, injected as environment variables and never written to the workflow file.
 - A decision on gzip: either pre-gzip `tileset.json` and set `Content-Encoding: gzip` yourself, or leave files raw and let the CDN compress. Do exactly one — double compression is a classic breakage covered below.
 
@@ -176,7 +176,7 @@ content-type: application/octet-stream
 cache-control: public, max-age=31536000, immutable
 ```
 
-Then load `https://tiles.example.com/live/tileset.json` with `Cesium.Cesium3DTileset.fromUrl` and confirm the tiles render at the survey location. Because the release prefix is immutable and the alias is atomic, rolling back is repointing `live/tileset.json` at a previous release — no re-upload. For a fully managed alternative that skips bucket, headers, and invalidation entirely, publish to Cesium ion instead; see [Cesium ion upload automation](/lod-management-optimization-strategies/cesium-ion-upload-automation/) and [automating ion tileset uploads with the REST API](/lod-management-optimization-strategies/cesium-ion-upload-automation/automating-ion-tileset-uploads-with-the-rest-api/).
+Then load `https://tiles.example.com/live/tileset.json` with `Cesium.Cesium3DTileset.fromUrl` and confirm the tiles render at the survey location. Because the release prefix is immutable and the alias is atomic, rolling back is repointing `live/tileset.json` at a previous release — no re-upload. For a fully managed alternative that skips bucket, headers, and invalidation entirely, publish to Cesium ion instead; see [Cesium ion upload automation](https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/) and [automating ion tileset uploads with the REST API](https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/automating-ion-tileset-uploads-with-the-rest-api/).
 
 ## Common Errors
 
@@ -188,9 +188,9 @@ Then load `https://tiles.example.com/live/tileset.json` with `Cesium.Cesium3DTil
 
 ## Related Guides
 
-- [Schema Validation Gates for Spatial Data](/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/schema-validation-gates-for-spatial-data/) — the gate that must pass before this deploy runs
-- [GitHub Actions GDAL/PDAL Pipeline Jobs](/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/github-actions-gdal-pdal-pipeline-jobs/) — the process stage producing the artifact deployed here
-- [Cesium ion Upload Automation](/lod-management-optimization-strategies/cesium-ion-upload-automation/) — the managed-hosting alternative to a self-hosted CDN
-- [Automated Tile Generation for 3D Geospatial](/lod-management-optimization-strategies/automated-tile-generation/) — how the tileset being deployed is built
+- [Schema Validation Gates for Spatial Data](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/schema-validation-gates-for-spatial-data/) — the gate that must pass before this deploy runs
+- [GitHub Actions GDAL/PDAL Pipeline Jobs](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/github-actions-gdal-pdal-pipeline-jobs/) — the process stage producing the artifact deployed here
+- [Cesium ion Upload Automation](https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/) — the managed-hosting alternative to a self-hosted CDN
+- [Automated Tile Generation for 3D Geospatial](https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/) — how the tileset being deployed is built
 
-Back to [CI/CD Automation for Spatial Pipelines](/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/).
+Back to [CI/CD Automation for Spatial Pipelines](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/).

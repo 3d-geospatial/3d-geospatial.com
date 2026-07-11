@@ -4,7 +4,7 @@ description: "Runnable Python script to upload a local 3D Tiles directory to Ces
 ---
 # Automating ion Tileset Uploads With the REST API and Temporary S3 Credentials
 
-This walkthrough uploads a local 3D Tiles directory to Cesium ion entirely from a Python script — creating the asset with `requests`, pushing every file to ion's temporary S3 location with `boto3`, posting the `onComplete` signal, and polling `GET /v1/assets/{id}` until the status reads `COMPLETE`. It is the concrete, runnable version of the [Cesium ion upload automation](/lod-management-optimization-strategies/cesium-ion-upload-automation/) workflow, aimed at a `tileset.json` tree you have already built and validated locally.
+This walkthrough uploads a local 3D Tiles directory to Cesium ion entirely from a Python script — creating the asset with `requests`, pushing every file to ion's temporary S3 location with `boto3`, posting the `onComplete` signal, and polling `GET /v1/assets/{id}` until the status reads `COMPLETE`. It is the concrete, runnable version of the [Cesium ion upload automation](https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/) workflow, aimed at a `tileset.json` tree you have already built and validated locally.
 
 You reach for this the first time you want a hosted preview from CI instead of dragging a folder into the ion web UI — a per-pull-request deploy, a nightly refresh, or any publish that has to be reproducible and leave an audit trail.
 
@@ -170,7 +170,7 @@ final = poll_until_done(session, asset_id)
 print(f"asset {final['id']} COMPLETE — {final['bytes'] / 1e6:.1f} MB in EPSG:4978")
 ```
 
-The backoff is what keeps this loop a good citizen: it starts at five seconds and doubles to a sixty-second ceiling, so a job that tiles in ten seconds is caught quickly while an hour-long city-scale job does not burn thousands of requests against your rate limit. Surfacing `statusMessage` on failure matters because ion's message names the actual defect — an unreferenced content URI, an unsupported extension, a missing CRS — which turns a red build into a one-line fix instead of a guessing game. To keep the run idempotent across repeated CI invocations, record `asset_id` alongside a hash of the source so a later run can skip an unchanged tileset, exactly as the parent [Cesium ion upload automation](/lod-management-optimization-strategies/cesium-ion-upload-automation/) workflow describes.
+The backoff is what keeps this loop a good citizen: it starts at five seconds and doubles to a sixty-second ceiling, so a job that tiles in ten seconds is caught quickly while an hour-long city-scale job does not burn thousands of requests against your rate limit. Surfacing `statusMessage` on failure matters because ion's message names the actual defect — an unreferenced content URI, an unsupported extension, a missing CRS — which turns a red build into a one-line fix instead of a guessing game. To keep the run idempotent across repeated CI invocations, record `asset_id` alongside a hash of the source so a later run can skip an unchanged tileset, exactly as the parent [Cesium ion upload automation](https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/) workflow describes.
 
 ## Expected Output & Verification
 
@@ -209,8 +209,8 @@ Then load it in CesiumJS with `Cesium.Cesium3DTileset.fromIonAssetId(asset_id)` 
 
 ## Related Guides
 
-- [Cesium ion Upload Automation for 3D Tilesets](/lod-management-optimization-strategies/cesium-ion-upload-automation/) — the concepts, idempotency, and sourceType choices behind this script
-- [Automated Tile Generation for 3D Geospatial](/lod-management-optimization-strategies/automated-tile-generation/) — build and validate the tileset before you upload it
-- [CI/CD Automation for Spatial Pipelines](/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/) — run this upload as a job in a spatial build
+- [Cesium ion Upload Automation for 3D Tilesets](https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/) — the concepts, idempotency, and sourceType choices behind this script
+- [Automated Tile Generation for 3D Geospatial](https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/) — build and validate the tileset before you upload it
+- [CI/CD Automation for Spatial Pipelines](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/) — run this upload as a job in a spatial build
 
-Back to [Cesium ion Upload Automation for 3D Tilesets](/lod-management-optimization-strategies/cesium-ion-upload-automation/).
+Back to [Cesium ion Upload Automation for 3D Tilesets](https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/).

@@ -1,6 +1,6 @@
 # Data Validation & QA Gates for 3D Geospatial Pipelines
 
-Bad geometry and bad metadata do not announce themselves. A tileset with an inverted `geometricError`, a point cloud silently in EPSG:4326 degrees, or a mesh with a hole where a QEM collapse widened a non-manifold edge will render — badly — and the defect only surfaces when a measurement disagrees with the survey or a client refuses to refine. The remedy is a set of automated gates that run between "tiling finished" and "artifact published," each one asserting a specific invariant and failing the build with a non-zero exit code when the invariant breaks. This guide defines those gates — JSON Schema on `tileset.json` and metadata, `geometricError` monotonicity and bounding-volume containment, CRS and units checks with `pyproj`, LAS header checks with `laspy`, and mesh watertightness with `trimesh` — and shows how to wire them as blocking checks so no defect reaches a CDN. It is the offline counterpart to [streaming and runtime diagnostics](/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/) and belongs under [digital twin troubleshooting and reliability](/digital-twin-troubleshooting-and-reliability/); the CI plumbing that runs these gates lives in [CI/CD automation for spatial pipelines](/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/).
+Bad geometry and bad metadata do not announce themselves. A tileset with an inverted `geometricError`, a point cloud silently in EPSG:4326 degrees, or a mesh with a hole where a QEM collapse widened a non-manifold edge will render — badly — and the defect only surfaces when a measurement disagrees with the survey or a client refuses to refine. The remedy is a set of automated gates that run between "tiling finished" and "artifact published," each one asserting a specific invariant and failing the build with a non-zero exit code when the invariant breaks. This guide defines those gates — JSON Schema on `tileset.json` and metadata, `geometricError` monotonicity and bounding-volume containment, CRS and units checks with `pyproj`, LAS header checks with `laspy`, and mesh watertightness with `trimesh` — and shows how to wire them as blocking checks so no defect reaches a CDN. It is the offline counterpart to [streaming and runtime diagnostics](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/) and belongs under [digital twin troubleshooting and reliability](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/); the CI plumbing that runs these gates lives in [CI/CD automation for spatial pipelines](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/).
 
 ## Prerequisites
 
@@ -131,7 +131,7 @@ tileset = json.loads(open("tileset/tileset.json").read())
 geometry_gate(tileset["root"])
 ```
 
-The monotonicity invariant is the single most common silent failure in tiling; the deep dive on wiring it, plus the transform check, is [writing 3d-tiles-validator checks in CI](/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/writing-3d-tiles-validator-checks-in-ci/).
+The monotonicity invariant is the single most common silent failure in tiling; the deep dive on wiring it, plus the transform check, is [writing 3d-tiles-validator checks in CI](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/writing-3d-tiles-validator-checks-in-ci/).
 
 ### 3. CRS and units gate with pyproj
 
@@ -153,7 +153,7 @@ crs_gate(32618)          # UTM 18N, projected metres -> passes
 # crs_gate(4326)         # WGS84 degrees -> raises, correctly rejected
 ```
 
-The full treatment — round-tripping a control point and rejecting EPSG:4326 while accepting EPSG:32618 — is in [asserting CRS and units with pyproj](/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/asserting-crs-and-units-with-pyproj/).
+The full treatment — round-tripping a control point and rejecting EPSG:4326 while accepting EPSG:32618 — is in [asserting CRS and units with pyproj](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/asserting-crs-and-units-with-pyproj/).
 
 ### 4. LAS header gate with laspy
 
@@ -301,9 +301,9 @@ In CI, between the tiling job and the deploy job, as a required check. The cheap
 
 ## Related Guides
 
-- [Writing 3D Tiles Validator Checks in CI](/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/writing-3d-tiles-validator-checks-in-ci/) — the geometry and transform gates as a CI job
-- [Asserting CRS and Units with pyproj](/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/asserting-crs-and-units-with-pyproj/) — the CRS gate in full, EPSG:32618 versus EPSG:4326
-- [CI/CD Automation for Spatial Pipelines](/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/) — the runner that executes these gates before deploy
-- [Automated Tile Generation for 3D Geospatial](/lod-management-optimization-strategies/automated-tile-generation/) — the tiling step whose output these gates validate
+- [Writing 3D Tiles Validator Checks in CI](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/writing-3d-tiles-validator-checks-in-ci/) — the geometry and transform gates as a CI job
+- [Asserting CRS and Units with pyproj](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/asserting-crs-and-units-with-pyproj/) — the CRS gate in full, EPSG:32618 versus EPSG:4326
+- [CI/CD Automation for Spatial Pipelines](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/) — the runner that executes these gates before deploy
+- [Automated Tile Generation for 3D Geospatial](https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/) — the tiling step whose output these gates validate
 
-Back to [Digital Twin Troubleshooting & Reliability](/digital-twin-troubleshooting-and-reliability/).
+Back to [Digital Twin Troubleshooting & Reliability](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/).

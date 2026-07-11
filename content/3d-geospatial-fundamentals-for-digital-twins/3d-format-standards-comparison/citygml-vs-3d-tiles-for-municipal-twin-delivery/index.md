@@ -37,7 +37,7 @@ You hit this the moment a planning department that has invested years in a CityG
 
 ## Decision Table
 
-Read this as a division of labour, not a ranking — most municipal twins run both, with CityGML as the register and 3D Tiles as the front end. The wider format landscape (IFC, glTF, OBJ, GeoPackage) is mapped in the [3D format standards comparison](/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/).
+Read this as a division of labour, not a ranking — most municipal twins run both, with CityGML as the register and 3D Tiles as the front end. The wider format landscape (IFC, glTF, OBJ, GeoPackage) is mapped in the [3D format standards comparison](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/).
 
 | Criterion | CityGML | OGC 3D Tiles |
 |---|---|---|
@@ -57,7 +57,7 @@ Read this as a division of labour, not a ranking — most municipal twins run bo
 - Python 3.11 with `lxml>=5.0` for namespaced CityGML parsing, `pyproj>=3.6` (PROJ 9.x) for the reprojection chain, `numpy>=1.24`, and `py3dtiles>=8.0` for tileset assembly. Install with `pip install "lxml>=5.0" "pyproj>=3.6" numpy "py3dtiles>=8.0"`.
 - A CityGML 2.0 or 3.0 dataset with an explicit `srsName`. The examples use EPSG:25832 (ETRS89 / UTM 32N, metres), the standard German/central-European store; substitute your national grid but state it.
 - For heavy production conversion, the Java `citygml-tools` CLI (`citygml-tools to-cityjson`) or FME's CityGML reader handle full LOD4 solids and ADEs more completely than a hand-rolled parser; the `lxml` path below is for LOD1/LOD2 building shells and for understanding exactly what crosses the boundary.
-- Familiarity with why Cesium needs EPSG:4978 — the geocentric Earth-Centered Earth-Fixed frame — is assumed; the [coordinate reference systems](/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/) guide covers the reprojection theory.
+- Familiarity with why Cesium needs EPSG:4978 — the geocentric Earth-Centered Earth-Fixed frame — is assumed; the [coordinate reference systems](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/) guide covers the reprojection theory.
 
 ## Step-by-Step
 
@@ -205,9 +205,9 @@ The [OGC 3D Tiles specification](https://www.ogc.org/standard/3dtiles/) requires
 
 ## Related Guides
 
-- [glTF vs 3D Tiles vs OBJ for Spatial Data](/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/gltf-vs-3dtiles-vs-obj-for-spatial-data/) — the web-delivery formats that sit inside a tileset
-- [3D Format Standards Comparison](/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/) — the full CityGML/IFC/glTF/LAS trade-off matrix
-- [Coordinate Reference Systems for 3D Assets](/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/) — the EPSG:25832 → EPSG:4978 chain in depth
-- [Automated Tile Generation for 3D Geospatial](/lod-management-optimization-strategies/automated-tile-generation/) — building the tileset hierarchy at city scale
+- [glTF vs 3D Tiles vs OBJ for Spatial Data](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/gltf-vs-3dtiles-vs-obj-for-spatial-data/) — the web-delivery formats that sit inside a tileset
+- [3D Format Standards Comparison](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/) — the full CityGML/IFC/glTF/LAS trade-off matrix
+- [Coordinate Reference Systems for 3D Assets](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/) — the EPSG:25832 → EPSG:4978 chain in depth
+- [Automated Tile Generation for 3D Geospatial](https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/) — building the tileset hierarchy at city scale
 
-Back to [3D Format Standards Comparison](/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/).
+Back to [3D Format Standards Comparison](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/).

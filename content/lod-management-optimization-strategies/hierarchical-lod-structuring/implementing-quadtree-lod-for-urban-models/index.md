@@ -2,7 +2,7 @@
 
 This guide builds a quadtree LOD index for urban 3D models in Python using `numpy` and `shapely` — recursively subdividing a projected city extent into four quadrants per level, assigning a `geometricError` to each depth, and querying the visible nodes for a viewport. The result is the spatial backbone that drives runtime detail selection: a tree where every node maps to a deterministic ground footprint and carries the screen-space error budget a renderer needs to decide whether to draw it or descend into its children.
 
-You hit this problem the moment a digital twin outgrows a single mesh. A city covers tens of square kilometres, and you cannot ship every building at full detail to a browser or game engine — you need an index that answers "which tiles matter for *this* camera" in microseconds. A quadtree gives you that index, but only if it is built in a metric CRS, with a `geometricError` ladder that decreases predictably toward the leaves and bounding boxes that strictly nest. Get any of those wrong and you inherit popping artifacts, distorted tiles, or a 3D Tiles tileset the validator rejects. This page walks the construction end to end so the tree you produce is directly compatible with [hierarchical LOD structuring](/lod-management-optimization-strategies/hierarchical-lod-structuring/) and the [OGC 3D Tiles](https://www.ogc.org/standard/3dtiles/) `geometricError` model.
+You hit this problem the moment a digital twin outgrows a single mesh. A city covers tens of square kilometres, and you cannot ship every building at full detail to a browser or game engine — you need an index that answers "which tiles matter for *this* camera" in microseconds. A quadtree gives you that index, but only if it is built in a metric CRS, with a `geometricError` ladder that decreases predictably toward the leaves and bounding boxes that strictly nest. Get any of those wrong and you inherit popping artifacts, distorted tiles, or a 3D Tiles tileset the validator rejects. This page walks the construction end to end so the tree you produce is directly compatible with [hierarchical LOD structuring](https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/) and the [OGC 3D Tiles](https://www.ogc.org/standard/3dtiles/) `geometricError` model.
 
 <figure class="diagram">
 <svg viewBox="0 0 760 300" role="img" aria-labelledby="qtlod-t qtlod-d" xmlns="http://www.w3.org/2000/svg">
@@ -188,7 +188,7 @@ visible = query_visible(root, viewport, camera, px_tolerance=16.0)
 print(f"{len(visible)} nodes selected for the viewport")
 ```
 
-This is the same descent logic 3D Tiles runtimes use, so the tree slots straight into the broader [LOD management workflow](/lod-management-optimization-strategies/) and the related [automated tile generation](/lod-management-optimization-strategies/automated-tile-generation/) and [streaming sync patterns](/lod-management-optimization-strategies/streaming-sync-patterns/).
+This is the same descent logic 3D Tiles runtimes use, so the tree slots straight into the broader [LOD management workflow](https://www.3d-geospatial.com/lod-management-optimization-strategies/) and the related [automated tile generation](https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/) and [streaming sync patterns](https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/).
 
 ## Expected Output & Verification
 
@@ -252,14 +252,14 @@ Set `root_error` to roughly the diagonal extent of your largest renderable featu
 
 ### Can I export this tree directly to a 3D Tiles tileset?
 
-Yes — the structure maps one-to-one. Each `QuadNode` becomes a tile with a `boundingVolume` (its `bounds` reprojected to EPSG:4326 region coordinates or kept as a box), the `geometric_error` you assigned, and a `content` URI pointing at the node's decimated mesh (the `mesh_ids` you placed in step 4). The descent rule in step 5 is exactly the `geometricError` refinement 3D Tiles runtimes apply, so a tileset built this way refines predictably. See [automated tile generation](/lod-management-optimization-strategies/automated-tile-generation/) for the export mechanics.
+Yes — the structure maps one-to-one. Each `QuadNode` becomes a tile with a `boundingVolume` (its `bounds` reprojected to EPSG:4326 region coordinates or kept as a box), the `geometric_error` you assigned, and a `content` URI pointing at the node's decimated mesh (the `mesh_ids` you placed in step 4). The descent rule in step 5 is exactly the `geometricError` refinement 3D Tiles runtimes apply, so a tileset built this way refines predictably. See [automated tile generation](https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/) for the export mechanics.
 
 ## Related Guides
 
-- [Hierarchical LOD Structuring for Digital Twins](/lod-management-optimization-strategies/hierarchical-lod-structuring/) — the broader tree-design patterns this index plugs into
-- [Automated Tile Generation for 3D Geospatial](/lod-management-optimization-strategies/automated-tile-generation/) — turning quadtree nodes into a streamable tileset
-- [Streaming Sync Patterns for 3D Geospatial](/lod-management-optimization-strategies/streaming-sync-patterns/) — fetching and evicting tiles as the camera moves
-- [LOD Management & Optimization Strategies](/lod-management-optimization-strategies/) — the optimization area overall
-- [Coordinate Reference Systems for 3D Assets](/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/) — picking and enforcing the projected CRS the tree depends on
+- [Hierarchical LOD Structuring for Digital Twins](https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/) — the broader tree-design patterns this index plugs into
+- [Automated Tile Generation for 3D Geospatial](https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/) — turning quadtree nodes into a streamable tileset
+- [Streaming Sync Patterns for 3D Geospatial](https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/) — fetching and evicting tiles as the camera moves
+- [LOD Management & Optimization Strategies](https://www.3d-geospatial.com/lod-management-optimization-strategies/) — the optimization area overall
+- [Coordinate Reference Systems for 3D Assets](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/) — picking and enforcing the projected CRS the tree depends on
 
-Back to [Hierarchical LOD Structuring for Digital Twins](/lod-management-optimization-strategies/hierarchical-lod-structuring/).
+Back to [Hierarchical LOD Structuring for Digital Twins](https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/).

@@ -4,16 +4,16 @@ description: "Surface reconstruction for digital twins: Poisson, ball pivoting, 
 ---
 # Surface Reconstruction Algorithms for Geospatial Digital Twins
 
-Surface reconstruction turns an unstructured point cloud into a connected mesh you can render, query, and simulate against. The choice of algorithm is not cosmetic: feed the same building scan to Poisson, ball-pivoting (BPA), and a Delaunay alpha shape and you get three meshes with different watertightness, different noise behaviour, and different polygon counts. Pick the wrong one for your data and you spend the next week patching holes in facades or sanding off bubbles that the solver hallucinated. This guide shows how to reconstruct surfaces with [`open3d`](https://www.open3d.org/), how the three algorithm families trade off, and how to choose per data type — all on point clouds that already live in an explicit metric CRS such as EPSG:32618 (UTM zone 18N). For where this step sits in the wider workflow, see the [Point Cloud & Mesh Processing Pipelines](/point-cloud-mesh-processing-pipelines/) overview.
+Surface reconstruction turns an unstructured point cloud into a connected mesh you can render, query, and simulate against. The choice of algorithm is not cosmetic: feed the same building scan to Poisson, ball-pivoting (BPA), and a Delaunay alpha shape and you get three meshes with different watertightness, different noise behaviour, and different polygon counts. Pick the wrong one for your data and you spend the next week patching holes in facades or sanding off bubbles that the solver hallucinated. This guide shows how to reconstruct surfaces with [`open3d`](https://www.open3d.org/), how the three algorithm families trade off, and how to choose per data type — all on point clouds that already live in an explicit metric CRS such as EPSG:32618 (UTM zone 18N). For where this step sits in the wider workflow, see the [Point Cloud & Mesh Processing Pipelines](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/) overview.
 
 ## Prerequisites
 
 Reconstruction is unforgiving of bad inputs, so the contract for entering this stage is strict:
 
 - **Tooling:** `open3d>=0.17` (the `create_from_point_cloud_poisson` and `create_from_point_cloud_ball_pivoting` APIs and the density return are stable from 0.17), plus `numpy>=1.24` and `scipy>=1.10` for the post-processing and nearest-neighbour spacing estimates. Install with `pip install "open3d>=0.17" "numpy>=1.24" "scipy>=1.10"`.
-- **A projected, metric CRS — stated explicitly.** Every algorithm here measures distances and radii in the point cloud's own units, so the cloud must be in a metric projected system such as EPSG:32618 (UTM 18N) or EPSG:25832 (ETRS89 / UTM 32N), not geographic EPSG:4326. A radius of `0.05` means five centimetres in EPSG:32618; in EPSG:4326 it means 0.05 degrees — roughly 5.5 km — and the reconstruction silently collapses. Reproject before you reach this page; the mechanics are in [converting WGS84 to local projected coordinates](/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/converting-wgs84-to-local-projected-coordinates/).
+- **A projected, metric CRS — stated explicitly.** Every algorithm here measures distances and radii in the point cloud's own units, so the cloud must be in a metric projected system such as EPSG:32618 (UTM 18N) or EPSG:25832 (ETRS89 / UTM 32N), not geographic EPSG:4326. A radius of `0.05` means five centimetres in EPSG:32618; in EPSG:4326 it means 0.05 degrees — roughly 5.5 km — and the reconstruction silently collapses. Reproject before you reach this page; the mechanics are in [converting WGS84 to local projected coordinates](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/converting-wgs84-to-local-projected-coordinates/).
 - **Oriented normals.** Poisson and BPA both consume per-point normals, and the orientation (which way "outward" points) matters as much as the direction. A cloud with consistent vectors but flipped orientation produces an inside-out surface. Normals are estimated and oriented as the first workflow step below.
-- **A filtered cloud.** Outliers, vegetation returns, and birds become real triangles if you leave them in — implicit solvers cannot tell a measurement artefact from a wall. Run statistical outlier removal and ground classification first; see [Point Cloud Filtering Techniques](/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/).
+- **A filtered cloud.** Outliers, vegetation returns, and birds become real triangles if you leave them in — implicit solvers cannot tell a measurement artefact from a wall. Run statistical outlier removal and ground classification first; see [Point Cloud Filtering Techniques](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/).
 - **Roughly uniform density**, ideally 10–20 points/m² for architectural and infrastructure features. BPA in particular fails on the sparse patches that occlusion leaves behind.
 
 ## Concept
@@ -198,7 +198,7 @@ assert np.allclose(mesh.get_axis_aligned_bounding_box().get_extent(),
 
 Expected values for a clean genus-0 Poisson shell: `is_watertight()` is `True`, both manifold checks are `True`, and `V - E + F` equals `2`. If `is_watertight()` is `False` after trimming, lower `trim_quantile` — over-aggressive trimming punches holes in the very shell you wanted closed. A `euler` value far from 2 signals handles or holes; the genus of the surface is `(2 - (V - E + F)) / 2`, so a Euler number of 0 means one handle (a tunnel through the mesh), which on a building usually traces back to two walls meeting through an occluded gap. Inspect with the BPA mesh, whose open boundaries make missing-data regions visible at a glance.
 
-The bounding-box extents (in metres, EPSG:32618) should match the source cloud to within a voxel; a large mismatch almost always means flipped or inconsistent normals, because an inside-out Poisson surface balloons outward past the data. It is worth folding these assertions into the pipeline as a hard gate rather than a print, so a malformed tile fails the batch loudly instead of flowing downstream into [mesh decimation](/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/) and tiling, where the same defect is far more expensive to diagnose. For the full set of manifold and orientation rules these checks enforce, see [Mesh Topology Basics](/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/).
+The bounding-box extents (in metres, EPSG:32618) should match the source cloud to within a voxel; a large mismatch almost always means flipped or inconsistent normals, because an inside-out Poisson surface balloons outward past the data. It is worth folding these assertions into the pipeline as a hard gate rather than a print, so a malformed tile fails the batch loudly instead of flowing downstream into [mesh decimation](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/) and tiling, where the same defect is far more expensive to diagnose. For the full set of manifold and orientation rules these checks enforce, see [Mesh Topology Basics](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/).
 
 ## Performance & Scale
 
@@ -236,7 +236,7 @@ Both algorithms need *oriented* normals — direction and a consistent outward s
 
 ### What depth should I pass to Poisson?
 
-`depth` controls octree resolution. 8–9 covers most municipal and urban datasets; go to 10 only when validation shows you are smoothing away real detail. Each step up roughly multiplies memory and time, and high depth overfits to noise, so raise it deliberately. Tile-specific tuning, the `scale` and `linear_fit` parameters, and density-trim interactions are covered in depth in [Poisson surface reconstruction parameters](/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/poisson-surface-reconstruction-parameters/).
+`depth` controls octree resolution. 8–9 covers most municipal and urban datasets; go to 10 only when validation shows you are smoothing away real detail. Each step up roughly multiplies memory and time, and high depth overfits to noise, so raise it deliberately. Tile-specific tuning, the `scale` and `linear_fit` parameters, and density-trim interactions are covered in depth in [Poisson surface reconstruction parameters](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/poisson-surface-reconstruction-parameters/).
 
 ### How do I keep my reconstructed mesh in the right coordinate system?
 
@@ -244,10 +244,10 @@ Both algorithms need *oriented* normals — direction and a consistent outward s
 
 ## Related Guides
 
-- [Poisson Surface Reconstruction Parameters](/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/poisson-surface-reconstruction-parameters/) — depth, scale, and density-trim tuning in detail
-- [Point Cloud Filtering Techniques](/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/) — outlier removal and classification before reconstruction
-- [Automated Mesh Decimation](/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/) — reduce reconstructed triangle counts to a polygon budget
-- [Texture Mapping Workflows](/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/) — apply photogrammetry textures to the reconstructed mesh
-- [Mesh Topology Basics](/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/) — manifold rules and repair for the validation step
+- [Poisson Surface Reconstruction Parameters](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/poisson-surface-reconstruction-parameters/) — depth, scale, and density-trim tuning in detail
+- [Point Cloud Filtering Techniques](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/) — outlier removal and classification before reconstruction
+- [Automated Mesh Decimation](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/) — reduce reconstructed triangle counts to a polygon budget
+- [Texture Mapping Workflows](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/) — apply photogrammetry textures to the reconstructed mesh
+- [Mesh Topology Basics](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/) — manifold rules and repair for the validation step
 
-Back to [Point Cloud & Mesh Processing Pipelines](/point-cloud-mesh-processing-pipelines/).
+Back to [Point Cloud & Mesh Processing Pipelines](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/).

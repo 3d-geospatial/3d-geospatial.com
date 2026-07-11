@@ -1,6 +1,6 @@
 # Hierarchical LOD Structuring for 3D Geospatial Data & Digital Twin Automation
 
-City-scale digital twins fail in the same predictable way: a flat level-of-detail system that swaps an entire model at a fixed camera distance either floods the GPU with millions of triangles the moment the user zooms in, or pops a blurry placeholder into view the moment they pull back. The fix is to stop treating the model as one object and start treating space itself as the index. Hierarchical LOD structuring partitions a geographic extent into a tree of nested cells — a quadtree for terrain and building footprints, an octree for volumetric infrastructure — where each node carries a progressively refined slice of geometry tagged with a `geometricError` value. The renderer then walks the tree, refining only the branches whose projected error exceeds a screen-space threshold, so memory and bandwidth scale with what is actually visible rather than with the size of the dataset. This page builds that index from scratch in Python, assigns physically meaningful error values, and shows how to validate the result before it reaches a [3D Tiles](/lod-management-optimization-strategies/automated-tile-generation/) writer.
+City-scale digital twins fail in the same predictable way: a flat level-of-detail system that swaps an entire model at a fixed camera distance either floods the GPU with millions of triangles the moment the user zooms in, or pops a blurry placeholder into view the moment they pull back. The fix is to stop treating the model as one object and start treating space itself as the index. Hierarchical LOD structuring partitions a geographic extent into a tree of nested cells — a quadtree for terrain and building footprints, an octree for volumetric infrastructure — where each node carries a progressively refined slice of geometry tagged with a `geometricError` value. The renderer then walks the tree, refining only the branches whose projected error exceeds a screen-space threshold, so memory and bandwidth scale with what is actually visible rather than with the size of the dataset. This page builds that index from scratch in Python, assigns physically meaningful error values, and shows how to validate the result before it reaches a [3D Tiles](https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/) writer.
 
 ## Prerequisites
 
@@ -237,7 +237,7 @@ def points_in_bounds(bounds):
     return cand[keep]
 ```
 
-For datasets that exceed RAM, back the coordinate array with `numpy.memmap` and serialize each leaf to a tile in the recursion's termination branch so node geometry never all resides in memory at once — the same streaming discipline used in [automated tile generation](/lod-management-optimization-strategies/automated-tile-generation/). For mesh leaves, simplify with `trimesh` before writing so each tile carries a triangle budget proportional to its `geometricError`:
+For datasets that exceed RAM, back the coordinate array with `numpy.memmap` and serialize each leaf to a tile in the recursion's termination branch so node geometry never all resides in memory at once — the same streaming discipline used in [automated tile generation](https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/). For mesh leaves, simplify with `trimesh` before writing so each tile carries a triangle budget proportional to its `geometricError`:
 
 ```python
 leaf_mesh = trimesh.load("block_0421.ply")
@@ -276,9 +276,9 @@ Let the `max_per_leaf` density threshold decide depth rather than forcing a fixe
 
 ## Related Guides
 
-- [Implementing Quadtree LOD for Urban Models](/lod-management-optimization-strategies/hierarchical-lod-structuring/implementing-quadtree-lod-for-urban-models/) — the concrete building-clustering walkthrough that extends this index
-- [Automated Tile Generation for 3D Geospatial](/lod-management-optimization-strategies/automated-tile-generation/) — serializing this tree to a 3D Tiles tileset
-- [Streaming Sync Patterns for 3D Geospatial](/lod-management-optimization-strategies/streaming-sync-patterns/) — runtime cache eviction and request batching for the tiles produced here
-- [3D Format Standards Comparison](/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/) — how glTF and 3D Tiles carry the geometry each node holds
+- [Implementing Quadtree LOD for Urban Models](https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/implementing-quadtree-lod-for-urban-models/) — the concrete building-clustering walkthrough that extends this index
+- [Automated Tile Generation for 3D Geospatial](https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/) — serializing this tree to a 3D Tiles tileset
+- [Streaming Sync Patterns for 3D Geospatial](https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/) — runtime cache eviction and request batching for the tiles produced here
+- [3D Format Standards Comparison](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/) — how glTF and 3D Tiles carry the geometry each node holds
 
-Back to [LOD Management & Optimization Strategies](/lod-management-optimization-strategies/).
+Back to [LOD Management & Optimization Strategies](https://www.3d-geospatial.com/lod-management-optimization-strategies/).

@@ -6,7 +6,7 @@ description: "Fail fast before tiling: assert a dataset's CRS is a projected met
 
 This guide uses `pyproj` to assert that a dataset's coordinate reference system is a projected, metric system — not geographic degrees — before a single tile is generated: inspecting `CRS.is_projected` and `axis_info` unit names, round-tripping a control point to prove the transform is metric and lossless, and failing fast when the answer is wrong. EPSG:32618 (UTM 18N, metres) passes; EPSG:4326 (WGS84, degrees) is rejected outright. You hit this whenever data arrives from an upstream source with a CRS you did not set yourself, because a point cloud or mesh silently in degrees produces a `geometricError` measured in fractions of a degree — a number that is meaningless to a renderer and corrupts every downstream LOD decision.
 
-The check is cheap and belongs at the very front of the pipeline, before tiling spends minutes on data it should have rejected in milliseconds. It is the CRS gate from the [data validation and QA gates](/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/) set, worked in full.
+The check is cheap and belongs at the very front of the pipeline, before tiling spends minutes on data it should have rejected in milliseconds. It is the CRS gate from the [data validation and QA gates](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/) set, worked in full.
 
 ## Prerequisites
 
@@ -204,12 +204,12 @@ The round-trip residual for a well-formed projected CRS is sub-micron in practic
 
 **The round-trip residual is large for a legitimate CRS.** Usually an axis-order mistake — `always_xy=True` was omitted, so `pyproj` returned coordinates in the CRS's declared latitude-longitude order and the round-trip mixed easting with northing. Always pass `always_xy=True` to the transformers so the code consistently uses (x, y) / (lon, lat) order, and the residual falls back to sub-millimetre.
 
-**A compound CRS passes the horizontal checks but hides a vertical-datum surprise.** A system like EPSG:32618+5703 carries a projected horizontal component in metres and a separate vertical datum; `is_projected` and the metre check pass on the horizontal axes while the height axis follows its own reference surface. When elevations matter, assert the specific compound EPSG code you expect rather than only the horizontal one, so an ellipsoidal height is never mistaken for an orthometric one downstream — the vertical side of this is covered in [handling vertical datums and geoid separation](/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/handling-vertical-datums-and-geoid-separation/).
+**A compound CRS passes the horizontal checks but hides a vertical-datum surprise.** A system like EPSG:32618+5703 carries a projected horizontal component in metres and a separate vertical datum; `is_projected` and the metre check pass on the horizontal axes while the height axis follows its own reference surface. When elevations matter, assert the specific compound EPSG code you expect rather than only the horizontal one, so an ellipsoidal height is never mistaken for an orthometric one downstream — the vertical side of this is covered in [handling vertical datums and geoid separation](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/handling-vertical-datums-and-geoid-separation/).
 
 ## Related Guides
 
-- [Data Validation & QA Gates for 3D Tiles](/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/) — the full set of blocking gates this preflight joins
-- [Writing 3D Tiles Validator Checks in CI](/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/writing-3d-tiles-validator-checks-in-ci/) — verifying the output transform resolves to EPSG:4978
-- [Coordinate Reference Systems for 3D Assets](/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/) — choosing and enforcing the projected CRS this gate assumes
+- [Data Validation & QA Gates for 3D Tiles](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/) — the full set of blocking gates this preflight joins
+- [Writing 3D Tiles Validator Checks in CI](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/writing-3d-tiles-validator-checks-in-ci/) — verifying the output transform resolves to EPSG:4978
+- [Coordinate Reference Systems for 3D Assets](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/) — choosing and enforcing the projected CRS this gate assumes
 
-Back to [Data Validation & QA Gates for 3D Tiles](/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/).
+Back to [Data Validation & QA Gates for 3D Tiles](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/).

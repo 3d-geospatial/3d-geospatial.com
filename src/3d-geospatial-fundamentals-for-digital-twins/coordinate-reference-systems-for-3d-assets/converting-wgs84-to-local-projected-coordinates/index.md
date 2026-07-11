@@ -12,7 +12,7 @@ Almost every 3D acquisition begins in EPSG:4326. GNSS receivers, RTK base correc
 
 The economic case is sharper than it first appears. Once geometry is anchored to a projected CRS like EPSG:32618, a one-metre offset in the data is a one-metre offset on the ground — the units are isometric and uniform across the whole tile, so registration, clash detection, and volumetric queries behave linearly. Left in EPSG:4326, the same operations need spherical trigonometry on every call, lose precision near the poles, and break the moment a rendering or physics engine assumes its axes are equal-scale. Picking a projection whose scale-factor deviation stays under 1:10,000 across your site keeps cumulative drift below the centimetre tolerances that survey-grade twins are held to.
 
-Two failure classes dominate this conversion: silent axis-order swaps (PROJ's CRS database declares EPSG:4326 as latitude-first, so the naive call flips your coordinates) and ignored vertical datums (GNSS gives ellipsoidal height; your twin almost certainly wants orthometric height relative to a geoid). Both produce output that looks plausible and is wrong by metres. The steps below close off both. For the broader question of which target CRS to pick, see [Coordinate Reference Systems for 3D Assets](/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/).
+Two failure classes dominate this conversion: silent axis-order swaps (PROJ's CRS database declares EPSG:4326 as latitude-first, so the naive call flips your coordinates) and ignored vertical datums (GNSS gives ellipsoidal height; your twin almost certainly wants orthometric height relative to a geoid). Both produce output that looks plausible and is wrong by metres. The steps below close off both. For the broader question of which target CRS to pick, see [Coordinate Reference Systems for 3D Assets](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/).
 
 <figure class="diagram">
 <svg viewBox="0 0 760 230" role="img" aria-labelledby="wgs84-conv-t wgs84-conv-d" xmlns="http://www.w3.org/2000/svg">
@@ -172,7 +172,7 @@ Beyond the automated checks, validate against ground truth before trusting a bat
 
 ### How do I pick the right UTM zone (and EPSG code) for my site?
 
-UTM zones are 6° wide; the zone number is `floor((longitude + 180) / 6) + 1`, with EPSG:326xx for the northern hemisphere and EPSG:327xx for the south. Longitude −73.99 gives zone 18N → EPSG:32618. For sites that straddle a zone boundary or span more than a degree or two, a single UTM zone introduces scale distortion at the edges — prefer a national grid or a custom Transverse Mercator. See [how to choose a CRS for urban digital twins](/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/how-to-choose-crs-for-urban-digital-twins/) for the full decision.
+UTM zones are 6° wide; the zone number is `floor((longitude + 180) / 6) + 1`, with EPSG:326xx for the northern hemisphere and EPSG:327xx for the south. Longitude −73.99 gives zone 18N → EPSG:32618. For sites that straddle a zone boundary or span more than a degree or two, a single UTM zone introduces scale distortion at the edges — prefer a national grid or a custom Transverse Mercator. See [how to choose a CRS for urban digital twins](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/how-to-choose-crs-for-urban-digital-twins/) for the full decision.
 
 ### Do I always need the compound vertical CRS, or can I project 2D and fix height later?
 
@@ -184,9 +184,9 @@ They look fine only by coincidence of your test data, or because the target CRS 
 
 ## Related Guides
 
-- [Coordinate Reference Systems for 3D Assets](/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/) — datum management and transformation strategy
-- [How to Choose CRS for Urban Digital Twins](/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/how-to-choose-crs-for-urban-digital-twins/) — selecting the target projection
-- [Point Cloud Density Standards](/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/) — density targets for the LiDAR you reproject
-- [3D Geospatial Fundamentals for Digital Twins](/3d-geospatial-fundamentals-for-digital-twins/) — the spatial baseline this fits into
+- [Coordinate Reference Systems for 3D Assets](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/) — datum management and transformation strategy
+- [How to Choose CRS for Urban Digital Twins](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/how-to-choose-crs-for-urban-digital-twins/) — selecting the target projection
+- [Point Cloud Density Standards](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/) — density targets for the LiDAR you reproject
+- [3D Geospatial Fundamentals for Digital Twins](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/) — the spatial baseline this fits into
 
-Back to [Coordinate Reference Systems for 3D Assets](/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/).
+Back to [Coordinate Reference Systems for 3D Assets](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/).

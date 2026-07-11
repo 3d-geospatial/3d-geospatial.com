@@ -4,11 +4,11 @@ description: "Automated mesh decimation for geospatial pipelines: quadric edge c
 ---
 # Automated Mesh Decimation for Geospatial Digital Twins
 
-Raw photogrammetric and LiDAR-derived meshes routinely exceed tens or hundreds of millions of triangles, making them computationally prohibitive for real-time digital twin environments, web-based GIS viewers, and edge-deployed infrastructure models. Automated mesh decimation resolves this bottleneck by algorithmically reducing polygon density while preserving topological integrity, geospatial alignment, and visual fidelity — turning a 40 M-triangle building block into a 400 K-triangle asset that a browser can stream without dropping frames. This page is a runnable, production-grade workflow: it covers quadric edge collapse (QEM) and vertex clustering, target triangle budgets, boundary, UV and normal preservation, the LOD chains that feed a viewer, and how to prove the result with Hausdorff error measurement. It is part of the broader [Point Cloud & Mesh Processing Pipelines](/point-cloud-mesh-processing-pipelines/) work and assumes you have already reconstructed a surface from your point cloud.
+Raw photogrammetric and LiDAR-derived meshes routinely exceed tens or hundreds of millions of triangles, making them computationally prohibitive for real-time digital twin environments, web-based GIS viewers, and edge-deployed infrastructure models. Automated mesh decimation resolves this bottleneck by algorithmically reducing polygon density while preserving topological integrity, geospatial alignment, and visual fidelity — turning a 40 M-triangle building block into a 400 K-triangle asset that a browser can stream without dropping frames. This page is a runnable, production-grade workflow: it covers quadric edge collapse (QEM) and vertex clustering, target triangle budgets, boundary, UV and normal preservation, the LOD chains that feed a viewer, and how to prove the result with Hausdorff error measurement. It is part of the broader [Point Cloud & Mesh Processing Pipelines](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/) work and assumes you have already reconstructed a surface from your point cloud.
 
 ## Prerequisites
 
-Decimation sits late in the pipeline, after [surface reconstruction](/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/) has produced a triangulated mesh. Pin exact versions — the `simplify_quadric_decimation` signature and its keyword arguments changed across Open3D releases, and code written for 0.16 silently breaks on 0.17+.
+Decimation sits late in the pipeline, after [surface reconstruction](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/) has produced a triangulated mesh. Pin exact versions — the `simplify_quadric_decimation` signature and its keyword arguments changed across Open3D releases, and code written for 0.16 silently breaks on 0.17+.
 
 - **Python 3.9+** in an isolated environment. With `venv`: `python -m venv .venv && source .venv/bin/activate && pip install "open3d>=0.17" "trimesh>=4.0" "numpy>=1.24" scipy`. With `conda`: `conda create -n decim python=3.11 && conda activate decim && pip install "open3d>=0.17" "trimesh>=4.0" numpy scipy`.
 - **Core libraries**: `open3d>=0.17` (its `simplify_quadric_decimation` and `simplify_vertex_clustering`), `trimesh>=4.0` (for `trimesh.repair`, watertightness, and Hausdorff sampling), `numpy>=1.24`, and `scipy` (for `scipy.spatial.cKDTree`, used in the error metric).
@@ -16,7 +16,7 @@ Decimation sits late in the pipeline, after [surface reconstruction](/point-clou
 - **Geospatial context**: a known coordinate reference system, stated explicitly. Decimation must run in a projected metric CRS such as EPSG:32618 (UTM zone 18N) — never in geographic EPSG:4326, where degrees-of-longitude and degrees-of-latitude are anisotropic and QEM's error metric, which assumes isotropic Euclidean distance, will preferentially collapse edges along one axis. Store the CRS in a sidecar `.prj` (WKT) or a `.crs.json` next to the mesh, because PLY and OBJ carry no CRS field.
 - **Hardware**: minimum 16 GB RAM for city-block-scale meshes; 64+ GB recommended for district-level datasets processed in a single tile.
 
-Clean input geometry is non-negotiable. Decimation algorithms assume manifold or near-manifold topology. If your source originates from noisy LiDAR returns or unstructured point clouds, apply [point cloud filtering techniques](/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/) before reconstruction. Outliers, duplicate vertices, and non-watertight boundaries propagate through decimation, causing UV tearing, texture misalignment, or silent geometry collapse.
+Clean input geometry is non-negotiable. Decimation algorithms assume manifold or near-manifold topology. If your source originates from noisy LiDAR returns or unstructured point clouds, apply [point cloud filtering techniques](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/) before reconstruction. Outliers, duplicate vertices, and non-watertight boundaries propagate through decimation, causing UV tearing, texture misalignment, or silent geometry collapse.
 
 ## Concept
 
@@ -104,7 +104,7 @@ def ingest_and_validate(filepath: str):
 
 ### 2. Topology pre-processing
 
-Raw meshes from photogrammetry or [surface reconstruction](/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/) often contain degenerate faces, overlapping vertices, or inconsistent normals. Pre-processing normalises the geometry so the QEM heuristic operates predictably — degenerate triangles produce zero-area face planes whose quadrics are ill-defined.
+Raw meshes from photogrammetry or [surface reconstruction](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/) often contain degenerate faces, overlapping vertices, or inconsistent normals. Pre-processing normalises the geometry so the QEM heuristic operates predictably — degenerate triangles produce zero-area face planes whose quadrics are ill-defined.
 
 ```python
 def preprocess_topology(mesh: o3d.geometry.TriangleMesh) -> o3d.geometry.TriangleMesh:
@@ -165,7 +165,7 @@ def build_lod_chain(mesh, budgets=(4_000_000, 800_000, 120_000)):
 
 ### 5. UV and seam preservation with trimesh
 
-When a mesh carries a texture atlas, QEM that merges vertices across a UV seam tears the texture. `trimesh` exposes the UV island structure; decimating per-island, or splitting on seams first, keeps texture coordinates coherent. This matters most for the CAD-derived and photogrammetric facades feeding [texture mapping workflows](/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/).
+When a mesh carries a texture atlas, QEM that merges vertices across a UV seam tears the texture. `trimesh` exposes the UV island structure; decimating per-island, or splitting on seams first, keeps texture coordinates coherent. This matters most for the CAD-derived and photogrammetric facades feeding [texture mapping workflows](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/).
 
 ```python
 import trimesh
@@ -247,7 +247,7 @@ mean=2.1 cm  p95=6.8 cm
 
 QEM cost scales with the number of edge collapses, so reduction depth dominates runtime more than input size — taking a mesh to 1% of its triangles is far more than ten times the work of taking it to 10%, because the priority queue of candidate collapses must be re-sorted after every merge. Memory is the harder ceiling: Open3D holds the full vertex array, triangle array, and per-vertex quadric matrices in RAM at once, so a 40 M-triangle mesh can sit at 6–8 GB before decimation even begins. Indicative single-threaded benchmarks on a 32 GB machine: 1 M → 100 K triangles (QEM) in roughly 2.4 s; 5 M → 500 K (QEM) in roughly 9 s; 10 M → 1 M via vertex clustering in roughly 4 s. The Hausdorff check at 200 K samples adds about 1–2 s per pair, dominated by building the two KD-trees.
 
-For district-scale data, never load the whole model into one process. Tile the mesh into spatially coherent chunks on a quadtree or octree aligned to the same EPSG:32618 grid your [LOD management](/lod-management-optimization-strategies/) tiling uses, decimate each chunk independently, and merge at the viewer. This is embarrassingly parallel — distribute tiles across CPU cores with `ProcessPoolExecutor`, keeping I/O single-threaded to avoid file-lock contention, and expect roughly a 3× speedup on four cores at ~85% utilisation. Make each task idempotent and cache intermediate LODs so a failed tile is retried, not rerun from scratch.
+For district-scale data, never load the whole model into one process. Tile the mesh into spatially coherent chunks on a quadtree or octree aligned to the same EPSG:32618 grid your [LOD management](https://www.3d-geospatial.com/lod-management-optimization-strategies/) tiling uses, decimate each chunk independently, and merge at the viewer. This is embarrassingly parallel — distribute tiles across CPU cores with `ProcessPoolExecutor`, keeping I/O single-threaded to avoid file-lock contention, and expect roughly a 3× speedup on four cores at ~85% utilisation. Make each task idempotent and cache intermediate LODs so a failed tile is retried, not rerun from scratch.
 
 ```python
 import os, glob
@@ -289,7 +289,7 @@ def batch_decimate(input_dir, output_dir, budgets, crs_wkt, workers=4):
 Use QEM by default for any asset where shape matters — buildings, bridges, infrastructure — because it preserves silhouettes and curvature. Reach for vertex clustering when speed beats fidelity (terrain, vegetation, far-distance background tiles) or when the input is too dirty for QEM to converge. In production, run QEM first and fall back to clustering only when it degenerates.
 
 ### What triangle budget should a web tile target?
-Browser-based viewers are typically comfortable around 1–2 million triangles per visible tile, while desktop digital twins tolerate 5–10 million. Drive the budget by screen-space footprint through the LOD chain rather than one global number, and confirm thresholds against your target hardware in [optimizing mesh triangle count for web rendering](/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/optimizing-mesh-triangle-count-for-web-rendering/).
+Browser-based viewers are typically comfortable around 1–2 million triangles per visible tile, while desktop digital twins tolerate 5–10 million. Drive the budget by screen-space footprint through the LOD chain rather than one global number, and confirm thresholds against your target hardware in [optimizing mesh triangle count for web rendering](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/optimizing-mesh-triangle-count-for-web-rendering/).
 
 ### How do I keep decimation from shifting my coordinates?
 Decimation itself does not move geometry, but float precision does when you operate on raw UTM coordinates. Translate the mesh to a local origin (subtract the centroid) before decimating in EPSG:32618, then add the offset back on export and write the CRS to a sidecar, since PLY and OBJ store no CRS.
@@ -298,14 +298,14 @@ Decimation itself does not move geometry, but float precision does when you oper
 It depends on the asset and the LOD. For the highest-detail level of building geometry, a sub-5 cm mean and sub-15 cm maximum (Hausdorff) distance in metric CRS units is a common gate; coarser levels relax in step with their geometric error. Always assert the tolerance in code so a bad budget fails the batch.
 
 ### Can I decimate before reconstructing a surface?
-No — decimation operates on triangulated meshes, so the surface must already exist. Clean the point cloud with [point cloud filtering techniques](/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/), reconstruct, then decimate. Decimating a noisy reconstruction just bakes the noise into a smaller, cheaper-to-render mesh.
+No — decimation operates on triangulated meshes, so the surface must already exist. Clean the point cloud with [point cloud filtering techniques](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/), reconstruct, then decimate. Decimating a noisy reconstruction just bakes the noise into a smaller, cheaper-to-render mesh.
 
 ## Related Guides
 
-- [Optimizing Mesh Triangle Count for Web Rendering](/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/optimizing-mesh-triangle-count-for-web-rendering/) — platform triangle thresholds and LOD selection
-- [Surface Reconstruction for Geospatial Twins](/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/) — generating the mesh that decimation reduces
-- [Point Cloud Filtering Techniques](/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/) — cleaning the cloud before reconstruction
-- [Texture Mapping Workflows for Digital Twins](/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/) — preserving UVs through decimation
-- [LOD Management & Optimization Strategies](/lod-management-optimization-strategies/) — tiling and streaming the decimated chain
+- [Optimizing Mesh Triangle Count for Web Rendering](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/optimizing-mesh-triangle-count-for-web-rendering/) — platform triangle thresholds and LOD selection
+- [Surface Reconstruction for Geospatial Twins](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/) — generating the mesh that decimation reduces
+- [Point Cloud Filtering Techniques](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/) — cleaning the cloud before reconstruction
+- [Texture Mapping Workflows for Digital Twins](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/) — preserving UVs through decimation
+- [LOD Management & Optimization Strategies](https://www.3d-geospatial.com/lod-management-optimization-strategies/) — tiling and streaming the decimated chain
 
-Back to [Point Cloud & Mesh Processing Pipelines](/point-cloud-mesh-processing-pipelines/).
+Back to [Point Cloud & Mesh Processing Pipelines](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/).

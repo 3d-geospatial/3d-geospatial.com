@@ -1,6 +1,6 @@
 # Automated Tile Generation for 3D Geospatial Data & Digital Twin Automation
 
-A city-scale mesh or a multi-billion-point LiDAR survey cannot be handed to a browser as a single file — the client would block for minutes and exhaust GPU memory long before the first frame. Automated tile generation solves this by partitioning a monolithic dataset into a hierarchy of small, self-describing tiles (`b3dm`, `pnts`, or `glb`) indexed by a `tileset.json` tree, where each node carries a bounding volume and a `geometricError` that tells the renderer when to fetch its higher-resolution children. This page is a runnable workflow for producing that hierarchy with `py3dtiles` and the `3d-tiles-tools` CLI, computing a correct per-level `geometricError`, placing tiles in Earth-Centered Earth-Fixed coordinates (EPSG:4978) for CesiumJS, and validating the result before it reaches a CDN. It assumes you already have manifold meshes or classified point clouds in a known CRS and want a deterministic, CI-friendly tiling step inside [LOD management](/lod-management-optimization-strategies/).
+A city-scale mesh or a multi-billion-point LiDAR survey cannot be handed to a browser as a single file — the client would block for minutes and exhaust GPU memory long before the first frame. Automated tile generation solves this by partitioning a monolithic dataset into a hierarchy of small, self-describing tiles (`b3dm`, `pnts`, or `glb`) indexed by a `tileset.json` tree, where each node carries a bounding volume and a `geometricError` that tells the renderer when to fetch its higher-resolution children. This page is a runnable workflow for producing that hierarchy with `py3dtiles` and the `3d-tiles-tools` CLI, computing a correct per-level `geometricError`, placing tiles in Earth-Centered Earth-Fixed coordinates (EPSG:4978) for CesiumJS, and validating the result before it reaches a CDN. It assumes you already have manifold meshes or classified point clouds in a known CRS and want a deterministic, CI-friendly tiling step inside [LOD management](https://www.3d-geospatial.com/lod-management-optimization-strategies/).
 
 ## Prerequisites
 
@@ -341,10 +341,10 @@ Aim for a few hundred thousand triangles or points per leaf tile after Draco —
 
 ## Related Guides
 
-- [Hierarchical LOD Structuring for Digital Twins](/lod-management-optimization-strategies/hierarchical-lod-structuring/) — the parent-child refinement model the tileset tree implements
-- [Implementing Quadtree LOD for Urban Models](/lod-management-optimization-strategies/hierarchical-lod-structuring/implementing-quadtree-lod-for-urban-models/) — the partitioning strategy behind step 3
-- [Streaming Sync Patterns for 3D Geospatial](/lod-management-optimization-strategies/streaming-sync-patterns/) — how clients request tiles by screen-space error
-- [Automated Mesh Decimation for Digital Twins](/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/) — generating the simplified geometry each LOD level needs
-- [glTF vs 3D Tiles vs OBJ for Spatial Data](/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/gltf-vs-3dtiles-vs-obj-for-spatial-data/) — why glTF is the payload inside b3dm tiles
+- [Hierarchical LOD Structuring for Digital Twins](https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/) — the parent-child refinement model the tileset tree implements
+- [Implementing Quadtree LOD for Urban Models](https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/implementing-quadtree-lod-for-urban-models/) — the partitioning strategy behind step 3
+- [Streaming Sync Patterns for 3D Geospatial](https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/) — how clients request tiles by screen-space error
+- [Automated Mesh Decimation for Digital Twins](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/) — generating the simplified geometry each LOD level needs
+- [glTF vs 3D Tiles vs OBJ for Spatial Data](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/gltf-vs-3dtiles-vs-obj-for-spatial-data/) — why glTF is the payload inside b3dm tiles
 
-Back to [LOD Management & Optimization Strategies](/lod-management-optimization-strategies/).
+Back to [LOD Management & Optimization Strategies](https://www.3d-geospatial.com/lod-management-optimization-strategies/).

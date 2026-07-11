@@ -2,7 +2,7 @@
 
 Both [PDAL](https://pdal.io/) and [Open3D](https://www.open3d.org/) can strip outliers, thin density, and classify ground on a LiDAR scan, but they are built on opposite philosophies: PDAL is a declarative, CRS-aware pipeline engine that reads `.laz` headers and streams tiles through a JSON stage graph, while Open3D is an in-memory research library that hands you a `numpy`-backed `PointCloud` and expects you to manage coordinates and metadata yourself. This page decides between them for a filtering step — comparing outlier removal, ground classification, and voxel downsampling in each, their behaviour on large `.laz`, and how each treats a coordinate reference system such as EPSG:32618 (UTM zone 18N) — and ends with a verdict on when to reach for one, the other, or both.
 
-You hit this decision the moment your filtering step outgrows a one-off script. If you already have both installed after reading the broader [point cloud filtering techniques](/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/) guide, the question is no longer *how* to run statistical outlier removal but *which engine owns the stage* — because the choice dictates whether your CRS is preserved automatically, whether a billion-point survey fits in RAM, and whether the run is reproducible from a committed JSON file or a Python notebook.
+You hit this decision the moment your filtering step outgrows a one-off script. If you already have both installed after reading the broader [point cloud filtering techniques](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/) guide, the question is no longer *how* to run statistical outlier removal but *which engine owns the stage* — because the choice dictates whether your CRS is preserved automatically, whether a billion-point survey fits in RAM, and whether the run is reproducible from a committed JSON file or a Python notebook.
 
 <figure class="diagram">
 <svg viewBox="0 0 800 360" role="img" aria-labelledby="pdvo-t pdvo-d" xmlns="http://www.w3.org/2000/svg">
@@ -168,9 +168,9 @@ Open3D holds everything resident. A `PointCloud` over 50 M points already wants 
 
 ## Verdict
 
-Choose **PDAL** when the filtering step is part of an ingestion pipeline: it reads and preserves the CRS automatically, ground-classifies natively, streams `.laz` far larger than RAM, and reduces to a JSON document you gate in CI. Choose **Open3D** when filtering is the front of a geometry-processing chain that stays in memory — outlier removal followed by normal estimation and [surface reconstruction](/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/) — where having the cloud as a live numpy array and the kept-index arrays for attribute alignment is worth managing the EPSG yourself.
+Choose **PDAL** when the filtering step is part of an ingestion pipeline: it reads and preserves the CRS automatically, ground-classifies natively, streams `.laz` far larger than RAM, and reduces to a JSON document you gate in CI. Choose **Open3D** when filtering is the front of a geometry-processing chain that stays in memory — outlier removal followed by normal estimation and [surface reconstruction](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/) — where having the cloud as a live numpy array and the kept-index arrays for attribute alignment is worth managing the EPSG yourself.
 
-In practice most production twins use **both**, and the seam is clean: let PDAL own ingestion — read the header, reproject to EPSG:32618, classify ground, clip, and tile — then hand each tile to Open3D for the in-memory geometry work. The [terrestrial LiDAR noise-removal walkthrough](/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/removing-noise-from-terrestrial-lidar-scans/) is a pure-Open3D example of that second half; a PDAL splitter feeding it is the pairing that scales to a city. The one rule that spans both tools is to keep every distance parameter in a metric CRS — a `radius` of `0.25` is 25 cm in EPSG:32618 and a meaningless 0.25 degrees in EPSG:4326.
+In practice most production twins use **both**, and the seam is clean: let PDAL own ingestion — read the header, reproject to EPSG:32618, classify ground, clip, and tile — then hand each tile to Open3D for the in-memory geometry work. The [terrestrial LiDAR noise-removal walkthrough](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/removing-noise-from-terrestrial-lidar-scans/) is a pure-Open3D example of that second half; a PDAL splitter feeding it is the pairing that scales to a city. The one rule that spans both tools is to keep every distance parameter in a metric CRS — a `radius` of `0.25` is 25 cm in EPSG:32618 and a meaningless 0.25 degrees in EPSG:4326.
 
 ## Expected Output & Verification
 
@@ -210,9 +210,9 @@ pdal info block_filtered.laz --metadata | grep -i srs
 
 ## Related Guides
 
-- [Point Cloud Filtering Techniques](/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/) — the full SOR, radius, voxel, and ground toolkit both libraries implement
-- [Removing Noise from Terrestrial LiDAR Scans](/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/removing-noise-from-terrestrial-lidar-scans/) — a pure-Open3D noise-removal walkthrough for the in-memory half
-- [Surface Reconstruction for Geospatial Twins](/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/) — where an Open3D-filtered cloud goes next
-- [Coordinate Reference Systems for 3D Assets](/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/) — choosing the metric EPSG both tools depend on
+- [Point Cloud Filtering Techniques](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/) — the full SOR, radius, voxel, and ground toolkit both libraries implement
+- [Removing Noise from Terrestrial LiDAR Scans](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/removing-noise-from-terrestrial-lidar-scans/) — a pure-Open3D noise-removal walkthrough for the in-memory half
+- [Surface Reconstruction for Geospatial Twins](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/) — where an Open3D-filtered cloud goes next
+- [Coordinate Reference Systems for 3D Assets](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/) — choosing the metric EPSG both tools depend on
 
-Back to [Point Cloud Filtering Techniques](/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/).
+Back to [Point Cloud Filtering Techniques](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/).

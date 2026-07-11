@@ -6,13 +6,13 @@ description: "Run 3d-tiles-validator plus custom numpy invariant checks — mono
 
 This guide wires the `3d-tiles-validator` CLI together with custom Python invariant checks — monotonic `geometricError`, child bounding-volume containment, and a root `transform` that resolves cleanly to EPSG:4978 — into a single CI gate that exits non-zero the instant any check fails. You reach for this the moment a tileset is built by an automated job rather than by hand: the reference validator catches schema and structural faults, but it will not tell you that your root transform places the model at the centre of the Earth, so the gate has to combine the official tool with assertions the tool does not make.
 
-The job's contract is simple — it prints a report and returns 0 or 1 — so it drops into any runner. This walkthrough is the CI-facing counterpart to the [data validation and QA gates](/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/) overview, which catalogues the full gate set; here the focus is the runnable check job and the transform math the validator omits.
+The job's contract is simple — it prints a report and returns 0 or 1 — so it drops into any runner. This walkthrough is the CI-facing counterpart to the [data validation and QA gates](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/) overview, which catalogues the full gate set; here the focus is the runnable check job and the transform math the validator omits.
 
 ## Prerequisites
 
 - Node 18+ with `3d-tiles-validator` 0.5+ available via `npx`, and Python 3.10+ with `numpy` 1.26+ and `pyproj` 3.6+.
 - A built tileset — `tileset.json` plus its `.b3dm`/`.pnts` payloads — whose tiles render in **EPSG:4978 (geocentric WGS84, metres)**. The root tile carries a column-major 4×4 `transform` that places East-North-Up geometry onto the ellipsoid; the last check verifies that matrix.
-- A CI runner (GitHub Actions, GitLab CI, or similar) where the job can fail the pipeline on a non-zero exit. The pipeline plumbing itself is covered in [CI/CD automation for spatial pipelines](/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/).
+- A CI runner (GitHub Actions, GitLab CI, or similar) where the job can fail the pipeline on a non-zero exit. The pipeline plumbing itself is covered in [CI/CD automation for spatial pipelines](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/).
 - Knowledge of the dataset's expected location, so a transform that resolves to the wrong continent is caught by a plausibility bound rather than passing silently.
 
 ## Step-by-Step
@@ -217,14 +217,14 @@ A valid EPSG:4978 origin near the site converts to a longitude and latitude with
 
 **Transform check flags a valid tileset as off the ellipsoid.** The matrix was reshaped row-major instead of column-major, transposing the rotation and translation. 3D Tiles stores `transform` in column-major order, so reshape with `order="F"`; a row-major read scrambles the ENU basis and moves the origin far from the true site.
 
-**The gate exits 0 despite a visibly wrong tileset.** No `transform` was present, so the transform check was skipped, and the geometry happened to satisfy monotonicity and containment while sitting in the wrong CRS. Assert that a root transform exists when the tileset is meant for CesiumJS, and pair this gate with the [CRS and units check](/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/asserting-crs-and-units-with-pyproj/) on the source data so a wrong-CRS input is caught before tiling.
+**The gate exits 0 despite a visibly wrong tileset.** No `transform` was present, so the transform check was skipped, and the geometry happened to satisfy monotonicity and containment while sitting in the wrong CRS. Assert that a root transform exists when the tileset is meant for CesiumJS, and pair this gate with the [CRS and units check](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/asserting-crs-and-units-with-pyproj/) on the source data so a wrong-CRS input is caught before tiling.
 
 **The job passes but the CI runner had no network.** `npx --yes` silently succeeded because the validator was cached from a previous run, so a fresh runner with the package absent and no registry access would instead hang or fail to resolve it. Install `3d-tiles-validator` as an explicit, version-pinned dependency in the job image rather than fetching it on demand, and treat a missing validator as a hard failure — a gate that cannot run is not a gate that passed.
 
 ## Related Guides
 
-- [Data Validation & QA Gates for 3D Tiles](/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/) — the full gate set this job belongs to
-- [Asserting CRS and Units with pyproj](/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/asserting-crs-and-units-with-pyproj/) — catching a wrong source CRS before tiling
-- [CI/CD Automation for Spatial Pipelines](/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/) — the runner and pipeline this gate plugs into
+- [Data Validation & QA Gates for 3D Tiles](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/) — the full gate set this job belongs to
+- [Asserting CRS and Units with pyproj](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/asserting-crs-and-units-with-pyproj/) — catching a wrong source CRS before tiling
+- [CI/CD Automation for Spatial Pipelines](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/) — the runner and pipeline this gate plugs into
 
-Back to [Data Validation & QA Gates for 3D Tiles](/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/).
+Back to [Data Validation & QA Gates for 3D Tiles](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/).

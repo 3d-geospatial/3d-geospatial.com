@@ -4,7 +4,7 @@ description: "Point cloud density standards: ppsm targets, ASPRS/USGS 3DEP Quali
 ---
 # Point Cloud Density Standards
 
-When a survey is delivered as "high density" with no number attached, you cannot tell whether it will resolve a curb edge or smear it across half a metre. This page turns that vague label into a measurable specification: how many **points per square metre (ppsm)** a point cloud actually carries, how that maps onto published Quality Levels, and how to compute and verify it from a `.laz` file before the data ever reaches your reconstruction or [Digital Elevation Model Workflows](/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/). Density is the single sampling parameter that governs whether downstream feature extraction, change detection, and mesh generation succeed — and it is cheap to validate up front and expensive to discover missing in production.
+When a survey is delivered as "high density" with no number attached, you cannot tell whether it will resolve a curb edge or smear it across half a metre. This page turns that vague label into a measurable specification: how many **points per square metre (ppsm)** a point cloud actually carries, how that maps onto published Quality Levels, and how to compute and verify it from a `.laz` file before the data ever reaches your reconstruction or [Digital Elevation Model Workflows](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/). Density is the single sampling parameter that governs whether downstream feature extraction, change detection, and mesh generation succeed — and it is cheap to validate up front and expensive to discover missing in production.
 
 ## Prerequisites
 
@@ -13,7 +13,7 @@ You need a controlled, reproducible environment before any density figure is tru
 - **Python packages**: `laspy>=2.4` (the 2.x API with `chunk_iterator` and lazy headers), `numpy>=1.24`, and `scipy>=1.10` for the nearest-neighbour spacing checks. Install the LAZ backend explicitly with `pip install "laspy[lazrs]>=2.4"` so compressed `.laz` files decode without a separate LASzip binary.
 - **Input formats**: LAS 1.4 or LAZ with a populated header — `point_count`, `scales`, `offsets`, and a valid bounding box. Point record formats 6–10 (LAS 1.4 native) carry the extended return-number fields used for first/last-return stratification. Legacy formats 0–5 work for raw density but often lack the extended variable length records (EVLRs) that record pulse metadata.
 - **Coordinate reference system**: a projected, metric CRS, declared explicitly — for example EPSG:32618 (UTM zone 18N, metres) or EPSG:6347 (NAD83(2011) / UTM 18N). Computing density in a geographic CRS such as EPSG:4326 is the most common way to get a wrong answer, because a "square degree" is not a constant area. Confirm the CRS from the WKT in the LAS header or its sidecar `.prj`; do not assume it.
-- **Ground truth**: the acquisition specification (the contracted nominal pulse spacing or QL) plus, ideally, survey-grade control so computed ppsm can be checked against what was actually paid for. For the asset-specific targets that drive those contracts, work through [LiDAR point density best practices for infrastructure](/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/best-practices-for-lidar-point-density-in-infrastructure/).
+- **Ground truth**: the acquisition specification (the contracted nominal pulse spacing or QL) plus, ideally, survey-grade control so computed ppsm can be checked against what was actually paid for. For the asset-specific targets that drive those contracts, work through [LiDAR point density best practices for infrastructure](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/best-practices-for-lidar-point-density-in-infrastructure/).
 
 ## Concept
 
@@ -241,7 +241,7 @@ One scaling subtlety: the empty-cell fraction inflates near tile edges where the
 
 ## Failure Modes & Gotchas
 
-- **Geographic-CRS density skew.** Binning in EPSG:4326 treats degrees as a flat metric grid. At 45° latitude a degree of longitude is ~79 km versus ~111 km for latitude, so cells are non-square and density is distorted by tens of percent — worse toward the poles. Always reproject to a projected metric CRS (EPSG:32618, EPSG:6347, or a national grid) first; step 1 enforces this. The mechanics of that reprojection live in [Coordinate Reference Systems for 3D Assets](/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/).
+- **Geographic-CRS density skew.** Binning in EPSG:4326 treats degrees as a flat metric grid. At 45° latitude a degree of longitude is ~79 km versus ~111 km for latitude, so cells are non-square and density is distorted by tens of percent — worse toward the poles. Always reproject to a projected metric CRS (EPSG:32618, EPSG:6347, or a national grid) first; step 1 enforces this. The mechanics of that reprojection live in [Coordinate Reference Systems for 3D Assets](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/).
 - **Reporting the mean over empty cells.** Dividing total points by the full rectangular extent counts no-data cells as zero-density and understates the true sampling. Worse, a healthy mean can sit on top of a 20% void from a dropped flight line. Always report the 5th percentile and empty-cell fraction alongside the mean.
 - **Confusing point density with pulse density.** Over dense canopy, multiple returns per pulse can push point density 50% above pulse density, so a cloud can "pass" a QL2 point-density check while failing the QL2 pulse spec it was contracted on. Stratify by `return_number == 1` before comparing to a 3DEP level.
 - **Cell size masking the gap you care about.** A 1 m cell averages away a 0.3 m structural feature. If the twin must resolve kerbs, expansion joints, or rebar, validate at a cell size near the feature scale, not a convenient round metre — and remember binning variance rises as cells shrink and per-cell counts fall.
@@ -253,7 +253,7 @@ One scaling subtlety: the empty-cell fraction inflates near tile edges where the
 Points per square metre (ppsm) counts every recorded return per square metre; pulse density counts emitted laser shots per square metre. Because one pulse can yield several returns over vegetation, point density is usually higher. USGS 3DEP Quality Levels are specified on pulse density, so filter to first returns (`return_number == 1`) before comparing your computed ppsm to a QL target.
 
 ### Which Quality Level should I require for an urban digital twin?
-QL1 (8.0 ppsm, ~0.35 m spacing) is the common floor for urban modeling and floodplain work, while corridor and engineering-grade capture moves to QL0 (30+ ppsm, ≤0.18 m). QL2 (4.0 ppsm, ~0.5 m) suits regional topography but tends to smear fine street furniture. Match the level to the smallest feature the twin must resolve; the per-asset reasoning is detailed in [LiDAR point density best practices for infrastructure](/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/best-practices-for-lidar-point-density-in-infrastructure/).
+QL1 (8.0 ppsm, ~0.35 m spacing) is the common floor for urban modeling and floodplain work, while corridor and engineering-grade capture moves to QL0 (30+ ppsm, ≤0.18 m). QL2 (4.0 ppsm, ~0.5 m) suits regional topography but tends to smear fine street furniture. Match the level to the smallest feature the twin must resolve; the per-asset reasoning is detailed in [LiDAR point density best practices for infrastructure](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/best-practices-for-lidar-point-density-in-infrastructure/).
 
 ### Why is my computed density wrong by a large factor?
 The two usual causes are a geographic CRS (binning EPSG:4326 degrees as if they were metres) and computing the mean over the full rectangular header extent including empty cells. Confirm a projected metric CRS such as EPSG:32618, and report density over the data footprint rather than the bounding box.
@@ -266,10 +266,10 @@ Uniform oversampling bloats storage, slows every downstream stage, and can intro
 
 ## Related Guides
 
-- [LiDAR point density best practices for infrastructure](/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/best-practices-for-lidar-point-density-in-infrastructure/) — per-asset ppsm targets and acquisition planning
-- [Coordinate Reference Systems for 3D Assets](/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/) — reproject to a metric CRS before binning
-- [Digital Elevation Model Workflows](/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/) — where density gaps surface as interpolation artifacts
-- [Point Cloud Filtering Techniques](/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/) — cleaning and decimation that change density
+- [LiDAR point density best practices for infrastructure](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/best-practices-for-lidar-point-density-in-infrastructure/) — per-asset ppsm targets and acquisition planning
+- [Coordinate Reference Systems for 3D Assets](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/) — reproject to a metric CRS before binning
+- [Digital Elevation Model Workflows](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/) — where density gaps surface as interpolation artifacts
+- [Point Cloud Filtering Techniques](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/) — cleaning and decimation that change density
 - [USGS 3DEP Lidar Base Specification](https://pubs.usgs.gov/tm/11b4/) — the authoritative Quality Level definitions
 
-Back to [3D Geospatial Fundamentals for Digital Twins](/3d-geospatial-fundamentals-for-digital-twins/).
+Back to [3D Geospatial Fundamentals for Digital Twins](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/).

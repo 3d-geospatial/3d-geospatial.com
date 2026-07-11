@@ -185,9 +185,9 @@ Drift between the LiDAR geometry and the photogrammetry block creates seams no p
 
 ## Related Guides
 
-- [Texture Mapping Workflows for Digital Twins](/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/) — the broader texturing workflow this page sits in
-- [Point Cloud Filtering Techniques](/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/) — clean the cloud before you colour it
-- [Surface Reconstruction for Geospatial Twins](/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/) — turn the coloured cloud into a mesh
-- [Coordinate Reference Systems for 3D Assets](/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/) — get points and cameras into one EPSG
+- [Texture Mapping Workflows for Digital Twins](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/) — the broader texturing workflow this page sits in
+- [Point Cloud Filtering Techniques](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/) — clean the cloud before you colour it
+- [Surface Reconstruction for Geospatial Twins](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/) — turn the coloured cloud into a mesh
+- [Coordinate Reference Systems for 3D Assets](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/) — get points and cameras into one EPSG
 
-Back to [Texture Mapping Workflows for Digital Twins](/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/).
+Back to [Texture Mapping Workflows for Digital Twins](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/).

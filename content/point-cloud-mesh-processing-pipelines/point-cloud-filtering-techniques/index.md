@@ -1,6 +1,6 @@
 # Point Cloud Filtering Techniques for Digital Twin Pipelines
 
-Raw LiDAR, photogrammetric, and terrestrial laser scanning (TLS) datasets arrive contaminated with acquisition artifacts: floating multipath returns, atmospheric backscatter, birds and dust, vegetation penetration noise, and sensor calibration drift. Feed that data straight into reconstruction and you inherit non-manifold geometry, vegetation spikes baked into the bare-earth surface, and storage costs inflated by points that carry no signal. This guide covers production-ready point cloud filtering — statistical outlier removal, radius outlier removal, voxel downsampling, and ground extraction — implemented in `pdal`, `open3d`, and `laspy` against a metric CRS, with the validation and chunking discipline a digital twin pipeline needs. It sits inside the [Point Cloud & Mesh Processing Pipelines](/point-cloud-mesh-processing-pipelines/) work, immediately upstream of surface reconstruction.
+Raw LiDAR, photogrammetric, and terrestrial laser scanning (TLS) datasets arrive contaminated with acquisition artifacts: floating multipath returns, atmospheric backscatter, birds and dust, vegetation penetration noise, and sensor calibration drift. Feed that data straight into reconstruction and you inherit non-manifold geometry, vegetation spikes baked into the bare-earth surface, and storage costs inflated by points that carry no signal. This guide covers production-ready point cloud filtering — statistical outlier removal, radius outlier removal, voxel downsampling, and ground extraction — implemented in `pdal`, `open3d`, and `laspy` against a metric CRS, with the validation and chunking discipline a digital twin pipeline needs. It sits inside the [Point Cloud & Mesh Processing Pipelines](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/) work, immediately upstream of surface reconstruction.
 
 ## Prerequisites
 
@@ -289,7 +289,7 @@ Match it to the smallest feature the twin must resolve and your LOD budget, not 
 
 ### How do I filter without classification codes?
 
-When the LAS has no usable classification, extract ground geometrically: run `filters.smrf` (or CSF for vegetated terrain) to label ground from raw XYZ, then keep `Classification[2:2]`. For a non-ground/structure split without a full classifier, height-above-ground from a coarse TIN of the SMRF ground gives you a workable `z`-relative band. See [removing noise from terrestrial LiDAR scans](/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/removing-noise-from-terrestrial-lidar-scans/) for scanner-specific artifact handling.
+When the LAS has no usable classification, extract ground geometrically: run `filters.smrf` (or CSF for vegetated terrain) to label ground from raw XYZ, then keep `Classification[2:2]`. For a non-ground/structure split without a full classifier, height-above-ground from a coarse TIN of the SMRF ground gives you a workable `z`-relative band. See [removing noise from terrestrial LiDAR scans](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/removing-noise-from-terrestrial-lidar-scans/) for scanner-specific artifact handling.
 
 ### Why did SOR remove 30% of my points?
 
@@ -301,10 +301,10 @@ No — SOR, radius removal, and range clipping only delete points; surviving coo
 
 ## Related Guides
 
-- [Removing Noise from Terrestrial LiDAR Scans](/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/removing-noise-from-terrestrial-lidar-scans/) — scanner-specific artifacts: tripod occlusion, atmospheric backscatter
-- [Surface Reconstruction for Geospatial Twins](/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/) — the stage filtering feeds directly
-- [Automated Mesh Decimation for Digital Twins](/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/) — polygon-budget reduction after reconstruction
-- [Point Cloud Density Standards](/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/) — density targets that set your voxel size
-- [Coordinate Reference Systems for 3D Assets](/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/) — choosing the metric EPSG filtering depends on
+- [Removing Noise from Terrestrial LiDAR Scans](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/removing-noise-from-terrestrial-lidar-scans/) — scanner-specific artifacts: tripod occlusion, atmospheric backscatter
+- [Surface Reconstruction for Geospatial Twins](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/) — the stage filtering feeds directly
+- [Automated Mesh Decimation for Digital Twins](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/) — polygon-budget reduction after reconstruction
+- [Point Cloud Density Standards](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/) — density targets that set your voxel size
+- [Coordinate Reference Systems for 3D Assets](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/) — choosing the metric EPSG filtering depends on
 
-Back to [Point Cloud & Mesh Processing Pipelines](/point-cloud-mesh-processing-pipelines/).
+Back to [Point Cloud & Mesh Processing Pipelines](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/).

@@ -28,7 +28,7 @@ That single defect breaks watertightness, so `is_watertight` returns `False`; it
 <figcaption>Left: a clean edge shared by exactly two faces. Right: a third face joined along the same edge raises the shared-face count to three, violating the manifold rule.</figcaption>
 </figure>
 
-This guide sits under [Mesh Topology Basics](/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/), which covers the half-edge data structures and manifold constraints these repairs rely on.
+This guide sits under [Mesh Topology Basics](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/), which covers the half-edge data structures and manifold constraints these repairs rely on.
 
 ## Prerequisites
 
@@ -196,9 +196,9 @@ The `V − E + F == 2` test assumes a single closed surface with no handles. An 
 
 ## Related Guides
 
-- [Mesh Topology Basics](/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/) — manifold rules, half-edge structures, and normal validation
-- [Poisson Surface Reconstruction Parameters](/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/poisson-surface-reconstruction-parameters/) — generating meshes that need less repair
-- [Automated Mesh Decimation for Digital Twins](/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/) — reducing triangle count after topology is clean
-- [3D Geospatial Fundamentals for Digital Twins](/3d-geospatial-fundamentals-for-digital-twins/) — where mesh integrity fits in the wider ingestion contract
+- [Mesh Topology Basics](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/) — manifold rules, half-edge structures, and normal validation
+- [Poisson Surface Reconstruction Parameters](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/poisson-surface-reconstruction-parameters/) — generating meshes that need less repair
+- [Automated Mesh Decimation for Digital Twins](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/) — reducing triangle count after topology is clean
+- [3D Geospatial Fundamentals for Digital Twins](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/) — where mesh integrity fits in the wider ingestion contract
 
-Back to [Mesh Topology Basics for Digital Twins](/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/).
+Back to [Mesh Topology Basics for Digital Twins](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/).

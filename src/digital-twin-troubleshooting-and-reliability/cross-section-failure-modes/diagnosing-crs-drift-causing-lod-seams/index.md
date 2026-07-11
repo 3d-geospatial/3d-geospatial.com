@@ -4,7 +4,7 @@ description: "Find and fix CRS and transform drift that shows up as seams betwee
 ---
 # Diagnosing CRS Drift That Shows Up as Seams Between LOD Tiles
 
-This guide finds and fixes the coordinate-system drift that appears as visible seams between adjacent LOD tiles, using `pyproj` and `numpy` to verify every tile transform resolves to one EPSG code (EPSG:4978 for a Cesium tileset), diff a control point round-tripped through the pipeline, detect a geographic-versus-projected mix, and assert that tile bounds nest monotonically. It belongs to the [cross-pillar failure modes](/digital-twin-troubleshooting-and-reliability/cross-pillar-failure-modes/) area, because the cause lives in the [coordinate reference systems](/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/) stage while the symptom appears in the [LOD runtime](/lod-management-optimization-strategies/).
+This guide finds and fixes the coordinate-system drift that appears as visible seams between adjacent LOD tiles, using `pyproj` and `numpy` to verify every tile transform resolves to one EPSG code (EPSG:4978 for a Cesium tileset), diff a control point round-tripped through the pipeline, detect a geographic-versus-projected mix, and assert that tile bounds nest monotonically. It belongs to the [cross-section failure modes](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/) area, because the cause lives in the [coordinate reference systems](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/) stage while the symptom appears in the [LOD runtime](https://www.3d-geospatial.com/lod-management-optimization-strategies/).
 
 You hit this the moment two surveys, two tiling runs, or two teams contribute tiles that should abut but do not: a hairline crack of background shows between neighbouring tiles, or one tile sits a few centimetres proud of the next. The geometry looks correct in isolation, every tile validates, and yet the join is wrong — the signature of a transform chain that drifted somewhere between source and tileset root.
 
@@ -202,9 +202,9 @@ A drifting tileset breaks exactly one of these first: multiple frames in step 1,
 
 ## Related Guides
 
-- [Cross-Pillar Failure Modes in Digital Twins](/digital-twin-troubleshooting-and-reliability/cross-pillar-failure-modes/) — the full catalogue of boundary defects this seam belongs to
-- [Fixing Memory OOM in City-Scale Decimation](/digital-twin-troubleshooting-and-reliability/cross-pillar-failure-modes/fixing-memory-oom-in-city-scale-decimation/) — the other common city-scale reliability failure
-- [Converting WGS84 to Local Projected Coordinates](/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/converting-wgs84-to-local-projected-coordinates/) — the transform chain that drifts when misbuilt
-- [Automated Tile Generation for 3D Geospatial](/lod-management-optimization-strategies/automated-tile-generation/) — where the per-tile transforms and bounds are written
+- [Cross-Section Failure Modes in Digital Twins](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/) — the full catalogue of boundary defects this seam belongs to
+- [Fixing Memory OOM in City-Scale Decimation](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/fixing-memory-oom-in-city-scale-decimation/) — the other common city-scale reliability failure
+- [Converting WGS84 to Local Projected Coordinates](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/converting-wgs84-to-local-projected-coordinates/) — the transform chain that drifts when misbuilt
+- [Automated Tile Generation for 3D Geospatial](https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/) — where the per-tile transforms and bounds are written
 
-Back to [Cross-Pillar Failure Modes in Digital Twins](/digital-twin-troubleshooting-and-reliability/cross-pillar-failure-modes/).
+Back to [Cross-Section Failure Modes in Digital Twins](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/).

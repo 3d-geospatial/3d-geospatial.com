@@ -2,7 +2,7 @@
 
 A 3D asset that renders perfectly but sits ten metres below the imagery, or a LiDAR tile whose heights disagree with the survey benchmark by the local geoid undulation, is not a rendering bug — it is a coordinate reference system that was never fully declared. Unlike 2D GIS, where a horizontal EPSG code is usually enough, a 3D digital twin must simultaneously pin down horizontal positioning, a vertical datum, unit scaling, axis order, and (for survey-grade work) a coordinate epoch. This guide gives you the production patterns to define, transform, and validate those references with `pyproj`, `rasterio`, and `laspy` so that misalignment is caught at ingestion rather than discovered three pipeline stages later in a flood simulation that quietly dammed itself behind buildings.
 
-These patterns sit inside the broader [3D Geospatial Fundamentals for Digital Twins](/3d-geospatial-fundamentals-for-digital-twins/) baseline: every terrain raster, point cloud, and mesh downstream inherits the CRS decisions made here, so getting the compound CRS and the transformation chain right is the cheapest insurance the twin will ever buy.
+These patterns sit inside the broader [3D Geospatial Fundamentals for Digital Twins](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/) baseline: every terrain raster, point cloud, and mesh downstream inherits the CRS decisions made here, so getting the compound CRS and the transformation chain right is the cheapest insurance the twin will ever buy.
 
 ## Prerequisites
 
@@ -151,7 +151,7 @@ las.write("scan_utm18n_navd88.laz")
 print("rewrote", len(las.points), "points to EPSG:32618+5703")
 ```
 
-Two details make this round-trip safe. First, `las.header.parse_crs()` reads whichever VLR the producer wrote — older tools embed a GeoTIFF-key VLR, newer ones a WKT VLR — and returns `None` if neither exists, which is your cue to halt rather than guess. Second, `add_crs()` writes the *destination* compound CRS back so the file is self-describing; skipping that step leaves a point cloud whose coordinates are UTM/NAVD88 but whose header still claims WGS84, the worst of both worlds. For LAS 1.4 you should also confirm the `global_encoding` WKT bit is set so downstream readers prefer the WKT VLR over any stale GeoTIFF keys. The point density that this reprojected cloud must satisfy is governed by the [Point Cloud Density Standards](/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/), which only stay deterministic when every tile shares one CRS grid.
+Two details make this round-trip safe. First, `las.header.parse_crs()` reads whichever VLR the producer wrote — older tools embed a GeoTIFF-key VLR, newer ones a WKT VLR — and returns `None` if neither exists, which is your cue to halt rather than guess. Second, `add_crs()` writes the *destination* compound CRS back so the file is self-describing; skipping that step leaves a point cloud whose coordinates are UTM/NAVD88 but whose header still claims WGS84, the worst of both worlds. For LAS 1.4 you should also confirm the `global_encoding` WKT bit is set so downstream readers prefer the WKT VLR over any stale GeoTIFF keys. The point density that this reprojected cloud must satisfy is governed by the [Point Cloud Density Standards](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/), which only stay deterministic when every tile shares one CRS grid.
 
 ### 5. Align a DEM raster to the same compound vertical datum
 
@@ -174,7 +174,7 @@ band_aligned = z_navd88.reshape(band.shape).astype("float32")
 print("median datum shift:", float(np.nanmedian(band_aligned - band)), "m")
 ```
 
-The mechanics of pushing a geographic source into a metric grid are covered in depth in [converting WGS84 to local projected coordinates](/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/converting-wgs84-to-local-projected-coordinates/), and the trade-offs behind *which* projected frame to pick are the subject of [how to choose a CRS for urban digital twins](/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/how-to-choose-crs-for-urban-digital-twins/).
+The mechanics of pushing a geographic source into a metric grid are covered in depth in [converting WGS84 to local projected coordinates](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/converting-wgs84-to-local-projected-coordinates/), and the trade-offs behind *which* projected frame to pick are the subject of [how to choose a CRS for urban digital twins](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/how-to-choose-crs-for-urban-digital-twins/).
 
 ## Validation & Verification
 
@@ -238,7 +238,7 @@ def transform_chunked(lon, lat, h, chunk=5_000_000):
 - **Axis-order swap.** Omitting `always_xy=True` makes geographic CRSs emit lat/lon (Y,X) order, so easting and northing arrive transposed — points land hundreds of kilometres away. Lock the order on every `Transformer` and round-trip-test.
 - **Bare CRS posing as compound.** `EPSG:32618` and `EPSG:32618+5703` both parse cleanly, but only the second carries a vertical datum. A horizontal-only target throws Z away as ellipsoidal. Gate every ingestion through `crs.is_compound`.
 - **Unit and datum-epoch drift.** Mixing metres with US survey feet (EPSG:6360 vs EPSG:5703) or applying a static transform to dynamic NAD83(2011)/ETRS89 data without an epoch introduces scale and millimetre-to-centimetre drift. Normalize to metres and pass an explicit coordinate epoch for survey-grade multi-year data.
-- **Z-up versus Y-up handoff.** CAD/BIM is right-handed Z-up; many WebGL renderers expect Y-up. The CRS transform fixes georeferencing but not the renderer's axis convention — record the axis swap matrix in the sidecar so the [3D format conversion](/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/) stage applies it deterministically.
+- **Z-up versus Y-up handoff.** CAD/BIM is right-handed Z-up; many WebGL renderers expect Y-up. The CRS transform fixes georeferencing but not the renderer's axis convention — record the axis swap matrix in the sidecar so the [3D format conversion](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/) stage applies it deterministically.
 
 ## Frequently Asked Questions
 
@@ -255,14 +255,14 @@ Write the CRS and a local origin offset into a companion `.prj` or `.json` sidec
 For most static city twins, no. But survey-grade data on dynamic datums (NAD83(2011), ETRS89, ITRF) drifts millimetres to centimetres per year from plate motion. If you fuse multi-year acquisitions or need centimetre vertical accuracy, transform with an explicit epoch using `pyproj`'s epoch-aware operations and version the CRS alongside each data release.
 
 ### Which CRS should the twin use internally versus for web delivery?
-Use a single projected, metric, compound CRS internally (a UTM zone or national grid plus an orthometric vertical datum) so distances, indexing, and physics stay accurate. Reproject to EPSG:4326 / EPSG:4979 only at the web-delivery boundary for Cesium and 3D Tiles. [How to choose a CRS for urban digital twins](/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/how-to-choose-crs-for-urban-digital-twins/) walks through selecting that internal frame.
+Use a single projected, metric, compound CRS internally (a UTM zone or national grid plus an orthometric vertical datum) so distances, indexing, and physics stay accurate. Reproject to EPSG:4326 / EPSG:4979 only at the web-delivery boundary for Cesium and 3D Tiles. [How to choose a CRS for urban digital twins](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/how-to-choose-crs-for-urban-digital-twins/) walks through selecting that internal frame.
 
 ## Related Guides
 
-- [Converting WGS84 to Local Projected Coordinates](/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/converting-wgs84-to-local-projected-coordinates/) — the EPSG:4326 → UTM transform in depth
-- [How to Choose CRS for Urban Digital Twins](/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/how-to-choose-crs-for-urban-digital-twins/) — selecting the internal metric frame
-- [Digital Elevation Model Workflows](/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/) — aligning raster terrain to the same vertical datum
-- [Point Cloud Density Standards](/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/) — density targets that depend on a consistent CRS grid
-- [3D Format Standards Comparison](/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/) — how each container preserves or discards CRS metadata
+- [Converting WGS84 to Local Projected Coordinates](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/converting-wgs84-to-local-projected-coordinates/) — the EPSG:4326 → UTM transform in depth
+- [How to Choose CRS for Urban Digital Twins](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/how-to-choose-crs-for-urban-digital-twins/) — selecting the internal metric frame
+- [Digital Elevation Model Workflows](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/) — aligning raster terrain to the same vertical datum
+- [Point Cloud Density Standards](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/) — density targets that depend on a consistent CRS grid
+- [3D Format Standards Comparison](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/) — how each container preserves or discards CRS metadata
 
-Back to [3D Geospatial Fundamentals for Digital Twins](/3d-geospatial-fundamentals-for-digital-twins/).
+Back to [3D Geospatial Fundamentals for Digital Twins](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/).

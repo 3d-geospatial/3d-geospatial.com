@@ -6,7 +6,7 @@ description: "Measure points/m² and coverage gaps in a .laz with PDAL: filters.
 
 This page measures **point density** (points per square metre) and coverage uniformity from a `.laz` file with `PDAL` — using `filters.hexbin` to estimate density and trace the survey boundary, reading the EPSG code straight from the LAS header (EPSG:32618 in the examples), and reporting a median density plus the fraction of the extent that falls into gaps. The pipeline is a PDAL JSON stage list driven from the `pdal` Python bindings, with `numpy` only for the final reduction, so the same logic runs unchanged in a batch job over a whole delivery.
 
-You hit this when a survey lands and you need one authoritative density figure before it enters the twin — and, more importantly, a map of where the cloud is too thin to trust. A headline mean hides dropped flight lines and occlusion shadows; PDAL's `filters.hexbin` is purpose-built for both jobs because it estimates density and emits a boundary polygon whose interior holes are exactly the voids you care about. This complements the standalone `laspy`/`numpy` binning in the [point cloud density standards](/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/) reference and the per-asset targets in [LiDAR point density best practices for infrastructure](/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/best-practices-for-lidar-point-density-in-infrastructure/); here the tool is PDAL end to end.
+You hit this when a survey lands and you need one authoritative density figure before it enters the twin — and, more importantly, a map of where the cloud is too thin to trust. A headline mean hides dropped flight lines and occlusion shadows; PDAL's `filters.hexbin` is purpose-built for both jobs because it estimates density and emits a boundary polygon whose interior holes are exactly the voids you care about. This complements the standalone `laspy`/`numpy` binning in the [point cloud density standards](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/) reference and the per-asset targets in [LiDAR point density best practices for infrastructure](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/best-practices-for-lidar-point-density-in-infrastructure/); here the tool is PDAL end to end.
 
 <figure class="diagram">
 <svg viewBox="0 0 780 300" role="img" aria-labelledby="pdalhex-t pdalhex-d" xmlns="http://www.w3.org/2000/svg">
@@ -45,7 +45,7 @@ You hit this when a survey lands and you need one authoritative density figure b
 
 - PDAL 2.5+ with the Python bindings and `numpy>=1.24`. Install the whole stack from conda-forge so the LAZ backend and GEOS (which `filters.hexbin` needs for the boundary polygon) are matched: `conda install -c conda-forge pdal python-pdal numpy`.
 - A `.laz` or `.las` tile whose header declares a projected metric CRS. The examples assume EPSG:32618 (UTM 18N, metres); density computed in a geographic CRS such as EPSG:4326 is wrong by orders of magnitude because a degree is not a metre.
-- A density target to check against — for example a QL1 floor of 8 ppsm for urban work. The Quality Level table lives in the [point cloud density standards](/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/) reference.
+- A density target to check against — for example a QL1 floor of 8 ppsm for urban work. The Quality Level table lives in the [point cloud density standards](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/) reference.
 - The authoritative `filters.hexbin` and pipeline documentation at [pdal.io](https://pdal.io/) if you need the full option list.
 
 ## Step-by-Step
@@ -174,9 +174,9 @@ Cross-check the two independent estimates: the hexbin `avg_pt_spacing` (~0.29 m)
 
 ## Related Guides
 
-- [Point Cloud Density Standards](/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/) — ppsm, Quality Levels, and the standalone numpy binning routine
-- [LiDAR Point Density Best Practices](/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/best-practices-for-lidar-point-density-in-infrastructure/) — per-asset density targets and sparse-cell flagging
-- [Coordinate Reference Systems for 3D Assets](/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/) — reproject to EPSG:32618 before any metric measurement
-- [Digital Elevation Model Workflows](/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/) — where density gaps surface as raster voids
+- [Point Cloud Density Standards](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/) — ppsm, Quality Levels, and the standalone numpy binning routine
+- [LiDAR Point Density Best Practices](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/best-practices-for-lidar-point-density-in-infrastructure/) — per-asset density targets and sparse-cell flagging
+- [Coordinate Reference Systems for 3D Assets](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/) — reproject to EPSG:32618 before any metric measurement
+- [Digital Elevation Model Workflows](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/) — where density gaps surface as raster voids
 
-Back to [Point Cloud Density Standards](/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/).
+Back to [Point Cloud Density Standards](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/).

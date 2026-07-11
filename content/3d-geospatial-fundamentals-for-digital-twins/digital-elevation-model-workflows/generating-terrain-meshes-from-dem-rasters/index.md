@@ -2,7 +2,7 @@
 
 This page turns a **DEM raster** — a GeoTIFF of elevations — into a watertight triangle mesh a digital twin can render, using `rasterio` to read the grid, `numpy` to build vertices, and `trimesh` to triangulate, simplify, and export glTF or OBJ. The path is: read the raster and its nodata mask, sample every valid cell into an XYZ vertex on an explicit CRS (here EPSG:32618 horizontal with vertical EPSG:5703), stitch the regular grid into triangles, optionally decimate to a TIN to cut triangle count, and write a `.glb` or `.obj` ready to drape imagery over.
 
-You hit this the moment a terrain surface has to be geometry rather than a raster: a Cesium or game-engine twin needs a mesh to occlude buildings, cast shadows, and let the camera skim the ground, and analysis like cut-and-fill needs a continuous triangulated surface. The DEM already exists — produced by the [digital elevation model workflows](/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/) that rasterize, void-fill, and hydro-flatten a point cloud — so this guide starts from a clean GeoTIFF and ends at a mesh, and the two things that break it are mishandled nodata (which pulls spikes down to the fill value) and a CRS left implicit (which mis-scales or mis-places the surface).
+You hit this the moment a terrain surface has to be geometry rather than a raster: a Cesium or game-engine twin needs a mesh to occlude buildings, cast shadows, and let the camera skim the ground, and analysis like cut-and-fill needs a continuous triangulated surface. The DEM already exists — produced by the [digital elevation model workflows](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/) that rasterize, void-fill, and hydro-flatten a point cloud — so this guide starts from a clean GeoTIFF and ends at a mesh, and the two things that break it are mishandled nodata (which pulls spikes down to the fill value) and a CRS left implicit (which mis-scales or mis-places the surface).
 
 <figure class="diagram">
 <svg viewBox="0 0 800 300" role="img" aria-labelledby="demmesh-t demmesh-d" xmlns="http://www.w3.org/2000/svg">
@@ -186,9 +186,9 @@ The extent should match the raster's ground coverage and the height range should
 
 ## Related Guides
 
-- [Digital Elevation Model Workflows](/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/) — producing the void-filled DEM this mesh starts from
-- [Coordinate Reference Systems for 3D Assets](/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/) — keeping EPSG:32618+5703 explicit through the export
-- [Mesh Topology Basics for Digital Twins](/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/) — winding, manifoldness, and the repair checks behind step 4
-- [3D Format Standards Comparison](/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/) — choosing glTF vs OBJ vs 3D Tiles for the finished terrain
+- [Digital Elevation Model Workflows](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/) — producing the void-filled DEM this mesh starts from
+- [Coordinate Reference Systems for 3D Assets](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/) — keeping EPSG:32618+5703 explicit through the export
+- [Mesh Topology Basics for Digital Twins](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/) — winding, manifoldness, and the repair checks behind step 4
+- [3D Format Standards Comparison](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/) — choosing glTF vs OBJ vs 3D Tiles for the finished terrain
 
-Back to [Digital Elevation Model Workflows](/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/).
+Back to [Digital Elevation Model Workflows](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/).

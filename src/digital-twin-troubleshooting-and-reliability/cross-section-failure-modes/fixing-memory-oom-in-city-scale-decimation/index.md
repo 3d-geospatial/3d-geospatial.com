@@ -1,6 +1,10 @@
+---
+title: "Fixing Memory OOM in City-Scale Decimation"
+description: "Prevent out-of-memory in city-scale mesh decimation and point processing: tile-by-tile streaming, chunked laspy reads, bounded ProcessPoolExecutor workers, and RSS measured with psutil."
+---
 # Fixing Out-of-Memory Failures in City-Scale Mesh Decimation
 
-This guide prevents the `MemoryError` and OOM-killer terminations that strike when [automated mesh decimation](/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/) and point-cloud processing scale from a few buildings to a whole city, using tile-by-tile streaming instead of whole-survey loads, chunked `laspy` reads, a bounded `ProcessPoolExecutor`, explicit freeing of intermediates, and resident-set measurement with `psutil`. It sits in the [cross-pillar failure modes](/digital-twin-troubleshooting-and-reliability/cross-pillar-failure-modes/) area because the failure spans the boundary between the [processing pipeline](/point-cloud-mesh-processing-pipelines/) and the [LOD tiler](/lod-management-optimization-strategies/) that consumes its output.
+This guide prevents the `MemoryError` and OOM-killer terminations that strike when [automated mesh decimation](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/) and point-cloud processing scale from a few buildings to a whole city, using tile-by-tile streaming instead of whole-survey loads, chunked `laspy` reads, a bounded `ProcessPoolExecutor`, explicit freeing of intermediates, and resident-set measurement with `psutil`. It sits in the [cross-section failure modes](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/) area because the failure spans the boundary between the [processing pipeline](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/) and the [LOD tiler](https://www.3d-geospatial.com/lod-management-optimization-strategies/) that consumes its output.
 
 You hit this the first time a pipeline that ran fine on a test block is pointed at a full survey: a job that decimated ten buildings in seconds tries to load a 40 GB `.laz` or a directory of thousands of meshes at once, resident memory climbs past the machine's RAM, and the process is killed with no traceback or a bare `MemoryError`. The fix is architectural — never hold the whole survey — and it is the same discipline whether the payload is points or triangles.
 
@@ -192,9 +196,9 @@ If peak scales with survey size, an intermediate is still being accumulated — 
 
 ## Related Guides
 
-- [Cross-Pillar Failure Modes in Digital Twins](/digital-twin-troubleshooting-and-reliability/cross-pillar-failure-modes/) — the boundary defects this OOM failure belongs to
-- [Diagnosing CRS Drift Causing LOD Seams](/digital-twin-troubleshooting-and-reliability/cross-pillar-failure-modes/diagnosing-crs-drift-causing-lod-seams/) — the other common city-scale reliability failure
-- [Automated Mesh Decimation for Digital Twins](/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/) — the decimation stage whose memory this bounds
-- [Point Cloud & Mesh Processing Pipelines](/point-cloud-mesh-processing-pipelines/) — the broader processing context for streamed reads
+- [Cross-Section Failure Modes in Digital Twins](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/) — the boundary defects this OOM failure belongs to
+- [Diagnosing CRS Drift Causing LOD Seams](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/diagnosing-crs-drift-causing-lod-seams/) — the other common city-scale reliability failure
+- [Automated Mesh Decimation for Digital Twins](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/) — the decimation stage whose memory this bounds
+- [Point Cloud & Mesh Processing Pipelines](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/) — the broader processing context for streamed reads
 
-Back to [Cross-Pillar Failure Modes in Digital Twins](/digital-twin-troubleshooting-and-reliability/cross-pillar-failure-modes/).
+Back to [Cross-Section Failure Modes in Digital Twins](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/).

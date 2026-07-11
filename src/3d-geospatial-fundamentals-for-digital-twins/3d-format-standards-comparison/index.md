@@ -234,7 +234,7 @@ Format choice dominates payload size and client memory. For a 50,000-triangle te
 
 LAS to LAZ compression with LASzip is lossless and typically 7–10x; a 1 km² urban tile at 16 pts/m² is ~120 MB as `.las` and ~14 MB as `.laz`, and Cloud-Optimized Point Cloud (COPC) layout adds spatial chunking so a client reads only the octree nodes in view.
 
-At city scale, never hold the full model in memory. Tile to ~1 km² footprints, generate one tileset per district, and reference them from a parent `tileset.json` so the client streams by frustum. CityGML and IFC have no streaming path — convert them to 3D Tiles offline in a CI/CD job, chunking by feature with `numpy.memmap`-backed buffers or a `dask` bag when a single source file exceeds RAM. The detailed tiling step is covered under [automated tile generation](/lod-management-optimization-strategies/automated-tile-generation/) within [LOD management](/lod-management-optimization-strategies/).
+At city scale, never hold the full model in memory. Tile to ~1 km² footprints, generate one tileset per district, and reference them from a parent `tileset.json` so the client streams by frustum. CityGML and IFC have no streaming path — convert them to 3D Tiles offline in a CI/CD job, chunking by feature with `numpy.memmap`-backed buffers or a `dask` bag when a single source file exceeds RAM. The detailed tiling step is covered under [automated tile generation](https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/) within [LOD management](https://www.3d-geospatial.com/lod-management-optimization-strategies/).
 
 Schema validation cost is also a scale factor that teams underestimate. Validating a CityGML file against its full XSD is O(document size) and can take tens of seconds for a large municipal export, so run it once at ingestion rather than on every CI build. The `3d-tiles-validator` is comparatively cheap per tile but multiplies across thousands of tiles — validate a representative sample plus every tile touched by a change set, not the entire pyramid, to keep build times bounded. For LAS/LAZ, prefer COPC's spatial chunking so validation and rendering both read only the octree nodes a query needs, which keeps verification linear in the viewport rather than in the full cloud.
 
@@ -258,7 +258,7 @@ Map the source attributes explicitly into the tileset's feature-table/metadata o
 
 ### Is glTF or 3D Tiles the right choice for a web twin?
 
-They are complementary, not alternatives. glTF is the geometry payload; 3D Tiles is the spatial index and streaming wrapper around glTF. A single building can ship as glTF; a city must ship as 3D Tiles so the client pages by screen-space error. The full trade-off, including OBJ, is in [glTF vs 3D Tiles vs OBJ for spatial data](/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/gltf-vs-3dtiles-vs-obj-for-spatial-data/).
+They are complementary, not alternatives. glTF is the geometry payload; 3D Tiles is the spatial index and streaming wrapper around glTF. A single building can ship as glTF; a city must ship as 3D Tiles so the client pages by screen-space error. The full trade-off, including OBJ, is in [glTF vs 3D Tiles vs OBJ for spatial data](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/gltf-vs-3dtiles-vs-obj-for-spatial-data/).
 
 ### Does LAZ lose any data compared to LAS?
 
@@ -266,14 +266,14 @@ No. LAZ (LASzip) is lossless — it reconstructs every coordinate, classificatio
 
 ### How do I keep CRS metadata intact across every conversion?
 
-Declare the EPSG code at each stage and verify it on the other side. Use `ogr2ogr -s_srs/-t_srs` with explicit codes for vector formats, anchor 3D Tiles via a transform you can round-trip with `pyproj`, and write `source_crs` into glTF `extras`. The transformation mechanics are covered in [Coordinate Reference Systems for 3D Assets](/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/) and the practical step of [converting WGS84 to local projected coordinates](/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/converting-wgs84-to-local-projected-coordinates/).
+Declare the EPSG code at each stage and verify it on the other side. Use `ogr2ogr -s_srs/-t_srs` with explicit codes for vector formats, anchor 3D Tiles via a transform you can round-trip with `pyproj`, and write `source_crs` into glTF `extras`. The transformation mechanics are covered in [Coordinate Reference Systems for 3D Assets](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/) and the practical step of [converting WGS84 to local projected coordinates](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/converting-wgs84-to-local-projected-coordinates/).
 
 ## Related Guides
 
-- [glTF vs 3D Tiles vs OBJ for Spatial Data](/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/gltf-vs-3dtiles-vs-obj-for-spatial-data/) — the head-to-head on the three web-delivery formats
-- [Coordinate Reference Systems for 3D Assets](/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/) — CRS and datum handling that every conversion depends on
-- [Digital Elevation Model Workflows](/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/) — terrain raster generation and registration
-- [Automated Tile Generation for 3D Geospatial](/lod-management-optimization-strategies/automated-tile-generation/) — turning canonical geometry into streamable tilesets
-- [Point Cloud & Mesh Processing Pipelines](/point-cloud-mesh-processing-pipelines/) — producing the meshes these formats carry
+- [glTF vs 3D Tiles vs OBJ for Spatial Data](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/gltf-vs-3dtiles-vs-obj-for-spatial-data/) — the head-to-head on the three web-delivery formats
+- [Coordinate Reference Systems for 3D Assets](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/) — CRS and datum handling that every conversion depends on
+- [Digital Elevation Model Workflows](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/) — terrain raster generation and registration
+- [Automated Tile Generation for 3D Geospatial](https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/) — turning canonical geometry into streamable tilesets
+- [Point Cloud & Mesh Processing Pipelines](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/) — producing the meshes these formats carry
 
-Back to [3D Geospatial Fundamentals for Digital Twins](/3d-geospatial-fundamentals-for-digital-twins/).
+Back to [3D Geospatial Fundamentals for Digital Twins](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/).

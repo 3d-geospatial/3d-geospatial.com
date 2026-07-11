@@ -1,6 +1,6 @@
 # Tuning Draco Quantization Bits for Georeferenced Building Meshes
 
-This guide chooses `KHR_draco_mesh_compression` quantization bit settings for georeferenced building glTF meshes — using `numpy` to solve the extent-versus-error relationship and `gltf-transform` to encode — so decoded positions stay sub-centimetre while the payload still shrinks by an order of magnitude. You hit this the moment a Draco encode either bloats (too many bits, no size win) or bows a facade (too few bits on a large building), and you need a defensible number instead of a copied default. It assumes meshes authored in a local East-North-Up (ENU) metric frame and placed onto the globe by a root transform into EPSG:4978, as set up in the parent workflow, [glTF LOD generation with Draco compression](/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/).
+This guide chooses `KHR_draco_mesh_compression` quantization bit settings for georeferenced building glTF meshes — using `numpy` to solve the extent-versus-error relationship and `gltf-transform` to encode — so decoded positions stay sub-centimetre while the payload still shrinks by an order of magnitude. You hit this the moment a Draco encode either bloats (too many bits, no size win) or bows a facade (too few bits on a large building), and you need a defensible number instead of a copied default. It assumes meshes authored in a local East-North-Up (ENU) metric frame and placed onto the globe by a root transform into EPSG:4978, as set up in the parent workflow, [glTF LOD generation with Draco compression](https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/).
 
 ## Prerequisites
 
@@ -161,8 +161,8 @@ The report must list `KHR_draco_mesh_compression` under extensions; if it is abs
 
 ## Related Guides
 
-- [glTF LOD Generation With Draco Compression](/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/) — the full LOD-chain and encode workflow this tuning slots into
-- [Automated Tile Generation for 3D Geospatial](/lod-management-optimization-strategies/automated-tile-generation/) — wrapping the tuned glTF as b3dm with correct bounding volumes
-- [Automated Mesh Decimation for Digital Twins](/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/) — the triangle-budget decimation that precedes quantization
+- [glTF LOD Generation With Draco Compression](https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/) — the full LOD-chain and encode workflow this tuning slots into
+- [Automated Tile Generation for 3D Geospatial](https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/) — wrapping the tuned glTF as b3dm with correct bounding volumes
+- [Automated Mesh Decimation for Digital Twins](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/) — the triangle-budget decimation that precedes quantization
 
-Back to [glTF LOD Generation With Draco Compression](/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/).
+Back to [glTF LOD Generation With Draco Compression](https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/).

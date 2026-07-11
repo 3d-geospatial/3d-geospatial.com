@@ -162,7 +162,7 @@ Targets are stated in ppsm for the delivered, classified cloud — not raw retur
 | Power-line corridor | 20–35 | Conductor catenary, pylon steelwork, vegetation encroachment | ±5–10 cm |
 | Broad terrain / right-of-way | 8–15 | Earthwork volumes, watershed, regional planning | ±10–15 cm |
 
-These bands sit inside the wider [Point Cloud Density Standards](/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/) framework. For authoritative accuracy benchmarks, cross-reference the [USGS 3DEP Lidar Base Specification](https://pubs.usgs.gov/tm/11b4/) and the ASPRS Positional Accuracy Standards.
+These bands sit inside the wider [Point Cloud Density Standards](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/) framework. For authoritative accuracy benchmarks, cross-reference the [USGS 3DEP Lidar Base Specification](https://pubs.usgs.gov/tm/11b4/) and the ASPRS Positional Accuracy Standards.
 
 ## Expected Output & Verification
 
@@ -198,13 +198,13 @@ Average point spacing (in metres) and ppsm describe the same data, but ppsm is a
 Use 1.0 m for general corridor acceptance — it makes the count equal the ppsm and matches most spec language. Drop to 0.5 m when verifying fine structural elements (bridge soffits, switchgear) where a 1 m cell would average over the feature you care about. Going below ~0.25 m mostly measures sensor noise and inflates the cell count, so reserve it for targeted patches rather than the whole swath.
 
 ### My mean ppsm passes but clearances still fail — what's wrong?
-A passing mean hides localised sparsity. Clearance failures almost always come from occlusion: the conductor underside or bridge soffit sits in a shadow where the airborne sensor never had line of sight. Inspect the flagged-cell Parquet, isolate clusters at structures, and fill them with terrestrial or mobile scanning rather than re-flying the whole corridor — see the broader [3D Geospatial Fundamentals for Digital Twins](/3d-geospatial-fundamentals-for-digital-twins/) treatment of how density feeds mesh accuracy.
+A passing mean hides localised sparsity. Clearance failures almost always come from occlusion: the conductor underside or bridge soffit sits in a shadow where the airborne sensor never had line of sight. Inspect the flagged-cell Parquet, isolate clusters at structures, and fill them with terrestrial or mobile scanning rather than re-flying the whole corridor — see the broader [3D Geospatial Fundamentals for Digital Twins](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/) treatment of how density feeds mesh accuracy.
 
 ## Related Guides
 
-- [Point Cloud Density Standards](/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/) — the density framework and per-class baselines
-- [Digital Elevation Model Workflows](/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/) — how density drives raster resolution
-- [Point Cloud Filtering Techniques](/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/) — the classification step that reduces delivered density
-- [Converting WGS84 to Local Projected Coordinates](/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/converting-wgs84-to-local-projected-coordinates/) — getting into a metric CRS before binning
+- [Point Cloud Density Standards](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/) — the density framework and per-class baselines
+- [Digital Elevation Model Workflows](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/) — how density drives raster resolution
+- [Point Cloud Filtering Techniques](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/) — the classification step that reduces delivered density
+- [Converting WGS84 to Local Projected Coordinates](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/converting-wgs84-to-local-projected-coordinates/) — getting into a metric CRS before binning
 
-Back to [Point Cloud Density Standards](/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/)
+Back to [Point Cloud Density Standards](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/)

@@ -6,7 +6,7 @@ description: "Fan the glTF→b3dm+Draco encode across CPU cores with concurrent.
 
 This guide parallelises the glTF→`b3dm`+Draco encode across CPU cores using Python's `concurrent.futures.ProcessPoolExecutor`, driving the Node-based `3d-tiles-tools` CLI through `subprocess` while chunking leaf jobs to amortise process startup, sizing workers to physical cores because Draco compression is CPU-bound, collecting per-job failures instead of crashing the batch, and enforcing a deterministic ordering so a CI rerun produces byte-identical tiles.
 
-You hit this the moment a [batch tiling pipeline](/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/) grows past a few hundred shards: the encode is embarrassingly parallel — each tile is independent — but a naive `for` loop pins one core while the other fifteen idle, and every `3d-tiles-tools` call pays a fresh Node startup. The fix is a bounded process pool over deterministically chunked jobs.
+You hit this the moment a [batch tiling pipeline](https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/) grows past a few hundred shards: the encode is embarrassingly parallel — each tile is independent — but a naive `for` loop pins one core while the other fifteen idle, and every `3d-tiles-tools` call pays a fresh Node startup. The fix is a bounded process pool over deterministically chunked jobs.
 
 <figure class="diagram">
 <svg viewBox="0 0 820 300" role="img" aria-labelledby="ppool-t ppool-d" xmlns="http://www.w3.org/2000/svg">
@@ -64,7 +64,7 @@ You hit this the moment a [batch tiling pipeline](/lod-management-optimization-s
 
 - Python 3.10+ (`concurrent.futures` and `os.cpu_count` are standard library).
 - `3d-tiles-tools` 0.4+ on `PATH` (Node 18+), and `trimesh` 4.4+ for the merge step.
-- A directory of per-tile `.glb` files already merged and placed in the local ENU frame, produced by the [batch tiling pipeline](/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/). Geometry is authored around a survey anchor whose ENU→ECEF transform (source EPSG:32618+5703 → EPSG:4979 → EPSG:4978) lives on the tileset root, so the encode itself is CRS-agnostic — it only rewrites container bytes.
+- A directory of per-tile `.glb` files already merged and placed in the local ENU frame, produced by the [batch tiling pipeline](https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/). Geometry is authored around a survey anchor whose ENU→ECEF transform (source EPSG:32618+5703 → EPSG:4979 → EPSG:4978) lives on the tileset root, so the encode itself is CRS-agnostic — it only rewrites container bytes.
 - Physical vs logical core count. `os.cpu_count()` reports logical CPUs (hyperthreads); Draco saturates ALU throughput, so hyperthreads add little. Prefer physical cores where you can detect them.
 
 ## Step-by-Step
@@ -179,7 +179,7 @@ if failed:
 
 ### 6. Verify byte-stability across reruns
 
-The determinism contract is what lets the parent [batch tiling pipeline](/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/) trust its hash cache. Re-encode one tile in isolation and compare bytes to the pooled output.
+The determinism contract is what lets the parent [batch tiling pipeline](https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/) trust its hash cache. Re-encode one tile in isolation and compare bytes to the pooled output.
 
 ```python
 import hashlib
@@ -227,8 +227,8 @@ Expect roughly a 6–7x speedup on 8 physical cores (not the full 8x — Node st
 
 ## Related Guides
 
-- [3D Tiles Batch Tiling Pipelines](/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/) — the sharding, hash-cache, and assembly layer this encode step plugs into
-- [Automated Tile Generation for 3D Geospatial](/lod-management-optimization-strategies/automated-tile-generation/) — the single-tileset encode and geometricError model each job produces
-- [CI/CD Automation for Spatial Pipelines](/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/) — running the parallel encode as a cached, reproducible CI job
+- [3D Tiles Batch Tiling Pipelines](https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/) — the sharding, hash-cache, and assembly layer this encode step plugs into
+- [Automated Tile Generation for 3D Geospatial](https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/) — the single-tileset encode and geometricError model each job produces
+- [CI/CD Automation for Spatial Pipelines](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/) — running the parallel encode as a cached, reproducible CI job
 
-Back to [3D Tiles Batch Tiling Pipelines](/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/).
+Back to [3D Tiles Batch Tiling Pipelines](https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/).

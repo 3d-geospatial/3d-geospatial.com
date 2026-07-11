@@ -1,4 +1,4 @@
-/* SEO audit for every built HTML page in _site/.
+/* Meta and head-tag audit for every built HTML page in _site/.
    Checks each page has:
      - <title>, meta description (with length sanity)
      - canonical link, og:url, og:title, og:description, og:image, og:type
@@ -219,7 +219,7 @@ for (const f of required) {
     console.error(`✗ missing: /${f}`);
   }
 }
-if (missing === 0) console.log(`Required SEO files: ${required.length}/${required.length} present.`);
+if (missing === 0) console.log(`Required meta files: ${required.length}/${required.length} present.`);
 
 const exit = failingPages + dupTitles.length + dupDescs.length + missing;
 process.exit(exit > 0 ? 1 : 0);

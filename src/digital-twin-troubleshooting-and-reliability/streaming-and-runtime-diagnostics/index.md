@@ -4,7 +4,7 @@ description: "Diagnose 3D Tiles runtime faults: tile popping, over-fetching, VRA
 ---
 # Streaming & Runtime Diagnostics for 3D Tiles Clients
 
-A tileset can pass every offline check and still misbehave the moment a camera moves through it. Tiles flash into view a beat too late, the network fetches ten times the geometry the frame needs, VRAM climbs until the tab reloads itself, or detail simply refuses to sharpen no matter how close you fly. These are runtime faults, and they live in the interaction between the authored `geometricError`, the client's screen-space error (SSE) calculation, the request queue, and a fixed memory budget. This guide instruments that interaction so each symptom maps to a measured number rather than a hunch, and pairs every diagnosis with a concrete fix — predictive prefetch, an SSE threshold change, LRU eviction, or queue backpressure. It assumes a served 3D Tiles tileset (built via [automated tile generation](/lod-management-optimization-strategies/automated-tile-generation/)) and a client whose frame loop you can log, and it sits under [digital twin troubleshooting and reliability](/digital-twin-troubleshooting-and-reliability/) as the runtime counterpart to the offline [data validation and QA gates](/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/).
+A tileset can pass every offline check and still misbehave the moment a camera moves through it. Tiles flash into view a beat too late, the network fetches ten times the geometry the frame needs, VRAM climbs until the tab reloads itself, or detail simply refuses to sharpen no matter how close you fly. These are runtime faults, and they live in the interaction between the authored `geometricError`, the client's screen-space error (SSE) calculation, the request queue, and a fixed memory budget. This guide instruments that interaction so each symptom maps to a measured number rather than a hunch, and pairs every diagnosis with a concrete fix — predictive prefetch, an SSE threshold change, LRU eviction, or queue backpressure. It assumes a served 3D Tiles tileset (built via [automated tile generation](https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/)) and a client whose frame loop you can log, and it sits under [digital twin troubleshooting and reliability](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/) as the runtime counterpart to the offline [data validation and QA gates](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/).
 
 ## Prerequisites
 
@@ -128,7 +128,7 @@ popping = pop_latency(captured_events)
 print(f"{len(popping)} tiles popped (>2 frame lag or never resident)")
 ```
 
-The fix is predictive prefetch: extend the visible set by projecting the camera forward along its velocity so tiles are requested before they are strictly visible. The full treatment lives in [eliminating tile popping and pop-in](/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/eliminating-tile-popping-and-pop-in/); the short version is to enqueue tiles for the predicted pose, not only the current one.
+The fix is predictive prefetch: extend the visible set by projecting the camera forward along its velocity so tiles are requested before they are strictly visible. The full treatment lives in [eliminating tile popping and pop-in](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/eliminating-tile-popping-and-pop-in/); the short version is to enqueue tiles for the predicted pose, not only the current one.
 
 ### 3. Diagnose over-fetching
 
@@ -166,7 +166,7 @@ print("leaf SSE:", np.round(leaf_sse, 2))   # if all < 16, leaf never refines
 print("root SSE:", np.round(root_sse, 1))   # if all >> 16 at range, over-refines
 ```
 
-A leaf with `geometricError` so small that its SSE never reaches 16 px is starved geometry — re-measure the error against the source surface as in [automated tile generation](/lod-management-optimization-strategies/automated-tile-generation/) rather than hard-coding a tiny constant. A root error large enough to force every tile in at once means the client cannot stream progressively; anchor the root error to the extent diagonal and halve per level.
+A leaf with `geometricError` so small that its SSE never reaches 16 px is starved geometry — re-measure the error against the source surface as in [automated tile generation](https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/) rather than hard-coding a tiny constant. A root error large enough to force every tile in at once means the client cannot stream progressively; anchor the root error to the extent diagonal and halve per level.
 
 ### 5. Diagnose VRAM OOM and GC stalls
 
@@ -293,9 +293,9 @@ Yes. Capture the client's per-tile state as a frame trace and run every diagnost
 
 ## Related Guides
 
-- [Eliminating Tile Popping and Pop-In](/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/eliminating-tile-popping-and-pop-in/) — predictive prefetch and LOD crossfade in depth
-- [Data Validation & QA Gates](/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/) — proving the geometry is sound before blaming the client
-- [Streaming Sync Patterns for 3D Geospatial](/lod-management-optimization-strategies/streaming-sync-patterns/) — the SSE queue, prefetch, and eviction model these diagnostics probe
-- [Automated Tile Generation for 3D Geospatial](/lod-management-optimization-strategies/automated-tile-generation/) — where a correct, measured geometricError is produced
+- [Eliminating Tile Popping and Pop-In](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/eliminating-tile-popping-and-pop-in/) — predictive prefetch and LOD crossfade in depth
+- [Data Validation & QA Gates](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/) — proving the geometry is sound before blaming the client
+- [Streaming Sync Patterns for 3D Geospatial](https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/) — the SSE queue, prefetch, and eviction model these diagnostics probe
+- [Automated Tile Generation for 3D Geospatial](https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/) — where a correct, measured geometricError is produced
 
-Back to [Digital Twin Troubleshooting & Reliability](/digital-twin-troubleshooting-and-reliability/).
+Back to [Digital Twin Troubleshooting & Reliability](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/).

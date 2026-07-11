@@ -2,7 +2,7 @@
 
 Preserving UV seams during mesh decimation means reducing a textured mesh's triangle count without letting an edge collapse merge two vertices that sit on opposite sides of a texture seam or material boundary — the collapse that smears a facade's window texture across its brick or wraps one material's atlas onto another. This page locks seam and boundary vertices with `open3d`'s `boundary_weight`, splits the mesh on its UV islands and materials with `trimesh`, drives an attribute-aware pass with `gltfpack` from the `meshoptimizer` toolchain, and verifies the result by measuring per-triangle UV area distortion, all on a georeferenced building block in EPSG:32618 (UTM zone 18N).
 
-You hit this the moment a textured web asset comes back from decimation looking scrambled: the geometry is fine but the texture crawls, because the [automated mesh decimation](/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/) pass treated UV-seam edges as ordinary interior edges and collapsed them. A UV seam is a curve where the texture atlas is cut so a 3D surface can be flattened; along it, one spatial vertex owns two or more different texture coordinates. Merge across it and there is no single UV that can be right, so the atlas tears.
+You hit this the moment a textured web asset comes back from decimation looking scrambled: the geometry is fine but the texture crawls, because the [automated mesh decimation](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/) pass treated UV-seam edges as ordinary interior edges and collapsed them. A UV seam is a curve where the texture atlas is cut so a 3D surface can be flattened; along it, one spatial vertex owns two or more different texture coordinates. Merge across it and there is no single UV that can be right, so the atlas tears.
 
 <figure class="diagram">
 <svg viewBox="0 0 820 260" role="img" aria-labelledby="uvs-t uvs-d" xmlns="http://www.w3.org/2000/svg">
@@ -192,9 +192,9 @@ A coefficient of variation near the input's is the pass signal; a jump to 0.8 or
 
 ## Related Guides
 
-- [Automated Mesh Decimation for Digital Twins](/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/) — the full QEM decimation workflow this refines
-- [Optimizing Mesh Triangle Count for Web Rendering](/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/optimizing-mesh-triangle-count-for-web-rendering/) — triangle budgets and glTF export for the decimated tile
-- [Baking Normal and AO Maps for Web Delivery](/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/baking-normal-and-ao-maps-for-web-delivery/) — moving high-poly detail onto the decimated mesh as textures
-- [Texture Mapping Workflows for Digital Twins](/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/) — how the atlas and UVs you are protecting were produced
+- [Automated Mesh Decimation for Digital Twins](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/) — the full QEM decimation workflow this refines
+- [Optimizing Mesh Triangle Count for Web Rendering](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/optimizing-mesh-triangle-count-for-web-rendering/) — triangle budgets and glTF export for the decimated tile
+- [Baking Normal and AO Maps for Web Delivery](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/baking-normal-and-ao-maps-for-web-delivery/) — moving high-poly detail onto the decimated mesh as textures
+- [Texture Mapping Workflows for Digital Twins](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/) — how the atlas and UVs you are protecting were produced
 
-Back to [Automated Mesh Decimation for Digital Twins](/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/).
+Back to [Automated Mesh Decimation for Digital Twins](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/).

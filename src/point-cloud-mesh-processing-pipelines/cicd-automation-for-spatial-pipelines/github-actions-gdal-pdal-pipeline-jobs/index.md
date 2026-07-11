@@ -6,7 +6,7 @@ description: "Run a PDAL pipeline (reader.las to filters.range/outlier to writer
 
 This guide writes a GitHub Actions workflow that runs a PDAL point-cloud pipeline and a `gdalwarp` raster reprojection on every push and pull request, inside a container with pinned `pdal` and `gdal`, then caches the toolchain and uploads the processed tile as a build artifact. The processing is a PDAL pipeline JSON — `readers.las` → `filters.range` → `filters.outlier` → `writers.las` — followed by a `gdalwarp` reprojection with an explicit EPSG code.
 
-You hit this the moment point-cloud processing needs to be reproducible: a teammate edits a filter threshold, and you want CI to re-run the exact same `pdal` build on the exact same fixture and prove the output still validates before the change can merge. This is the process stage of the broader [CI/CD automation for spatial pipelines](/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/) workflow.
+You hit this the moment point-cloud processing needs to be reproducible: a teammate edits a filter threshold, and you want CI to re-run the exact same `pdal` build on the exact same fixture and prove the output still validates before the change can merge. This is the process stage of the broader [CI/CD automation for spatial pipelines](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/) workflow.
 
 <figure class="diagram">
 <svg viewBox="0 0 820 300" role="img" aria-labelledby="gha-pdal-t gha-pdal-d" xmlns="http://www.w3.org/2000/svg">
@@ -214,8 +214,8 @@ In the Actions run summary the `Upload processed tile` step lists `processed-til
 
 ## Related Guides
 
-- [Schema Validation Gates for Spatial Data](/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/schema-validation-gates-for-spatial-data/) — turning the processed tile into a merge-blocking check
-- [Automated 3D Tiles Deployment to a CDN](/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/automated-3d-tiles-deployment-to-cdn/) — promoting the validated artifact
-- [Removing Noise from Terrestrial LiDAR Scans](/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/removing-noise-from-terrestrial-lidar-scans/) — the filtering theory behind the PDAL stages here
+- [Schema Validation Gates for Spatial Data](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/schema-validation-gates-for-spatial-data/) — turning the processed tile into a merge-blocking check
+- [Automated 3D Tiles Deployment to a CDN](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/automated-3d-tiles-deployment-to-cdn/) — promoting the validated artifact
+- [Removing Noise from Terrestrial LiDAR Scans](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/removing-noise-from-terrestrial-lidar-scans/) — the filtering theory behind the PDAL stages here
 
-Back to [CI/CD Automation for Spatial Pipelines](/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/).
+Back to [CI/CD Automation for Spatial Pipelines](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/).

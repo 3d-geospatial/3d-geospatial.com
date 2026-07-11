@@ -2,7 +2,7 @@
 
 Screened Poisson and the Delaunay family — ball-pivoting (BPA) and alpha shapes — reconstruct a surface from the same oriented point cloud but answer fundamentally different questions. Poisson fits a single continuous implicit function and returns a watertight, noise-averaged shell that may invent geometry over gaps; Delaunay/BPA interpolates the exact measured points and returns an open surface with honest holes and preserved sharp edges. This page decides between them for LiDAR and photogrammetry meshes in a metric CRS such as EPSG:32618 (UTM zone 18N), weighing their behaviour on noise, holes, sharp edges, and non-uniform density, comparing the parameters that control each (`depth` for Poisson, ball radii for BPA), and closing with a verdict on which wins for which asset class.
 
-You reach this decision after cleaning a cloud and before committing a reconstruction algorithm to your pipeline. The single-parameter tuning of one algorithm belongs in [Poisson surface reconstruction parameters](/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/poisson-surface-reconstruction-parameters/); the question here is prior to that — which of the two philosophies your data and your downstream use actually want.
+You reach this decision after cleaning a cloud and before committing a reconstruction algorithm to your pipeline. The single-parameter tuning of one algorithm belongs in [Poisson surface reconstruction parameters](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/poisson-surface-reconstruction-parameters/); the question here is prior to that — which of the two philosophies your data and your downstream use actually want.
 
 <figure class="diagram">
 <svg viewBox="0 0 820 340" role="img" aria-labelledby="pvd-t pvd-d" xmlns="http://www.w3.org/2000/svg">
@@ -130,7 +130,7 @@ print(f"Poisson extrapolated ~{extrapolated:.1%} | "
 
 ## Parameters that control each
 
-Poisson exposes a smooth continuum of resolution through `depth` (each step roughly multiplies memory and runtime by up to 8x) plus `scale`, `linear_fit`, and the density-trim quantile — a coherent knob set covered in the [parameter-tuning guide](/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/poisson-surface-reconstruction-parameters/). BPA is controlled almost entirely by its radius list: too small and the ball falls through sparse patches leaving holes, too large and it bridges across real gaps and reintroduces the over-smoothing you switched away from Poisson to avoid. Alpha shapes have the single `alpha` radius with the same trade-off. The practical consequence is that Poisson degrades gracefully as you tune one number, while BPA is bimodal — a radius is either sufficient for a region or it is not — which is why BPA needs the multi-radius list and Poisson does not.
+Poisson exposes a smooth continuum of resolution through `depth` (each step roughly multiplies memory and runtime by up to 8x) plus `scale`, `linear_fit`, and the density-trim quantile — a coherent knob set covered in the [parameter-tuning guide](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/poisson-surface-reconstruction-parameters/). BPA is controlled almost entirely by its radius list: too small and the ball falls through sparse patches leaving holes, too large and it bridges across real gaps and reintroduces the over-smoothing you switched away from Poisson to avoid. Alpha shapes have the single `alpha` radius with the same trade-off. The practical consequence is that Poisson degrades gracefully as you tune one number, while BPA is bimodal — a radius is either sufficient for a region or it is not — which is why BPA needs the multi-radius list and Poisson does not.
 
 ## Decision table
 
@@ -150,7 +150,7 @@ Poisson exposes a smooth continuum of resolution through `depth` (each step roug
 
 Use **Poisson** whenever the twin needs a watertight surface and can tolerate trimming a few invented triangles: terrain, building envelopes, and any continuous surface headed for volumetrics, flood, or line-of-sight analysis, where a hole is a defect that leaks water. Its noise-averaging also makes it the safer default on raw photogrammetry. Use **Delaunay/BPA** when fidelity to the exact measured points beats closure — as-built inspection asking "what did the scanner actually see?", CAD-aligned facades with crisp breaks, and clean, uniformly sampled mechanical scans — where an extrapolated Poisson bubble is a lie and an honest BPA hole is the correct answer.
 
-The mature pipeline uses **both, keyed off asset class rather than picked globally**: Poisson for terrain and massing, an alpha-shape or BPA path for facades and footprints that must keep their edges, and the extrapolation/unconnected metric above to flag the ambiguous tiles a reviewer should look at. Whichever you pick, reconstruct in a metric CRS like EPSG:32618, validate watertightness and the Euler characteristic before shipping, and pass the result into [automated mesh decimation](/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/) — the decimator inherits whatever holes or bubbles you leave behind.
+The mature pipeline uses **both, keyed off asset class rather than picked globally**: Poisson for terrain and massing, an alpha-shape or BPA path for facades and footprints that must keep their edges, and the extrapolation/unconnected metric above to flag the ambiguous tiles a reviewer should look at. Whichever you pick, reconstruct in a metric CRS like EPSG:32618, validate watertightness and the Euler characteristic before shipping, and pass the result into [automated mesh decimation](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/) — the decimator inherits whatever holes or bubbles you leave behind.
 
 ## Expected Output & Verification
 
@@ -187,9 +187,9 @@ An extrapolated fraction climbing toward 20% means Poisson is guessing large reg
 
 ## Related Guides
 
-- [Surface Reconstruction for Geospatial Twins](/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/) — the parent workflow with the full three-algorithm toolkit
-- [Poisson Surface Reconstruction Parameters](/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/poisson-surface-reconstruction-parameters/) — deep tuning of depth, scale, and density trimming
-- [Point Cloud Filtering Techniques](/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/) — cleaning and orienting normals before either algorithm
-- [Automated Mesh Decimation for Digital Twins](/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/) — reducing whichever mesh you reconstruct
+- [Surface Reconstruction for Geospatial Twins](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/) — the parent workflow with the full three-algorithm toolkit
+- [Poisson Surface Reconstruction Parameters](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/poisson-surface-reconstruction-parameters/) — deep tuning of depth, scale, and density trimming
+- [Point Cloud Filtering Techniques](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/) — cleaning and orienting normals before either algorithm
+- [Automated Mesh Decimation for Digital Twins](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/) — reducing whichever mesh you reconstruct
 
-Back to [Surface Reconstruction for Geospatial Twins](/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/).
+Back to [Surface Reconstruction for Geospatial Twins](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/).

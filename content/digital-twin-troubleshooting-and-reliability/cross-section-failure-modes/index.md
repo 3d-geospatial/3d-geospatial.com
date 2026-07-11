@@ -1,6 +1,6 @@
-# Cross-Pillar Failure Modes: Debugging the Boundaries Between Twin Pipelines
+# Cross-Section Failure Modes: Debugging the Boundaries Between Twin Pipelines
 
-A digital twin is assembled by three pipelines that each hand values to the next, and the defects that are hardest to diagnose are the ones whose cause and symptom sit on opposite sides of a hand-off. A coordinate system that validates cleanly in the [fundamentals](/3d-geospatial-fundamentals-for-digital-twins/) stage produces seams once the [LOD](/lod-management-optimization-strategies/) tiler places geometry; a mesh that renders fine at full resolution tears into holes when the [processing pipeline](/point-cloud-mesh-processing-pipelines/) decimates it; an attribute table that survives filtering is dropped during tiling. This guide catalogues those boundary defects — for each one, the root cause, a way to reproduce it deterministically, and the `pyproj`, `trimesh`, or `numpy` assertion that catches it at the hand-off instead of two pipelines downstream.
+A digital twin is assembled by three pipelines that each hand values to the next, and the defects that are hardest to diagnose are the ones whose cause and symptom sit on opposite sides of a hand-off. A coordinate system that validates cleanly in the [fundamentals](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/) stage produces seams once the [LOD](https://www.3d-geospatial.com/lod-management-optimization-strategies/) tiler places geometry; a mesh that renders fine at full resolution tears into holes when the [processing pipeline](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/) decimates it; an attribute table that survives filtering is dropped during tiling. This guide catalogues those boundary defects — for each one, the root cause, a way to reproduce it deterministically, and the `pyproj`, `trimesh`, or `numpy` assertion that catches it at the hand-off instead of two pipelines downstream.
 
 ## Prerequisites
 
@@ -84,7 +84,7 @@ assert residual < 1e-3, f"CRS chain drifts by {residual*1000:.3f} mm"
 print(f"round-trip residual {residual*1000:.4f} mm")
 ```
 
-The step-by-step form of this check, extended to per-tile transforms and seam detection, is in [diagnosing CRS drift causing LOD seams](/digital-twin-troubleshooting-and-reliability/cross-pillar-failure-modes/diagnosing-crs-drift-causing-lod-seams/).
+The step-by-step form of this check, extended to per-tile transforms and seam detection, is in [diagnosing CRS drift causing LOD seams](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/diagnosing-crs-drift-causing-lod-seams/).
 
 ### 2. Assert the CRS is projected and metric before it reaches the tiler
 
@@ -101,7 +101,7 @@ assert axis_units <= {"metre", "meter"}, f"non-metric axis units: {axis_units}"
 print(f"working CRS EPSG:{crs.to_epsg()} is projected, units {axis_units}")
 ```
 
-The reasoning behind picking such a CRS is covered in [how to choose CRS for urban digital twins](/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/how-to-choose-crs-for-urban-digital-twins/) and the conversion mechanics in [converting WGS84 to local projected coordinates](/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/converting-wgs84-to-local-projected-coordinates/).
+The reasoning behind picking such a CRS is covered in [how to choose CRS for urban digital twins](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/how-to-choose-crs-for-urban-digital-twins/) and the conversion mechanics in [converting WGS84 to local projected coordinates](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/converting-wgs84-to-local-projected-coordinates/).
 
 ### 3. Assert manifoldness before decimation so holes cannot widen
 
@@ -119,7 +119,7 @@ open_edges = len(mesh.edges) - 2 * len(mesh.edges_unique)
 print(f"faces {len(mesh.faces)}, watertight {mesh.is_watertight}, open edges {open_edges}")
 ```
 
-When this fails, repair before tiling — the procedure is in [fixing non-manifold edges in 3D meshes](/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/fixing-non-manifold-edges-in-3d-meshes/), part of the broader [mesh topology basics](/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/).
+When this fails, repair before tiling — the procedure is in [fixing non-manifold edges in 3D meshes](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/fixing-non-manifold-edges-in-3d-meshes/), part of the broader [mesh topology basics](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/).
 
 ### 4. Diff the attribute schema across the tiling hand-off
 
@@ -161,7 +161,7 @@ lon, lat, h_ellip = to_geo3d.transform(583_000.0, 4_507_000.0, 12.0)
 print(f"orthometric 12.0 m -> ellipsoidal {h_ellip:.3f} m via EPSG:4979")
 ```
 
-Consistent handling of these datums end to end is detailed in [handling vertical datums and geoid separation](/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/handling-vertical-datums-and-geoid-separation/).
+Consistent handling of these datums end to end is detailed in [handling vertical datums and geoid separation](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/handling-vertical-datums-and-geoid-separation/).
 
 ## Validation & Verification
 
@@ -184,7 +184,7 @@ def test_boundary_contracts(dataset):
 
 ## Performance & Scale
 
-These checks are metadata operations, not geometry passes, so they scale trivially — but wiring them into a city-scale build still rewards a little care. Run the CRS and datum asserts once per dataset, not per tile; the transform chain is identical for every tile, so a single control-point round-trip covers the whole survey. Run the manifoldness and attribute checks per tile, because those are per-mesh properties, but read only the header and topology, never the full vertex buffer, when you only need the invariant. For surveys of tens of thousands of tiles, sample the manifoldness check on incremental rebuilds — assert every changed tile plus a random audit sample of the unchanged ones — and run the full sweep only on release candidates. The one check that genuinely costs geometry time, a Hausdorff distance to verify measured error, belongs in the tiling job that already loads the mesh, not in a separate validation pass that would load it twice. Memory discipline for the heaviest of these passes is covered in [fixing memory OOM in city-scale decimation](/digital-twin-troubleshooting-and-reliability/cross-pillar-failure-modes/fixing-memory-oom-in-city-scale-decimation/).
+These checks are metadata operations, not geometry passes, so they scale trivially — but wiring them into a city-scale build still rewards a little care. Run the CRS and datum asserts once per dataset, not per tile; the transform chain is identical for every tile, so a single control-point round-trip covers the whole survey. Run the manifoldness and attribute checks per tile, because those are per-mesh properties, but read only the header and topology, never the full vertex buffer, when you only need the invariant. For surveys of tens of thousands of tiles, sample the manifoldness check on incremental rebuilds — assert every changed tile plus a random audit sample of the unchanged ones — and run the full sweep only on release candidates. The one check that genuinely costs geometry time, a Hausdorff distance to verify measured error, belongs in the tiling job that already loads the mesh, not in a separate validation pass that would load it twice. Memory discipline for the heaviest of these passes is covered in [fixing memory OOM in city-scale decimation](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/fixing-memory-oom-in-city-scale-decimation/).
 
 ## Failure Modes & Gotchas
 
@@ -214,10 +214,10 @@ Both. Run them inline in the ingestion and tiling code so a bad dataset fails fa
 
 ## Related Guides
 
-- [Diagnosing CRS Drift Causing LOD Seams](/digital-twin-troubleshooting-and-reliability/cross-pillar-failure-modes/diagnosing-crs-drift-causing-lod-seams/) — the seam defect, step by step with pyproj
-- [Fixing Memory OOM in City-Scale Decimation](/digital-twin-troubleshooting-and-reliability/cross-pillar-failure-modes/fixing-memory-oom-in-city-scale-decimation/) — streaming and bounded workers for large surveys
-- [Coordinate Reference Systems for 3D Assets](/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/) — the CRS contract these checks enforce
-- [Mesh Topology Basics](/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/) — manifoldness and the non-manifold repair path
-- [Automated Mesh Decimation for Digital Twins](/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/) — the stage that widens topological flaws if unchecked
+- [Diagnosing CRS Drift Causing LOD Seams](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/diagnosing-crs-drift-causing-lod-seams/) — the seam defect, step by step with pyproj
+- [Fixing Memory OOM in City-Scale Decimation](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/fixing-memory-oom-in-city-scale-decimation/) — streaming and bounded workers for large surveys
+- [Coordinate Reference Systems for 3D Assets](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/) — the CRS contract these checks enforce
+- [Mesh Topology Basics](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/) — manifoldness and the non-manifold repair path
+- [Automated Mesh Decimation for Digital Twins](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/) — the stage that widens topological flaws if unchecked
 
-Back to [Digital Twin Troubleshooting & Reliability](/digital-twin-troubleshooting-and-reliability/).
+Back to [Digital Twin Troubleshooting & Reliability](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/).

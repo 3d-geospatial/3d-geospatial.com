@@ -13,7 +13,7 @@ This workflow targets a server that scores and prefetches tiles ahead of a thin 
 - **Python 3.11+** — required for `asyncio.TaskGroup` and `asyncio.timeout()`, both used below for structured cancellation.
 - **`numpy` 1.26+** — vectorized priority scoring over candidate tile arrays.
 - **`aiohttp` 3.9+** or equivalent async HTTP client — for fetching tile payloads from origin or object storage. The examples stub the network call so they run without a server.
-- **A 3D Tiles 1.1 tileset** following the [OGC 3D Tiles specification](https://www.ogc.org/standard/3dtiles/) — an implicit quadtree or explicit bounding-volume hierarchy with `geometricError` per tile. The streaming logic assumes you have already produced this with [automated tile generation](/lod-management-optimization-strategies/automated-tile-generation/).
+- **A 3D Tiles 1.1 tileset** following the [OGC 3D Tiles specification](https://www.ogc.org/standard/3dtiles/) — an implicit quadtree or explicit bounding-volume hierarchy with `geometricError` per tile. The streaming logic assumes you have already produced this with [automated tile generation](https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/).
 - **Tile bounding volumes in EPSG:32618** (UTM 18N, metres). Distances, frustum tests, and eviction margins are all metric; mixing in EPSG:4326 degrees here would make the priority scores meaningless.
 - **A camera telemetry feed** delivering position, look direction, field of view, and viewport pixel dimensions at 30–60 Hz. Camera position is converted from EPSG:4326 to EPSG:32618 once per frame before scoring.
 
@@ -67,7 +67,7 @@ Priority is what decides admission order. Each candidate tile is scored by a wei
 <figcaption>The tile lifecycle: priority admits a tile to fetching, a validated response loads it, the renderer makes it visible, and camera motion evicts it back to unloaded — with cancellation short-circuiting an in-flight fetch.</figcaption>
 </figure>
 
-This page extends [LOD Management & Optimization Strategies](/lod-management-optimization-strategies/) by adding temporal coordination on top of spatial structure. The hierarchy itself — parent/child tile relationships and refinement rules — comes from [hierarchical LOD structuring](/lod-management-optimization-strategies/hierarchical-lod-structuring/), and the priority scorer below depends on each candidate carrying a correct `geometricError`, so the two layers must agree on the quadtree.
+This page extends [LOD Management & Optimization Strategies](https://www.3d-geospatial.com/lod-management-optimization-strategies/) by adding temporal coordination on top of spatial structure. The hierarchy itself — parent/child tile relationships and refinement rules — comes from [hierarchical LOD structuring](https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/), and the priority scorer below depends on each candidate carrying a correct `geometricError`, so the two layers must agree on the quadtree.
 
 ## Step-by-Step Workflow
 
@@ -278,7 +278,7 @@ Choose the eviction policy to match navigation pattern. LRU suits free-flying ca
 
 ## Failure Modes & Gotchas
 
-- **Visual popping at LOD boundaries.** A tile pops in abruptly because its parent was evicted before the child loaded, leaving a one-frame hole. Keep the parent resident until all four children reach `LOADED`, and never evict a `VISIBLE` tile — the eviction code above filters to `LOADED` for exactly this reason. Geometric-error mismatch with [hierarchical LOD structuring](/lod-management-optimization-strategies/hierarchical-lod-structuring/) makes this worse, since the scorer admits children too early or too late.
+- **Visual popping at LOD boundaries.** A tile pops in abruptly because its parent was evicted before the child loaded, leaving a one-frame hole. Keep the parent resident until all four children reach `LOADED`, and never evict a `VISIBLE` tile — the eviction code above filters to `LOADED` for exactly this reason. Geometric-error mismatch with [hierarchical LOD structuring](https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/) makes this worse, since the scorer admits children too early or too late.
 - **Cache thrashing under camera jitter.** A camera hovering on a tile boundary repeatedly admits and evicts the same tiles, saturating the link with re-fetches of data that was just dropped. Add hysteresis: a margin between the admission threshold and the eviction threshold (admit at 1 px SSE, evict only below 0.5 px) so a tile must clearly leave relevance before it is dropped.
 - **Cancelled fetches that still mutate state.** If a `CancelledError` is swallowed instead of re-raised, the task can fall through to the `LOADED` assignment and leave a ghost tile counted against the byte budget. Always re-raise `CancelledError` after rolling back to `UNLOADED`, as shown in `_fetch`, and account bytes only after a fully validated response.
 - **Backpressure that becomes head-of-line blocking.** A single slow origin response holds a semaphore slot, starving higher-priority tiles queued behind it. Bound every fetch with `asyncio.timeout()` (5 s above) so a stalled request releases its slot, and re-score on the next frame rather than waiting on the stalled tile.
@@ -304,13 +304,13 @@ They are cancelled. `reconcile()` diffs the new candidate set against active tas
 
 ### How small should tiles be for smooth streaming?
 
-Target 100–500 KB per tile payload. Smaller tiles raise request overhead and HTTP round-trips until the connection cap dominates; larger tiles increase the granularity of popping and waste bandwidth when only a corner is visible. Tune the split during [automated tile generation](/lod-management-optimization-strategies/automated-tile-generation/) so the average tile fits a single congestion window, and let the byte budget and concurrency cap here do the rest.
+Target 100–500 KB per tile payload. Smaller tiles raise request overhead and HTTP round-trips until the connection cap dominates; larger tiles increase the granularity of popping and waste bandwidth when only a corner is visible. Tune the split during [automated tile generation](https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/) so the average tile fits a single congestion window, and let the byte budget and concurrency cap here do the rest.
 
 ## Related Guides
 
-- [Hierarchical LOD Structuring for Digital Twins](/lod-management-optimization-strategies/hierarchical-lod-structuring/) — the parent/child tile relationships the scorer depends on
-- [Implementing Quadtree LOD for Urban Models](/lod-management-optimization-strategies/hierarchical-lod-structuring/implementing-quadtree-lod-for-urban-models/) — building the spatial index that feeds streaming
-- [Automated Tile Generation for 3D Geospatial](/lod-management-optimization-strategies/automated-tile-generation/) — producing the 3D Tiles payloads and metadata this pipeline streams
-- [3D Geospatial Fundamentals for Digital Twins](/3d-geospatial-fundamentals-for-digital-twins/) — the CRS and mesh contracts streaming assumes upstream
+- [Hierarchical LOD Structuring for Digital Twins](https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/) — the parent/child tile relationships the scorer depends on
+- [Implementing Quadtree LOD for Urban Models](https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/implementing-quadtree-lod-for-urban-models/) — building the spatial index that feeds streaming
+- [Automated Tile Generation for 3D Geospatial](https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/) — producing the 3D Tiles payloads and metadata this pipeline streams
+- [3D Geospatial Fundamentals for Digital Twins](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/) — the CRS and mesh contracts streaming assumes upstream
 
-Back to [LOD Management & Optimization Strategies](/lod-management-optimization-strategies/).
+Back to [LOD Management & Optimization Strategies](https://www.3d-geospatial.com/lod-management-optimization-strategies/).
