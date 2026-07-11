@@ -1,0 +1,549 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <title>Handling Vertical Datums and Geoid Separation — 3D Geospatial</title>
+  <meta name="description" content="Reconcile ellipsoidal (EPSG:4979) and orthometric heights (NAVD88 EPSG:5703, EGM2008 EPSG:3855) with pyproj compound-CRS transforms and stop Z steps at tile seams">
+  <meta name="keywords" content="3D geospatial, digital twin, point cloud, mesh pipeline, LOD, 3D Tiles, Cesium, PDAL, Open3D, Python, CI/CD">
+  <meta name="author" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta name="theme-color" content="#1f6b8a">
+  <meta name="color-scheme" content="light">
+  <meta name="generator" content="Eleventy">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="googlebot" content="index,follow,max-image-preview:large">
+
+  
+  <link rel="canonical" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/handling-vertical-datums-and-geoid-separation/">
+  <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">
+
+  
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/icon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+
+  
+  <link rel="apple-touch-icon" href="/assets/img/icon-180.png">
+  <link rel="mask-icon" href="/assets/img/logo.svg" color="#1f6b8a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="3D Geospatial">
+  <meta name="application-name" content="3D Geospatial">
+
+  
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Handling Vertical Datums and Geoid Separation — 3D Geospatial">
+  <meta property="og:description" content="Reconcile ellipsoidal (EPSG:4979) and orthometric heights (NAVD88 EPSG:5703, EGM2008 EPSG:3855) with pyproj compound-CRS transforms and stop Z steps at tile seams">
+  <meta property="og:url" content="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/handling-vertical-datums-and-geoid-separation/">
+  <meta property="og:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+  <meta property="og:site_name" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta property="og:locale" content="en_US">
+  
+  <meta property="article:published_time" content="2026-07-11T14:25:25.857Z">
+  <meta property="article:modified_time" content="2026-07-11T14:25:25.857Z">
+  <meta property="article:publisher" content="https://www.3d-geospatial.com/">
+  
+
+  
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Handling Vertical Datums and Geoid Separation — 3D Geospatial">
+  <meta name="twitter:description" content="Reconcile ellipsoidal (EPSG:4979) and orthometric heights (NAVD88 EPSG:5703, EGM2008 EPSG:3855) with pyproj compound-CRS transforms and stop Z steps at tile seams">
+  <meta name="twitter:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta name="twitter:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+
+  
+  <link rel="preload" href="/assets/css/styles.css?v=f77cea8785" as="style">
+  
+
+  <link rel="stylesheet" href="/assets/css/styles.css?v=f77cea8785">
+
+  
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.3d-geospatial.com/#organization",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "url": "https://www.3d-geospatial.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/icon-512.png",
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://www.3d-geospatial.com/#website",
+      "url": "https://www.3d-geospatial.com/",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "description": "Build reliable 3D spatial data pipelines for digital twins — point clouds, meshes, LOD strategies, Python processing, and CI/CD automation.",
+      "inLanguage": "en",
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      }
+    },
+    {
+      "@type": "TechArticle",
+      "@id": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/handling-vertical-datums-and-geoid-separation/#article",
+      "isPartOf": {
+        "@id": "https://www.3d-geospatial.com/#website"
+      },
+      "headline": "Handling Vertical Datums and Geoid Separation",
+      "name": "Handling Vertical Datums and Geoid Separation",
+      "description": "Reconcile ellipsoidal (EPSG:4979) and orthometric heights (NAVD88 EPSG:5703, EGM2008 EPSG:3855) with pyproj compound-CRS transforms and stop Z steps at tile seams",
+      "url": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/handling-vertical-datums-and-geoid-separation/",
+      "mainEntityOfPage": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/handling-vertical-datums-and-geoid-separation/",
+      "inLanguage": "en",
+      "datePublished": "2026-07-11T14:25:25.857Z",
+      "dateModified": "2026-07-11T14:25:25.857Z",
+      "author": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "image": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/og-cover.png",
+        "width": 1200,
+        "height": 630
+      },
+      "breadcrumb": {
+        "@id": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/handling-vertical-datums-and-geoid-separation/#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/handling-vertical-datums-and-geoid-separation/#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://www.3d-geospatial.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "3D Geospatial Fundamentals For Digital Twins",
+          "item": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Coordinate Reference Systems For 3D Assets",
+          "item": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "name": "Handling Vertical Datums And Geoid Separation",
+          "item": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/handling-vertical-datums-and-geoid-separation/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  
+<header class="site-header" role="banner">
+  <div class="container site-header__inner">
+    <a href="/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+      <img src="/assets/img/logo.svg" alt="" class="brand__mark" width="36" height="36">
+      <span class="brand__name">
+        3D Geospatial
+        <small>Digital Twin Automation</small>
+      </span>
+    </a>
+
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>
+      <span class="nav-toggle__icon" aria-hidden="true"><span></span></span>
+      Menu
+    </button>
+
+    <nav class="primary-nav" id="primary-nav" aria-label="Primary">
+      
+      <a href="/" >
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/>
+        </svg>
+        Home
+      </a>
+      
+        
+        <a href="/3d-geospatial-fundamentals-for-digital-twins/" aria-current="page">
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2 3 7l9 5 9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 17l9 5 9-5"/>
+            </svg>
+          
+          3D Geospatial Fundamentals
+        </a>
+      
+        
+        <a href="/lod-management-optimization-strategies/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+          
+          LOD Management &amp; Optimization
+        </a>
+      
+        
+        <a href="/point-cloud-mesh-processing-pipelines/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="6" cy="6" r="1.5"/><circle cx="12" cy="6" r="1.5"/><circle cx="18" cy="6" r="1.5"/>
+              <circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/>
+              <circle cx="6" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="18" cy="18" r="1.5"/>
+            </svg>
+          
+          Point Cloud &amp; Mesh Pipelines
+        </a>
+      
+        
+        <a href="/digital-twin-troubleshooting-and-reliability/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <path d="M12 9v4"/><path d="M12 17h.01"/>
+            </svg>
+          
+          Troubleshooting &amp; Reliability
+        </a>
+      
+    </nav>
+  </div>
+</header>
+
+
+  <main id="main">
+    
+
+
+<div class="container">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    
+      
+        <a href="/">Home</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals For Digital Twins</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems For 3D Assets</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <span class="current">Handling Vertical Datums And Geoid Separation</span>
+      
+    
+  </nav>
+
+  <div class="content-page">
+    <article class="article">
+      <h1 id="handling-vertical-datums-and-geoid-separation-in-3d-geospatial-data" tabindex="-1"><a class="heading-link" href="#handling-vertical-datums-and-geoid-separation-in-3d-geospatial-data"><span>Handling Vertical Datums and Geoid Separation in 3D Geospatial Data</span></a></h1>
+<p>This page shows how to reconcile the two height systems a digital twin mixes — <strong>ellipsoidal</strong> heights on WGS84 (EPSG:4979) and <strong>orthometric</strong> heights on a geoid model (NAVD88, EPSG:5703; or EGM2008, EPSG:3855) — by computing the geoid separation N explicitly with <code>pyproj</code> compound-CRS transforms, and how a datum mismatch shows up as a vertical step at tile seams. The core operation is a compound-CRS transform such as EPSG:32618+5703 → EPSG:4979 that carries a metric, orthometric point into the ellipsoidal frame Cesium renders in, applying the geoid grid per point rather than a constant.</p>
+<p>You hit this whenever two datasets that “look” co-registered disagree in Z: a GNSS-derived cloud on ellipsoidal heights sits tens of metres above a DEM on NAVD88, or two adjacent tiles authored against different geoid models leave a cliff at their shared edge. The offset is the geoid separation, and it is not a bug in the geometry — it is an undeclared vertical datum. This guide isolates and quantifies that separation. The broader datum-management strategy lives in <a href="/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">coordinate reference systems for 3D assets</a>, and the horizontal EPSG:4326 → UTM path is covered in <a href="/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/converting-wgs84-to-local-projected-coordinates/">converting WGS84 to local projected coordinates</a>; here the focus is strictly the vertical.</p>
+<figure class="diagram">
+<svg viewBox="0 0 800 320" role="img" aria-labelledby="vdatum-t vdatum-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="vdatum-t">Geoid separation and a Z step at a tile seam</title>
+  <desc id="vdatum-d">Two adjacent terrain tiles share an edge; the left tile is referenced to the ellipsoid and the right to the geoid, so their surfaces meet at a vertical step equal to the geoid separation N, the gap between the ellipsoid and geoid surfaces.</desc>
+  <defs>
+    <marker id="vdatum-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
+    </marker>
+  </defs>
+  <path d="M40 90 Q 250 70 400 82 T 760 90" fill="none" stroke="#1f6b8a" stroke-width="2"/>
+  <path d="M40 150 Q 250 175 400 150 T 760 152" fill="none" stroke="#c46a3d" stroke-width="2"/>
+  <text x="90" y="82" fill="#1f6b8a" font-size="12">ellipsoid (EPSG:4979)</text>
+  <text x="90" y="168" fill="#c46a3d" font-size="12">geoid (NAVD88 / EGM2008)</text>
+  <line x1="400" y1="82" x2="400" y2="150" stroke="#5b6471" stroke-width="2" stroke-dasharray="4 3"/>
+  <text x="415" y="120" fill="#1f2937" font-size="13">N</text>
+  <rect x="160" y="210" width="230" height="44" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="410" y="238" width="230" height="44" rx="8" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <line x1="390" y1="232" x2="410" y2="260" stroke="#5b6471" stroke-width="2" marker-end="url(#vdatum-arrow)"/>
+  <text x="400" y="300" fill="#c46a3d" font-size="13" text-anchor="middle">Z step = N at the seam</text>
+  <g font-size="13" text-anchor="middle" fill="#15384a">
+    <text x="275" y="237">tile A: ellipsoidal Z</text>
+  </g>
+  <g font-size="13" text-anchor="middle" fill="#1f2937">
+    <text x="525" y="265">tile B: orthometric Z</text>
+  </g>
+</svg>
+<figcaption>The geoid separation N is the gap between ellipsoid and geoid; author two tiles against different vertical datums and N reappears as a vertical step at their shared edge.</figcaption>
+</figure>
+<h2 id="prerequisites" tabindex="-1"><a class="heading-link" href="#prerequisites"><span>Prerequisites</span></a></h2>
+<ul>
+<li>Python 3.9+ with <code>pyproj&gt;=3.6</code> (PROJ 9.x) and <code>numpy&gt;=1.24</code>: <code>pip install &quot;pyproj&gt;=3.6&quot; numpy</code>.</li>
+<li>PROJ vertical grids reachable at runtime — <code>us_noaa_g2018u0.tif</code> (GEOID18, behind NAVD88) and <code>us_nga_egm2008_1.tif</code> (EGM2008). Enable the PROJ CDN or install <code>proj-data</code>; without the grid, PROJ silently returns ellipsoidal heights and every separation reads as zero.</li>
+<li>Data whose vertical datum you can state. The examples use a horizontal EPSG:32618 (UTM 18N) paired with orthometric NAVD88 (EPSG:5703) or EGM2008 (EPSG:3855), and the geographic-3D ellipsoidal frame EPSG:4979.</li>
+<li>A published benchmark or a control point with a known orthometric height for validation.</li>
+</ul>
+<p>Enable network grids first so a missing geoid fails loudly:</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> pyproj
+pyproj<span class="token punctuation">.</span>network<span class="token punctuation">.</span>set_network_enabled<span class="token punctuation">(</span>active<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"PROJ"</span><span class="token punctuation">,</span> pyproj<span class="token punctuation">.</span>proj_version_str<span class="token punctuation">,</span> <span class="token string">"| network:"</span><span class="token punctuation">,</span> pyproj<span class="token punctuation">.</span>network<span class="token punctuation">.</span>is_network_enabled<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<h2 id="step-by-step" tabindex="-1"><a class="heading-link" href="#step-by-step"><span>Step-by-Step</span></a></h2>
+<h3 id="1-compute-the-geoid-separation-n-per-point" tabindex="-1"><a class="heading-link" href="#1-compute-the-geoid-separation-n-per-point"><span>1. Compute the geoid separation N per point</span></a></h3>
+<p>N is the signed gap between ellipsoidal height h and orthometric height H, with H = h − N. Recover it directly: transform your orthometric compound CRS (EPSG:32618+5703) into the ellipsoidal frame (EPSG:4979) and subtract. N varies continuously across the extent, which is exactly why a constant will not do.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> numpy <span class="token keyword">as</span> np
+<span class="token keyword">from</span> pyproj <span class="token keyword">import</span> Transformer
+
+<span class="token comment"># Orthometric NAVD88 (EPSG:32618+5703) -> ellipsoidal WGS84 3D (EPSG:4979)</span>
+to_ellip <span class="token operator">=</span> Transformer<span class="token punctuation">.</span>from_crs<span class="token punctuation">(</span><span class="token string">"EPSG:32618+5703"</span><span class="token punctuation">,</span> <span class="token string">"EPSG:4979"</span><span class="token punctuation">,</span> always_xy<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+
+easting  <span class="token operator">=</span> np<span class="token punctuation">.</span>array<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token number">583120.4</span><span class="token punctuation">,</span> <span class="token number">583402.9</span><span class="token punctuation">,</span> <span class="token number">584010.7</span><span class="token punctuation">]</span><span class="token punctuation">)</span>   <span class="token comment"># metres, EPSG:32618</span>
+northing <span class="token operator">=</span> np<span class="token punctuation">.</span>array<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token number">4507880.1</span><span class="token punctuation">,</span> <span class="token number">4508110.7</span><span class="token punctuation">,</span> <span class="token number">4508640.2</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+ortho_H  <span class="token operator">=</span> np<span class="token punctuation">.</span>array<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token number">14.62</span><span class="token punctuation">,</span> <span class="token number">11.08</span><span class="token punctuation">,</span> <span class="token number">9.55</span><span class="token punctuation">]</span><span class="token punctuation">)</span>              <span class="token comment"># NAVD88 orthometric, metres</span>
+
+lon<span class="token punctuation">,</span> lat<span class="token punctuation">,</span> ellip_h <span class="token operator">=</span> to_ellip<span class="token punctuation">.</span>transform<span class="token punctuation">(</span>easting<span class="token punctuation">,</span> northing<span class="token punctuation">,</span> ortho_H<span class="token punctuation">)</span>
+separation <span class="token operator">=</span> ellip_h <span class="token operator">-</span> ortho_H                          <span class="token comment"># N, metres</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"geoid separation N (m):"</span><span class="token punctuation">,</span> np<span class="token punctuation">.</span><span class="token builtin">round</span><span class="token punctuation">(</span>separation<span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<h3 id="2-convert-orthometric-heights-to-ellipsoidal-for-cesium-delivery" tabindex="-1"><a class="heading-link" href="#2-convert-orthometric-heights-to-ellipsoidal-for-cesium-delivery"><span>2. Convert orthometric heights to ellipsoidal for Cesium delivery</span></a></h3>
+<p>Web runtimes place geometry on the WGS84 ellipsoid (EPSG:4978 ECEF, reached via EPSG:4979). So the delivery boundary needs ellipsoidal Z, not the orthometric Z the twin analyses in. Do the conversion with the same compound transform, keeping the internal store orthometric.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">from</span> pyproj <span class="token keyword">import</span> Transformer
+
+to_ecef <span class="token operator">=</span> Transformer<span class="token punctuation">.</span>from_crs<span class="token punctuation">(</span><span class="token string">"EPSG:4979"</span><span class="token punctuation">,</span> <span class="token string">"EPSG:4978"</span><span class="token punctuation">,</span> always_xy<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+
+<span class="token comment"># lon, lat, ellip_h came from step 1 — now push to geocentric ECEF for the tileset.</span>
+x<span class="token punctuation">,</span> y<span class="token punctuation">,</span> z <span class="token operator">=</span> to_ecef<span class="token punctuation">.</span>transform<span class="token punctuation">(</span>lon<span class="token punctuation">,</span> lat<span class="token punctuation">,</span> ellip_h<span class="token punctuation">)</span>
+radii <span class="token operator">=</span> np<span class="token punctuation">.</span>linalg<span class="token punctuation">.</span>norm<span class="token punctuation">(</span>np<span class="token punctuation">.</span>column_stack<span class="token punctuation">(</span><span class="token punctuation">[</span>x<span class="token punctuation">,</span> y<span class="token punctuation">,</span> z<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">,</span> axis<span class="token operator">=</span><span class="token number">1</span><span class="token punctuation">)</span>
+<span class="token keyword">assert</span> <span class="token punctuation">(</span><span class="token number">6.3e6</span> <span class="token operator">&lt;</span> radii<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">all</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">and</span> <span class="token punctuation">(</span>radii <span class="token operator">&lt;</span> <span class="token number">6.5e6</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">all</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"not on the ellipsoid — datum chain wrong"</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"ECEF radius (m):"</span><span class="token punctuation">,</span> np<span class="token punctuation">.</span><span class="token builtin">round</span><span class="token punctuation">(</span>radii<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<h3 id="3-quantify-the-z-step-two-datums-produce-at-a-seam" tabindex="-1"><a class="heading-link" href="#3-quantify-the-z-step-two-datums-produce-at-a-seam"><span>3. Quantify the Z step two datums produce at a seam</span></a></h3>
+<p>If tile A is authored on EGM2008 and tile B on NAVD88, points that are physically identical carry different Z. Transform one benchmark through both compound CRSs into the shared ellipsoidal frame and the difference is the seam step you would see in the viewer.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">from</span> pyproj <span class="token keyword">import</span> Transformer
+
+navd88  <span class="token operator">=</span> Transformer<span class="token punctuation">.</span>from_crs<span class="token punctuation">(</span><span class="token string">"EPSG:32618+5703"</span><span class="token punctuation">,</span> <span class="token string">"EPSG:4979"</span><span class="token punctuation">,</span> always_xy<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+egm2008 <span class="token operator">=</span> Transformer<span class="token punctuation">.</span>from_crs<span class="token punctuation">(</span><span class="token string">"EPSG:32618+3855"</span><span class="token punctuation">,</span> <span class="token string">"EPSG:4979"</span><span class="token punctuation">,</span> always_xy<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+
+e<span class="token punctuation">,</span> n<span class="token punctuation">,</span> h_ortho <span class="token operator">=</span> <span class="token number">583120.4</span><span class="token punctuation">,</span> <span class="token number">4507880.1</span><span class="token punctuation">,</span> <span class="token number">14.62</span>     <span class="token comment"># same ground point, one number per datum</span>
+_<span class="token punctuation">,</span> _<span class="token punctuation">,</span> ellip_from_navd88  <span class="token operator">=</span> navd88<span class="token punctuation">.</span>transform<span class="token punctuation">(</span>e<span class="token punctuation">,</span> n<span class="token punctuation">,</span> h_ortho<span class="token punctuation">)</span>
+_<span class="token punctuation">,</span> _<span class="token punctuation">,</span> ellip_from_egm2008 <span class="token operator">=</span> egm2008<span class="token punctuation">.</span>transform<span class="token punctuation">(</span>e<span class="token punctuation">,</span> n<span class="token punctuation">,</span> h_ortho<span class="token punctuation">)</span>
+
+seam_step <span class="token operator">=</span> ellip_from_navd88 <span class="token operator">-</span> ellip_from_egm2008
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"seam Z step from mixed vertical datums: </span><span class="token interpolation"><span class="token punctuation">{</span>seam_step<span class="token operator">*</span><span class="token number">100</span><span class="token punctuation">:</span><span class="token format-spec">.1f</span><span class="token punctuation">}</span></span><span class="token string"> cm"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<h3 id="4-assert-one-vertical-datum-across-a-dataset-before-tiling" tabindex="-1"><a class="heading-link" href="#4-assert-one-vertical-datum-across-a-dataset-before-tiling"><span>4. Assert one vertical datum across a dataset before tiling</span></a></h3>
+<p>The durable fix is a gate: refuse any tile whose declared vertical sub-CRS differs from the project datum. Resolve the compound CRS and compare the vertical component by EPSG code.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">from</span> pyproj <span class="token keyword">import</span> CRS
+
+PROJECT_VERTICAL <span class="token operator">=</span> <span class="token number">5703</span>        <span class="token comment"># NAVD88 for the whole twin</span>
+
+<span class="token keyword">def</span> <span class="token function">assert_vertical_datum</span><span class="token punctuation">(</span>crs_string<span class="token punctuation">:</span> <span class="token builtin">str</span><span class="token punctuation">)</span> <span class="token operator">-</span><span class="token operator">></span> <span class="token boolean">None</span><span class="token punctuation">:</span>
+    crs <span class="token operator">=</span> CRS<span class="token punctuation">.</span>from_user_input<span class="token punctuation">(</span>crs_string<span class="token punctuation">)</span>
+    <span class="token keyword">if</span> <span class="token keyword">not</span> crs<span class="token punctuation">.</span>is_compound<span class="token punctuation">:</span>
+        <span class="token keyword">raise</span> ValueError<span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>crs_string<span class="token punctuation">}</span></span><span class="token string"> has no vertical datum; Z is ambiguous"</span></span><span class="token punctuation">)</span>
+    vert <span class="token operator">=</span> crs<span class="token punctuation">.</span>sub_crs_list<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span>
+    <span class="token keyword">if</span> vert<span class="token punctuation">.</span>to_epsg<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">!=</span> PROJECT_VERTICAL<span class="token punctuation">:</span>
+        <span class="token keyword">raise</span> ValueError<span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"vertical datum EPSG:</span><span class="token interpolation"><span class="token punctuation">{</span>vert<span class="token punctuation">.</span>to_epsg<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">}</span></span><span class="token string"> != project EPSG:</span><span class="token interpolation"><span class="token punctuation">{</span>PROJECT_VERTICAL<span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>crs_string<span class="token punctuation">}</span></span><span class="token string">: vertical datum OK (</span><span class="token interpolation"><span class="token punctuation">{</span>vert<span class="token punctuation">.</span>name<span class="token punctuation">}</span></span><span class="token string">)"</span></span><span class="token punctuation">)</span>
+
+assert_vertical_datum<span class="token punctuation">(</span><span class="token string">"EPSG:32618+5703"</span><span class="token punctuation">)</span>
+</code></pre></div>
+<h2 id="expected-output-verification" tabindex="-1"><a class="heading-link" href="#expected-output-verification"><span>Expected Output &amp; Verification</span></a></h2>
+<p>Running steps 1–3 over the sample control points around New York, where the NAVD88 geoid separation is roughly −33 m, prints:</p>
+<div class="codeblock" data-lang="text"><div class="codeblock__bar"><span class="codeblock__lang">text</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-text" tabindex="0" role="group" aria-label="text code sample"><code class="language-text">geoid separation N (m): [-33.412 -33.398 -33.371]
+ECEF radius (m): [6368521.7 6368512.4 6368498.9]
+seam Z step from mixed vertical datums: 27.4 cm
+</code></pre></div>
+<p>Verify against a benchmark whose published NAVD88 height you trust — the residual is your real vertical accuracy, and a residual near a round 30–100 m means the geoid grid never loaded:</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python">known_ortho <span class="token operator">=</span> <span class="token number">38.512</span>                       <span class="token comment"># published NAVD88 benchmark height, m</span>
+_<span class="token punctuation">,</span> _<span class="token punctuation">,</span> ellip_bm <span class="token operator">=</span> to_ellip<span class="token punctuation">.</span>transform<span class="token punctuation">(</span><span class="token number">583500.0</span><span class="token punctuation">,</span> <span class="token number">4508900.0</span><span class="token punctuation">,</span> known_ortho<span class="token punctuation">)</span>
+
+<span class="token comment"># The benchmark's ellipsoidal height must equal H + N (N ≈ -33.4 m here).</span>
+n_at_benchmark <span class="token operator">=</span> ellip_bm <span class="token operator">-</span> known_ortho
+<span class="token keyword">assert</span> <span class="token operator">-</span><span class="token number">34.5</span> <span class="token operator">&lt;</span> n_at_benchmark <span class="token operator">&lt;</span> <span class="token operator">-</span><span class="token number">32.5</span><span class="token punctuation">,</span> <span class="token string-interpolation"><span class="token string">f"N=</span><span class="token interpolation"><span class="token punctuation">{</span>n_at_benchmark<span class="token punctuation">:</span><span class="token format-spec">.2f</span><span class="token punctuation">}</span></span><span class="token string"> m off — check the geoid grid"</span></span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"benchmark separation N:"</span><span class="token punctuation">,</span> <span class="token builtin">round</span><span class="token punctuation">(</span>n_at_benchmark<span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"m"</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Two signatures matter. A separation that comes back exactly 0.0 means PROJ fell back to ellipsoidal heights because the grid was missing — the transform ran but did nothing. A seam step in step 3 on the order of 0.2–0.5 m is the real difference between GEOID18/NAVD88 and EGM2008 in the mid-latitudes, and it is precisely the cliff you would otherwise ship into a tileset.</p>
+<h2 id="common-errors" tabindex="-1"><a class="heading-link" href="#common-errors"><span>Common Errors</span></a></h2>
+<p><strong>Geoid separation reads exactly 0.0 for every point.</strong> PROJ could not find the vertical grid and silently returned ellipsoidal heights. Call <code>pyproj.network.set_network_enabled(active=True)</code> before building the transformer, pre-download the grid with <code>projsync --file us_noaa_g2018u0.tif</code>, and assert <code>transformer.get_grids_used()</code> reports <code>available=True</code>.</p>
+<p><strong><code>pyproj.exceptions.CRSError: Invalid projection: EPSG:32618+3855</code>.</strong> The compound <code>+</code> syntax needs <code>pyproj&gt;=3.0</code> and PROJ 7+, and EGM2008 as a height CRS is EPSG:3855 (not a geographic code). Upgrade <code>pyproj</code>, or build the compound explicitly with <code>CRS.from_epsg(32618) + CRS.from_epsg(3855)</code>.</p>
+<p><strong>Heights are off by a clean 33 m only in one region of a tiled twin.</strong> One batch of tiles was authored on ellipsoidal Z and the rest on orthometric, so the geoid separation appears as a step exactly where the batches meet. Gate every tile through the vertical-datum check in step 4 and re-transform the offending batch through the correct compound CRS rather than shifting it by a constant, which is wrong wherever N changes.</p>
+<h2 id="related-guides" tabindex="-1"><a class="heading-link" href="#related-guides"><span>Related Guides</span></a></h2>
+<ul>
+<li><a href="/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems for 3D Assets</a> — the full datum-management and validation strategy</li>
+<li><a href="/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/converting-wgs84-to-local-projected-coordinates/">Converting WGS84 to Local Projected Coordinates</a> — the horizontal EPSG:4326 → UTM transform</li>
+<li><a href="/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/how-to-choose-crs-for-urban-digital-twins/">How to Choose CRS for Urban Digital Twins</a> — selecting the internal metric and vertical frame</li>
+<li><a href="/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/">Digital Elevation Model Workflows</a> — aligning terrain rasters to one vertical datum</li>
+</ul>
+<p>Back to <a href="/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems for 3D Assets</a>.</p>
+
+
+      
+      
+
+      <div class="related-nav">
+        
+
+        
+          <div>
+            <h3>Related</h3>
+            <div class="related-grid">
+              
+                <a class="related-card" href="/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/converting-wgs84-to-local-projected-coordinates/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Converting WGS84 to Local Projected Coordinates</span>
+                </a>
+              
+                <a class="related-card" href="/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/how-to-choose-crs-for-urban-digital-twins/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">How to Choose CRS for Urban Digital Twins</span>
+                </a>
+              
+            </div>
+          </div>
+        
+      </div>
+    </article>
+
+    
+    <aside class="toc" aria-label="On this page" data-toc hidden>
+      <h4>On this page</h4>
+      <ul></ul>
+    </aside>
+  </div>
+</div>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+  <div class="container site-footer__inner">
+    <div class="site-footer__brand">
+      <a href="/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+        <img src="/assets/img/logo-mark.svg" alt="" class="brand__mark" width="36" height="36">
+        <span class="brand__name">
+          3D Geospatial
+          <small>Digital Twin Automation</small>
+        </span>
+      </a>
+      <p>Engineering-grade guides on point cloud processing, mesh pipelines, LOD strategies, and CI/CD automation for digital twin platforms.</p>
+    </div>
+
+    <div class="site-footer__col">
+      <h4>Sections</h4>
+      <ul>
+        <li><a href="/">Home</a></li>
+        
+          <li><a href="/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals</a></li>
+        
+          <li><a href="/lod-management-optimization-strategies/">LOD Management &amp; Optimization</a></li>
+        
+          <li><a href="/point-cloud-mesh-processing-pipelines/">Point Cloud &amp; Mesh Pipelines</a></li>
+        
+          <li><a href="/digital-twin-troubleshooting-and-reliability/">Troubleshooting &amp; Reliability</a></li>
+        
+      </ul>
+    </div>
+
+    
+      <div class="site-footer__col">
+        <h4>3D Geospatial Fundamentals</h4>
+        <ul>
+          
+          
+            <li><a href="/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/">3D Format Standards Comparison</a></li>
+          
+            <li><a href="/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems for 3D Assets</a></li>
+          
+            <li><a href="/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/">Digital Elevation Model Workflows</a></li>
+          
+            <li><a href="/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics for Digital Twins</a></li>
+          
+            <li><a href="/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>LOD Management &amp; Optimization</h4>
+        <ul>
+          
+          
+            <li><a href="/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a></li>
+          
+            <li><a href="/lod-management-optimization-strategies/automated-tile-generation/">Automated Tile Generation for 3D Geospatial</a></li>
+          
+            <li><a href="/lod-management-optimization-strategies/cesium-ion-upload-automation/">Cesium ion Upload Automation for 3D Tilesets</a></li>
+          
+            <li><a href="/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/">glTF LOD Generation With Draco Compression</a></li>
+          
+            <li><a href="/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring for Digital Twins</a></li>
+          
+            <li><a href="/lod-management-optimization-strategies/streaming-sync-patterns/">Streaming Sync Patterns for 3D Geospatial</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Point Cloud &amp; Mesh Pipelines</h4>
+        <ul>
+          
+          
+            <li><a href="/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/">Automated Mesh Decimation for Digital Twins</a></li>
+          
+            <li><a href="/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/">CI/CD Automation for Spatial Pipelines</a></li>
+          
+            <li><a href="/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/">Point Cloud Filtering Techniques</a></li>
+          
+            <li><a href="/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/">Surface Reconstruction for Geospatial Twins</a></li>
+          
+            <li><a href="/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/">Texture Mapping Workflows for Digital Twins</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Troubleshooting &amp; Reliability</h4>
+        <ul>
+          
+          
+            <li><a href="/digital-twin-troubleshooting-and-reliability/cross-pillar-failure-modes/">Cross-Pillar Failure Modes in Digital Twins</a></li>
+          
+            <li><a href="/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/">Data Validation &amp; QA Gates for 3D Tiles</a></li>
+          
+            <li><a href="/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/">Streaming &amp; Runtime Diagnostics for 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+  </div>
+  <div class="container site-footer__bottom">
+    <span>© 2026 3D Geospatial &amp; Digital Twin Automation</span>
+    <span>Built with Eleventy · PWA-enabled</span>
+  </div>
+</footer>
+
+
+  <script src="/assets/js/site.js?v=d27ef9f948" defer></script>
+  
+</body>
+</html>

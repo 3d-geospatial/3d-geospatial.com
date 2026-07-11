@@ -1,0 +1,572 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <title>Fixing Memory OOM in City-Scale Decimation — 3D Geospatial</title>
+  <meta name="description" content="Prevent out-of-memory in city-scale mesh decimation and point processing: tile-by-tile streaming, chunked laspy reads, bounded ProcessPoolExecutor workers, and RSS measured with psutil.">
+  <meta name="keywords" content="3D geospatial, digital twin, point cloud, mesh pipeline, LOD, 3D Tiles, Cesium, PDAL, Open3D, Python, CI/CD">
+  <meta name="author" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta name="theme-color" content="#1f6b8a">
+  <meta name="color-scheme" content="light">
+  <meta name="generator" content="Eleventy">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="googlebot" content="index,follow,max-image-preview:large">
+
+  
+  <link rel="canonical" href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-pillar-failure-modes/fixing-memory-oom-in-city-scale-decimation/">
+  <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">
+
+  
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/icon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+
+  
+  <link rel="apple-touch-icon" href="/assets/img/icon-180.png">
+  <link rel="mask-icon" href="/assets/img/logo.svg" color="#1f6b8a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="3D Geospatial">
+  <meta name="application-name" content="3D Geospatial">
+
+  
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Fixing Memory OOM in City-Scale Decimation — 3D Geospatial">
+  <meta property="og:description" content="Prevent out-of-memory in city-scale mesh decimation and point processing: tile-by-tile streaming, chunked laspy reads, bounded ProcessPoolExecutor workers, and RSS measured with psutil.">
+  <meta property="og:url" content="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-pillar-failure-modes/fixing-memory-oom-in-city-scale-decimation/">
+  <meta property="og:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+  <meta property="og:site_name" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta property="og:locale" content="en_US">
+  
+  <meta property="article:published_time" content="2026-07-11T14:27:32.875Z">
+  <meta property="article:modified_time" content="2026-07-11T14:27:32.875Z">
+  <meta property="article:publisher" content="https://www.3d-geospatial.com/">
+  
+
+  
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Fixing Memory OOM in City-Scale Decimation — 3D Geospatial">
+  <meta name="twitter:description" content="Prevent out-of-memory in city-scale mesh decimation and point processing: tile-by-tile streaming, chunked laspy reads, bounded ProcessPoolExecutor workers, and RSS measured with psutil.">
+  <meta name="twitter:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta name="twitter:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+
+  
+  <link rel="preload" href="/assets/css/styles.css?v=f77cea8785" as="style">
+  
+
+  <link rel="stylesheet" href="/assets/css/styles.css?v=f77cea8785">
+
+  
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.3d-geospatial.com/#organization",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "url": "https://www.3d-geospatial.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/icon-512.png",
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://www.3d-geospatial.com/#website",
+      "url": "https://www.3d-geospatial.com/",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "description": "Build reliable 3D spatial data pipelines for digital twins — point clouds, meshes, LOD strategies, Python processing, and CI/CD automation.",
+      "inLanguage": "en",
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      }
+    },
+    {
+      "@type": "TechArticle",
+      "@id": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-pillar-failure-modes/fixing-memory-oom-in-city-scale-decimation/#article",
+      "isPartOf": {
+        "@id": "https://www.3d-geospatial.com/#website"
+      },
+      "headline": "Fixing Memory OOM in City-Scale Decimation",
+      "name": "Fixing Memory OOM in City-Scale Decimation",
+      "description": "Prevent out-of-memory in city-scale mesh decimation and point processing: tile-by-tile streaming, chunked laspy reads, bounded ProcessPoolExecutor workers, and RSS measured with psutil.",
+      "url": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-pillar-failure-modes/fixing-memory-oom-in-city-scale-decimation/",
+      "mainEntityOfPage": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-pillar-failure-modes/fixing-memory-oom-in-city-scale-decimation/",
+      "inLanguage": "en",
+      "datePublished": "2026-07-11T14:27:32.875Z",
+      "dateModified": "2026-07-11T14:27:32.875Z",
+      "author": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "image": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/og-cover.png",
+        "width": 1200,
+        "height": 630
+      },
+      "breadcrumb": {
+        "@id": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-pillar-failure-modes/fixing-memory-oom-in-city-scale-decimation/#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-pillar-failure-modes/fixing-memory-oom-in-city-scale-decimation/#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://www.3d-geospatial.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Digital Twin Troubleshooting And Reliability",
+          "item": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Cross Pillar Failure Modes",
+          "item": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-pillar-failure-modes/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "name": "Fixing Memory Oom In City Scale Decimation",
+          "item": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-pillar-failure-modes/fixing-memory-oom-in-city-scale-decimation/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  
+<header class="site-header" role="banner">
+  <div class="container site-header__inner">
+    <a href="/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+      <img src="/assets/img/logo.svg" alt="" class="brand__mark" width="36" height="36">
+      <span class="brand__name">
+        3D Geospatial
+        <small>Digital Twin Automation</small>
+      </span>
+    </a>
+
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>
+      <span class="nav-toggle__icon" aria-hidden="true"><span></span></span>
+      Menu
+    </button>
+
+    <nav class="primary-nav" id="primary-nav" aria-label="Primary">
+      
+      <a href="/" >
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/>
+        </svg>
+        Home
+      </a>
+      
+        
+        <a href="/3d-geospatial-fundamentals-for-digital-twins/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2 3 7l9 5 9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 17l9 5 9-5"/>
+            </svg>
+          
+          3D Geospatial Fundamentals
+        </a>
+      
+        
+        <a href="/lod-management-optimization-strategies/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+          
+          LOD Management &amp; Optimization
+        </a>
+      
+        
+        <a href="/point-cloud-mesh-processing-pipelines/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="6" cy="6" r="1.5"/><circle cx="12" cy="6" r="1.5"/><circle cx="18" cy="6" r="1.5"/>
+              <circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/>
+              <circle cx="6" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="18" cy="18" r="1.5"/>
+            </svg>
+          
+          Point Cloud &amp; Mesh Pipelines
+        </a>
+      
+        
+        <a href="/digital-twin-troubleshooting-and-reliability/" aria-current="page">
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <path d="M12 9v4"/><path d="M12 17h.01"/>
+            </svg>
+          
+          Troubleshooting &amp; Reliability
+        </a>
+      
+    </nav>
+  </div>
+</header>
+
+
+  <main id="main">
+    
+
+
+<div class="container">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    
+      
+        <a href="/">Home</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="/digital-twin-troubleshooting-and-reliability/">Digital Twin Troubleshooting And Reliability</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="/digital-twin-troubleshooting-and-reliability/cross-pillar-failure-modes/">Cross Pillar Failure Modes</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <span class="current">Fixing Memory Oom In City Scale Decimation</span>
+      
+    
+  </nav>
+
+  <div class="content-page">
+    <article class="article">
+      <h1 id="fixing-out-of-memory-failures-in-city-scale-mesh-decimation" tabindex="-1"><a class="heading-link" href="#fixing-out-of-memory-failures-in-city-scale-mesh-decimation"><span>Fixing Out-of-Memory Failures in City-Scale Mesh Decimation</span></a></h1>
+<p>This guide prevents the <code>MemoryError</code> and OOM-killer terminations that strike when <a href="/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/">automated mesh decimation</a> and point-cloud processing scale from a few buildings to a whole city, using tile-by-tile streaming instead of whole-survey loads, chunked <code>laspy</code> reads, a bounded <code>ProcessPoolExecutor</code>, explicit freeing of intermediates, and resident-set measurement with <code>psutil</code>. It sits in the <a href="/digital-twin-troubleshooting-and-reliability/cross-pillar-failure-modes/">cross-pillar failure modes</a> area because the failure spans the boundary between the <a href="/point-cloud-mesh-processing-pipelines/">processing pipeline</a> and the <a href="/lod-management-optimization-strategies/">LOD tiler</a> that consumes its output.</p>
+<p>You hit this the first time a pipeline that ran fine on a test block is pointed at a full survey: a job that decimated ten buildings in seconds tries to load a 40 GB <code>.laz</code> or a directory of thousands of meshes at once, resident memory climbs past the machine’s RAM, and the process is killed with no traceback or a bare <code>MemoryError</code>. The fix is architectural — never hold the whole survey — and it is the same discipline whether the payload is points or triangles.</p>
+<figure class="diagram">
+<svg viewBox="0 0 780 320" role="img" aria-labelledby="oom-t oom-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="oom-t">Whole-survey load versus streamed tile-by-tile processing</title>
+  <desc id="oom-d">The top path loads the entire survey into memory at once and crosses the RAM budget, triggering the out-of-memory killer. The bottom path streams one chunk or tile at a time through a bounded pool of workers, holding resident memory flat below the budget line regardless of survey size.</desc>
+  <defs>
+    <marker id="oom-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
+    </marker>
+  </defs>
+  <rect x="25" y="40" width="150" height="60" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="315" y="40" width="180" height="60" rx="8" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <rect x="600" y="40" width="155" height="60" rx="8" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <line x1="175" y1="70" x2="313" y2="70" stroke="#5b6471" stroke-width="2" marker-end="url(#oom-arrow)"/>
+  <line x1="495" y1="70" x2="598" y2="70" stroke="#5b6471" stroke-width="2" marker-end="url(#oom-arrow)"/>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="100" y="66"><tspan x="100" dy="0" font-weight="600">Whole survey</tspan><tspan x="100" dy="16" font-size="11">40 GB .laz</tspan></text>
+    <text x="405" y="66"><tspan x="405" dy="0">load all points</tspan><tspan x="405" dy="16" font-size="11">RSS &gt; RAM budget</tspan></text>
+    <text x="677" y="74" font-weight="600">OOM kill (137)</text>
+  </g>
+  <rect x="25" y="185" width="150" height="60" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="315" y="185" width="180" height="60" rx="8" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <rect x="600" y="185" width="155" height="60" rx="8" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <line x1="175" y1="215" x2="313" y2="215" stroke="#5b6471" stroke-width="2" marker-end="url(#oom-arrow)"/>
+  <line x1="495" y1="215" x2="598" y2="215" stroke="#5b6471" stroke-width="2" marker-end="url(#oom-arrow)"/>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="100" y="211"><tspan x="100" dy="0" font-weight="600">chunk_iterator</tspan><tspan x="100" dy="16" font-size="11">one chunk / tile</tspan></text>
+    <text x="405" y="211"><tspan x="405" dy="0">bounded pool</tspan><tspan x="405" dy="16" font-size="11">del + gc.collect</tspan></text>
+    <text x="677" y="211"><tspan x="677" dy="0" font-weight="600">flat RSS</tspan><tspan x="677" dy="16" font-size="11">under budget</tspan></text>
+  </g>
+  <text x="390" y="290" fill="#5b6471" font-size="12" text-anchor="middle">Peak memory tracks one chunk times worker count — not the survey size</text>
+</svg>
+<figcaption>Loading the whole survey crosses the RAM budget and invites the OOM killer; streaming one chunk or tile through a memory-bounded pool holds resident set flat no matter how large the survey grows.</figcaption>
+</figure>
+<h2 id="prerequisites" tabindex="-1"><a class="heading-link" href="#prerequisites"><span>Prerequisites</span></a></h2>
+<ul>
+<li>Python 3.10+ with <code>laspy</code> 2.5+ (with the <code>lazrs</code> or <code>laszip</code> backend for <code>.laz</code>), <code>numpy</code> 1.26+, <code>trimesh</code> 4.4+, and <code>psutil</code> 5.9+: <code>pip install &quot;laspy[lazrs]&gt;=2.5&quot; &quot;numpy&gt;=1.26&quot; &quot;trimesh&gt;=4.4&quot; &quot;psutil&gt;=5.9&quot;</code>.</li>
+<li>Source data as classified <code>.laz</code>/<code>.las</code> point clouds or per-tile <code>.glb</code>/<code>.ply</code> meshes in a projected metric CRS — the examples use EPSG:32618 (UTM 18N) so that chunk extents and point counts are in metres and are directly comparable across tiles.</li>
+<li>A machine whose RAM you know: the whole point of the exercise is to keep peak resident-set size (RSS) below that ceiling with headroom for the OS, so measure it (<code>psutil.virtual_memory().total</code>) rather than assuming.</li>
+</ul>
+<h2 id="step-by-step" tabindex="-1"><a class="heading-link" href="#step-by-step"><span>Step-by-Step</span></a></h2>
+<h3 id="1-measure-peak-rss-so-out-of-memory-becomes-a-number" tabindex="-1"><a class="heading-link" href="#1-measure-peak-rss-so-out-of-memory-becomes-a-number"><span>1. Measure peak RSS so “out of memory” becomes a number</span></a></h3>
+<p>Before changing anything, instrument the job. Without a measured RSS you are guessing, and the fix cannot be verified. <code>psutil</code> reads the process’s resident set; sample it around the heavy call.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> os<span class="token punctuation">,</span> psutil
+
+proc <span class="token operator">=</span> psutil<span class="token punctuation">.</span>Process<span class="token punctuation">(</span>os<span class="token punctuation">.</span>getpid<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+
+<span class="token keyword">def</span> <span class="token function">rss_mb</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">return</span> proc<span class="token punctuation">.</span>memory_info<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span>rss <span class="token operator">/</span> <span class="token number">1024</span><span class="token operator">**</span><span class="token number">2</span>
+
+budget_mb <span class="token operator">=</span> psutil<span class="token punctuation">.</span>virtual_memory<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span>total <span class="token operator">/</span> <span class="token number">1024</span><span class="token operator">**</span><span class="token number">2</span> <span class="token operator">*</span> <span class="token number">0.6</span>   <span class="token comment"># leave 40% headroom</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"RSS at start </span><span class="token interpolation"><span class="token punctuation">{</span>rss_mb<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span><span class="token format-spec">.0f</span><span class="token punctuation">}</span></span><span class="token string"> MB, soft budget </span><span class="token interpolation"><span class="token punctuation">{</span>budget_mb<span class="token punctuation">:</span><span class="token format-spec">.0f</span><span class="token punctuation">}</span></span><span class="token string"> MB"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Keep the soft budget well below total RAM — decimation allocates temporary index and normal arrays several times the size of the geometry, so 60% of physical memory is a safe working ceiling.</p>
+<h3 id="2-stream-a-large-point-cloud-in-fixed-size-chunks" tabindex="-1"><a class="heading-link" href="#2-stream-a-large-point-cloud-in-fixed-size-chunks"><span>2. Stream a large point cloud in fixed-size chunks</span></a></h3>
+<p>The core fix for point data: never call <code>laspy.read</code>, which materialises every point. Open the file and iterate fixed-size chunks so resident memory is bounded by the chunk, not the survey.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> laspy
+<span class="token keyword">import</span> numpy <span class="token keyword">as</span> np
+
+CHUNK <span class="token operator">=</span> <span class="token number">5_000_000</span>   <span class="token comment"># points per chunk; ~120 MB for XYZ float64 + attributes</span>
+
+<span class="token keyword">def</span> <span class="token function">stream_ground_points</span><span class="token punctuation">(</span>path<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Yield decimated ground points chunk by chunk, holding one chunk at a time."""</span>
+    <span class="token keyword">with</span> laspy<span class="token punctuation">.</span><span class="token builtin">open</span><span class="token punctuation">(</span>path<span class="token punctuation">)</span> <span class="token keyword">as</span> reader<span class="token punctuation">:</span>          <span class="token comment"># header only — no points loaded yet</span>
+        <span class="token keyword">assert</span> reader<span class="token punctuation">.</span>header<span class="token punctuation">.</span>parse_crs<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span>to_epsg<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token number">32618</span><span class="token punctuation">,</span> <span class="token string">"expected EPSG:32618"</span>
+        <span class="token keyword">for</span> chunk <span class="token keyword">in</span> reader<span class="token punctuation">.</span>chunk_iterator<span class="token punctuation">(</span>CHUNK<span class="token punctuation">)</span><span class="token punctuation">:</span>
+            xyz <span class="token operator">=</span> np<span class="token punctuation">.</span>vstack<span class="token punctuation">(</span><span class="token punctuation">(</span>chunk<span class="token punctuation">.</span>x<span class="token punctuation">,</span> chunk<span class="token punctuation">.</span>y<span class="token punctuation">,</span> chunk<span class="token punctuation">.</span>z<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">.</span>T      <span class="token comment"># this chunk only</span>
+            ground <span class="token operator">=</span> xyz<span class="token punctuation">[</span>chunk<span class="token punctuation">.</span>classification <span class="token operator">==</span> <span class="token number">2</span><span class="token punctuation">]</span>             <span class="token comment"># ASPRS ground class</span>
+            keep <span class="token operator">=</span> ground<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">:</span><span class="token number">4</span><span class="token punctuation">]</span>                                  <span class="token comment"># 4x voxel-free thin</span>
+            <span class="token keyword">yield</span> keep
+            <span class="token keyword">del</span> xyz<span class="token punctuation">,</span> ground                                    <span class="token comment"># free before next chunk</span>
+</code></pre></div>
+<p>Each <code>yield</code> hands downstream a small array; the <code>del</code> drops the chunk’s working buffers so the next iteration starts from the header cursor, not a growing accumulation.</p>
+<h3 id="3-decimate-one-tile-at-a-time-freeing-intermediates" tabindex="-1"><a class="heading-link" href="#3-decimate-one-tile-at-a-time-freeing-intermediates"><span>3. Decimate one tile at a time, freeing intermediates</span></a></h3>
+<p>For meshes, the same rule applies per file. Load one tile, decimate, export, and explicitly drop every intermediate before the next tile — do not build a list of loaded meshes.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> gc<span class="token punctuation">,</span> trimesh
+<span class="token keyword">from</span> pathlib <span class="token keyword">import</span> Path
+
+<span class="token keyword">def</span> <span class="token function">decimate_tile</span><span class="token punctuation">(</span>glb_path<span class="token punctuation">:</span> Path<span class="token punctuation">,</span> out_dir<span class="token punctuation">:</span> Path<span class="token punctuation">,</span> ratio<span class="token operator">=</span><span class="token number">0.125</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    mesh <span class="token operator">=</span> trimesh<span class="token punctuation">.</span>load<span class="token punctuation">(</span>glb_path<span class="token punctuation">,</span> force<span class="token operator">=</span><span class="token string">"mesh"</span><span class="token punctuation">,</span> process<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">)</span>
+    target <span class="token operator">=</span> <span class="token builtin">max</span><span class="token punctuation">(</span><span class="token number">500</span><span class="token punctuation">,</span> <span class="token builtin">int</span><span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>mesh<span class="token punctuation">.</span>faces<span class="token punctuation">)</span> <span class="token operator">*</span> ratio<span class="token punctuation">)</span><span class="token punctuation">)</span>
+    simplified <span class="token operator">=</span> mesh<span class="token punctuation">.</span>simplify_quadric_decimation<span class="token punctuation">(</span>target<span class="token punctuation">)</span>
+    out <span class="token operator">=</span> out_dir <span class="token operator">/</span> <span class="token punctuation">(</span>glb_path<span class="token punctuation">.</span>stem <span class="token operator">+</span> <span class="token string">"_lod1.glb"</span><span class="token punctuation">)</span>
+    simplified<span class="token punctuation">.</span>export<span class="token punctuation">(</span>out<span class="token punctuation">)</span>
+    faces_in<span class="token punctuation">,</span> faces_out <span class="token operator">=</span> <span class="token builtin">len</span><span class="token punctuation">(</span>mesh<span class="token punctuation">.</span>faces<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token builtin">len</span><span class="token punctuation">(</span>simplified<span class="token punctuation">.</span>faces<span class="token punctuation">)</span>
+    <span class="token keyword">del</span> mesh<span class="token punctuation">,</span> simplified          <span class="token comment"># drop both meshes' vertex/face/index buffers</span>
+    gc<span class="token punctuation">.</span>collect<span class="token punctuation">(</span><span class="token punctuation">)</span>                  <span class="token comment"># reclaim before the next tile is loaded</span>
+    <span class="token keyword">return</span> out<span class="token punctuation">,</span> faces_in<span class="token punctuation">,</span> faces_out
+</code></pre></div>
+<p>Calling <code>gc.collect()</code> after <code>del</code> forces trimesh’s numpy-backed buffers to be reclaimed immediately rather than at the next allocation pressure, which is what keeps RSS flat across thousands of tiles.</p>
+<h3 id="4-parallelise-with-a-bounded-process-pool" tabindex="-1"><a class="heading-link" href="#4-parallelise-with-a-bounded-process-pool"><span>4. Parallelise with a bounded process pool</span></a></h3>
+<p>Decimation is CPU-bound and embarrassingly parallel per tile, but an unbounded pool multiplies peak memory by the worker count and re-triggers the OOM you just fixed. Size the pool to fit within the budget: each worker holds roughly one tile’s footprint, so <code>workers ≤ budget / per_tile_peak</code>.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">from</span> concurrent<span class="token punctuation">.</span>futures <span class="token keyword">import</span> ProcessPoolExecutor<span class="token punctuation">,</span> as_completed
+<span class="token keyword">from</span> pathlib <span class="token keyword">import</span> Path
+<span class="token keyword">import</span> os
+
+PER_TILE_PEAK_MB <span class="token operator">=</span> <span class="token number">700</span>          <span class="token comment"># measured peak RSS of one decimate_tile call</span>
+max_workers <span class="token operator">=</span> <span class="token builtin">max</span><span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">,</span> <span class="token builtin">min</span><span class="token punctuation">(</span>os<span class="token punctuation">.</span>cpu_count<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token builtin">int</span><span class="token punctuation">(</span>budget_mb <span class="token operator">//</span> PER_TILE_PEAK_MB<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+
+<span class="token keyword">def</span> <span class="token function">run</span><span class="token punctuation">(</span>tiles<span class="token punctuation">,</span> out_dir<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    out_dir <span class="token operator">=</span> Path<span class="token punctuation">(</span>out_dir<span class="token punctuation">)</span><span class="token punctuation">;</span> out_dir<span class="token punctuation">.</span>mkdir<span class="token punctuation">(</span>exist_ok<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+    results <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    <span class="token keyword">with</span> ProcessPoolExecutor<span class="token punctuation">(</span>max_workers<span class="token operator">=</span>max_workers<span class="token punctuation">)</span> <span class="token keyword">as</span> pool<span class="token punctuation">:</span>
+        futures <span class="token operator">=</span> <span class="token punctuation">{</span>pool<span class="token punctuation">.</span>submit<span class="token punctuation">(</span>decimate_tile<span class="token punctuation">,</span> t<span class="token punctuation">,</span> out_dir<span class="token punctuation">)</span><span class="token punctuation">:</span> t <span class="token keyword">for</span> t <span class="token keyword">in</span> tiles<span class="token punctuation">}</span>
+        <span class="token keyword">for</span> fut <span class="token keyword">in</span> as_completed<span class="token punctuation">(</span>futures<span class="token punctuation">)</span><span class="token punctuation">:</span>        <span class="token comment"># collect as they finish, not all at once</span>
+            results<span class="token punctuation">.</span>append<span class="token punctuation">(</span>fut<span class="token punctuation">.</span>result<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> results
+
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"using </span><span class="token interpolation"><span class="token punctuation">{</span>max_workers<span class="token punctuation">}</span></span><span class="token string"> workers within </span><span class="token interpolation"><span class="token punctuation">{</span>budget_mb<span class="token punctuation">:</span><span class="token format-spec">.0f</span><span class="token punctuation">}</span></span><span class="token string"> MB budget"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Submitting all futures up front is fine — they queue — but bounding <code>max_workers</code> by the memory budget, not just the core count, is what prevents the pool from over-committing RAM.</p>
+<h3 id="5-aggregate-streamed-results-without-reloading" tabindex="-1"><a class="heading-link" href="#5-aggregate-streamed-results-without-reloading"><span>5. Aggregate streamed results without reloading</span></a></h3>
+<p>When a downstream step needs all the thinned points (for example to build one tileset extent), accumulate running statistics or write to a memory-mapped array, never a growing Python list of full chunks.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> numpy <span class="token keyword">as</span> np
+
+<span class="token keyword">def</span> <span class="token function">survey_bounds</span><span class="token punctuation">(</span>paths<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Fold streamed chunks into a bounds accumulator — O(1) memory in survey size."""</span>
+    lo <span class="token operator">=</span> np<span class="token punctuation">.</span>full<span class="token punctuation">(</span><span class="token number">3</span><span class="token punctuation">,</span> np<span class="token punctuation">.</span>inf<span class="token punctuation">)</span>
+    hi <span class="token operator">=</span> np<span class="token punctuation">.</span>full<span class="token punctuation">(</span><span class="token number">3</span><span class="token punctuation">,</span> <span class="token operator">-</span>np<span class="token punctuation">.</span>inf<span class="token punctuation">)</span>
+    total <span class="token operator">=</span> <span class="token number">0</span>
+    <span class="token keyword">for</span> path <span class="token keyword">in</span> paths<span class="token punctuation">:</span>
+        <span class="token keyword">for</span> keep <span class="token keyword">in</span> stream_ground_points<span class="token punctuation">(</span>path<span class="token punctuation">)</span><span class="token punctuation">:</span>
+            lo <span class="token operator">=</span> np<span class="token punctuation">.</span>minimum<span class="token punctuation">(</span>lo<span class="token punctuation">,</span> keep<span class="token punctuation">.</span><span class="token builtin">min</span><span class="token punctuation">(</span>axis<span class="token operator">=</span><span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+            hi <span class="token operator">=</span> np<span class="token punctuation">.</span>maximum<span class="token punctuation">(</span>hi<span class="token punctuation">,</span> keep<span class="token punctuation">.</span><span class="token builtin">max</span><span class="token punctuation">(</span>axis<span class="token operator">=</span><span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+            total <span class="token operator">+=</span> <span class="token builtin">len</span><span class="token punctuation">(</span>keep<span class="token punctuation">)</span>
+    <span class="token keyword">return</span> lo<span class="token punctuation">,</span> hi<span class="token punctuation">,</span> total
+
+lo<span class="token punctuation">,</span> hi<span class="token punctuation">,</span> total <span class="token operator">=</span> survey_bounds<span class="token punctuation">(</span><span class="token punctuation">[</span>Path<span class="token punctuation">(</span><span class="token string">"survey"</span><span class="token punctuation">)</span> <span class="token operator">/</span> f <span class="token keyword">for</span> f <span class="token keyword">in</span> <span class="token punctuation">(</span><span class="token string">"n.laz"</span><span class="token punctuation">,</span> <span class="token string">"s.laz"</span><span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"kept </span><span class="token interpolation"><span class="token punctuation">{</span>total<span class="token punctuation">:</span><span class="token format-spec">,</span><span class="token punctuation">}</span></span><span class="token string"> points, extent </span><span class="token interpolation"><span class="token punctuation">{</span><span class="token punctuation">(</span>hi <span class="token operator">-</span> lo<span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token format-spec">2]</span><span class="token punctuation">}</span></span><span class="token string"> m (EPSG:32618)"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<h2 id="expected-output-verification" tabindex="-1"><a class="heading-link" href="#expected-output-verification"><span>Expected Output &amp; Verification</span></a></h2>
+<p>A correctly streamed run holds RSS roughly flat regardless of survey size — resident memory tracks one chunk or one tile plus the worker multiple, not the total data volume.</p>
+<div class="codeblock" data-lang="text"><div class="codeblock__bar"><span class="codeblock__lang">text</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-text" tabindex="0" role="group" aria-label="text code sample"><code class="language-text">RSS at start 92 MB, soft budget 19660 MB
+using 12 workers within 19660 MB budget
+tile block_0003.glb: 214880 -> 26860 faces
+tile block_0004.glb: 198122 -> 24765 faces
+kept 41,203,588 points, extent [1188.4 1421.7] m (EPSG:32618)
+peak RSS 8140 MB (budget 19660 MB) — OK
+</code></pre></div>
+<p>Verify the fix by asserting peak RSS stayed under budget across the whole run, and by confirming peak is independent of survey size — process a survey twice as large and peak RSS should barely move.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python">peak <span class="token operator">=</span> rss_mb<span class="token punctuation">(</span><span class="token punctuation">)</span>
+<span class="token keyword">assert</span> peak <span class="token operator">&lt;</span> budget_mb<span class="token punctuation">,</span> <span class="token string-interpolation"><span class="token string">f"peak RSS </span><span class="token interpolation"><span class="token punctuation">{</span>peak<span class="token punctuation">:</span><span class="token format-spec">.0f</span><span class="token punctuation">}</span></span><span class="token string"> MB exceeded budget </span><span class="token interpolation"><span class="token punctuation">{</span>budget_mb<span class="token punctuation">:</span><span class="token format-spec">.0f</span><span class="token punctuation">}</span></span><span class="token string"> MB"</span></span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"peak RSS </span><span class="token interpolation"><span class="token punctuation">{</span>peak<span class="token punctuation">:</span><span class="token format-spec">.0f</span><span class="token punctuation">}</span></span><span class="token string"> MB (budget </span><span class="token interpolation"><span class="token punctuation">{</span>budget_mb<span class="token punctuation">:</span><span class="token format-spec">.0f</span><span class="token punctuation">}</span></span><span class="token string"> MB) — OK"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>If peak scales with survey size, an intermediate is still being accumulated — a list of chunks, an un-<code>del</code>-eted mesh, or an unbounded pool — and the offending step is the one whose output grows.</p>
+<h2 id="common-errors" tabindex="-1"><a class="heading-link" href="#common-errors"><span>Common Errors</span></a></h2>
+<p><strong><code>MemoryError</code> or a silent kill with exit code 137.</strong> Exit 137 is the Linux OOM killer (128 + SIGKILL), which leaves no Python traceback, so the job just vanishes from the scheduler. It means resident memory crossed the physical ceiling, almost always because <code>laspy.read</code> or <code>trimesh.load</code> was called on the whole survey. Switch to <code>laspy.open(...).chunk_iterator</code> and per-tile loading as in steps 2 and 3, and cap the pool by memory in step 4.</p>
+<p><strong><code>laspy</code> raises <code>LaspyException: laszip is not available</code> on <code>.laz</code>.</strong> The compressed reader backend is missing, so <code>chunk_iterator</code> cannot decode the file. Install a backend with <code>pip install &quot;laspy[lazrs]&quot;</code> (pure-Rust, no system dependency) or <code>laspy[laszip]</code>, and confirm with <code>laspy.LazBackend.detect_available()</code> before the run. Reading <code>.las</code> uncompressed masks this but multiplies disk and memory cost.</p>
+<p><strong>Peak RSS climbs slowly across thousands of tiles despite per-tile loading.</strong> numpy-backed buffers from trimesh are not always reclaimed at the moment the Python reference drops, so memory creeps until an allocation forces collection. Add an explicit <code>del</code> of every mesh and intermediate followed by <code>gc.collect()</code> at the end of each tile (step 3); without the forced collection, the drift eventually crosses the budget on a long enough run.</p>
+<h2 id="related-guides" tabindex="-1"><a class="heading-link" href="#related-guides"><span>Related Guides</span></a></h2>
+<ul>
+<li><a href="/digital-twin-troubleshooting-and-reliability/cross-pillar-failure-modes/">Cross-Pillar Failure Modes in Digital Twins</a> — the boundary defects this OOM failure belongs to</li>
+<li><a href="/digital-twin-troubleshooting-and-reliability/cross-pillar-failure-modes/diagnosing-crs-drift-causing-lod-seams/">Diagnosing CRS Drift Causing LOD Seams</a> — the other common city-scale reliability failure</li>
+<li><a href="/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/">Automated Mesh Decimation for Digital Twins</a> — the decimation stage whose memory this bounds</li>
+<li><a href="/point-cloud-mesh-processing-pipelines/">Point Cloud &amp; Mesh Processing Pipelines</a> — the broader processing context for streamed reads</li>
+</ul>
+<p>Back to <a href="/digital-twin-troubleshooting-and-reliability/cross-pillar-failure-modes/">Cross-Pillar Failure Modes in Digital Twins</a>.</p>
+
+
+      
+      
+
+      <div class="related-nav">
+        
+
+        
+          <div>
+            <h3>Related</h3>
+            <div class="related-grid">
+              
+                <a class="related-card" href="/digital-twin-troubleshooting-and-reliability/cross-pillar-failure-modes/diagnosing-crs-drift-causing-lod-seams/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Diagnosing CRS Drift Causing LOD Seams</span>
+                </a>
+              
+            </div>
+          </div>
+        
+      </div>
+    </article>
+
+    
+    <aside class="toc" aria-label="On this page" data-toc hidden>
+      <h4>On this page</h4>
+      <ul></ul>
+    </aside>
+  </div>
+</div>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+  <div class="container site-footer__inner">
+    <div class="site-footer__brand">
+      <a href="/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+        <img src="/assets/img/logo-mark.svg" alt="" class="brand__mark" width="36" height="36">
+        <span class="brand__name">
+          3D Geospatial
+          <small>Digital Twin Automation</small>
+        </span>
+      </a>
+      <p>Engineering-grade guides on point cloud processing, mesh pipelines, LOD strategies, and CI/CD automation for digital twin platforms.</p>
+    </div>
+
+    <div class="site-footer__col">
+      <h4>Sections</h4>
+      <ul>
+        <li><a href="/">Home</a></li>
+        
+          <li><a href="/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals</a></li>
+        
+          <li><a href="/lod-management-optimization-strategies/">LOD Management &amp; Optimization</a></li>
+        
+          <li><a href="/point-cloud-mesh-processing-pipelines/">Point Cloud &amp; Mesh Pipelines</a></li>
+        
+          <li><a href="/digital-twin-troubleshooting-and-reliability/">Troubleshooting &amp; Reliability</a></li>
+        
+      </ul>
+    </div>
+
+    
+      <div class="site-footer__col">
+        <h4>3D Geospatial Fundamentals</h4>
+        <ul>
+          
+          
+            <li><a href="/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/">3D Format Standards Comparison</a></li>
+          
+            <li><a href="/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems for 3D Assets</a></li>
+          
+            <li><a href="/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/">Digital Elevation Model Workflows</a></li>
+          
+            <li><a href="/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics for Digital Twins</a></li>
+          
+            <li><a href="/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>LOD Management &amp; Optimization</h4>
+        <ul>
+          
+          
+            <li><a href="/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a></li>
+          
+            <li><a href="/lod-management-optimization-strategies/automated-tile-generation/">Automated Tile Generation for 3D Geospatial</a></li>
+          
+            <li><a href="/lod-management-optimization-strategies/cesium-ion-upload-automation/">Cesium ion Upload Automation for 3D Tilesets</a></li>
+          
+            <li><a href="/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/">glTF LOD Generation With Draco Compression</a></li>
+          
+            <li><a href="/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring for Digital Twins</a></li>
+          
+            <li><a href="/lod-management-optimization-strategies/streaming-sync-patterns/">Streaming Sync Patterns for 3D Geospatial</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Point Cloud &amp; Mesh Pipelines</h4>
+        <ul>
+          
+          
+            <li><a href="/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/">Automated Mesh Decimation for Digital Twins</a></li>
+          
+            <li><a href="/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/">CI/CD Automation for Spatial Pipelines</a></li>
+          
+            <li><a href="/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/">Point Cloud Filtering Techniques</a></li>
+          
+            <li><a href="/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/">Surface Reconstruction for Geospatial Twins</a></li>
+          
+            <li><a href="/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/">Texture Mapping Workflows for Digital Twins</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Troubleshooting &amp; Reliability</h4>
+        <ul>
+          
+          
+            <li><a href="/digital-twin-troubleshooting-and-reliability/cross-pillar-failure-modes/">Cross-Pillar Failure Modes in Digital Twins</a></li>
+          
+            <li><a href="/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/">Data Validation &amp; QA Gates for 3D Tiles</a></li>
+          
+            <li><a href="/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/">Streaming &amp; Runtime Diagnostics for 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+  </div>
+  <div class="container site-footer__bottom">
+    <span>© 2026 3D Geospatial &amp; Digital Twin Automation</span>
+    <span>Built with Eleventy · PWA-enabled</span>
+  </div>
+</footer>
+
+
+  <script src="/assets/js/site.js?v=d27ef9f948" defer></script>
+  
+</body>
+</html>

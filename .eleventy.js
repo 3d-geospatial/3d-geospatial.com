@@ -184,7 +184,7 @@ module.exports = function (eleventyConfig) {
         const depth = i.url.split("/").filter(Boolean).length;
         return depth === 1;
       })
-      .sort((a, b) => (a.data.order || 0) - (b.data.order || 0));
+      .sort((a, b) => (a.data.sectionOrder || 0) - (b.data.sectionOrder || 0));
   });
 
   // All content (excludes the homepage)
@@ -199,7 +199,10 @@ module.exports = function (eleventyConfig) {
       data: "_data",
       output: "_site",
     },
-    markdownTemplateEngine: "njk",
+    // Markdown pages are pure content (code samples legitimately contain `{{ }}` and
+    // `${{ }}` from GitHub Actions/Jinja), so do NOT run them through Nunjucks — only
+    // layouts (.njk) are templated. This prevents template-collision build failures.
+    markdownTemplateEngine: false,
     htmlTemplateEngine: "njk",
     templateFormats: ["njk", "md", "html", "11ty.js"],
   };
