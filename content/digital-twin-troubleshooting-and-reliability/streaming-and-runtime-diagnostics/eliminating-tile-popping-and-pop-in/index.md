@@ -77,6 +77,29 @@ sets = prefetch_set(frame_tiles, curr, future, max_sse=12.0)
 print(f"{len(sets['visible'])} visible, {len(sets['prefetch'])} prefetched ahead")
 ```
 
+<figure class="diagram">
+<svg viewBox="-6 21 752 283" role="img" aria-labelledby="tp-sse-t tp-sse-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="tp-sse-t">Lowering the screen-space error threshold alone does not fix popping</title>
+  <desc id="tp-sse-d">As the maximum screen-space error falls, pop events per minute drop steeply at first and then flatten, while bandwidth climbs without limit. The remaining pops are a latency problem rather than a threshold problem, and only prefetching or a crossfade removes them.</desc>
+  <rect class="svg-bg" x="-6" y="21" width="752" height="283" fill="#ffffff"/>
+  <path d="M70 56 V216 H680" fill="none" stroke="#5b6471" stroke-width="1.5"/>
+  <polyline points="100,80 180,110 260,142 340,168 420,182 500,188 580,190 650,191" fill="none" stroke="#4f7a4d" stroke-width="2.5"/>
+  <polyline points="100,200 180,194 260,184 340,168 420,144 500,110 580,80 650,62" fill="none" stroke="#c46a3d" stroke-width="2.5"/>
+  <path d="M420 56 V222" fill="none" stroke="#b0413e" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="420" y="48" fill="#b0413e" font-size="12" text-anchor="middle">past here you are paying for nothing</text>
+  <text x="180" y="132" fill="#4f7a4d" font-size="12" text-anchor="start">pop events / min</text>
+  <text x="530" y="140" fill="#c46a3d" font-size="12" text-anchor="middle">bandwidth</text>
+  <g fill="#1f2937" font-size="11.5" text-anchor="middle">
+    <text x="100" y="238">32</text><text x="180" y="238">24</text><text x="260" y="238">16</text>
+    <text x="340" y="238">12</text><text x="420" y="238">8</text><text x="500" y="238">6</text>
+    <text x="580" y="238">4</text><text x="650" y="238">2</text>
+  </g>
+  <text x="380" y="262" fill="#5b6471" font-size="12" text-anchor="middle">maximum screen-space error (pixels)</text>
+  <text x="370" y="286" fill="#15384a" font-size="12" text-anchor="middle">The residual pops are tiles arriving late, not tiles chosen wrongly — which is why prefetch and crossfade are the remaining levers</text>
+</svg>
+<figcaption>Turning the threshold down is the first thing everyone tries and it works, briefly. The flat part of the green curve is where the real fix starts.</figcaption>
+</figure>
+
 ### 4. Lower the SSE threshold and keep prefetched tiles warm
 
 A lower `maximumScreenSpaceError` refines earlier, so a tile is already resident when it becomes visible. Pair it with a cache large enough that a prefetched tile is not evicted before the camera arrives — size the cache to at least the visible set plus the prefetch set, and mark prefetched tiles as recently used so LRU keeps them.
@@ -122,9 +145,10 @@ for f in range(0, 10):
 ```
 
 <figure class="diagram">
-<svg viewBox="0 0 810 300" role="img" aria-labelledby="pop-t pop-d" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="6 16 808 266" role="img" aria-labelledby="pop-t pop-d" xmlns="http://www.w3.org/2000/svg">
   <title id="pop-t">Velocity-based predictive prefetch feeding a warm cache and crossfade</title>
   <desc id="pop-d">The camera pose and velocity extrapolate a predicted future pose; the current pose yields the current visible set and the predicted pose yields the predicted visible set, whose union warms the cache, and arriving tiles are crossfaded to avoid a visible pop.</desc>
+  <rect class="svg-bg" x="6" y="16" width="808" height="266" fill="#ffffff"/>
   <defs>
     <marker id="pop-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
@@ -158,6 +182,27 @@ for f in range(0, 10):
 <figcaption>Velocity extrapolation produces a predicted visible set; its union with the current set warms the cache ahead of time, and a crossfade smooths each LOD swap on arrival.</figcaption>
 </figure>
 
+<figure class="diagram">
+<svg viewBox="-21 25 782 269" role="img" aria-labelledby="tp-fade-t tp-fade-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="tp-fade-t">A crossfade turns one visible frame into twelve invisible ones</title>
+  <desc id="tp-fade-d">Swapping level of detail in a single frame produces a step change the eye reads as a pop. Ramping the outgoing tile's opacity down and the incoming tile's up over about twelve frames spreads the same change across two hundred milliseconds, below the threshold at which it registers as an event.</desc>
+  <rect class="svg-bg" x="-21" y="25" width="782" height="269" fill="#ffffff"/>
+  <path d="M70 60 V196 H680" fill="none" stroke="#5b6471" stroke-width="1.5"/>
+  <polyline points="90,74 300,74 300,190 660,190" fill="none" stroke="#b0413e" stroke-width="2.5"/>
+  <polyline points="90,190 260,190 380,74 660,74" fill="none" stroke="#4f7a4d" stroke-width="2.5"/>
+  <path d="M260 60 V200 M380 60 V200" fill="none" stroke="#e6e0d4" stroke-width="1.5" stroke-dasharray="4 4"/>
+  <text x="320" y="52" fill="#5b6471" font-size="12" text-anchor="middle">12 frames ≈ 200 ms</text>
+  <text x="160" y="66" fill="#b0413e" font-size="12" text-anchor="middle">outgoing LOD</text>
+  <text x="560" y="66" fill="#4f7a4d" font-size="12" text-anchor="middle">incoming LOD</text>
+  <text x="44" y="80" fill="#5b6471" font-size="11.5" text-anchor="middle">1.0</text>
+  <text x="44" y="194" fill="#5b6471" font-size="11.5" text-anchor="middle">0.0</text>
+  <text x="380" y="226" fill="#5b6471" font-size="12" text-anchor="middle">frames</text>
+  <text x="370" y="256" fill="#15384a" font-size="12.5" text-anchor="middle">Both tiles are resident during the ramp, so a crossfade costs memory for its duration — budget for it rather than being surprised</text>
+  <text x="370" y="276" fill="#5b6471" font-size="12" text-anchor="middle">Skip the fade when the reader has asked for reduced motion; an instant swap is preferable to a ramp they did not want</text>
+</svg>
+<figcaption>The fade does not make the transition better; it makes it slower than the eye&#39;s change-detection threshold. That is a different and much cheaper goal.</figcaption>
+</figure>
+
 ## Expected Output & Verification
 
 Verify the prefetch actually leads the camera and the crossfade reaches full opacity. A correct prefetch set is non-empty while moving and collapses to zero at rest; the alpha ramp must hit 1.0 by the blend length.
@@ -183,6 +228,8 @@ predicted metres ahead: 4.2
 warm cache holds 24 tiles, 512 MB resident
 prefetch and crossfade verified
 ```
+
+Measure pop events rather than judging them by eye. Counting the frames in which a rendered tile's level changed, and logging the rate per minute of camera motion, turns "does this look better" into a number that survives a code review and a change of reviewer.
 
 ## Common Errors
 

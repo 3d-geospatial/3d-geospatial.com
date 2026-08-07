@@ -3,6 +3,48 @@
 (function () {
   "use strict";
 
+  // -------------------------- Theme toggle --------------------------
+  // The <head> script has already resolved and applied data-theme before first
+  // paint; this only wires the control and persists an explicit user choice.
+  const themeToggle = document.querySelector("[data-theme-toggle]");
+  const root = document.documentElement;
+
+  function labelTheme() {
+    if (!themeToggle) return;
+    const next = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
+    const label = "Switch to " + next + " theme";
+    themeToggle.setAttribute("aria-label", label);
+    themeToggle.setAttribute("title", label);
+  }
+  labelTheme();
+
+  if (themeToggle) {
+    themeToggle.addEventListener("click", () => {
+      const next = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
+      root.setAttribute("data-theme", next);
+      try {
+        localStorage.setItem("theme", next);
+      } catch (_) {}
+      labelTheme();
+    });
+  }
+
+  // Follow the OS while the reader has not made an explicit choice.
+  if (window.matchMedia) {
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    const onSchemeChange = (e) => {
+      let stored = null;
+      try {
+        stored = localStorage.getItem("theme");
+      } catch (_) {}
+      if (stored === "dark" || stored === "light") return;
+      root.setAttribute("data-theme", e.matches ? "dark" : "light");
+      labelTheme();
+    };
+    if (mq.addEventListener) mq.addEventListener("change", onSchemeChange);
+    else if (mq.addListener) mq.addListener(onSchemeChange);
+  }
+
   // -------------------------- Mobile nav toggle --------------------------
   const navToggle = document.querySelector("[data-nav-toggle]");
   const primaryNav = document.getElementById("primary-nav");

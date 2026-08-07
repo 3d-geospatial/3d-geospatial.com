@@ -32,9 +32,10 @@ Filtering is not one operation but a family of them, each answering a different 
 The decision of which family to run, and in what order, follows from the data and the goal. A floating-noise problem on a clean structural scan needs SOR plus radius removal and nothing else. A bare-earth DTM needs ground filtering and a `Classification[2:2]` clip. A web-streaming twin needs voxel downsampling to hit a point budget. Most production runs need all four in the canonical order — range clip, outlier removal, ground separation, voxel downsample — because each one makes the next cheaper and safer: the range clip shrinks the search space, outlier removal stops noise from poisoning ground classification and voxel centroids, and downsampling comes last so it resamples already-clean geometry.
 
 <figure class="diagram">
-<svg viewBox="0 0 880 250" role="img" aria-labelledby="filt-pipe-t filt-pipe-d" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="-2 20 848 192" role="img" aria-labelledby="filt-pipe-t filt-pipe-d" xmlns="http://www.w3.org/2000/svg">
   <title id="filt-pipe-t">Point cloud filtering pipeline</title>
   <desc id="filt-pipe-d">A noisy raw cloud passes through statistical outlier removal to drop floating points, then radius outlier removal to clear isolated specks, then voxel downsampling to a uniform density, producing a clean cloud ready for reconstruction.</desc>
+  <rect class="svg-bg" x="-2" y="20" width="848" height="192" fill="#ffffff"/>
   <defs>
     <marker id="filt-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
@@ -141,6 +142,26 @@ Tune `nb_neighbors` to density: `20` suits dense urban TLS; raise to `40-60` for
 
 The same operation is available in PDAL as `filters.outlier` with `method: "statistical"`, `mean_k`, and `multiplier` — useful when you want the whole chain to stay in a single declarative pipeline rather than crossing into `open3d`. The two implementations differ slightly in how they treat the standard-deviation cutoff, so do not assume `std_ratio=2.0` and `multiplier=2.0` produce an identical result; pick one library for a given dataset and record the parameters. Whichever you use, the kept-index array is the audit record that lets you reconstruct exactly which points the filter rejected and replay the decision if a downstream check fails.
 
+<figure class="diagram">
+<svg viewBox="6 12 740 298" role="img" aria-labelledby="pf-sor-t pf-sor-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="pf-sor-t">What statistical and radius outlier removal each measure</title>
+  <desc id="pf-sor-d">Statistical outlier removal computes each point's mean distance to its k nearest neighbours and drops points whose mean sits more than a set number of standard deviations above the cloud's average. Radius outlier removal instead counts how many neighbours fall inside a fixed sphere and drops points below a threshold. The first adapts to local density; the second does not, which is what makes it predictable.</desc>
+  <rect class="svg-bg" x="6" y="12" width="740" height="298" fill="#ffffff"/>
+  <g fill="#1f6b8a"><circle cx="137" cy="151" r="2.6"/><circle cx="80" cy="175" r="2.6"/><circle cx="131" cy="160" r="2.6"/><circle cx="127" cy="193" r="2.6"/><circle cx="154" cy="184" r="2.6"/><circle cx="110" cy="138" r="2.6"/><circle cx="84" cy="144" r="2.6"/><circle cx="23" cy="195" r="2.6"/><circle cx="126" cy="153" r="2.6"/><circle cx="152" cy="140" r="2.6"/><circle cx="130" cy="172" r="2.6"/><circle cx="64" cy="199" r="2.6"/><circle cx="126" cy="168" r="2.6"/><circle cx="83" cy="133" r="2.6"/><circle cx="182" cy="136" r="2.6"/><circle cx="106" cy="164" r="2.6"/><circle cx="173" cy="83" r="2.6"/><circle cx="174" cy="158" r="2.6"/><circle cx="153" cy="122" r="2.6"/><circle cx="132" cy="195" r="2.6"/><circle cx="117" cy="133" r="2.6"/><circle cx="105" cy="136" r="2.6"/><circle cx="150" cy="156" r="2.6"/><circle cx="103" cy="173" r="2.6"/><circle cx="81" cy="111" r="2.6"/><circle cx="210" cy="133" r="2.6"/><circle cx="180" cy="148" r="2.6"/><circle cx="113" cy="165" r="2.6"/><circle cx="90" cy="127" r="2.6"/><circle cx="113" cy="140" r="2.6"/><circle cx="147" cy="205" r="2.6"/><circle cx="78" cy="126" r="2.6"/><circle cx="148" cy="165" r="2.6"/><circle cx="162" cy="130" r="2.6"/><circle cx="142" cy="149" r="2.6"/><circle cx="61" cy="163" r="2.6"/><circle cx="64" cy="166" r="2.6"/><circle cx="104" cy="145" r="2.6"/><circle cx="199" cy="193" r="2.6"/><circle cx="136" cy="162" r="2.6"/><circle cx="93" cy="185" r="2.6"/><circle cx="144" cy="127" r="2.6"/><circle cx="60" cy="151" r="2.6"/><circle cx="114" cy="175" r="2.6"/><circle cx="83" cy="126" r="2.6"/><circle cx="136" cy="153" r="2.6"/><circle cx="155" cy="182" r="2.6"/><circle cx="88" cy="85" r="2.6"/><circle cx="123" cy="130" r="2.6"/><circle cx="130" cy="75" r="2.6"/><circle cx="117" cy="153" r="2.6"/><circle cx="100" cy="165" r="2.6"/><circle cx="125" cy="157" r="2.6"/><circle cx="168" cy="187" r="2.6"/><circle cx="165" cy="161" r="2.6"/><circle cx="126" cy="166" r="2.6"/><circle cx="132" cy="130" r="2.6"/><circle cx="135" cy="176" r="2.6"/><circle cx="106" cy="120" r="2.6"/><circle cx="142" cy="130" r="2.6"/><circle cx="67" cy="144" r="2.6"/><circle cx="68" cy="160" r="2.6"/><circle cx="102" cy="153" r="2.6"/><circle cx="162" cy="182" r="2.6"/><circle cx="117" cy="88" r="2.6"/><circle cx="104" cy="118" r="2.6"/><circle cx="153" cy="194" r="2.6"/><circle cx="146" cy="169" r="2.6"/><circle cx="141" cy="170" r="2.6"/><circle cx="107" cy="176" r="2.6"/><circle cx="110" cy="118" r="2.6"/><circle cx="123" cy="195" r="2.6"/><circle cx="114" cy="101" r="2.6"/><circle cx="166" cy="157" r="2.6"/><circle cx="141" cy="138" r="2.6"/><circle cx="138" cy="196" r="2.6"/><circle cx="97" cy="170" r="2.6"/><circle cx="134" cy="127" r="2.6"/><circle cx="128" cy="167" r="2.6"/><circle cx="90" cy="183" r="2.6"/><circle cx="81" cy="183" r="2.6"/><circle cx="144" cy="158" r="2.6"/><circle cx="93" cy="129" r="2.6"/><circle cx="40" cy="150" r="2.6"/><circle cx="116" cy="166" r="2.6"/><circle cx="158" cy="156" r="2.6"/><circle cx="109" cy="178" r="2.6"/><circle cx="121" cy="150" r="2.6"/><circle cx="78" cy="180" r="2.6"/><circle cx="97" cy="205" r="2.6"/></g>
+  <g fill="#b0413e"><circle cx="70" cy="70" r="4"/><circle cx="300" cy="76" r="4"/><circle cx="58" cy="236" r="4"/><circle cx="322" cy="220" r="4"/><circle cx="196" cy="58" r="4"/></g>
+  <circle cx="70" cy="70" r="30" fill="none" stroke="#b0413e" stroke-width="1.5" stroke-dasharray="4 3"/>
+  <circle cx="120" cy="150" r="30" fill="none" stroke="#4f7a4d" stroke-width="1.5" stroke-dasharray="4 3"/>
+  <g fill="#1f6b8a"><circle cx="527" cy="151" r="2.6"/><circle cx="470" cy="175" r="2.6"/><circle cx="521" cy="160" r="2.6"/><circle cx="517" cy="193" r="2.6"/><circle cx="544" cy="184" r="2.6"/><circle cx="500" cy="138" r="2.6"/><circle cx="474" cy="144" r="2.6"/><circle cx="413" cy="195" r="2.6"/><circle cx="516" cy="153" r="2.6"/><circle cx="542" cy="140" r="2.6"/><circle cx="520" cy="172" r="2.6"/><circle cx="454" cy="199" r="2.6"/><circle cx="516" cy="168" r="2.6"/><circle cx="473" cy="133" r="2.6"/><circle cx="572" cy="136" r="2.6"/><circle cx="496" cy="164" r="2.6"/><circle cx="563" cy="83" r="2.6"/><circle cx="564" cy="158" r="2.6"/><circle cx="543" cy="122" r="2.6"/><circle cx="522" cy="195" r="2.6"/><circle cx="507" cy="133" r="2.6"/><circle cx="495" cy="136" r="2.6"/><circle cx="540" cy="156" r="2.6"/><circle cx="493" cy="173" r="2.6"/><circle cx="471" cy="111" r="2.6"/><circle cx="600" cy="133" r="2.6"/><circle cx="570" cy="148" r="2.6"/><circle cx="503" cy="165" r="2.6"/><circle cx="480" cy="127" r="2.6"/><circle cx="503" cy="140" r="2.6"/><circle cx="537" cy="205" r="2.6"/><circle cx="468" cy="126" r="2.6"/><circle cx="538" cy="165" r="2.6"/><circle cx="552" cy="130" r="2.6"/><circle cx="532" cy="149" r="2.6"/><circle cx="451" cy="163" r="2.6"/><circle cx="454" cy="166" r="2.6"/><circle cx="494" cy="145" r="2.6"/><circle cx="589" cy="193" r="2.6"/><circle cx="526" cy="162" r="2.6"/><circle cx="483" cy="185" r="2.6"/><circle cx="534" cy="127" r="2.6"/><circle cx="450" cy="151" r="2.6"/><circle cx="504" cy="175" r="2.6"/><circle cx="473" cy="126" r="2.6"/><circle cx="526" cy="153" r="2.6"/><circle cx="545" cy="182" r="2.6"/><circle cx="478" cy="85" r="2.6"/><circle cx="513" cy="130" r="2.6"/><circle cx="520" cy="75" r="2.6"/><circle cx="507" cy="153" r="2.6"/><circle cx="490" cy="165" r="2.6"/><circle cx="515" cy="157" r="2.6"/><circle cx="558" cy="187" r="2.6"/><circle cx="555" cy="161" r="2.6"/><circle cx="516" cy="166" r="2.6"/><circle cx="522" cy="130" r="2.6"/><circle cx="525" cy="176" r="2.6"/><circle cx="496" cy="120" r="2.6"/><circle cx="532" cy="130" r="2.6"/><circle cx="457" cy="144" r="2.6"/><circle cx="458" cy="160" r="2.6"/><circle cx="492" cy="153" r="2.6"/><circle cx="552" cy="182" r="2.6"/><circle cx="507" cy="88" r="2.6"/><circle cx="494" cy="118" r="2.6"/><circle cx="543" cy="194" r="2.6"/><circle cx="536" cy="169" r="2.6"/><circle cx="531" cy="170" r="2.6"/><circle cx="497" cy="176" r="2.6"/><circle cx="500" cy="118" r="2.6"/><circle cx="513" cy="195" r="2.6"/><circle cx="504" cy="101" r="2.6"/><circle cx="556" cy="157" r="2.6"/><circle cx="531" cy="138" r="2.6"/><circle cx="528" cy="196" r="2.6"/><circle cx="487" cy="170" r="2.6"/><circle cx="524" cy="127" r="2.6"/><circle cx="518" cy="167" r="2.6"/><circle cx="480" cy="183" r="2.6"/><circle cx="471" cy="183" r="2.6"/><circle cx="534" cy="158" r="2.6"/><circle cx="483" cy="129" r="2.6"/><circle cx="430" cy="150" r="2.6"/><circle cx="506" cy="166" r="2.6"/><circle cx="548" cy="156" r="2.6"/><circle cx="499" cy="178" r="2.6"/><circle cx="511" cy="150" r="2.6"/><circle cx="468" cy="180" r="2.6"/><circle cx="487" cy="205" r="2.6"/></g>
+  <text x="196" y="40" fill="#1f2937" font-size="12.5" text-anchor="middle" font-weight="600">before — 5 isolated returns</text>
+  <text x="586" y="40" fill="#1f2937" font-size="12.5" text-anchor="middle" font-weight="600">after — same 90 surface points, nothing moved</text>
+  <text x="70" y="274" fill="#b0413e" font-size="11.5" text-anchor="start">a fixed-radius sphere here holds 1 neighbour</text>
+  <text x="70" y="292" fill="#4f7a4d" font-size="11.5" text-anchor="start">the same sphere on the surface holds 24</text>
+  <text x="586" y="274" fill="#5b6471" font-size="11.5" text-anchor="middle">SOR adapts to local density; radius removal uses one</text>
+  <text x="586" y="292" fill="#5b6471" font-size="11.5" text-anchor="middle">absolute distance, so it behaves the same everywhere</text>
+</svg>
+<figcaption>Both tests reject the same five points here. They diverge on a cloud whose density varies — a mobile scan near and far from the trajectory — where SOR follows the density and radius removal does not.</figcaption>
+</figure>
+
 ### Step 4: Radius outlier removal
 
 Follow SOR with a hard local-density gate to clear isolated specks SOR's global statistic missed. Set `radius` from your expected point spacing — roughly 2–4× the median nearest-neighbour distance.
@@ -196,6 +217,34 @@ out.x, out.y, out.z = xyz_out[:, 0], xyz_out[:, 1], xyz_out[:, 2]
 out.write("filtered_final.laz")
 print(f"{len(xyz_out):,} points written to filtered_final.laz")
 ```
+
+<figure class="diagram">
+<svg viewBox="26 12 688 294" role="img" aria-labelledby="pf-vox-t pf-vox-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="pf-vox-t">Voxel downsampling replaces points with cell centroids</title>
+  <desc id="pf-vox-d">A voxel grid is laid over the cloud and every occupied cell contributes one point at the centroid of the points it contains. Density becomes uniform, which is what reconstruction wants, but the output is no longer a set of measurements — every surviving point is an average that was never observed.</desc>
+  <rect class="svg-bg" x="26" y="12" width="688" height="294" fill="#ffffff"/>
+  <path d="M40 60 h300 v180 h-300 Z M100 60 V240 M160 60 V240 M220 60 V240 M280 60 V240 M40 120 H340 M40 180 H340"
+        fill="none" stroke="#e6e0d4" stroke-width="1.5"/>
+  <g fill="#1f6b8a">
+    <circle cx="62" cy="88" r="2.6"/><circle cx="78" cy="104" r="2.6"/><circle cx="70" cy="96" r="2.6"/>
+    <circle cx="126" cy="92" r="2.6"/><circle cx="140" cy="110" r="2.6"/>
+    <circle cx="186" cy="150" r="2.6"/><circle cx="196" cy="162" r="2.6"/><circle cx="204" cy="140" r="2.6"/><circle cx="176" cy="166" r="2.6"/>
+    <circle cx="248" cy="200" r="2.6"/><circle cx="262" cy="214" r="2.6"/>
+    <circle cx="304" cy="206" r="2.6"/>
+  </g>
+  <path d="M400 60 h300 v180 h-300 Z M460 60 V240 M520 60 V240 M580 60 V240 M640 60 V240 M400 120 H700 M400 180 H700"
+        fill="none" stroke="#e6e0d4" stroke-width="1.5"/>
+  <g fill="#4f7a4d">
+    <circle cx="430" cy="96" r="4.5"/><circle cx="493" cy="101" r="4.5"/>
+    <circle cx="551" cy="155" r="4.5"/><circle cx="615" cy="207" r="4.5"/><circle cx="664" cy="206" r="4.5"/>
+  </g>
+  <text x="190" y="40" fill="#1f2937" font-size="12.5" text-anchor="middle" font-weight="600">12 measured returns</text>
+  <text x="550" y="40" fill="#1f2937" font-size="12.5" text-anchor="middle" font-weight="600">5 cell centroids</text>
+  <text x="370" y="268" fill="#15384a" font-size="12.5" text-anchor="middle">Every green point is an average of points that were measured. None of them is itself a measurement.</text>
+  <text x="370" y="288" fill="#5b6471" font-size="12" text-anchor="middle">Downsample for reconstruction, never for the archive — and record the voxel size next to the output</text>
+</svg>
+<figcaption>Voxel downsampling is the one filtering step that manufactures new coordinates. That is fine going into a solver and wrong going into a survey deliverable.</figcaption>
+</figure>
 
 ### Step 7: Estimate normals (optional, for reconstruction)
 

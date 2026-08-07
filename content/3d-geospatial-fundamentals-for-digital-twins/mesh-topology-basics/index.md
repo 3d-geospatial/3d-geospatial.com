@@ -28,9 +28,10 @@ A mesh is **manifold** when every edge is shared by exactly one or two faces and
 The **Euler characteristic** gives a one-number sanity check: `χ = V − E + F`. For a closed surface of genus *g* (number of through-holes, like a torus's hole), `χ = 2 − 2g`. A watertight sphere-topology mesh yields `χ = 2`; a single torus yields `0`. Any other value flags a defect — boundary holes, disconnected components, or non-manifold structure — before you pay for a full geometric audit. The diagram below contrasts a clean manifold edge with the non-manifold case.
 
 <figure class="diagram">
-<svg viewBox="0 0 720 300" role="img" aria-labelledby="mesh-manifold-t mesh-manifold-d" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="6 16 708 278" role="img" aria-labelledby="mesh-manifold-t mesh-manifold-d" xmlns="http://www.w3.org/2000/svg">
   <title id="mesh-manifold-t">Manifold versus non-manifold edge</title>
   <desc id="mesh-manifold-d">On the left a shared edge borders exactly two triangular faces, the manifold case; on the right the same edge is shared by three faces, a non-manifold edge that creates ambiguous surface orientation.</desc>
+  <rect class="svg-bg" x="6" y="16" width="708" height="278" fill="#ffffff"/>
   <defs>
     <marker id="mesh-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
@@ -39,14 +40,14 @@ The **Euler characteristic** gives a one-number sanity check: `χ = V − E + F`
   <rect x="20" y="30" width="320" height="250" rx="8" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
   <rect x="380" y="30" width="320" height="250" rx="8" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
   <g fill="#ffffff" stroke="#1f6b8a" stroke-width="2">
-    <polygon points="180,90 90,200 270,200"/>
-    <polygon points="180,90 270,200 350,110"/>
+    <path d="M180 90 L90 200 L270 200 Z"/>
+    <path d="M180 90 L270 200 L350 110 Z"/>
   </g>
   <line x1="180" y1="90" x2="270" y2="200" stroke="#4f7a4d" stroke-width="5"/>
   <g fill="#ffffff" stroke="#1f6b8a" stroke-width="2">
-    <polygon points="540,90 450,200 630,200"/>
-    <polygon points="540,90 630,200 690,110"/>
-    <polygon points="540,90 630,200 560,250"/>
+    <path d="M540 90 L450 200 L630 200 Z"/>
+    <path d="M540 90 L630 200 L690 110 Z"/>
+    <path d="M540 90 L630 200 L560 250 Z"/>
   </g>
   <line x1="540" y1="90" x2="630" y2="200" stroke="#c46a3d" stroke-width="5"/>
   <g font-size="14" text-anchor="middle">
@@ -96,6 +97,36 @@ _, inverse = np.unique(np.round(mesh.vertices, 5), axis=0, return_inverse=True)
 print(f"vertices: {before} -> {len(mesh.vertices)} "
       f"(coincident clusters: {len(mesh.vertices) - inverse.max() - 1})")
 ```
+
+Two properties make this the first repair to run rather than the last. Merging is idempotent and it never moves geometry — vertices within the tolerance collapse onto one representative position, and everything outside it is untouched — so it cannot make a mesh worse. And almost every later check silently depends on it: `is_watertight` counts boundary edges, normal propagation walks face adjacency, and hole filling looks for edges used by exactly one face. All three read a mesh of unmerged duplicates as an unconnected soup of triangles, so they report thousands of defects that are really one.
+
+The tolerance itself is the only judgement call. It is an absolute distance in the mesh's own units, so it has to sit above the noise that produced the duplicates — typically export rounding at the fourth or fifth decimal place — and well below the smallest real feature you must keep. For building geometry in metres, `1e-5` to `1e-4` is the usual band: tight enough to preserve a 5 mm panel joint, loose enough to catch a vertex written once as `12.34567` and once as `12.345671`. Run it after the local-origin shift, because against a raw 585,000 m easting the float64 representation is already coarser than the tolerance you meant to apply.
+
+<figure class="diagram">
+<svg viewBox="4 1 714 279" role="img" aria-labelledby="mt-merge-t mt-merge-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="mt-merge-t">Coincident vertices before and after a merge</title>
+  <desc id="mt-merge-d">Two triangles that look joined are built from six vertices, with two pairs sitting a few millimetres apart, so the shared edge is really two boundary edges. After merging by position, the same pair of triangles has four vertices and one genuinely shared edge.</desc>
+  <rect class="svg-bg" x="4" y="1" width="714" height="279" fill="#ffffff"/>
+  <text x="360" y="30" fill="#1f2937" font-size="13" text-anchor="middle" font-weight="600">merge_vertices() collapses coincident positions — the geometry does not move, the topology does</text>
+  <path d="M50 200 L150 70 L250 200 Z" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <path d="M254 204 L154 74 L354 204 Z" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <g fill="#b0413e">
+    <circle cx="50" cy="200" r="4"/><circle cx="150" cy="70" r="4"/><circle cx="250" cy="200" r="4"/>
+    <circle cx="254" cy="204" r="4"/><circle cx="154" cy="74" r="4"/><circle cx="354" cy="204" r="4"/>
+  </g>
+  <path d="M400 200 L500 70 L600 200 Z" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <path d="M500 70 L600 200 L700 200 Z" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <path d="M500 70 L600 200" fill="none" stroke="#4f7a4d" stroke-width="4"/>
+  <g fill="#4f7a4d">
+    <circle cx="400" cy="200" r="4"/><circle cx="500" cy="70" r="4"/>
+    <circle cx="600" cy="200" r="4"/><circle cx="700" cy="200" r="4"/>
+  </g>
+  <text x="202" y="238" fill="#b0413e" font-size="12.5" text-anchor="middle">6 vertices — the shared edge is two boundary edges</text>
+  <text x="550" y="238" fill="#4f7a4d" font-size="12.5" text-anchor="middle">4 vertices — one edge, shared by two faces</text>
+  <text x="360" y="262" fill="#5b6471" font-size="12" text-anchor="middle">The tolerance is an absolute distance in CRS units, so run the merge after the local-origin shift, never against raw eastings</text>
+</svg>
+<figcaption>Nothing here is visibly wrong before the merge. The mesh is simply not connected, which is why watertightness, normals, and hole-filling all fail on it.</figcaption>
+</figure>
 
 ### 3. Detect non-manifold edges
 
@@ -155,6 +186,51 @@ if not mesh.is_watertight:
     f = filled.to_legacy() if hasattr(filled, "to_legacy") else filled
     mesh = trimesh.Trimesh(np.asarray(f.vertices), np.asarray(f.triangles), process=False)
 ```
+
+<figure class="diagram">
+<svg viewBox="38 -1 628 291" role="img" aria-labelledby="mt-hole-t mt-hole-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="mt-hole-t">A boundary loop and the fan that closes it</title>
+  <desc id="mt-hole-d">A surface patch with a hole. The hole is found by collecting edges that belong to exactly one face and walking them into a closed loop. Filling it means adding a centre vertex and fanning triangles to every boundary vertex, which closes the surface without moving any existing geometry.</desc>
+  <rect class="svg-bg" x="38" y="-1" width="628" height="291" fill="#ffffff"/>
+  <g fill="#e3f0f4" stroke="#1f6b8a" stroke-width="1.5">
+    <path d="M190 85 L138 123 L78 104 Z"/>
+    <path d="M190 85 L78 104 L190 22 Z"/>
+    <path d="M138 123 L158 184 L121 235 Z"/>
+    <path d="M138 123 L121 235 L78 104 Z"/>
+    <path d="M158 184 L222 184 L259 235 Z"/>
+    <path d="M158 184 L259 235 L121 235 Z"/>
+    <path d="M222 184 L242 123 L302 104 Z"/>
+    <path d="M222 184 L302 104 L259 235 Z"/>
+    <path d="M242 123 L190 85 L190 22 Z"/>
+    <path d="M242 123 L190 22 L302 104 Z"/>
+  </g>
+  <path d="M190 85 L138 123 L158 184 L222 184 L242 123 Z" fill="none" stroke="#b0413e" stroke-width="3.5"/>
+  <g fill="#e3f0f4" stroke="#1f6b8a" stroke-width="1.5">
+    <path d="M540 85 L488 123 L428 104 Z"/>
+    <path d="M540 85 L428 104 L540 22 Z"/>
+    <path d="M488 123 L508 184 L471 235 Z"/>
+    <path d="M488 123 L471 235 L428 104 Z"/>
+    <path d="M508 184 L572 184 L609 235 Z"/>
+    <path d="M508 184 L609 235 L471 235 Z"/>
+    <path d="M572 184 L592 123 L652 104 Z"/>
+    <path d="M572 184 L652 104 L609 235 Z"/>
+    <path d="M592 123 L540 85 L540 22 Z"/>
+    <path d="M592 123 L540 22 L652 104 Z"/>
+  </g>
+  <g fill="#eef5e9" stroke="#4f7a4d" stroke-width="1.5">
+    <path d="M540 85 L488 123 L540 140 Z"/>
+    <path d="M488 123 L508 184 L540 140 Z"/>
+    <path d="M508 184 L572 184 L540 140 Z"/>
+    <path d="M572 184 L592 123 L540 140 Z"/>
+    <path d="M592 123 L540 85 L540 140 Z"/>
+  </g>
+  <circle cx="540" cy="140" r="4" fill="#4f7a4d"/>
+  <text x="190" y="272" fill="#b0413e" font-size="12.5" text-anchor="middle">boundary loop: edges used by exactly one face</text>
+  <text x="540" y="272" fill="#4f7a4d" font-size="12.5" text-anchor="middle">fan fill from a new centre vertex</text>
+  <text x="360" y="28" fill="#1f2937" font-size="13" text-anchor="middle" font-weight="600">Finding the hole is edge bookkeeping; closing it is a modelling decision</text>
+</svg>
+<figcaption>A fan is the safe default for a small planar hole. For a large or strongly curved one it produces a flat cap, so cut the loop into smaller loops before filling.</figcaption>
+</figure>
 
 ### 6. Remove degenerate and broken faces
 

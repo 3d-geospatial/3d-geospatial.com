@@ -22,9 +22,10 @@ Each format optimizes for one thing and pays for it elsewhere. CityGML optimizes
 The resolution to this tension is not a single winning format but a **canonical internal format with derived outputs**: keep semantics and CRS in an authoritative store, and generate each delivery format as a versioned, disposable derivative. The corollary is that conversion direction matters — you should only ever convert from a richer format to a leaner one (CityGML → 3D Tiles, IFC → glTF, LAS → derived mesh), never the reverse, because the lean format physically cannot reconstruct what it never stored. A glTF that has lost its IFC property sets cannot regrow them; an OBJ that dropped its CRS cannot infer one. Treat every arrow in the diagram below as one-way and lossy, and keep the upstream source so you can regenerate when a target spec changes or a Draco bug is found.
 
 <figure class="diagram">
-<svg viewBox="0 0 860 320" role="img" aria-labelledby="fmt-canon-t fmt-canon-d" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="1 1 858 279" role="img" aria-labelledby="fmt-canon-t fmt-canon-d" xmlns="http://www.w3.org/2000/svg">
   <title id="fmt-canon-t">Canonical internal format with derived outputs</title>
   <desc id="fmt-canon-d">Semantic-rich sources CityGML, IFC, and LAS/LAZ feed a canonical store holding geometry plus attributes plus an explicit CRS, from which streaming, archival, and exchange formats are derived as disposable outputs.</desc>
+  <rect class="svg-bg" x="1" y="1" width="858" height="279" fill="#ffffff"/>
   <defs>
     <marker id="fmt-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
@@ -83,6 +84,41 @@ The matrix below ranks each format on the axes that decide a pipeline. "Streamin
 | **GeoPackage** | Attribute tables (SQL-queryable) | Native (`gpkg_spatial_ref_sys`, EPSG) | No (vector store) | SQLite + optional WKB | Attribute-rich query store, vector twin layers |
 | **3D GeoJSON** | Feature properties (JSON) | RFC 7946 mandates EPSG:4326 (CRS84) | No | gzip on the wire | Lightweight API delivery, web feature exchange |
 | **LAS / LAZ** | Per-point class/intensity (ASPRS) | Native (VLR/EVLR WKT, EPSG) | Partial — chunked/COPC reads | LAZ (LASzip) ~7–10x | Point-cloud archival, raw measurement fidelity |
+
+<figure class="diagram">
+<svg viewBox="0 26 802 197" role="img" aria-labelledby="fmt-ratchet-t fmt-ratchet-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="fmt-ratchet-t">Format conversion is a one-way ratchet</title>
+  <desc id="fmt-ratchet-d">CityGML converts to 3D Tiles, losing rooms, application domain extensions and schema validation. 3D Tiles converts to glTF, losing the batch table unless every attribute was mapped. glTF converts to OBJ, losing the CRS note in extras. No arrow points back, because a leaner format cannot reconstruct what it never stored.</desc>
+  <rect class="svg-bg" x="0" y="26" width="802" height="197" fill="#ffffff"/>
+  <defs>
+    <marker id="fmt-ratchet-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
+    </marker>
+  </defs>
+  <rect x="14" y="40" width="150" height="76" rx="8" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <rect x="222" y="40" width="150" height="76" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="430" y="40" width="150" height="76" rx="8" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <rect x="638" y="40" width="150" height="76" rx="8" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <g stroke="#5b6471" stroke-width="2" marker-end="url(#fmt-ratchet-a)">
+    <line x1="164" y1="78" x2="220" y2="78"/>
+    <line x1="372" y1="78" x2="428" y2="78"/>
+    <line x1="580" y1="78" x2="636" y2="78"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="89" y="72"><tspan x="89" dy="0" font-weight="600">CityGML</tspan><tspan x="89" dy="17">semantics, CRS,</tspan><tspan x="89" dy="16">LOD0–4, schema</tspan></text>
+    <text x="297" y="72"><tspan x="297" dy="0" font-weight="600">3D Tiles</tspan><tspan x="297" dy="17">batch metadata,</tspan><tspan x="297" dy="16">CRS, LOD tree</tspan></text>
+    <text x="505" y="72"><tspan x="505" dy="0" font-weight="600">glTF / GLB</tspan><tspan x="505" dy="17">materials, geometry,</tspan><tspan x="505" dy="16">free-form extras</tspan></text>
+    <text x="713" y="72"><tspan x="713" dy="0" font-weight="600">OBJ</tspan><tspan x="713" dy="17">triangles and</tspan><tspan x="713" dy="16">a material name</tspan></text>
+  </g>
+  <g fill="#b0413e" font-size="11.5" text-anchor="middle">
+    <text x="193" y="150"><tspan x="193" dy="0">drops rooms, ADEs</tspan><tspan x="193" dy="15">and schema validation</tspan></text>
+    <text x="401" y="150"><tspan x="401" dy="0">drops the batch table unless</tspan><tspan x="401" dy="15">every attribute was mapped</tspan></text>
+    <text x="609" y="150"><tspan x="609" dy="0">drops the CRS note that</tspan><tspan x="609" dy="15">generic tools never read</tspan></text>
+  </g>
+  <text x="400" y="204" fill="#15384a" font-size="12.5" text-anchor="middle">No arrow points left. Keep the upstream source, because the derivative cannot regrow what the step above discarded.</text>
+</svg>
+<figcaption>Each conversion is a deliberate discard, and the discard is silent. Naming what each hop drops is what turns &quot;we can regenerate it&quot; from a hope into a plan.</figcaption>
+</figure>
 
 ## Step-by-Step Workflow
 
@@ -189,6 +225,49 @@ with open("tileset.json", "w") as f:
 ```
 
 ## Validation & Verification
+
+<figure class="diagram">
+<svg viewBox="6 -3 744 309" role="img" aria-labelledby="fmt-crsslot-t fmt-crsslot-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="fmt-crsslot-t">Where each container keeps its coordinate reference system</title>
+  <desc id="fmt-crsslot-d">CityGML, LAS or LAZ, and GeoTIFF each hold an EPSG-identified CRS in a defined field. 3D Tiles holds a geocentric root transform but no EPSG string. glTF has no standard slot and relies on a convention in asset extras. OBJ has nowhere at all to record one.</desc>
+  <rect class="svg-bg" x="6" y="-3" width="744" height="309" fill="#ffffff"/>
+  <text x="110" y="24" fill="#5b6471" font-size="12" text-anchor="middle">container</text>
+  <text x="476" y="24" fill="#5b6471" font-size="12" text-anchor="middle">where the CRS actually lives</text>
+  <g fill="#eef5e9" stroke="#4f7a4d" stroke-width="2">
+    <rect x="20" y="34" width="180" height="38" rx="8"/>
+    <rect x="216" y="34" width="520" height="38" rx="8"/>
+    <rect x="20" y="78" width="180" height="38" rx="8"/>
+    <rect x="216" y="78" width="520" height="38" rx="8"/>
+    <rect x="20" y="122" width="180" height="38" rx="8"/>
+    <rect x="216" y="122" width="520" height="38" rx="8"/>
+  </g>
+  <g fill="#fdf3e0" stroke="#c46a3d" stroke-width="2">
+    <rect x="20" y="166" width="180" height="38" rx="8"/>
+    <rect x="216" y="166" width="520" height="38" rx="8"/>
+    <rect x="20" y="210" width="180" height="38" rx="8"/>
+    <rect x="216" y="210" width="520" height="38" rx="8"/>
+  </g>
+  <g fill="#f7dfdc" stroke="#b0413e" stroke-width="2">
+    <rect x="20" y="254" width="180" height="38" rx="8"/>
+    <rect x="216" y="254" width="520" height="38" rx="8"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="110" y="58">CityGML</text>
+    <text x="110" y="102">LAS / LAZ</text>
+    <text x="110" y="146">GeoTIFF</text>
+    <text x="110" y="190">3D Tiles</text>
+    <text x="110" y="234">glTF 2.0</text>
+    <text x="110" y="278">OBJ</text>
+    <text x="476" y="58">gml:Envelope srsName=&quot;EPSG:25832&quot; — declared and schema-validated</text>
+    <text x="476" y="102">WKT or GeoTIFF-key VLR, with global_encoding bit 4 naming the winner</text>
+    <text x="476" y="146">GeoKeyDirectory plus ModelTiepoint tags in the file header</text>
+    <text x="476" y="190">root transform into geocentric EPSG:4978 — a matrix, not an EPSG string</text>
+    <text x="476" y="234">no standard slot; asset.extras by convention, which no viewer acts on</text>
+    <text x="476" y="278">nowhere — the CRS has to travel in a sidecar or be lost</text>
+  </g>
+</svg>
+<figcaption>Three containers state the CRS, one implies it as a matrix, and two cannot hold it at all. A conversion that crosses those tiers needs the CRS carried out of band.</figcaption>
+</figure>
 
 Every conversion crosses a format boundary where CRS metadata and semantics can be dropped. Assert parity rather than trust the writer.
 

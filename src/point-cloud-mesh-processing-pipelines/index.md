@@ -9,9 +9,10 @@ A digital twin is born from a point cloud, but a raw cloud is nobody's idea of a
 This guide is written for digital twin engineers, GIS developers, and spatial Python practitioners who own the path from raw LiDAR or photogrammetry to a deployable 3D asset. It walks the full chain — filtering, surface reconstruction, decimation, and texture mapping — with runnable `PDAL`, `Open3D`, `laspy`, `trimesh`, `numpy`, and `scipy` code, explicit EPSG codes at every hand-off, and a production checklist and troubleshooting matrix you can lift directly into your own ingestion jobs. It assumes the inputs are already correct: a classified, density-validated cloud in an explicit metric CRS, the contract established by [3D Geospatial Fundamentals for Digital Twins](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/).
 
 <figure class="diagram">
-<svg viewBox="0 0 880 320" role="img" aria-labelledby="pcm-arch-t pcm-arch-d" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="1 46 878 252" role="img" aria-labelledby="pcm-arch-t pcm-arch-d" xmlns="http://www.w3.org/2000/svg">
   <title id="pcm-arch-t">Point cloud to mesh processing pipeline</title>
   <desc id="pcm-arch-d">A raw point cloud passes through filtering, surface reconstruction, mesh decimation, and texture mapping, then exports to glTF and 3D Tiles for streaming; the fundamentals layer feeds the raw input and the LOD pipeline consumes the export.</desc>
+  <rect class="svg-bg" x="1" y="46" width="878" height="252" fill="#ffffff"/>
   <defs>
     <marker id="pcm-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
@@ -183,6 +184,31 @@ The generated LOD chain is the raw material for tiling, which is where the [LOD 
 
 ---
 
+<figure class="diagram">
+<svg viewBox="36 8 653 270" role="img" aria-labelledby="pm-haus-t pm-haus-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="pm-haus-t">Mean deviation and Hausdorff distance disagree about the same mesh</title>
+  <desc id="pm-haus-d">A decimated profile follows the source surface closely across most of its length, so the mean deviation is small. One collapsed feature — a parapet — deviates by twenty-two centimetres, and that single worst case is the Hausdorff distance. Averaging hides exactly the failure a clearance calculation depends on.</desc>
+  <rect class="svg-bg" x="36" y="8" width="653" height="270" fill="#ffffff"/>
+  <defs>
+    <marker id="pm-haus-a" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#b0413e"/>
+    </marker>
+  </defs>
+  <polyline points="50,170 110,166 170,168 230,162 290,88 320,88 350,164 410,160 470,164 530,158 590,162 650,158"
+            fill="none" stroke="#5b6471" stroke-width="2.5" stroke-dasharray="6 4"/>
+  <polyline points="50,172 110,168 170,170 230,164 290,150 320,150 350,166 410,162 470,166 530,160 590,164 650,160"
+            fill="none" stroke="#1f6b8a" stroke-width="2.5"/>
+  <line x1="305" y1="88" x2="305" y2="150" stroke="#b0413e" stroke-width="2"
+        marker-start="url(#pm-haus-a)" marker-end="url(#pm-haus-a)"/>
+  <text x="318" y="118" fill="#b0413e" font-size="12" text-anchor="start">0.22 m — the parapet collapsed</text>
+  <text x="50" y="212" fill="#1f6b8a" font-size="12.5" text-anchor="start">mean deviation 0.014 m — comfortably inside any budget</text>
+  <text x="50" y="234" fill="#b0413e" font-size="12.5" text-anchor="start">Hausdorff distance 0.22 m — the number the clearance check actually needs</text>
+  <text x="370" y="36" fill="#1f2937" font-size="13" text-anchor="middle" font-weight="600">Dashed is the source surface; solid is the decimated one</text>
+  <text x="370" y="260" fill="#5b6471" font-size="12" text-anchor="middle">Accept decimation on the worst case, and log where the worst case is — it is nearly always a thin, tall feature</text>
+</svg>
+<figcaption>A single collapsed parapet barely moves the mean and completely determines whether the mesh can answer a clearance question.</figcaption>
+</figure>
+
 ## Texture Mapping
 
 A decimated mesh is geometrically correct but visually grey; texture mapping is what makes a digital twin recognisable. The stage has two halves: **UV unwrapping**, which assigns every triangle a position in a 2D texture space with minimal distortion, and **orthophoto projection**, which samples real imagery — drone orthomosaics, satellite tiles, or per-image photogrammetry frames — onto those UVs. The work of [Texture Mapping Workflows for Digital Twins](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/) is to do both without visible seams, GPU-busting atlas sizes, or misregistration between imagery and geometry.
@@ -226,6 +252,47 @@ This pipeline is the middle link in a three-stage chain. It consumes the outputs
 **Key Practice:** Make the boundary contract executable. At ingestion, assert the cloud's CRS is projected and metric and its classification codes are present; at export, assert the mesh is watertight and tagged with the horizontal and vertical EPSG it was built in. A contract enforced only in a wiki is a contract that will be violated on the first rushed delivery.
 
 ---
+
+<figure class="diagram">
+<svg viewBox="-30 46 820 262" role="img" aria-labelledby="pm-inv-t pm-inv-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="pm-inv-t">What each stage of the pipeline is allowed to change</title>
+  <desc id="pm-inv-d">Filtering removes points but must not move them. Reconstruction creates geometry and may invent surface across gaps. Decimation moves and removes vertices within a stated tolerance. Texturing changes no geometry at all. Naming the permitted change per stage is what makes a regression attributable.</desc>
+  <rect class="svg-bg" x="-30" y="46" width="820" height="262" fill="#ffffff"/>
+  <defs>
+    <marker id="pm-inv-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
+    </marker>
+  </defs>
+  <rect x="20" y="60" width="164" height="60" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="212" y="60" width="164" height="60" rx="8" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <rect x="404" y="60" width="164" height="60" rx="8" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <rect x="596" y="60" width="144" height="60" rx="8" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <g stroke="#5b6471" stroke-width="2" marker-end="url(#pm-inv-a)">
+    <line x1="184" y1="90" x2="210" y2="90"/>
+    <line x1="376" y1="90" x2="402" y2="90"/>
+    <line x1="568" y1="90" x2="594" y2="90"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="102" y="96">filter</text>
+    <text x="294" y="96">reconstruct</text>
+    <text x="486" y="96">decimate</text>
+    <text x="668" y="96">texture</text>
+  </g>
+  <rect x="20" y="150" width="164" height="86" rx="8" fill="#ffffff" stroke="#e6e0d4" stroke-width="2"/>
+  <rect x="212" y="150" width="164" height="86" rx="8" fill="#ffffff" stroke="#e6e0d4" stroke-width="2"/>
+  <rect x="404" y="150" width="164" height="86" rx="8" fill="#ffffff" stroke="#e6e0d4" stroke-width="2"/>
+  <rect x="596" y="150" width="144" height="86" rx="8" fill="#ffffff" stroke="#e6e0d4" stroke-width="2"/>
+  <g fill="#1f2937" font-size="11.5" text-anchor="middle">
+    <text x="102" y="174"><tspan x="102" dy="0">removes points</tspan><tspan x="102" dy="15">never moves one</tspan><tspan x="102" dy="15">CRS unchanged</tspan><tspan x="102" dy="15">count only falls</tspan></text>
+    <text x="294" y="174"><tspan x="294" dy="0">creates geometry</tspan><tspan x="294" dy="15">may invent surface</tspan><tspan x="294" dy="15">across real gaps</tspan><tspan x="294" dy="15">trim by density</tspan></text>
+    <text x="486" y="174"><tspan x="486" dy="0">moves vertices</tspan><tspan x="486" dy="15">inside a stated</tspan><tspan x="486" dy="15">Hausdorff bound</tspan><tspan x="486" dy="15">topology preserved</tspan></text>
+    <text x="668" y="174"><tspan x="668" dy="0">changes no</tspan><tspan x="668" dy="15">geometry at all</tspan><tspan x="668" dy="15">UVs and images</tspan><tspan x="668" dy="15">only</tspan></text>
+  </g>
+  <text x="380" y="266" fill="#15384a" font-size="12.5" text-anchor="middle">A vertex that moved during filtering, or a texture stage that changed a triangle count, is a bug regardless of how good the output looks</text>
+  <text x="380" y="290" fill="#5b6471" font-size="12" text-anchor="middle">Assert the invariant after each stage and a regression names its own stage</text>
+</svg>
+<figcaption>The pipeline's stages are separated by what they are permitted to change, not by which library runs them. That is what makes a fault attributable to one step.</figcaption>
+</figure>
 
 ## Production Checklist
 
@@ -282,6 +349,8 @@ Yes, but only by tiling. Split the extent into roughly 1 km² tiles, stream filt
 Often, yes. The mesh is the optimized, renderable representation, but the classified point cloud remains the measurement of record for change detection, volumetrics, and re-deriving surfaces when a better reconstruction algorithm or a denser scan arrives. Most production twins keep both, with the cloud archived in `.laz` and the mesh deployed as glTF or 3D Tiles.
 
 ---
+
+A closing word on sequencing. The stages above are presented in order because each one's output is the next one's input, but the ordering is not merely conventional — it is what keeps each stage's job tractable. Filtering before reconstruction means the solver never has to distinguish noise from geometry. Reconstructing before decimation means the decimator has a manifold surface to reason about. Decimating before texturing means the texture is baked against the geometry that will actually ship. Reorder any two of them and the later stage inherits a problem the earlier one was there to remove.
 
 ## Related Guides
 

@@ -17,9 +17,10 @@ This page shows how to tune the Poisson surface reconstruction parameters in `op
 - **Oriented normals are mandatory.** Poisson reconstructs from the normal field, not the raw points. Every point needs a unit normal whose direction is globally consistent (all pointing "outward"). A cloud without normals, or with normals that flip between adjacent patches, produces a torn, non-manifold surface regardless of how you tune the rest.
 
 <figure class="diagram">
-<svg viewBox="0 0 720 210" role="img" aria-labelledby="psr-flow-t psr-flow-d" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="0 56 658 98" role="img" aria-labelledby="psr-flow-t psr-flow-d" xmlns="http://www.w3.org/2000/svg">
   <title id="psr-flow-t">Poisson reconstruction parameter flow</title>
   <desc id="psr-flow-d">An oriented point cloud feeds the Poisson solver, which is shaped by depth, point_weight and samples_per_node, then a density quantile trim removes low-confidence vertices to yield a watertight mesh.</desc>
+  <rect class="svg-bg" x="0" y="56" width="658" height="98" fill="#ffffff"/>
   <defs>
     <marker id="psr-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
@@ -74,6 +75,40 @@ densities = np.asarray(densities)
 print(f"vertices={len(mesh.vertices)} triangles={len(mesh.triangles)}")
 ```
 
+<figure class="diagram">
+<svg viewBox="-11 5 988 327" role="img" aria-labelledby="psr-depth-t psr-depth-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="psr-depth-t">Octree depth against finest voxel and peak memory</title>
+  <desc id="psr-depth-d">Each increment of depth halves the finest voxel edge and roughly triples the peak memory, because node count grows with the cube of the resolution. Depth nine is the usual working point for city blocks; depth twelve needs tens of gigabytes and is only justified when the point density genuinely supports a three-centimetre voxel.</desc>
+  <rect class="svg-bg" x="-11" y="5" width="988" height="327" fill="#ffffff"/>
+  <text x="390" y="34" fill="#1f2937" font-size="13" text-anchor="middle" font-weight="600">Bar length is peak memory — the cost is cubic, the detail gain is linear</text>
+  <rect x="120" y="60" width="40" height="26" rx="4" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <rect x="120" y="96" width="90" height="26" rx="4" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <rect x="120" y="132" width="190" height="26" rx="4" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="120" y="168" width="380" height="26" rx="4" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="120" y="204" width="620" height="26" rx="4" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <rect x="120" y="240" width="660" height="26" rx="4" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <g fill="#1f2937" font-size="12.5">
+    <text x="108" y="78" text-anchor="end">depth 7</text>
+    <text x="108" y="114" text-anchor="end">depth 8</text>
+    <text x="108" y="150" text-anchor="end">depth 9</text>
+    <text x="108" y="186" text-anchor="end">depth 10</text>
+    <text x="108" y="222" text-anchor="end">depth 11</text>
+    <text x="108" y="258" text-anchor="end">depth 12</text>
+  </g>
+  <g fill="#1f2937" font-size="12">
+    <text x="170" y="78" text-anchor="start">voxel 0.9 m · peak RAM 0.4 GB</text>
+    <text x="220" y="114" text-anchor="start">voxel 0.45 m · peak RAM 1.1 GB</text>
+    <text x="320" y="150" text-anchor="start">voxel 0.22 m · peak RAM 3.2 GB</text>
+    <text x="510" y="186" text-anchor="start">voxel 0.11 m · peak RAM 9 GB</text>
+    <text x="750" y="222" text-anchor="start">voxel 0.06 m · peak RAM 26 GB</text>
+    <text x="790" y="258" text-anchor="start">voxel 0.03 m · peak RAM 74 GB</text>
+  </g>
+  <text x="390" y="298" fill="#15384a" font-size="12" text-anchor="middle">Raising depth past the cloud's own spacing buys nothing but memory — the solver interpolates the extra resolution from the same points</text>
+  <text x="390" y="314" fill="#5b6471" font-size="12" text-anchor="middle">Match the finest voxel to the mean point spacing, then stop</text>
+</svg>
+<figcaption>Depth is the only parameter here that can end a job with the OOM killer. Pick it from the point spacing rather than from the detail you wish you had.</figcaption>
+</figure>
+
 ### 3. Set `point_weight` (the `width` argument) and `samples_per_node`
 
 In Open3D the screened-Poisson interpolation weight — what most documentation calls `point_weight` — is passed as `width` only when you leave the API's depth-driven sizing; the more portable control is the standalone Poisson library's `--pointWeight`. In the Open3D Python API, `samples_per_node` is a direct argument controlling the minimum number of points constraining each octree node. Raise `samples_per_node` to 5–15 for noisy SfM clouds so the solver averages out jitter; keep it near 1.5 for clean TLS where you want fidelity. `point_weight` near 4.0 preserves sharp curbs and rooflines; drop toward 2.0 when normals are noisy.
@@ -109,6 +144,38 @@ mesh.compute_vertex_normals()
 o3d.io.write_triangle_mesh("facade_mesh.ply", mesh, write_ascii=False)
 print(f"after trim: triangles={len(mesh.triangles)}")
 ```
+
+<figure class="diagram">
+<svg viewBox="11 19 738 285" role="img" aria-labelledby="psr-trim-t psr-trim-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="psr-trim-t">The density quantile trim removes what the solver invented</title>
+  <desc id="psr-trim-d">Vertices supported by many nearby points carry a high density value; vertices the solver stretched across a data gap carry the lowest. Masking a low quantile therefore deletes the invented shell while leaving measured surface untouched, provided the quantile stays below the point where real geometry begins.</desc>
+  <rect class="svg-bg" x="11" y="19" width="738" height="285" fill="#ffffff"/>
+  <g fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2">
+    <rect x="90" y="176" width="34" height="34" rx="3"/>
+    <rect x="128" y="140" width="34" height="70" rx="3"/>
+    <rect x="166" y="96" width="34" height="114" rx="3"/>
+    <rect x="204" y="72" width="34" height="138" rx="3"/>
+    <rect x="242" y="86" width="34" height="124" rx="3"/>
+    <rect x="280" y="118" width="34" height="92" rx="3"/>
+    <rect x="318" y="152" width="34" height="58" rx="3"/>
+    <rect x="356" y="182" width="34" height="28" rx="3"/>
+  </g>
+  <rect x="52" y="192" width="34" height="18" rx="3" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <path d="M40 210 H420" fill="none" stroke="#5b6471" stroke-width="1.5"/>
+  <path d="M88 52 V216" fill="none" stroke="#b0413e" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="88" y="46" fill="#b0413e" font-size="12" text-anchor="middle">3rd percentile</text>
+  <text x="66" y="240" fill="#b0413e" font-size="11.5" text-anchor="middle">invented</text>
+  <text x="240" y="240" fill="#1f6b8a" font-size="11.5" text-anchor="middle">measured surface</text>
+  <text x="230" y="264" fill="#5b6471" font-size="12" text-anchor="middle">vertex density (support count)</text>
+  <path d="M470 66 h240 v160 h-240 Z" fill="none" stroke="#e6e0d4" stroke-width="2"/>
+  <path d="M496 190 C 540 130 590 128 640 178" fill="none" stroke="#4f7a4d" stroke-width="2.5"/>
+  <path d="M496 190 C 520 210 560 214 600 200 C 630 190 640 186 640 178" fill="none" stroke="#b0413e" stroke-width="2.5" stroke-dasharray="6 4"/>
+  <text x="590" y="54" fill="#1f2937" font-size="12.5" text-anchor="middle">the shell stretched across the gap</text>
+  <text x="590" y="248" fill="#b0413e" font-size="12" text-anchor="middle">dashed: lowest-density vertices, deleted by the trim</text>
+  <text x="370" y="286" fill="#15384a" font-size="12" text-anchor="middle">The histogram tells you where to cut: raise the quantile while the left spike survives, stop as soon as the bulk starts moving</text>
+</svg>
+<figcaption>The trim is safe precisely because the two populations are separable. If they are not, the reconstruction depth is wrong and no quantile will rescue it.</figcaption>
+</figure>
 
 ### Parameter reference
 

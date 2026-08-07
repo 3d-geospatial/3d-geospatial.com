@@ -23,9 +23,10 @@ So the trade-off is essentially: do you want a guaranteed-closed surface that ma
 The reason this matters in a geospatial twin specifically is that the *meaning* of a hole is data-dependent. For a flood or volumetrics model, a hole in a terrain surface is a defect — water leaks through it — so you want Poisson's guaranteed closure even at the cost of a few extrapolated triangles you trim afterwards. For an as-built inspection where the question is "what did the scanner actually measure?", an extrapolated Poisson bubble is a lie, and BPA's honest hole is the correct answer. The same point cloud therefore deserves a different algorithm depending on what the twin is *for*, which is why production pipelines key the algorithm choice off asset class rather than picking one solver globally.
 
 <figure class="diagram">
-<svg viewBox="0 0 860 320" role="img" aria-labelledby="recon-flow-t recon-flow-d" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="1 6 858 308" role="img" aria-labelledby="recon-flow-t recon-flow-d" xmlns="http://www.w3.org/2000/svg">
   <title id="recon-flow-t">Normals to reconstruct to trim flow, with three algorithm choices</title>
   <desc id="recon-flow-d">An oriented point cloud feeds a reconstruction stage offering three algorithms — Poisson which is watertight, ball pivoting which is open, and Delaunay alpha shapes which is open with sharp edges — and the result is trimmed and cleaned into a production mesh.</desc>
+  <rect class="svg-bg" x="1" y="6" width="858" height="308" fill="#ffffff"/>
   <defs>
     <marker id="recon-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
@@ -99,6 +100,45 @@ pcd.orient_normals_consistent_tangent_plane(k=30)
 assert pcd.has_normals(), "normals missing — Poisson/BPA will fail"
 ```
 
+<figure class="diagram">
+<svg viewBox="7 24 696 268" role="img" aria-labelledby="sr-norm-t sr-norm-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="sr-norm-t">Normals that exist versus normals that agree</title>
+  <desc id="sr-norm-d">Estimating normals from a local plane fit gives every point a direction but no sign, so adjacent patches can point in opposite directions. The Poisson solver reads that field as the boundary between inside and outside, so a patch pointing the wrong way tears the reconstructed surface open along the disagreement.</desc>
+  <rect class="svg-bg" x="7" y="24" width="696" height="268" fill="#ffffff"/>
+  <defs>
+    <marker id="sr-norm-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#b0413e"/>
+    </marker>
+    <marker id="sr-norm-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#4f7a4d"/>
+    </marker>
+  </defs>
+  <path d="M40 170 C 120 120 220 120 300 170" fill="none" stroke="#5b6471" stroke-width="2.5"/>
+  <g stroke="#b0413e" stroke-width="2" marker-end="url(#sr-norm-a)">
+    <path d="M74 148 L64 118"/>
+    <path d="M120 130 L114 98"/>
+    <path d="M170 124 L170 92"/>
+    <path d="M220 130 L232 160"/>
+    <path d="M266 148 L280 176"/>
+  </g>
+  <path d="M420 170 C 500 120 600 120 680 170" fill="none" stroke="#5b6471" stroke-width="2.5"/>
+  <g stroke="#4f7a4d" stroke-width="2" marker-end="url(#sr-norm-b)">
+    <path d="M454 148 L444 118"/>
+    <path d="M500 130 L494 98"/>
+    <path d="M550 124 L550 92"/>
+    <path d="M600 130 L612 100"/>
+    <path d="M646 148 L660 120"/>
+  </g>
+  <text x="170" y="52" fill="#b0413e" font-size="12.5" text-anchor="middle" font-weight="600">estimated, not oriented</text>
+  <text x="550" y="52" fill="#4f7a4d" font-size="12.5" text-anchor="middle" font-weight="600">oriented by a spanning-tree walk</text>
+  <text x="170" y="216" fill="#1f2937" font-size="12" text-anchor="middle">two patches disagree — the solver sees two surfaces</text>
+  <text x="550" y="216" fill="#1f2937" font-size="12" text-anchor="middle">one consistent outward field — one surface</text>
+  <text x="370" y="256" fill="#15384a" font-size="12.5" text-anchor="middle">estimate_normals gives direction. orient_normals_consistent_tangent_plane gives sign. Poisson needs both.</text>
+  <text x="370" y="274" fill="#5b6471" font-size="12" text-anchor="middle">A cloud that reconstructs as a smooth bubble much larger than the scan is almost always this, not a depth setting</text>
+</svg>
+<figcaption>The failure looks like a solver problem and is a data problem. Assert consistent orientation before reconstruction rather than tuning depth afterwards.</figcaption>
+</figure>
+
 ### 3. Reconstruct with Poisson (watertight path)
 
 `depth` sets the octree resolution; 9 suits most urban-scale data. Keep the per-vertex `densities` array — it drives the trim in the next step.
@@ -123,6 +163,36 @@ mesh_poisson.remove_degenerate_triangles()
 mesh_poisson.remove_duplicated_vertices()
 mesh_poisson.remove_non_manifold_edges()
 ```
+
+<figure class="diagram">
+<svg viewBox="3 18 728 292" role="img" aria-labelledby="sr-fam-t sr-fam-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="sr-fam-t">Implicit and interpolating reconstruction on the same corner</title>
+  <desc id="sr-fam-d">Poisson fits a smooth implicit function to the oriented normals and extracts an isosurface, so it averages noise and rounds a sharp corner. Ball pivoting and alpha shapes connect the measured points directly, so the corner stays sharp and every piece of noise stays with it. Neither is more correct; they fail in opposite directions.</desc>
+  <rect class="svg-bg" x="3" y="18" width="728" height="292" fill="#ffffff"/>
+  <g fill="#1f6b8a">
+    <circle cx="70" cy="200" r="3"/><circle cx="105" cy="196" r="3"/><circle cx="140" cy="202" r="3"/>
+    <circle cx="175" cy="197" r="3"/><circle cx="208" cy="186" r="3"/><circle cx="214" cy="150" r="3"/>
+    <circle cx="212" cy="112" r="3"/><circle cx="216" cy="76" r="3"/>
+    <circle cx="151" cy="168" r="3"/>
+  </g>
+  <path d="M70 202 C 130 198 190 194 206 168 C 214 140 212 106 216 76" fill="none" stroke="#c46a3d" stroke-width="2.5"/>
+  <g fill="#1f6b8a">
+    <circle cx="470" cy="200" r="3"/><circle cx="505" cy="196" r="3"/><circle cx="540" cy="202" r="3"/>
+    <circle cx="575" cy="197" r="3"/><circle cx="608" cy="186" r="3"/><circle cx="614" cy="150" r="3"/>
+    <circle cx="612" cy="112" r="3"/><circle cx="616" cy="76" r="3"/>
+    <circle cx="551" cy="168" r="3"/>
+  </g>
+  <polyline points="470,200 505,196 540,202 551,168 575,197 608,186 614,150 612,112 616,76"
+            fill="none" stroke="#4f7a4d" stroke-width="2.5"/>
+  <text x="150" y="46" fill="#c46a3d" font-size="12.5" text-anchor="middle" font-weight="600">Poisson — implicit, averaging</text>
+  <text x="550" y="46" fill="#4f7a4d" font-size="12.5" text-anchor="middle" font-weight="600">ball pivoting — interpolating</text>
+  <text x="150" y="240" fill="#1f2937" font-size="12" text-anchor="middle">noise absorbed, corner rounded, always closed</text>
+  <text x="550" y="240" fill="#1f2937" font-size="12" text-anchor="middle">corner kept, the stray point kept with it, open where data is</text>
+  <text x="380" y="272" fill="#15384a" font-size="12.5" text-anchor="middle">The stray point at the centre of each panel is the whole comparison: one family removes it, the other honours it</text>
+  <text x="380" y="292" fill="#5b6471" font-size="12" text-anchor="middle">So the choice follows from whether your remaining noise is smaller than the smallest feature you must keep</text>
+</svg>
+<figcaption>Choose by what your data still contains after filtering. Clean scans of built structure favour interpolation; noisy photogrammetry favours the implicit path.</figcaption>
+</figure>
 
 ### 5. Reconstruct with ball-pivoting (open / sharp path)
 

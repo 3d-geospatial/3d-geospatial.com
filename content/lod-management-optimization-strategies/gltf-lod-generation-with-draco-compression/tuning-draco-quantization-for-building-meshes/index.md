@@ -10,9 +10,10 @@ This guide chooses `KHR_draco_mesh_compression` quantization bit settings for ge
 - The core fact: a POSITION attribute quantized to `n` bits over a bounding box of extent `E` metres has a worst-case positional error of about `E / 2^n`. Quantization snaps every coordinate to one of `2^n` evenly spaced grid values across the box, so the grid spacing *is* the error floor.
 
 <figure class="diagram">
-<svg viewBox="0 0 760 300" role="img" aria-labelledby="tdq-t tdq-d" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="46 6 668 297" role="img" aria-labelledby="tdq-t tdq-d" xmlns="http://www.w3.org/2000/svg">
   <title id="tdq-t">Draco position error as a function of quantization bits for a 30 m building</title>
   <desc id="tdq-d">For a 30 metre bounding-box extent, 10 quantization bits give about 29 millimetres of position error, 12 bits about 7 millimetres, and 14 bits about 2 millimetres, so more bits shrink the error grid spacing.</desc>
+  <rect class="svg-bg" x="46" y="6" width="668" height="297" fill="#ffffff"/>
   <defs>
     <marker id="tdq-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
@@ -78,6 +79,28 @@ print(f"POSITION {pos_bits} bit -> predicted error "
       f"{predicted_error(max_extent, pos_bits) * 1000:.2f} mm")
 ```
 
+<figure class="diagram">
+<svg viewBox="-3 24 728 290" role="img" aria-labelledby="dq-lat-t dq-lat-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="dq-lat-t">The same wall corner on a coarse and a fine quantization lattice</title>
+  <desc id="dq-lat-d">Draco snaps every position onto a regular lattice whose spacing is the bounding-box extent divided by two to the power of the position bits. On a coarse lattice a wall corner and a setback move to the nearest grid intersection and the profile visibly changes. On a fine lattice the same profile is reproduced within a few millimetres.</desc>
+  <rect class="svg-bg" x="-3" y="24" width="728" height="290" fill="#ffffff"/>
+  <path d="M60 70 V250 M90 70 V250 M120 70 V250 M150 70 V250 M180 70 V250 M210 70 V250 M240 70 V250 M270 70 V250 M300 70 V250 M60 70 H300 M60 100 H300 M60 130 H300 M60 160 H300 M60 190 H300 M60 220 H300 M60 250 H300" fill="none" stroke="#e6e0d4" stroke-width="1"/>
+  <path d="M440 70 V250 M450 70 V250 M460 70 V250 M470 70 V250 M480 70 V250 M490 70 V250 M500 70 V250 M510 70 V250 M520 70 V250 M530 70 V250 M540 70 V250 M550 70 V250 M560 70 V250 M570 70 V250 M580 70 V250 M590 70 V250 M600 70 V250 M610 70 V250 M620 70 V250 M630 70 V250 M640 70 V250 M650 70 V250 M660 70 V250 M670 70 V250 M680 70 V250 M440 70 H680 M440 80 H680 M440 90 H680 M440 100 H680 M440 110 H680 M440 120 H680 M440 130 H680 M440 140 H680 M440 150 H680 M440 160 H680 M440 170 H680 M440 180 H680 M440 190 H680 M440 200 H680 M440 210 H680 M440 220 H680 M440 230 H680 M440 240 H680 M440 250 H680" fill="none" stroke="#e6e0d4" stroke-width="1"/>
+  <polyline points="60,210 60,120 150,120 150,96 240,96" fill="none" stroke="#5b6471" stroke-width="2" stroke-dasharray="5 4"/>
+  <polyline points="60,220 60,130 150,130 150,100 240,100" fill="none" stroke="#b0413e" stroke-width="2.5"/>
+  <polyline points="440,210 440,120 530,120 530,96 620,96" fill="none" stroke="#5b6471" stroke-width="2" stroke-dasharray="5 4"/>
+  <polyline points="440,210 440,120 530,120 530,100 620,100" fill="none" stroke="#4f7a4d" stroke-width="2.5"/>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="180" y="52">11 bits over a 30 m extent — 15 mm lattice</text>
+    <text x="560" y="52">14 bits over the same extent — 1.8 mm lattice</text>
+  </g>
+  <text x="180" y="278" fill="#b0413e" font-size="12" text-anchor="middle">the setback moves half a cell; the corner is no longer square</text>
+  <text x="560" y="278" fill="#4f7a4d" font-size="12" text-anchor="middle">indistinguishable from the source at any usable zoom</text>
+  <text x="370" y="296" fill="#5b6471" font-size="12" text-anchor="middle">Dashed grey is the source profile; the solid line is what decodes</text>
+</svg>
+<figcaption>Three extra bits cost about 12% of the position bytes and shrink the lattice by eight. That is the whole trade, and it is almost always worth taking.</figcaption>
+</figure>
+
 ### 3. Set texcoord and normal bits by role, not by extent
 
 TEXCOORD and NORMAL quantize over fixed ranges (UV in [0,1], normals on the unit sphere), so their bit budgets follow the attribute's role rather than the mesh size. For textured building facades, 12 texcoord bits keeps the atlas crisp and 10 normal bits avoids visible shading facets; drop normals to 8 only for hard-edged, untextured background assets.
@@ -89,6 +112,39 @@ NORMAL_BITS   = 10    # 8 bits facets on smooth curved facades
 quant = {"position": pos_bits, "texcoord": TEXCOORD_BITS, "normal": NORMAL_BITS}
 print("quantization plan:", quant)
 ```
+
+<figure class="diagram">
+<svg viewBox="46 20 676 284" role="img" aria-labelledby="dq-uv-t dq-uv-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="dq-uv-t">Why texture coordinates need their own bit budget</title>
+  <desc id="dq-uv-d">Two UV islands sit next to each other in an atlas with a narrow gutter between them. Quantizing texture coordinates too coarsely snaps vertices on the island edge across the gutter, so the shader samples the neighbouring island and a stripe of the wrong texture appears along the seam.</desc>
+  <rect class="svg-bg" x="46" y="20" width="676" height="284" fill="#ffffff"/>
+  <path d="M60 60 h200 v160 h-200 Z" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <path d="M276 60 h200 v160 h-200 Z" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <path d="M540 60 h140 v160 h-140 Z" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <path d="M260 60 V220 M276 60 V220" fill="none" stroke="#5b6471" stroke-width="1" stroke-dasharray="3 3"/>
+  <g fill="#1f6b8a">
+    <circle cx="256" cy="96" r="4"/><circle cx="256" cy="140" r="4"/><circle cx="256" cy="184" r="4"/>
+  </g>
+  <g fill="#b0413e">
+    <circle cx="282" cy="96" r="4"/><circle cx="282" cy="140" r="4"/><circle cx="282" cy="184" r="4"/>
+  </g>
+  <path d="M540 60 h140 v22 h-140 Z" fill="#fdf3e0" stroke="#c46a3d" stroke-width="1.5"/>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="160" y="48">island A</text>
+    <text x="376" y="48">island B</text>
+    <text x="610" y="48">what renders</text>
+  </g>
+  <text x="268" y="242" fill="#5b6471" font-size="11.5" text-anchor="middle">gutter</text>
+  <text x="268" y="262" fill="#b0413e" font-size="12" text-anchor="middle">island A's edge vertices snap across it</text>
+  <text x="610" y="242" fill="#b0413e" font-size="12" text-anchor="middle">a stripe of island B along the seam</text>
+  <text x="370" y="286" fill="#15384a" font-size="12" text-anchor="middle">The lattice spacing that matters here is the gutter width in UV space, not the building's size in metres</text>
+</svg>
+<figcaption>Texture coordinates live in a fixed zero-to-one space, so their bit budget has nothing to do with the mesh extent. Twelve bits is the usual floor for an atlas with tight gutters.</figcaption>
+</figure>
+
+This is why texcoord and normal bits should never be derived from the same reasoning as positions. Positions are quantized over the mesh's own bounding box, so the lattice spacing is a physical distance and the right budget follows from a tolerance in metres. Texture coordinates are always normalised into the unit square, so their lattice spacing is a fraction of the atlas regardless of whether the building is a kiosk or a stadium — and what it has to resolve is the gutter between UV islands, which is typically two to four texels wide. At 1024 texels that is roughly 0.002 to 0.004 in UV, and 10-bit texcoords give a lattice of 0.001, which is uncomfortably close. Twelve bits is the sensible floor for any atlas, and 14 for one with tight packing.
+
+Normals are the opposite case. Draco encodes them onto an octahedral parameterisation whose angular resolution is what actually matters, and shading is forgiving of small angular error. Eight bits gives roughly half a degree, which is below the threshold at which banding becomes visible on a curved surface, and 10 bits is generous for anything short of a mirror-finish material. Spending 12 or 14 bits on normals is the most common way a Draco configuration wastes budget: it costs real bytes on every vertex and buys precision no shader will express.
 
 ### 4. Encode with gltf-transform at the chosen bits
 
@@ -151,6 +207,8 @@ gltf-transform inspect building_draco.glb
 
 The report must list `KHR_draco_mesh_compression` under extensions; if it is absent, the encode no-opped and the size ratio will read near 1.0.
 
+Record the chosen bit budget in the asset's metadata alongside the bounding-box extent it was derived from. The two numbers together are what make the quantization reproducible: the same bit count over a different extent is a different lattice, so an asset re-exported after a re-tiling that changed its bounds will quietly change precision unless the budget is recomputed from the new extent.
+
 ## Common Errors
 
 **`AssertionError: position bits too low for this extent`.** The building spans more than the bit budget can resolve at your tolerance — a 400 m tower at 11 bits gives `400 / 2048 ≈ 195 mm`, far past 1 cm. The fix is not fewer bits elsewhere but more position bits: let `position_bits` compute from the real `max_extent` (step 1) rather than pasting a fixed 11, or cap the building's extent by splitting an oversized mega-mesh into per-storey parts before encoding.
@@ -158,6 +216,8 @@ The report must list `KHR_draco_mesh_compression` under extensions; if it is abs
 **`AssertionError: Draco did not shrink the payload` (ratio near 1.0).** The `draco` command passed geometry through without compressing — usually because the primitive lacks indices, or the native Draco module for `gltf-transform` did not load. Re-index the mesh (`trimesh` writes indexed glTF by default), reinstall `@gltf-transform/cli`, and confirm `KHR_draco_mesh_compression` appears in `gltf-transform inspect`.
 
 **Facades shade in visible facets after encoding.** NORMAL quantized at 8 bits bands smooth curved surfaces under directional light. Raise `NORMAL_BITS` to 10 for any textured or curved building facade; reserve 8 bits for flat, hard-edged, or untextured assets where the banding never faces the camera. Position and texcoord bits do not fix shading — the normal budget does.
+
+One habit worth adopting: derive the bit budget in code from the measured extent and the stated tolerance, rather than hard-coding the number the derivation produced. The two forms give identical output today, and only one of them keeps giving the right answer when a building archetype with a different footprint enters the pipeline.
 
 ## Related Guides
 

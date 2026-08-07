@@ -29,9 +29,10 @@ Two algorithm families dominate geospatial decimation, and choosing between them
 A target triangle budget is the input QEM needs: rather than a fixed ratio, you usually decimate to a **chain** of budgets — one mesh per level of detail. Each tile in a 3D Tiles tree carries the right LOD for its screen-space footprint, so a distant city block streams as a few thousand triangles while the block under the camera streams the full-resolution mesh. Three preservation constraints turn a naive collapse into a usable geospatial asset: **boundary preservation** pins the open edges of a tile so neighbouring tiles stay watertight against each other; **UV preservation** stops collapses from merging vertices across a texture seam and smearing the atlas; and **normal preservation** keeps shading consistent so a decimated facade does not develop faceting artefacts under directional light. QEM handles the first through edge weighting and the third through post-collapse normal recomputation; the second usually requires splitting the mesh on its UV islands before decimating.
 
 <figure class="diagram">
-<svg viewBox="0 0 820 280" role="img" aria-labelledby="decim-lod-t decim-lod-d" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="6 46 714 218" role="img" aria-labelledby="decim-lod-t decim-lod-d" xmlns="http://www.w3.org/2000/svg">
   <title id="decim-lod-t">QEM decimation LOD chain</title>
   <desc id="decim-lod-d">A high-resolution source mesh is quadric-edge-collapsed into three successive levels of detail with decreasing triangle counts, each selected by screen-space distance, and the error of each level is bounded by a Hausdorff distance check.</desc>
+  <rect class="svg-bg" x="6" y="46" width="714" height="218" fill="#ffffff"/>
   <defs>
     <marker id="decim-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
@@ -153,6 +154,33 @@ def decimate_qem(
     return simplified
 ```
 
+<figure class="diagram">
+<svg viewBox="4 62 732 230" role="img" aria-labelledby="dc-qem-t dc-qem-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="dc-qem-t">What a quadric error metric is measuring</title>
+  <desc id="dc-qem-d">Each vertex accumulates the squared distance to the planes of the faces around it. Collapsing an edge costs the accumulated error at the position the collapse would move to, so collapses in the middle of a flat wall cost almost nothing and collapses across a corner cost a great deal. The cheapest collapse is always taken first.</desc>
+  <rect class="svg-bg" x="4" y="62" width="732" height="230" fill="#ffffff"/>
+  <path d="M60 200 H320" fill="none" stroke="#1f6b8a" stroke-width="2.5"/>
+  <g fill="#1f6b8a">
+    <circle cx="110" cy="200" r="5"/><circle cx="170" cy="200" r="5"/><circle cx="230" cy="200" r="5"/>
+  </g>
+  <path d="M155 200 h30 v0" fill="none" stroke="#4f7a4d" stroke-width="6"/>
+  <path d="M430 200 H560 L640 110" fill="none" stroke="#1f6b8a" stroke-width="2.5"/>
+  <g fill="#1f6b8a">
+    <circle cx="500" cy="200" r="5"/><circle cx="560" cy="200" r="5"/><circle cx="608" cy="146" r="5"/>
+  </g>
+  <path d="M545 200 L590 165" fill="none" stroke="#b0413e" stroke-width="6"/>
+  <text x="190" y="90" fill="#4f7a4d" font-size="12.5" text-anchor="middle" font-weight="600">collapse inside a plane</text>
+  <text x="190" y="112" fill="#1f2937" font-size="12" text-anchor="middle">every face shares one plane, so the</text>
+  <text x="190" y="130" fill="#1f2937" font-size="12" text-anchor="middle">squared distance stays zero — cost ≈ 0</text>
+  <text x="560" y="90" fill="#b0413e" font-size="12.5" text-anchor="middle" font-weight="600">collapse across a corner</text>
+  <text x="560" y="112" fill="#1f2937" font-size="12" text-anchor="middle">two planes disagree, so any merged position</text>
+  <text x="560" y="130" fill="#1f2937" font-size="12" text-anchor="middle">is off both of them — cost is large</text>
+  <text x="370" y="248" fill="#15384a" font-size="12.5" text-anchor="middle">This is why QEM keeps building silhouettes for free: the flat wall between them is where all the cheap collapses are</text>
+  <text x="370" y="274" fill="#5b6471" font-size="12" text-anchor="middle">And why an aggressive budget eventually eats the corners — once the flat regions are gone, only expensive collapses remain</text>
+</svg>
+<figcaption>The metric is not a heuristic about importance; it is the exact squared deviation the collapse introduces. That is what makes the error bound reportable.</figcaption>
+</figure>
+
 ### 4. Building the LOD chain
 
 Most twins need several levels, not one. Generate each LOD from the source (not from the previous level — chaining decimations compounds error) at a halving cadence that matches the 3D Tiles geometric-error doubling between levels. The budgets in the example below step by roughly 5× per level, which keeps the on-screen triangle density of a tile near-constant as the camera pulls back and the tile shrinks to a quarter of its screen area. Tag each level with the Hausdorff error you measured for it, because the 3D Tiles `geometricError` field that drives LOD switching expects a real metric distance, not an arbitrary level index.
@@ -196,6 +224,32 @@ def export_with_crs(mesh, origin, output_path: str, crs_wkt: str):
                    "source": "automated_decimation_pipeline"}, f, indent=2)
     logging.info(f"Exported {output_path} (+ {meta})")
 ```
+
+<figure class="diagram">
+<svg viewBox="9 6 705 296" role="img" aria-labelledby="dc-bud-t dc-bud-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="dc-bud-t">Deviation against triangle budget for one building</title>
+  <desc id="dc-bud-d">Reducing a two hundred thousand triangle building to fifty thousand costs almost no measurable deviation, because the removed triangles were subdividing flat walls. Below about twelve thousand the curve turns sharply upward as the decimator starts collapsing the silhouette itself.</desc>
+  <rect class="svg-bg" x="9" y="6" width="705" height="296" fill="#ffffff"/>
+  <path d="M80 56 V214 H700" fill="none" stroke="#5b6471" stroke-width="1.5"/>
+  <polyline points="120,208 200,206 280,203 360,198 440,188 500,168 560,128 610,92 660,66"
+            fill="none" stroke="#1f6b8a" stroke-width="2.5"/>
+  <path d="M500 56 V220" fill="none" stroke="#4f7a4d" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="500" y="48" fill="#4f7a4d" font-size="12" text-anchor="middle">the knee — about 12 k triangles</text>
+  <g fill="#1f2937" font-size="11.5" text-anchor="middle">
+    <text x="120" y="234">200 k</text>
+    <text x="280" y="234">80 k</text>
+    <text x="440" y="234">25 k</text>
+    <text x="560" y="234">8 k</text>
+    <text x="660" y="234">2 k</text>
+  </g>
+  <text x="390" y="258" fill="#5b6471" font-size="12" text-anchor="middle">triangle budget</text>
+  <text x="40" y="128" fill="#5b6471" font-size="12" text-anchor="middle">Haus-</text>
+  <text x="40" y="144" fill="#5b6471" font-size="12" text-anchor="middle">dorff</text>
+  <text x="380" y="34" fill="#1f2937" font-size="13" text-anchor="middle" font-weight="600">Most of the reduction is free; all of the damage is in the last stretch</text>
+  <text x="380" y="284" fill="#15384a" font-size="12" text-anchor="middle">Find the knee once per building archetype, then set budgets from it rather than from a uniform percentage</text>
+</svg>
+<figcaption>A flat percentage applied across a city lands different archetypes on different sides of their own knee. The curve is cheap to measure and the budget should come from it.</figcaption>
+</figure>
 
 ## Validation & Verification
 

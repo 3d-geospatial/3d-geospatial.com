@@ -11,9 +11,10 @@ You hit this problem the moment a digital twin moves from a desktop GIS viewer t
 The reduction itself has to be lossless in the ways that matter for a twin and lossy only where the eye cannot tell. A naive vertex-clustering or random decimation hits the triangle target but rounds off the corners of buildings, melts road kerbs, and tears texture islands apart. Quadric edge collapse — the algorithm behind `simplify_quadric_decimation` — is the right default because it ranks every candidate edge by how much collapsing it would distort the original surface, so flat walls lose triangles aggressively while creases and silhouettes keep theirs. The steps below wrap that algorithm with the three guards a georeferenced mesh needs: a local-origin shift so `float32` survives, boundary weighting so footprints and UV seams stay sharp, and a Hausdorff check so the reduction ratio is defensible rather than guessed.
 
 <figure class="diagram">
-<svg viewBox="0 0 720 200" role="img" aria-labelledby="tridec-t tridec-d" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="-2 46 724 108" role="img" aria-labelledby="tridec-t tridec-d" xmlns="http://www.w3.org/2000/svg">
   <title id="tridec-t">Mesh decimation pipeline for web rendering</title>
   <desc id="tridec-d">A raw high-triangle mesh is measured, shifted to a local origin, decimated by quadric edge collapse with boundary preservation, packed as float32, and exported as glTF for streaming.</desc>
+  <rect class="svg-bg" x="-2" y="46" width="724" height="108" fill="#ffffff"/>
   <defs>
     <marker id="tridec-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
@@ -70,6 +71,27 @@ n_before = len(mesh.triangles)
 v_before = len(mesh.vertices)
 print(f"start: {n_before:,} triangles / {v_before:,} vertices")
 ```
+
+<figure class="diagram">
+<svg viewBox="26 8 688 278" role="img" aria-labelledby="ot-draw-t ot-draw-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="ot-draw-t">Triangle count is rarely the thing that costs the frame</title>
+  <desc id="ot-draw-d">A frame budget broken down for a city scene. Draw calls and state changes dominate, vertex processing is modest, and the triangle count itself contributes least. Merging four hundred small meshes into forty larger ones therefore buys more frame time than halving the triangles in each.</desc>
+  <rect class="svg-bg" x="26" y="8" width="688" height="278" fill="#ffffff"/>
+  <rect x="40" y="66" width="330" height="34" rx="4" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <rect x="40" y="114" width="136" height="34" rx="4" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <rect x="40" y="162" width="88" height="34" rx="4" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="40" y="210" width="48" height="34" rx="4" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <g fill="#1f2937" font-size="12.5" text-anchor="start">
+    <text x="382" y="88">draw calls — 7.5 ms, one per mesh across 412 meshes</text>
+    <text x="188" y="136">state changes — 3.1 ms, material and texture binds</text>
+    <text x="140" y="184">vertex shading — 2.0 ms, where the triangle count lives</text>
+    <text x="100" y="232">rasterisation — 1.1 ms</text>
+  </g>
+  <text x="380" y="36" fill="#1f2937" font-size="13" text-anchor="middle" font-weight="600">One frame of a city scene, 13.7 ms total</text>
+  <text x="380" y="268" fill="#15384a" font-size="12.5" text-anchor="middle">Halving every triangle saves about 1 ms. Merging the 412 meshes into 40 saves nearer 6 ms.</text>
+</svg>
+<figcaption>Triangle budgets are worth setting for download size and memory. For frame time, the number that matters is how many separate things the renderer is asked to draw.</figcaption>
+</figure>
 
 ### 2. Choose a triangle budget for the use case
 
@@ -136,6 +158,35 @@ print("max |coord| after packing:", float(np.abs(verts).max()))
 ```
 
 Open3D stores vertices internally as `float64`, so cast to `float32` to check the precision band, then assign back; the glTF writer emits the buffer as `float32` on export.
+
+<figure class="diagram">
+<svg viewBox="46 30 647 232" role="img" aria-labelledby="ot-f32-t ot-f32-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="ot-f32-t">What the vertex buffer actually costs per vertex</title>
+  <desc id="ot-f32-d">Positions, normals and texture coordinates at full float precision come to thirty-two bytes per vertex. Casting positions to float32 after the local-origin shift, packing normals to signed bytes and texture coordinates to unsigned shorts brings the same vertex to sixteen, halving both the download and the GPU buffer.</desc>
+  <rect class="svg-bg" x="46" y="30" width="647" height="232" fill="#ffffff"/>
+  <g stroke-width="2">
+    <rect x="60" y="70" width="240" height="34" rx="4" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="300" y="70" width="180" height="34" rx="4" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="480" y="70" width="120" height="34" rx="4" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="60" y="150" width="150" height="34" rx="4" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="210" y="150" width="90" height="34" rx="4" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="300" y="150" width="90" height="34" rx="4" fill="#eef5e9" stroke="#4f7a4d"/>
+  </g>
+  <g fill="#1f2937" font-size="11.5" text-anchor="middle">
+    <text x="180" y="92">POSITION float64 — 24 B</text>
+    <text x="390" y="92">NORMAL float32 — 12 B</text>
+    <text x="540" y="92">UV float32 — 8 B</text>
+    <text x="135" y="172">float32 — 12 B</text>
+    <text x="255" y="172">byte — 4 B</text>
+    <text x="345" y="172">ushort — 4 B</text>
+  </g>
+  <text x="60" y="58" fill="#b0413e" font-size="12.5" text-anchor="start" font-weight="600">as loaded from the source mesh — 44 bytes per vertex</text>
+  <text x="60" y="138" fill="#4f7a4d" font-size="12.5" text-anchor="start" font-weight="600">after the origin shift and packing — 20 bytes per vertex</text>
+  <text x="370" y="220" fill="#15384a" font-size="12.5" text-anchor="middle">The origin shift is what makes float32 positions safe; without it the packing is where the jitter comes from</text>
+  <text x="370" y="244" fill="#5b6471" font-size="12" text-anchor="middle">Across a 40 k-vertex building that is 1.8 MB against 0.8 MB, before any compression</text>
+</svg>
+<figcaption>Attribute packing is free geometry reduction: the same triangles, less than half the bytes, and no change to the silhouette at all.</figcaption>
+</figure>
 
 ### 6. Export glTF and confirm the format
 

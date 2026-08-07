@@ -9,9 +9,10 @@ Most digital twin failures are not crashes. They are silent disagreements: a bui
 This is the reliability discipline for twin engineers, GIS developers, and infrastructure platform teams who already have working pipelines and now need them to stay correct under production load, incremental rebuilds, and multi-team hand-offs. The mindset is contract-driven: every hand-off between pipelines has a contract, and a contract that lives only in a design document is a contract that will be violated. The pages linked below treat those contracts as executable — `assert` statements running in ingestion jobs and CI, not prose in a wiki — and give you the diagnostic tooling to localise a defect to the exact boundary it crossed. The three areas that follow cover the failures that span pipeline boundaries, the diagnostics you run against a live streaming client, and the validation gates that stop a bad dataset before it ships.
 
 <figure class="diagram">
-<svg viewBox="0 0 860 380" role="img" aria-labelledby="dtr-map-t dtr-map-d" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="-4 26 868 344" role="img" aria-labelledby="dtr-map-t dtr-map-d" xmlns="http://www.w3.org/2000/svg">
   <title id="dtr-map-t">Failure-mode map across the three digital twin pipelines</title>
   <desc id="dtr-map-d">Three pipelines run left to right — fundamentals, LOD, and mesh or point cloud — each handing values to the next. Below each pipeline sits the class of defect that originates there: CRS and unit mismatch and vertical-datum steps at fundamentals, meaningless geometric error and LOD seams and popping at LOD, and holes at coarse LOD, batch-table loss, and memory exhaustion at mesh processing. A bottom bar states that each boundary contract is enforced with executable assertions.</desc>
+  <rect class="svg-bg" x="-4" y="26" width="868" height="344" fill="#ffffff"/>
   <defs>
     <marker id="dtr-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
@@ -51,6 +52,12 @@ This is the reliability discipline for twin engineers, GIS developers, and infra
 </figure>
 
 The three stages form a chain of trust. The CRS you fix in fundamentals is the CRS the LOD tiler places geometry in; the geometric error the tiler writes is the number the runtime divides by camera distance; the manifold surface the mesh pipeline guarantees is what decimation collapses without tearing. A wrong value does not announce itself — it is faithfully carried forward until a symptom appears somewhere downstream. The reliability work is to inspect each value the moment it crosses a boundary.
+
+It is worth being precise about what "reliability" means for a twin, because the word usually imports availability from web operations and that is not the failing mode here. A digital twin is rarely down. It is wrong — quietly, plausibly, and in a way that renders perfectly. A tile whose vertical datum drifted still draws; a mesh whose parapet was decimated away still has a roof; a tileset whose geometric error inverted still shows buildings. Every one of those produces a picture a stakeholder will accept and a measurement an engineer should not. So the discipline that matters is not uptime monitoring but a chain of assertions that make wrongness loud at the point it is introduced.
+
+That chain has a shape worth stating once. Each stage in the pipeline declares what it requires of its input and what it guarantees about its output, in code rather than in a document. Ingest guarantees an explicit compound CRS and a stated classification scheme. Reconstruction guarantees a manifold surface with a recorded reconstruction method. Decimation guarantees a bounded Hausdorff deviation. Tiling guarantees monotonic geometric error and nested bounding volumes. Where two stages meet, the consumer asserts what the producer guaranteed — and because both halves are executable, a violated contract names the stage that broke it rather than the stage that noticed.
+
+The three sections below correspond to the three places those assertions can live. Failures that span stages, and are therefore invisible to any single one of them, are the subject of cross-section failure modes. Failures that only appear once a real camera and a real network are involved belong to streaming and runtime diagnostics. And the machinery for turning any of these checks into something that blocks a merge belongs to data validation and QA gates.
 
 ## Cross-Section Failure Modes
 
@@ -119,6 +126,25 @@ Tiles that stay above `MAX_SSE` frame after frame are the ones the eye reads as 
 
 **Key Practice:** Instrument the refinement loop with the same screen-space-error formula the client uses, and log resident bytes and unrefined-tile count every frame. A defect you can graph over a fly-through is a defect you can fix; a defect you only hear described as "it pops sometimes" is not.
 
+<figure class="diagram">
+<svg viewBox="-66 42 892 256" role="img" aria-labelledby="ts-kind-t ts-kind-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="ts-kind-t">Assertions, gates and runtime diagnostics see different things</title>
+  <desc id="ts-kind-d">An in-pipeline assertion runs on every execution and sees one stage's inputs and outputs. A CI gate runs once per build and sees the whole artifact, including cross-tile properties. A runtime diagnostic runs in the client and is the only one that sees the camera, the network and the GPU. None of the three substitutes for another.</desc>
+  <rect class="svg-bg" x="-66" y="42" width="892" height="256" fill="#ffffff"/>
+  <rect x="24" y="56" width="228" height="164" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="266" y="56" width="228" height="164" rx="8" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <rect x="508" y="56" width="228" height="164" rx="8" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="138" y="86"><tspan x="138" dy="0" font-weight="600">in-pipeline assertion</tspan><tspan x="138" dy="20">runs every execution</tspan><tspan x="138" dy="18">sees one stage's I/O</tspan><tspan x="138" dy="18">costs milliseconds</tspan><tspan x="138" dy="18">catches contract breaks</tspan></text>
+    <text x="380" y="86"><tspan x="380" dy="0" font-weight="600">CI gate</tspan><tspan x="380" dy="20">runs once per build</tspan><tspan x="380" dy="18">sees the whole artifact</tspan><tspan x="380" dy="18">costs minutes</tspan><tspan x="380" dy="18">catches cross-tile faults</tspan></text>
+    <text x="622" y="86"><tspan x="622" dy="0" font-weight="600">runtime diagnostic</tspan><tspan x="622" dy="20">runs in the client</tspan><tspan x="622" dy="18">sees camera, net, GPU</tspan><tspan x="622" dy="18">costs a frame budget</tspan><tspan x="622" dy="18">catches what only users hit</tspan></text>
+  </g>
+  <text x="380" y="256" fill="#15384a" font-size="12.5" text-anchor="middle">A gate cannot see a request storm; a runtime probe cannot see a schema drift. Teams that pick one usually pick the middle and are surprised twice.</text>
+  <text x="380" y="280" fill="#5b6471" font-size="12" text-anchor="middle">The three sections below are organised around exactly this division</text>
+</svg>
+<figcaption>These are not three strengths of the same idea. They observe disjoint things, and each is blind to the other two&#39;s failures.</figcaption>
+</figure>
+
 ## Data Validation & QA Gates
 
 The third area stops bad data at the door. [Data validation and QA gates](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/) are the automated checks — schema assertions, CRS and unit verification, geometric-error monotonicity, `3d-tiles-validator` runs — that a dataset must pass before it is allowed to reach a staging CDN or a downstream team. A gate is a place where the build fails loudly and early, converting a defect that would have surfaced as a silent measurement drift weeks later into a red CI run within minutes of the commit that caused it.
@@ -147,6 +173,36 @@ print("monotonicity gate passed")
 A single inverted error makes the client refine into coarser geometry — the "detail vanishes as you zoom in" bug — and a gate like this catches it before the tileset is ever requested. Writing these as first-class CI steps, including validator wiring and CRS/unit assertions, is covered in [writing 3D Tiles Validator checks in CI](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/writing-3d-tiles-validator-checks-in-ci/) and [asserting CRS and units with pyproj](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/asserting-crs-and-units-with-pyproj/).
 
 **Key Practice:** Make every boundary contract a gate that fails the build, not a warning that scrolls past in a log. A check that can be ignored will be ignored; a check that turns CI red gets fixed on the commit that broke it, which is the only cheap time to fix it.
+
+<figure class="diagram">
+<svg viewBox="-32 6 824 306" role="img" aria-labelledby="ts-cost-t ts-cost-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="ts-cost-t">What the same fault costs, by where it is caught</title>
+  <desc id="ts-cost-d">A wrong CRS caught at ingest costs one unit to fix. Caught after transformation it costs a few. Caught after tiling it costs a full rebuild. Caught after deployment it costs a rebuild plus a rollback. Caught by an analyst in production it costs all of that plus the decisions already taken on the wrong numbers.</desc>
+  <rect class="svg-bg" x="-32" y="6" width="824" height="306" fill="#ffffff"/>
+  <text x="380" y="34" fill="#1f2937" font-size="13" text-anchor="middle" font-weight="600">One undeclared CRS, five places it could be caught</text>
+  <rect x="80" y="218" width="88" height="6" rx="4" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <rect x="208" y="209" width="88" height="15" rx="4" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <rect x="336" y="191" width="88" height="33" rx="4" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <rect x="464" y="146" width="88" height="78" rx="4" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <rect x="592" y="58" width="88" height="166" rx="4" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <path d="M60 224 H700" fill="none" stroke="#5b6471" stroke-width="1.5"/>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="124" y="244">ingest</text>
+    <text x="124" y="212" font-size="11.5">24×</text>
+    <text x="252" y="244">transform</text>
+    <text x="252" y="203" font-size="11.5">60×</text>
+    <text x="380" y="244">tiling</text>
+    <text x="380" y="185" font-size="11.5">130×</text>
+    <text x="508" y="244">deploy</text>
+    <text x="508" y="140" font-size="11.5">300×</text>
+    <text x="636" y="244">production</text>
+    <text x="636" y="52" font-size="11.5">640×</text>
+  </g>
+  <text x="380" y="274" fill="#15384a" font-size="12.5" text-anchor="middle">The curve is the whole argument for assertions at boundaries: every gate you add moves faults left, and the left is where they are cheap</text>
+  <text x="380" y="294" fill="#5b6471" font-size="12" text-anchor="middle">Relative cost to remediate, including rebuild, redeploy and any analysis already based on the bad data</text>
+</svg>
+<figcaption>Nothing about the fault changes across these bars. Only the amount of work that has been built on top of it does.</figcaption>
+</figure>
 
 ## Cross-Section Integration
 
@@ -208,6 +264,8 @@ The high-value checks are cheap. A control-point round-trip, a manifoldness asse
 
 ### Which single practice prevents the most production incidents?
 Pin one CRS with an explicit EPSG code from source through tileset root and assert it at every boundary. Coordinate and unit defects are the most common root cause of seams, measurement drift, misplacement, and vertical steps, and they are the hardest to spot by eye because the geometry still looks plausible. A round-tripped control point with a sub-millimetre tolerance, asserted at each hand-off, closes off that entire class before it can propagate.
+
+None of this requires new infrastructure. Every check described across these three sections is a few lines of Python or a shell exit code, run either inside the pipeline you already have or in the CI job that already builds it. What it requires is a decision to treat a plausible-looking wrong answer as a build failure rather than as a rendering question — and that decision is easier to hold once the checks exist, because they turn an argument about whether something is wrong into a report of what is.
 
 ## Related Guides
 

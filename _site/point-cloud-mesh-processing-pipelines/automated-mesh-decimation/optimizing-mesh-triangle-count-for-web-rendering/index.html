@@ -8,8 +8,23 @@
   <meta name="description" content="Decimate geospatial meshes with open3d for WebGL: pick a triangle budget, preserve boundaries and UVs, pack float32 vertices, and export glTF for streaming.">
   <meta name="keywords" content="3D geospatial, digital twin, point cloud, mesh pipeline, LOD, 3D Tiles, Cesium, PDAL, Open3D, Python, CI/CD">
   <meta name="author" content="3D Geospatial &amp; Digital Twin Automation">
-  <meta name="theme-color" content="#1f6b8a">
-  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#1f6b8a" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f171d" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+
+  
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem("theme");
+        var theme = (stored === "dark" || stored === "light") ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    })();
+  </script>
   <meta name="generator" content="Eleventy">
   <meta name="format-detection" content="telephone=no">
   <meta name="robots" content="index,follow,max-image-preview:large">
@@ -47,8 +62,8 @@
   <meta property="og:site_name" content="3D Geospatial &amp; Digital Twin Automation">
   <meta property="og:locale" content="en_US">
   
-  <meta property="article:published_time" content="2026-07-11T16:43:55.847Z">
-  <meta property="article:modified_time" content="2026-07-11T16:43:55.847Z">
+  <meta property="article:published_time" content="2026-08-07T01:33:51.872Z">
+  <meta property="article:modified_time" content="2026-08-07T01:33:51.872Z">
   <meta property="article:publisher" content="https://www.3d-geospatial.com/">
   
 
@@ -60,10 +75,10 @@
   <meta name="twitter:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
 
   
-  <link rel="preload" href="/assets/css/styles.css?v=e63f3779f0" as="style">
+  <link rel="preload" href="/assets/css/styles.css?v=546adeb511" as="style">
   
 
-  <link rel="stylesheet" href="/assets/css/styles.css?v=e63f3779f0">
+  <link rel="stylesheet" href="/assets/css/styles.css?v=546adeb511">
 
   
   <script type="application/ld+json">
@@ -105,8 +120,8 @@
       "url": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/optimizing-mesh-triangle-count-for-web-rendering/",
       "mainEntityOfPage": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/optimizing-mesh-triangle-count-for-web-rendering/",
       "inLanguage": "en",
-      "datePublished": "2026-07-11T16:43:55.847Z",
-      "dateModified": "2026-07-11T16:43:55.847Z",
+      "datePublished": "2026-08-07T01:33:51.872Z",
+      "dateModified": "2026-08-07T01:33:51.872Z",
       "author": {
         "@id": "https://www.3d-geospatial.com/#organization"
       },
@@ -171,6 +186,17 @@
         <small>Digital Twin Automation</small>
       </span>
     </a>
+
+    <button class="theme-toggle" type="button" data-theme-toggle
+            aria-label="Switch to dark theme" title="Switch to dark theme">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4.2"/>
+        <path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/>
+      </svg>
+    </button>
 
     <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>
       <span class="nav-toggle__icon" aria-hidden="true"><span></span></span>
@@ -270,9 +296,10 @@
 <p>You hit this problem the moment a digital twin moves from a desktop GIS viewer to a browser. A RealityCapture or Pix4D export can carry 5–20 million triangles per building block — fine for a workstation, fatal for WebGL. Three constraints bite at once. <strong>Draw calls:</strong> every unbatched mesh is a separate GPU draw call, and a few hundred is the practical ceiling on a mobile browser before frame pacing collapses. <strong>GPU memory:</strong> vertex buffers are uploaded whole, and mobile Safari throttles or crashes the WebGL context past roughly 150 MB of resident VRAM — and a triangle at full <code>float32</code> position plus normal plus UV costs around 32 bytes of buffer, so two million triangles is already ~64 MB before textures. <strong>Float precision:</strong> WebGL stores positions as IEEE 754 <code>float32</code> (~7 significant digits), so a vertex at UTM easting 583,000.214 collapses to centimetre jitter, producing z-fighting and shimmering. Decimation, local-origin shifting, and <code>float32</code> packing solve all three in one pass.</p>
 <p>The reduction itself has to be lossless in the ways that matter for a twin and lossy only where the eye cannot tell. A naive vertex-clustering or random decimation hits the triangle target but rounds off the corners of buildings, melts road kerbs, and tears texture islands apart. Quadric edge collapse — the algorithm behind <code>simplify_quadric_decimation</code> — is the right default because it ranks every candidate edge by how much collapsing it would distort the original surface, so flat walls lose triangles aggressively while creases and silhouettes keep theirs. The steps below wrap that algorithm with the three guards a georeferenced mesh needs: a local-origin shift so <code>float32</code> survives, boundary weighting so footprints and UV seams stay sharp, and a Hausdorff check so the reduction ratio is defensible rather than guessed.</p>
 <figure class="diagram">
-<svg viewBox="0 0 720 200" role="img" aria-labelledby="tridec-t tridec-d" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="-2 46 724 108" role="img" aria-labelledby="tridec-t tridec-d" xmlns="http://www.w3.org/2000/svg">
   <title id="tridec-t">Mesh decimation pipeline for web rendering</title>
   <desc id="tridec-d">A raw high-triangle mesh is measured, shifted to a local origin, decimated by quadric edge collapse with boundary preservation, packed as float32, and exported as glTF for streaming.</desc>
+  <rect class="svg-bg" x="-2" y="46" width="724" height="108" fill="#ffffff"/>
   <defs>
     <marker id="tridec-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
@@ -323,6 +350,26 @@ n_before <span class="token operator">=</span> <span class="token builtin">len</
 v_before <span class="token operator">=</span> <span class="token builtin">len</span><span class="token punctuation">(</span>mesh<span class="token punctuation">.</span>vertices<span class="token punctuation">)</span>
 <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"start: </span><span class="token interpolation"><span class="token punctuation">{</span>n_before<span class="token punctuation">:</span><span class="token format-spec">,</span><span class="token punctuation">}</span></span><span class="token string"> triangles / </span><span class="token interpolation"><span class="token punctuation">{</span>v_before<span class="token punctuation">:</span><span class="token format-spec">,</span><span class="token punctuation">}</span></span><span class="token string"> vertices"</span></span><span class="token punctuation">)</span>
 </code></pre></div>
+<figure class="diagram">
+<svg viewBox="26 8 688 278" role="img" aria-labelledby="ot-draw-t ot-draw-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="ot-draw-t">Triangle count is rarely the thing that costs the frame</title>
+  <desc id="ot-draw-d">A frame budget broken down for a city scene. Draw calls and state changes dominate, vertex processing is modest, and the triangle count itself contributes least. Merging four hundred small meshes into forty larger ones therefore buys more frame time than halving the triangles in each.</desc>
+  <rect class="svg-bg" x="26" y="8" width="688" height="278" fill="#ffffff"/>
+  <rect x="40" y="66" width="330" height="34" rx="4" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <rect x="40" y="114" width="136" height="34" rx="4" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <rect x="40" y="162" width="88" height="34" rx="4" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="40" y="210" width="48" height="34" rx="4" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <g fill="#1f2937" font-size="12.5" text-anchor="start">
+    <text x="382" y="88">draw calls — 7.5 ms, one per mesh across 412 meshes</text>
+    <text x="188" y="136">state changes — 3.1 ms, material and texture binds</text>
+    <text x="140" y="184">vertex shading — 2.0 ms, where the triangle count lives</text>
+    <text x="100" y="232">rasterisation — 1.1 ms</text>
+  </g>
+  <text x="380" y="36" fill="#1f2937" font-size="13" text-anchor="middle" font-weight="600">One frame of a city scene, 13.7 ms total</text>
+  <text x="380" y="268" fill="#15384a" font-size="12.5" text-anchor="middle">Halving every triangle saves about 1 ms. Merging the 412 meshes into 40 saves nearer 6 ms.</text>
+</svg>
+<figcaption>Triangle budgets are worth setting for download size and memory. For frame time, the number that matters is how many separate things the renderer is asked to draw.</figcaption>
+</figure>
 <h3 id="2-choose-a-triangle-budget-for-the-use-case" tabindex="-1"><a class="heading-link" href="#2-choose-a-triangle-budget-for-the-use-case"><span>2. Choose a triangle budget for the use case</span></a></h3>
 <p>Pick the budget from the table below, not from a fixed percentage. The budget is an absolute triangle ceiling per visible asset, driven by how close the camera ever gets.</p>
 <div class="table-wrap" tabindex="0" role="group" aria-label="Table, scroll horizontally to see more"><table>
@@ -392,6 +439,34 @@ decimated<span class="token punctuation">.</span>vertices <span class="token ope
 <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"max |coord| after packing:"</span><span class="token punctuation">,</span> <span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span><span class="token builtin">abs</span><span class="token punctuation">(</span>verts<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">max</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
 </code></pre></div>
 <p>Open3D stores vertices internally as <code>float64</code>, so cast to <code>float32</code> to check the precision band, then assign back; the glTF writer emits the buffer as <code>float32</code> on export.</p>
+<figure class="diagram">
+<svg viewBox="46 30 647 232" role="img" aria-labelledby="ot-f32-t ot-f32-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="ot-f32-t">What the vertex buffer actually costs per vertex</title>
+  <desc id="ot-f32-d">Positions, normals and texture coordinates at full float precision come to thirty-two bytes per vertex. Casting positions to float32 after the local-origin shift, packing normals to signed bytes and texture coordinates to unsigned shorts brings the same vertex to sixteen, halving both the download and the GPU buffer.</desc>
+  <rect class="svg-bg" x="46" y="30" width="647" height="232" fill="#ffffff"/>
+  <g stroke-width="2">
+    <rect x="60" y="70" width="240" height="34" rx="4" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="300" y="70" width="180" height="34" rx="4" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="480" y="70" width="120" height="34" rx="4" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="60" y="150" width="150" height="34" rx="4" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="210" y="150" width="90" height="34" rx="4" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="300" y="150" width="90" height="34" rx="4" fill="#eef5e9" stroke="#4f7a4d"/>
+  </g>
+  <g fill="#1f2937" font-size="11.5" text-anchor="middle">
+    <text x="180" y="92">POSITION float64 — 24 B</text>
+    <text x="390" y="92">NORMAL float32 — 12 B</text>
+    <text x="540" y="92">UV float32 — 8 B</text>
+    <text x="135" y="172">float32 — 12 B</text>
+    <text x="255" y="172">byte — 4 B</text>
+    <text x="345" y="172">ushort — 4 B</text>
+  </g>
+  <text x="60" y="58" fill="#b0413e" font-size="12.5" text-anchor="start" font-weight="600">as loaded from the source mesh — 44 bytes per vertex</text>
+  <text x="60" y="138" fill="#4f7a4d" font-size="12.5" text-anchor="start" font-weight="600">after the origin shift and packing — 20 bytes per vertex</text>
+  <text x="370" y="220" fill="#15384a" font-size="12.5" text-anchor="middle">The origin shift is what makes float32 positions safe; without it the packing is where the jitter comes from</text>
+  <text x="370" y="244" fill="#5b6471" font-size="12" text-anchor="middle">Across a 40 k-vertex building that is 1.8 MB against 0.8 MB, before any compression</text>
+</svg>
+<figcaption>Attribute packing is free geometry reduction: the same triangles, less than half the bytes, and no change to the silhouette at all.</figcaption>
+</figure>
 <h3 id="6-export-gltf-and-confirm-the-format" tabindex="-1"><a class="heading-link" href="#6-export-gltf-and-confirm-the-format"><span>6. Export glTF and confirm the format</span></a></h3>
 <p>Prefer <code>.glb</code> (binary glTF) for web delivery: it embeds geometry, normals, and materials in one streamable file and supports Draco compression in modern browsers.</p>
 <div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python">o3d<span class="token punctuation">.</span>io<span class="token punctuation">.</span>write_triangle_mesh<span class="token punctuation">(</span>
@@ -528,6 +603,8 @@ _<span class="token punctuation">,</span> dist<span class="token punctuation">,<
           
             <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a></li>
           
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/">Spatial Indexing and Tiling Schemes for 3D Data</a></li>
+          
         </ul>
       </div>
     
@@ -591,7 +668,7 @@ _<span class="token punctuation">,</span> dist<span class="token punctuation">,<
 </footer>
 
 
-  <script src="/assets/js/site.js?v=d27ef9f948" defer></script>
+  <script src="/assets/js/site.js?v=b99aa9f971" defer></script>
   
 </body>
 </html>

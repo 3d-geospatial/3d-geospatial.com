@@ -9,9 +9,10 @@ Modern urban digital twins and large-scale geospatial platforms routinely ingest
 This guide is written for digital twin engineers, GIS developers, Python spatial developers, and infrastructure technology teams who have a validated dataset and now need it to load in a browser at sixty frames per second over a metropolitan extent. Level of detail (LOD) here is not a rendering shortcut bolted on at the end. It is a data architecture decision — geometric error budgets, quadtree depth, tile payload format, refinement mode, and cache policy — that determines storage cost, streaming latency, memory footprint, and whether measurements stay consistent as tiles swap. Implemented well, an LOD pipeline cuts VRAM consumption by 60–85% while holding sub-metre positional accuracy for critical infrastructure analysis. Implemented carelessly, it produces visible seams, popping, and silent analytical drift that only surfaces when a flood or line-of-sight result disagrees with the source survey.
 
 <figure class="diagram">
-<svg viewBox="0 0 880 360" role="img" aria-labelledby="lod-arch-t lod-arch-d" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="1 36 878 319" role="img" aria-labelledby="lod-arch-t lod-arch-d" xmlns="http://www.w3.org/2000/svg">
   <title id="lod-arch-t">LOD pipeline architecture</title>
   <desc id="lod-arch-d">Source meshes are partitioned by a quadtree into spatial tiles, decimated into discrete geometric-error LOD levels, packaged as a 3D Tiles tileset with b3dm and pnts payloads, and delivered to a streaming client that culls and swaps tiles by screen-space error against a memory budget.</desc>
+  <rect class="svg-bg" x="1" y="36" width="878" height="319" fill="#ffffff"/>
   <defs>
     <marker id="lod-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
@@ -179,6 +180,33 @@ def build_request_queue(candidate_tiles, camera_pos):
 
 **Key Practice:** Never let the request queue ignore the memory budget. Sort by descending SSE, but stop enqueuing the moment cumulative tile size reaches the VRAM pool, and pair every load with an LRU eviction so the budget is a hard ceiling rather than a hopeful average. Backpressure on the queue — not the GPU driver's out-of-memory killer — should be what bounds resident geometry.
 
+<figure class="diagram">
+<svg viewBox="0 0 780 250" role="img" aria-labelledby="lod-lat-t lod-lat-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="lod-lat-t">Where the time goes between wanting a tile and drawing it</title>
+  <desc id="lod-lat-d">A typical tile round trip spends three milliseconds scoring and queueing, forty-five fetching over HTTP, eighteen decoding Draco geometry, and six uploading to the GPU. The whole sequence is more than four times a sixty-frames-per-second frame budget, which is why every stage after scoring has to run off the render thread.</desc>
+  <rect class="svg-bg" x="0" y="0" width="780" height="250" fill="#ffffff"/>
+  <text x="390" y="30" fill="#1f2937" font-size="13" text-anchor="middle" font-weight="600">One tile, from &quot;the camera needs this&quot; to &quot;it is on screen&quot;</text>
+  <rect x="60" y="86" width="27" height="46" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="87" y="86" width="405" height="46" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <rect x="492" y="86" width="162" height="46" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <rect x="654" y="86" width="54" height="46" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <path d="M210 74 V140" fill="none" stroke="#b0413e" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="222" y="68" fill="#b0413e" font-size="12" text-anchor="start">one 60 fps frame ends here</text>
+  <g fill="none" stroke="#5b6471" stroke-width="1.5">
+    <path d="M73 132 V186"/>
+    <path d="M681 132 V186"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="290" y="114">HTTP fetch — 45 ms</text>
+    <text x="573" y="114">Draco decode — 18 ms</text>
+    <text x="73" y="200">score + queue, 3 ms</text>
+    <text x="681" y="200">GPU upload, 6 ms</text>
+  </g>
+  <text x="390" y="230" fill="#15384a" font-size="12.5" text-anchor="middle">72 ms end to end. Only the first 3 ms may run on the render thread; everything after it has to be asynchronous and cancellable.</text>
+</svg>
+<figcaption>The dominant cost is the network, and the second is decode — neither of which gets faster by simplifying the geometry. What tuning buys you is fewer round trips, not shorter ones.</figcaption>
+</figure>
+
 ## Memory Budgeting, GPU Culling & Compression
 
 LOD systems run inside fixed hardware budgets, and unchecked tile loading, uncompressed textures, or unbounded attribute caches exhaust VRAM and trigger garbage-collection stalls or out-of-memory crashes. Memory management is not a post-process; it is architected into the request lifecycle described above, with strict accounting at ingestion, streaming, and rendering.
@@ -188,6 +216,30 @@ Three controls keep the budget honest. **VRAM budgeting** allocates fixed pools 
 GPU-driven culling moves the per-frame frustum and SSE tests onto compute shaders, where thousands of tile bounds are evaluated in parallel and only the visible subset returns to the render queue. Modern [WebGPU](https://www.w3.org/TR/webgpu/) pipelines run this culling, point thinning, and LOD blending asynchronously, freeing the main thread for interaction and network I/O. Heavy, precision-critical work such as full-mesh QEM decimation stays CPU-bound during tiling; only runtime culling, instancing, and crossfade blending belong on the GPU, with explicit synchronization points so buffer races cannot stall the pipeline.
 
 **Key Practice:** Account memory at ingestion, not just at render. Stamp each tile's decompressed geometry and texture footprint into its metadata during tiling, so the streaming client can sum residency *before* fetching and the eviction policy can make exact decisions. A budget enforced only after upload to the GPU is a budget enforced too late.
+
+<figure class="diagram">
+<svg viewBox="17 2 648 308" role="img" aria-labelledby="lod-vram-t lod-vram-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="lod-vram-t">What actually occupies the VRAM budget</title>
+  <desc id="lod-vram-d">Resident tile geometry is only part of the footprint. Textures typically dominate, and the decode scratch space and framebuffer take a fixed cut before any tile is loaded. Eviction has to be driven by the sum against a declared budget, because the GPU only reports pressure once it is already too late.</desc>
+  <rect class="svg-bg" x="17" y="2" width="648" height="308" fill="#ffffff"/>
+  <text x="350" y="30" fill="#1f2937" font-size="13" text-anchor="middle" font-weight="600">A 1.2 GB budget, and what is already spending it</text>
+  <rect x="150" y="46" width="180" height="63" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="150" y="109" width="180" height="96" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <rect x="150" y="205" width="180" height="18" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <rect x="150" y="223" width="180" height="27" fill="#ffffff" stroke="#5b6471" stroke-width="2"/>
+  <path d="M120 70 H360" fill="none" stroke="#b0413e" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="112" y="74" fill="#b0413e" font-size="12" text-anchor="end">1.2 GB budget</text>
+  <g fill="#1f2937" font-size="12.5" text-anchor="start">
+    <text x="352" y="82">tile geometry — 420 MB</text>
+    <text x="352" y="161">textures — 640 MB</text>
+    <text x="352" y="218">decode scratch — 120 MB</text>
+    <text x="352" y="241">framebuffer + depth — 180 MB</text>
+  </g>
+  <text x="240" y="272" fill="#b0413e" font-size="12.5" text-anchor="middle">1.36 GB resident — 160 MB over</text>
+  <text x="350" y="292" fill="#5b6471" font-size="12" text-anchor="middle">Evicting geometry alone cannot recover it; the texture set is the larger half and has its own residency policy</text>
+</svg>
+<figcaption>Budgeting only the geometry is why a tileset that looks well within limits still evicts constantly. Count everything the tile brings with it.</figcaption>
+</figure>
 
 ## Cross-Section Integration
 

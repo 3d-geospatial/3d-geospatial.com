@@ -22,9 +22,10 @@ A streaming tile is never simply "there" or "not there" — it moves through a s
 Priority is what decides admission order. Each candidate tile is scored by a weighted combination of distance to the camera, screen-space projected size (a tile's `geometricError` divided by its distance, scaled by viewport height), and frustum membership. Tiles outside the frustum score zero and are never admitted; tiles that fill more pixels at lower distance score highest and are fetched first. Because the camera updates continuously, the score is recomputed each frame and the fetch queue is reordered — a tile queued three frames ago at low priority may now sit at the front, or may have dropped out of view entirely and be cancelled. The eviction side mirrors this: the cache is bounded, and when it is full the lowest-value resident tile (by recency for LRU, by access frequency for LFU) is dropped to make room.
 
 <figure class="diagram">
-<svg viewBox="0 0 820 250" role="img" aria-labelledby="sync-sm-t sync-sm-d" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="6 -7 698 176" role="img" aria-labelledby="sync-sm-t sync-sm-d" xmlns="http://www.w3.org/2000/svg">
   <title id="sync-sm-t">Tile streaming state machine</title>
   <desc id="sync-sm-d">A tile moves from unloaded to fetching when its priority clears the admission threshold, to loaded on a validated response, to visible when drawn, then to evicted when the camera moves away, returning to unloaded; a fetching tile can be cancelled straight back to unloaded.</desc>
+  <rect class="svg-bg" x="6" y="-7" width="698" height="176" fill="#ffffff"/>
   <defs>
     <marker id="sync-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
@@ -54,7 +55,7 @@ Priority is what decides admission order. Each candidate tile is scored by a wei
   </g>
   <g fill="#5b6471" font-size="12" text-anchor="middle">
     <text x="174" y="116">admit</text>
-    <text x="354" y="116">200 OK</text>
+    <text x="354" y="116">200</text>
     <text x="534" y="116">draw</text>
     <text x="180" y="58">cancel</text>
     <text x="330" y="20">camera moves on</text>
@@ -193,6 +194,42 @@ class PrefetchScheduler:
         return b"\x00" * (180_000 + registry[tid].hits)
 ```
 
+<figure class="diagram">
+<svg viewBox="15 46 730 258" role="img" aria-labelledby="ss-bp-t ss-bp-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="ss-bp-t">An unbounded queue against a bounded in-flight window</title>
+  <desc id="ss-bp-d">Without backpressure, every scored tile is dispatched at once. The browser's six-connections-per-host limit turns the excess into a first-in-first-out queue inside the network stack, where the scheduler can no longer reorder or cancel it. With a bounded in-flight window the queue stays in application code, so it can be resorted against the current camera and stale entries dropped.</desc>
+  <rect class="svg-bg" x="15" y="46" width="730" height="258" fill="#ffffff"/>
+  <defs>
+    <marker id="ss-bp-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
+    </marker>
+  </defs>
+  <rect x="30" y="60" width="150" height="52" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="250" y="60" width="180" height="52" rx="8" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <rect x="500" y="60" width="230" height="52" rx="8" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <rect x="30" y="186" width="150" height="52" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="250" y="186" width="180" height="52" rx="8" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <rect x="500" y="186" width="230" height="52" rx="8" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <g stroke="#5b6471" stroke-width="2" marker-end="url(#ss-bp-a)">
+    <line x1="180" y1="86" x2="248" y2="86"/>
+    <line x1="430" y1="86" x2="498" y2="86"/>
+    <line x1="180" y1="212" x2="248" y2="212"/>
+    <line x1="430" y1="212" x2="498" y2="212"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="105" y="91">214 tiles scored</text>
+    <text x="340" y="81"><tspan x="340" dy="0">all 214 dispatched</tspan><tspan x="340" dy="16">6 run, 208 queue in the stack</tspan></text>
+    <text x="615" y="81"><tspan x="615" dy="0">FIFO and uncancellable — the camera</tspan><tspan x="615" dy="16">has moved before most of them start</tspan></text>
+    <text x="105" y="217">214 tiles scored</text>
+    <text x="340" y="207"><tspan x="340" dy="0">6 in flight, 208 held</tspan><tspan x="340" dy="16">in the application queue</tspan></text>
+    <text x="615" y="207"><tspan x="615" dy="0">re-sorted every frame, stale entries</tspan><tspan x="615" dy="16">dropped before they ever leave</tspan></text>
+  </g>
+  <text x="380" y="150" fill="#5b6471" font-size="12" text-anchor="middle">Both paths issue exactly six concurrent requests. The difference is which side of the browser boundary the other 208 wait on.</text>
+  <text x="380" y="286" fill="#15384a" font-size="12" text-anchor="middle">Backpressure does not make anything faster — it keeps the ordering decision in code that can still see the camera</text>
+</svg>
+<figcaption>The network stack will apply a limit whether or not you do. Applying it yourself is what preserves the ability to change your mind.</figcaption>
+</figure>
+
 ### 4. Apply LRU / LFU eviction against the byte budget
 
 Eviction keeps resident bytes under budget. The policy ranks resident tiles by recency (LRU) or access frequency (LFU) and drops the weakest until the budget clears. Visible tiles are protected — evicting what the renderer is currently drawing causes the worst popping.
@@ -215,6 +252,36 @@ Eviction keeps resident bytes under budget. The policy ranks resident tiles by r
             log.info("evicted %s (%d KB)", rec.tile_id, rec.nbytes // 1024)
             rec.status = TileStatus.UNLOADED        # ready to re-admit later
 ```
+
+<figure class="diagram">
+<svg viewBox="9 4 742 286" role="img" aria-labelledby="ss-ev-t ss-ev-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="ss-ev-t">The same access trace under LRU and LFU eviction</title>
+  <desc id="ss-ev-d">Ten tile accesses run against a cache that holds three. Least-recently-used keeps whatever the camera touched most recently, which favours the direction of travel. Least-frequently-used keeps whatever has been touched most often, which favours the landmarks a camera keeps returning to. The two policies end with different residents from identical input.</desc>
+  <rect class="svg-bg" x="9" y="4" width="742" height="286" fill="#ffffff"/>
+  <text x="380" y="32" fill="#1f2937" font-size="13" text-anchor="middle" font-weight="600">Access trace: A B C A D B A E C A — cache holds three</text>
+  <rect x="30" y="70" width="390" height="52" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="30" y="168" width="390" height="52" rx="8" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="225" y="91"><tspan x="225" dy="0" font-weight="600">LRU — keep the most recently touched</tspan><tspan x="225" dy="17">follows the direction of travel</tspan></text>
+    <text x="225" y="189"><tspan x="225" dy="0" font-weight="600">LFU — keep the most often touched</tspan><tspan x="225" dy="17">holds on to landmarks the camera revisits</tspan></text>
+  </g>
+    <rect x="470" y="78" width="66" height="34" rx="6" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+    <text x="503" y="100" fill="#1f2937" font-size="12.5" text-anchor="middle">tile A</text>
+    <rect x="548" y="78" width="66" height="34" rx="6" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+    <text x="581" y="100" fill="#1f2937" font-size="12.5" text-anchor="middle">tile C</text>
+    <rect x="626" y="78" width="66" height="34" rx="6" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+    <text x="659" y="100" fill="#1f2937" font-size="12.5" text-anchor="middle">tile E</text>
+    <rect x="470" y="176" width="66" height="34" rx="6" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+    <text x="503" y="198" fill="#1f2937" font-size="12.5" text-anchor="middle">tile A</text>
+    <rect x="548" y="176" width="66" height="34" rx="6" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+    <text x="581" y="198" fill="#1f2937" font-size="12.5" text-anchor="middle">tile B</text>
+    <rect x="626" y="176" width="66" height="34" rx="6" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+    <text x="659" y="198" fill="#1f2937" font-size="12.5" text-anchor="middle">tile C</text>
+  <text x="380" y="252" fill="#15384a" font-size="12" text-anchor="middle">Same input, different survivors: LRU keeps E because it was last; LFU keeps B because it was touched twice</text>
+  <text x="380" y="272" fill="#5b6471" font-size="12" text-anchor="middle">A camera that flies keeps LRU warm; a camera that orbits one site keeps LFU warm. Most twins do both, so segment the cache.</text>
+</svg>
+<figcaption>Neither policy wins outright — they encode different assumptions about how the camera moves. Measuring the hit rate on real telemetry settles it faster than reasoning does.</figcaption>
+</figure>
 
 ### 5. Drive the loop from camera telemetry
 

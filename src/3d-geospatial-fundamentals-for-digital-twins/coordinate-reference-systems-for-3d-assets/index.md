@@ -32,9 +32,10 @@ A complete 3D reference is two CRSs fused into one declaration: a horizontal fra
 A compound CRS such as EPSG:32618+5703 names both halves in one string and removes the ambiguity entirely. Why not just keep ellipsoidal heights everywhere and avoid the geoid? Because every product the twin feeds — flood extents, line-of-sight, clearance envelopes, solar irradiance — is referenced to mean sea level, and the analyst comparing your output to a published benchmark or a flood gauge works in orthometric heights. Carry ellipsoidal Z into that comparison and the model is wrong by N, which in parts of the world is larger than the buildings being analysed. The diagram below shows the separation you are reconciling on every Z value, and the transformation chain that carries a GNSS point into a metric, orthometric twin.
 
 <figure class="diagram">
-<svg viewBox="0 0 860 320" role="img" aria-labelledby="crs-geoid-t crs-geoid-d" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="16 29 818 227" role="img" aria-labelledby="crs-geoid-t crs-geoid-d" xmlns="http://www.w3.org/2000/svg">
   <title id="crs-geoid-t">Ellipsoid, geoid, and the CRS transformation chain</title>
   <desc id="crs-geoid-d">A ground point sits at ellipsoidal height h above the ellipsoid and orthometric height H above the geoid; the two differ by the geoid undulation N. The lower row shows the transformation chain from WGS84 geographic through a geoid grid to a compound projected and orthometric CRS.</desc>
+  <rect class="svg-bg" x="16" y="29" width="818" height="227" fill="#ffffff"/>
   <defs>
     <marker id="crs-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
@@ -47,20 +48,20 @@ A compound CRS such as EPSG:32618+5703 names both halves in one string and remov
   <line x1="460" y1="48" x2="460" y2="119" stroke="#c46a3d" stroke-width="2"/>
   <line x1="420" y1="70" x2="420" y2="118" stroke="#5b6471" stroke-width="2" stroke-dasharray="4 3"/>
   <g fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2">
-    <rect x="30" y="225" width="170" height="62" rx="8"/>
-    <rect x="500" y="225" width="200" height="62" rx="8"/>
+    <rect x="30" y="180" width="170" height="62" rx="8"/>
+    <rect x="500" y="180" width="200" height="62" rx="8"/>
   </g>
-  <rect x="265" y="225" width="170" height="62" rx="8" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <rect x="265" y="180" width="170" height="62" rx="8" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
   <g stroke="#5b6471" stroke-width="2" marker-end="url(#crs-arrow)">
-    <line x1="200" y1="256" x2="263" y2="256"/>
-    <line x1="435" y1="256" x2="498" y2="256"/>
+    <line x1="200" y1="211" x2="263" y2="211"/>
+    <line x1="435" y1="211" x2="498" y2="211"/>
   </g>
   <g fill="#1f2937" font-size="13" text-anchor="middle">
     <text x="540" y="64" font-size="12">ground point</text>
     <text x="408" y="98" font-size="12">N</text>
-    <text x="115" y="252"><tspan x="115" dy="0">EPSG:4326</tspan><tspan x="115" dy="16">lon, lat, h</tspan></text>
-    <text x="350" y="252"><tspan x="350" dy="0">geoid grid</tspan><tspan x="350" dy="16">GEOID18 / EGM2008</tspan></text>
-    <text x="600" y="252"><tspan x="600" dy="0">EPSG:32618+5703</tspan><tspan x="600" dy="16">E, N, orthometric H</tspan></text>
+    <text x="115" y="207"><tspan x="115" dy="0">EPSG:4326</tspan><tspan x="115" dy="16">lon, lat, h</tspan></text>
+    <text x="350" y="207"><tspan x="350" dy="0">geoid grid</tspan><tspan x="350" dy="16">GEOID18 / EGM2008</tspan></text>
+    <text x="600" y="207"><tspan x="600" dy="0">EPSG:32618+5703</tspan><tspan x="600" dy="16">E, N, orthometric H</tspan></text>
   </g>
   <text x="700" y="60" fill="#1f6b8a" font-size="12" text-anchor="middle">ellipsoid</text>
   <text x="700" y="140" fill="#c46a3d" font-size="12" text-anchor="middle">geoid</text>
@@ -111,6 +112,39 @@ op = transformer.transformer_group.transformers[0] if hasattr(transformer, "tran
 print("operation:", transformer.description)          # names the grid(s) PROJ selected
 print("grids available:", all(g.available for g in transformer.get_grids_used() or []))
 ```
+
+<figure class="diagram">
+<svg viewBox="0 6 758 312" role="img" aria-labelledby="crs-op-t crs-op-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="crs-op-t">How PROJ picks a transformation, and where it silently downgrades</title>
+  <desc id="crs-op-d">A Transformer request feeds PROJ's operation search, which ranks candidate pipelines by stated accuracy: a grid shift at two centimetres, a seven-parameter Helmert at half a metre, and a ballpark or null transform at two metres or worse. A missing grid file does not raise an error; PROJ simply steps down to the next candidate.</desc>
+  <rect class="svg-bg" x="0" y="6" width="758" height="312" fill="#ffffff"/>
+  <defs>
+    <marker id="crs-op-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
+    </marker>
+  </defs>
+  <rect x="14" y="110" width="170" height="74" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="204" y="110" width="160" height="74" rx="8" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <rect x="396" y="20" width="348" height="64" rx="8" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <rect x="396" y="115" width="348" height="64" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="396" y="210" width="348" height="64" rx="8" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <g stroke="#5b6471" stroke-width="2" fill="none" marker-end="url(#crs-op-arrow)">
+    <line x1="184" y1="147" x2="202" y2="147"/>
+    <path d="M364 140 C 380 100 380 70 394 52"/>
+    <line x1="364" y1="147" x2="394" y2="147"/>
+    <path d="M364 154 C 380 194 380 224 394 242"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="99" y="140"><tspan x="99" dy="0">Transformer.from_crs</tspan><tspan x="99" dy="16">4326+5773 →</tspan><tspan x="99" dy="15">32618+5703</tspan></text>
+    <text x="284" y="140"><tspan x="284" dy="0">PROJ operation</tspan><tspan x="284" dy="16">search — rank by</tspan><tspan x="284" dy="15">stated accuracy</tspan></text>
+    <text x="570" y="46"><tspan x="570" dy="0">grid shift — NADCON5 + GEOID18</tspan><tspan x="570" dy="16">0.02 m · chosen when the grid is on disk</tspan></text>
+    <text x="570" y="141"><tspan x="570" dy="0">7-parameter Helmert</tspan><tspan x="570" dy="16">0.5 m · no grid needed</tspan></text>
+    <text x="570" y="236"><tspan x="570" dy="0">ballpark / null transform</tspan><tspan x="570" dy="16">2 m or worse · taken silently if grids are absent</tspan></text>
+  </g>
+  <text x="380" y="300" fill="#15384a" font-size="12.5" text-anchor="middle">A missing grid is not an error — PROJ steps down the list. description and get_grids_used() are what expose it.</text>
+</svg>
+<figcaption>PROJ ranks candidate pipelines and takes the best one it can actually run. Nothing in the API complains when that is the bottom of the list, so the check has to be yours.</figcaption>
+</figure>
 
 PROJ selects a transformation pipeline by searching its operation database for the most accurate path between the two CRSs, ranking candidates by stated accuracy and grid availability. When the ideal grid is missing it does not fail — it falls back to a lower-accuracy operation, often a 3-parameter or null transformation, and reports a larger accuracy figure that nobody reads. Inspecting `transformer.description` and `get_grids_used()` turns that hidden downgrade into an assertion you can fail a build on. For datum transformations that span a national extent, a 7-parameter Helmert or a grid shift (NADCON5, OSTN15, the GEOID18 grids) is the difference between sub-centimetre and multi-metre fidelity, so confirming the operation by name is worth the two extra lines.
 
@@ -213,6 +247,49 @@ print(f"control-point vertical residual: {residual*1000:.1f} mm")
 ```
 
 Expected outcome: round-trip residuals below 1 mm horizontal and 1 mm vertical, and a control-point residual within your survey tolerance (commonly 2–5 cm). A residual near a round 30–100 m is the unmistakable signature of a missing vertical grid; a residual that is a clean swap of magnitude between easting and northing means `always_xy=True` was dropped somewhere in the chain. Run both checks in CI against a small fixture of published benchmarks so a PROJ data upgrade or a grid removal surfaces as a failing test rather than a silently shifted twin. Log the operation name, the grid file, and its version alongside the residuals, because reproducing a transform six months later requires knowing not just the EPSG codes but which geoid grid revision produced the numbers.
+
+<figure class="diagram">
+<svg viewBox="6 4 788 330" role="img" aria-labelledby="crs-resid-t crs-resid-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="crs-resid-t">Reading a CRS residual as a diagnosis</title>
+  <desc id="crs-resid-d">Five residual signatures and what each one means: sub-millimetre residuals mean the chain is correct; a uniform thirty to one hundred metre offset in Z means no geoid grid was applied; swapped easting and northing magnitudes mean always_xy was omitted; a two parts per million scale error means survey feet were mixed with international feet; and an offset that grows with acquisition year means a dynamic datum was transformed without an epoch.</desc>
+  <rect class="svg-bg" x="6" y="4" width="788" height="330" fill="#ffffff"/>
+  <rect x="20" y="18" width="340" height="40" rx="8" fill="#1f6b8a" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="376" y="18" width="404" height="40" rx="8" fill="#1f6b8a" stroke="#1f6b8a" stroke-width="2"/>
+  <g fill="#eef5e9" stroke="#4f7a4d" stroke-width="2">
+    <rect x="20" y="70" width="340" height="42" rx="8"/>
+    <rect x="376" y="70" width="404" height="42" rx="8"/>
+  </g>
+  <g fill="#fdf3e0" stroke="#c46a3d" stroke-width="2">
+    <rect x="20" y="122" width="340" height="42" rx="8"/>
+    <rect x="376" y="122" width="404" height="42" rx="8"/>
+    <rect x="20" y="174" width="340" height="42" rx="8"/>
+    <rect x="376" y="174" width="404" height="42" rx="8"/>
+    <rect x="20" y="226" width="340" height="42" rx="8"/>
+    <rect x="376" y="226" width="404" height="42" rx="8"/>
+    <rect x="20" y="278" width="340" height="42" rx="8"/>
+    <rect x="376" y="278" width="404" height="42" rx="8"/>
+  </g>
+  <g font-size="13" text-anchor="middle" font-weight="600">
+    <text x="190" y="44" fill="#ffffff">What the residual looks like</text>
+    <text x="578" y="44" fill="#ffffff">What it is telling you</text>
+  </g>
+  <g font-size="12.5" text-anchor="middle" fill="#1f2937">
+    <text x="190" y="96">under 1 mm in X, Y and Z</text>
+    <text x="190" y="148">uniform 30–100 m offset in Z</text>
+    <text x="190" y="200">easting and northing magnitudes swapped</text>
+    <text x="190" y="252">horizontal scale off by about 2 ppm</text>
+    <text x="190" y="304">offset grows with acquisition year</text>
+    <text x="578" y="96">chain is correct — log the grid file and its version</text>
+    <text x="578" y="148">no geoid grid: heights fell back to ellipsoidal</text>
+    <text x="578" y="200">always_xy=True missing somewhere in the chain</text>
+    <text x="578" y="252">US survey feet mixed with international feet</text>
+    <text x="578" y="304">dynamic datum transformed without a coordinate epoch</text>
+  </g>
+</svg>
+<figcaption>A residual is a diagnosis, not just a number. Its shape — uniform, swapped, scaled, or drifting — names the specific mistake.</figcaption>
+</figure>
+
+Because the signature is that legible, it is worth asserting on shape as well as magnitude. A test that only checks `abs(residual) < 0.05` passes a pipeline that is wrong in a way that happens to be small today and large next quarter; a test that additionally asserts the residual is not correlated with acquisition epoch, and that the easting/northing ratio is within a few parts per million of one, catches the drift and the unit slip while they are still cheap.
 
 ## Performance & Scale
 

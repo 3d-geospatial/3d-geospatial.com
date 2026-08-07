@@ -59,6 +59,32 @@ def assert_projected(crs):
 assert_projected(source_crs)             # EPSG:32618 -> passes
 ```
 
+<figure class="diagram">
+<svg viewBox="43 6 715 304" role="img" aria-labelledby="ac-fun-t ac-fun-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="ac-fun-t">What each assertion actually rejects on a real intake</title>
+  <desc id="ac-fun-d">Of six hundred and fifty files from a municipal intake, twenty-eight carried no readable CRS, twenty-five were geographic rather than projected, eight were in US survey feet, and three resolved only through a ballpark transform. Each assertion catches a class the others cannot see.</desc>
+  <rect class="svg-bg" x="43" y="6" width="715" height="304" fill="#ffffff"/>
+  <text x="380" y="34" fill="#1f2937" font-size="13" text-anchor="middle" font-weight="600">Four assertions, four disjoint failure classes</text>
+  <rect x="250" y="56" width="273" height="30" rx="5" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <text x="240" y="76" fill="#1f2937" font-size="12" text-anchor="end">650 files arrive</text>
+  <text x="533" y="76" fill="#5b6471" font-size="11.5" text-anchor="start">everything the ingest job was handed</text>
+  <rect x="250" y="100" width="261" height="30" rx="5" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <text x="240" y="120" fill="#1f2937" font-size="12" text-anchor="end">CRS resolves at all</text>
+  <text x="521" y="120" fill="#5b6471" font-size="11.5" text-anchor="start">28 had no readable CRS in any header</text>
+  <rect x="250" y="144" width="250" height="30" rx="5" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <text x="240" y="164" fill="#1f2937" font-size="12" text-anchor="end">CRS is projected</text>
+  <text x="510" y="164" fill="#5b6471" font-size="11.5" text-anchor="start">25 were geographic — degrees, not metres</text>
+  <rect x="250" y="188" width="247" height="30" rx="5" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <text x="240" y="208" fill="#1f2937" font-size="12" text-anchor="end">linear unit is the metre</text>
+  <text x="507" y="208" fill="#5b6471" font-size="11.5" text-anchor="start">8 were in US survey feet</text>
+  <rect x="250" y="232" width="246" height="30" rx="5" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <text x="240" y="252" fill="#1f2937" font-size="12" text-anchor="end">round-trip under 1 mm</text>
+  <text x="506" y="252" fill="#5b6471" font-size="11.5" text-anchor="start">3 fell back to a ballpark transform</text>
+  <text x="380" y="292" fill="#15384a" font-size="12" text-anchor="middle">64 of 650 files would have entered the pipeline silently. None of them is malformed; every one of them is unusable.</text>
+</svg>
+<figcaption>The assertions are cheap and they are not redundant. Dropping any one of the four leaves a class of file that reaches tiling and is wrong in a way no later stage can detect.</figcaption>
+</figure>
+
 ### 3. Assert the linear unit is the metre
 
 Projected does not guarantee metres — some state-plane and legacy systems use US survey feet, which silently scales every coordinate by 0.3048. Inspect each axis's `unit_name` via `axis_info` and require metres on the horizontal axes.
@@ -74,6 +100,34 @@ def assert_metric(crs):
 
 assert_metric(source_crs)                # EPSG:32618 axes are 'metre' -> passes
 ```
+
+<figure class="diagram">
+<svg viewBox="26 46 666 228" role="img" aria-labelledby="ac-unit-t ac-unit-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="ac-unit-t">What each unit confusion costs over three hundred metres</title>
+  <desc id="ac-unit-d">Mistaking international feet for metres is a factor of three and impossible to miss. Mistaking US survey feet for international feet is two parts per million, six tenths of a millimetre over three hundred metres, and invisible in every viewer while still breaking a survey tie. Millimetres for metres is a factor of a thousand and usually lands the model off the planet.</desc>
+  <rect class="svg-bg" x="26" y="46" width="666" height="228" fill="#ffffff"/>
+  <g stroke-width="2">
+    <rect x="40" y="60" width="300" height="34" rx="6" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="40" y="106" width="300" height="34" rx="6" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="40" y="152" width="300" height="34" rx="6" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="40" y="198" width="300" height="34" rx="6" fill="#eef5e9" stroke="#4f7a4d"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="190" y="82">millimetres read as metres</text>
+    <text x="190" y="128">international feet read as metres</text>
+    <text x="190" y="174">US survey feet read as international feet</text>
+    <text x="190" y="220">metres read as metres</text>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="start">
+    <text x="368" y="82">×1000 — the model leaves the planet</text>
+    <text x="368" y="128">×3.28 — obvious in any viewer</text>
+    <text x="368" y="174">+0.6 mm over 300 m — invisible, and it breaks the tie</text>
+    <text x="368" y="220">the only case that needs no correction</text>
+  </g>
+  <text x="380" y="256" fill="#15384a" font-size="12.5" text-anchor="middle">Only the third row is dangerous, precisely because the first two announce themselves and it does not</text>
+</svg>
+<figcaption>An assertion on the linear unit costs one line and catches the only unit error that will otherwise survive review.</figcaption>
+</figure>
 
 ### 4. Round-trip a control point to prove the transform is metric and lossless
 
@@ -122,9 +176,10 @@ crs_preflight(32618, 583_000.0, 4_507_000.0)     # accepted
 ```
 
 <figure class="diagram">
-<svg viewBox="0 0 760 320" role="img" aria-labelledby="crs-t crs-d" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="46 16 668 302" role="img" aria-labelledby="crs-t crs-d" xmlns="http://www.w3.org/2000/svg">
   <title id="crs-t">CRS preflight accepting EPSG:32618 and rejecting EPSG:4326</title>
   <desc id="crs-d">EPSG:32618 passes the projected, metric-unit, and round-trip checks and is accepted for tiling, while EPSG:4326 fails the projected check immediately and is rejected without tiling.</desc>
+  <rect class="svg-bg" x="46" y="16" width="668" height="302" fill="#ffffff"/>
   <defs>
     <marker id="crs-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
@@ -191,6 +246,8 @@ correctly rejected: WGS 84 (EPSG:4326) is geographic degrees; tiling needs a pro
 ```
 
 The round-trip residual for a well-formed projected CRS is sub-micron in practice; anything above a millimetre signals a malformed transform. The 100 m offset check returns a span within half a metre of 100 for a true metric CRS and collapses to a tiny fraction of a degree for a geographic one.
+
+Run this preflight on the source files, not on an intermediate the pipeline has already rewritten. By the time a file has passed through one conversion its CRS is whatever the converter decided to write, which may be correct, absent, or confidently wrong — and asserting against that tells you about the converter rather than about the data you were given.
 
 ## Common Errors
 

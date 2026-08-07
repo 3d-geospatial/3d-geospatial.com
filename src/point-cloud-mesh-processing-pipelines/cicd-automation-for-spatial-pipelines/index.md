@@ -32,9 +32,10 @@ A spatial CI/CD pipeline has four stages, and the contract between them is what 
 Two properties make this reliable. First, **containerisation with pinned versions**: the exact `gdal`/`pdal` build runs identically on a contributor's fork and on the release runner, so "works on my machine" stops being a category of bug. Second, **artifact promotion**: the bytes validated on the pull request are the bytes deployed — CI uploads the processed tileset as a build artifact, the gate inspects that artifact, and the deploy stage downloads the same artifact rather than rebuilding, so nothing unreviewed slips between validation and publish. Fan-out is handled by a matrix over tiles, so a thousand-tile city rebuilds in parallel while each tile still passes the same gate.
 
 <figure class="diagram">
-<svg viewBox="0 0 860 340" role="img" aria-labelledby="cicd-flow-t cicd-flow-d" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="6 106 858 222" role="img" aria-labelledby="cicd-flow-t cicd-flow-d" xmlns="http://www.w3.org/2000/svg">
   <title id="cicd-flow-t">CI/CD gate flow for a spatial tileset pipeline</title>
   <desc id="cicd-flow-d">A pull request triggers a build-and-process stage running GDAL and PDAL, whose output passes through validation gates; when the gates pass the tileset deploys to a CDN or Cesium ion, and when any gate fails a red branch blocks the merge with no deploy.</desc>
+  <rect class="svg-bg" x="6" y="106" width="858" height="222" fill="#ffffff"/>
   <defs>
     <marker id="cicd-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
@@ -157,6 +158,50 @@ A city is thousands of independent tiles. Emit the tile list in one job, then ru
         with: { name: "tile-${{ matrix.tile }}", path: "work/" }
 ```
 
+<figure class="diagram">
+<svg viewBox="-53 26 866 268" role="img" aria-labelledby="ci-mat-t ci-mat-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="ci-mat-t">Fanning tiles across a matrix, and the join that follows</title>
+  <desc id="ci-mat-d">A matrix job runs one shard per runner in parallel, each producing an artifact. A single join step downloads all of them, runs the cross-tile checks that no individual runner can perform — bounding-volume containment, seam continuity, manifest completeness — and only then promotes the build.</desc>
+  <rect class="svg-bg" x="-53" y="26" width="866" height="268" fill="#ffffff"/>
+  <defs>
+    <marker id="ci-mat-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
+    </marker>
+  </defs>
+  <rect x="24" y="118" width="140" height="52" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <g fill="#fdf3e0" stroke="#c46a3d" stroke-width="2">
+    <rect x="230" y="40" width="180" height="42" rx="8"/>
+    <rect x="230" y="96" width="180" height="42" rx="8"/>
+    <rect x="230" y="152" width="180" height="42" rx="8"/>
+    <rect x="230" y="208" width="180" height="42" rx="8"/>
+  </g>
+  <rect x="476" y="96" width="150" height="98" rx="8" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <rect x="646" y="118" width="96" height="52" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <g stroke="#5b6471" stroke-width="2" fill="none" marker-end="url(#ci-mat-a)">
+    <path d="M164 132 C 190 96 200 76 228 61"/>
+    <path d="M164 140 L228 119"/>
+    <path d="M164 152 L228 172"/>
+    <path d="M164 160 C 190 196 200 214 228 229"/>
+    <path d="M410 61 C 440 80 450 96 474 116"/>
+    <path d="M410 117 L474 134"/>
+    <path d="M410 173 L474 156"/>
+    <path d="M410 229 C 440 210 450 194 474 174"/>
+    <path d="M626 145 L644 145"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="94" y="140"><tspan x="94" dy="0">shard list</tspan><tspan x="94" dy="16">from the manifest</tspan></text>
+    <text x="320" y="66">runner — shard 0-0</text>
+    <text x="320" y="122">runner — shard 0-1</text>
+    <text x="320" y="178">runner — shard 1-0</text>
+    <text x="320" y="234">runner — shard 1-1</text>
+    <text x="551" y="132"><tspan x="551" dy="0">join: cross-tile</tspan><tspan x="551" dy="16">checks no single</tspan><tspan x="551" dy="16">runner can do</tspan></text>
+    <text x="694" y="148">promote</text>
+  </g>
+  <text x="380" y="276" fill="#15384a" font-size="12" text-anchor="middle">Containment, seam continuity and manifest completeness are properties of the set — they have to be asserted after the fan-in, never inside a runner</text>
+</svg>
+<figcaption>Matrix jobs make the per-tile checks cheap and the cross-tile checks impossible. The join step is where the second kind has to live.</figcaption>
+</figure>
+
 ### 5. Gate: validate and exit non-zero on any failure
 
 The gate is the point of the whole exercise. It runs `3d-tiles-validator` and the CRS/schema assertions, and a non-zero exit is what GitHub converts into a failed required check that blocks the merge. The assertion library is developed in the [schema validation gates](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/schema-validation-gates-for-spatial-data/) guide.
@@ -213,6 +258,31 @@ print("gate polarity verified")
 
 **Expected values.** The determinism check prints `deterministic OK`; a non-deterministic result usually traces to an unpinned PROJ grid or a thread-count-dependent PDAL filter. The gate check must print `gate polarity verified`; if the bad fixture passes, the JSON Schema is too loose. In the Actions UI the `gate` job shows as a required status check, and the merge button is disabled on a red gate.
 
+<figure class="diagram">
+<svg viewBox="16 6 708 262" role="img" aria-labelledby="ci-pin-t ci-pin-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="ci-pin-t">What has to be pinned for a rebuild to be reproducible</title>
+  <desc id="ci-pin-d">A spatial pipeline's output depends on the container digest, the PROJ data version, the encoder version, the pipeline parameters and the source data hash. Pinning the first four and hashing the fifth is what lets an identical input produce byte-identical tiles a year later.</desc>
+  <rect class="svg-bg" x="16" y="6" width="708" height="262" fill="#ffffff"/>
+  <g fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2">
+    <rect x="30" y="56" width="320" height="36" rx="6"/>
+    <rect x="30" y="100" width="320" height="36" rx="6"/>
+    <rect x="30" y="144" width="320" height="36" rx="6"/>
+    <rect x="30" y="188" width="320" height="36" rx="6"/>
+  </g>
+  <rect x="390" y="100" width="320" height="80" rx="8" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <g fill="#1f2937" font-size="12" text-anchor="middle">
+    <text x="190" y="79">container image by digest, not by tag</text>
+    <text x="190" y="123">PROJ data release — grids change results</text>
+    <text x="190" y="167">encoder version — Draco, gltfpack, py3dtiles</text>
+    <text x="190" y="211">pipeline parameters, committed as a file</text>
+    <text x="550" y="132"><tspan x="550" dy="0">plus the source data hash</tspan><tspan x="550" dy="17">= byte-identical output</tspan><tspan x="550" dy="16">on any runner, any year</tspan></text>
+  </g>
+  <text x="370" y="34" fill="#1f2937" font-size="13" text-anchor="middle" font-weight="600">A "latest" tag anywhere in this list makes the build unreproducible and the content hash meaningless</text>
+  <text x="370" y="250" fill="#5b6471" font-size="12" text-anchor="middle">The PROJ data version is the one teams forget: a geoid grid revision moves every height without touching a line of code</text>
+</svg>
+<figcaption>Reproducibility here is not a nicety — the incremental rebuild's content hash is only trustworthy if everything outside the hash is pinned.</figcaption>
+</figure>
+
 ## Performance & Scale
 
 For city- and region-scale twins the runner-minutes bill is dominated by two things: repeated dependency installation and redundant reprocessing of unchanged tiles.
@@ -267,6 +337,8 @@ Combine three levers: a hash-keyed cache so only changed tiles reprocess, a matr
 ### Where should the source CRS be asserted in the pipeline?
 
 At both ends. Assert the declared input EPSG during ingest so a mislabelled tile fails before any processing, and assert the output CRS in the validation gate so a reprojection bug cannot ship. Pinning one projected EPSG (for example EPSG:32618) through the source and one delivery CRS (EPSG:4978 via EPSG:4979) through the tiler, and checking both in code, is what keeps measurements on the streamed tileset consistent with the original survey.
+
+Finally, keep the pipeline definition and the workflow file separate. The PDAL and GDAL steps describe what the data transformation is and belong in version control next to the data contract; the workflow file describes when and where that transformation runs. Merging the two produces a workflow nobody can execute locally, which in turn produces a pipeline nobody tests before pushing.
 
 ## Related Guides
 

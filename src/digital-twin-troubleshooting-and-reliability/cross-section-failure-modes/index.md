@@ -28,9 +28,10 @@ A boundary defect is a violation of an implicit contract between two pipelines. 
 Five contracts break most often. **CRS drift** occurs when a transform chain silently swaps a datum or mixes a geographic frame with a projected one, so adjacent tiles land on slightly different coordinates and seam. **Unit mismatch** makes every downstream metric meaningless: a `geometricError` computed in degrees, or a mesh exported in feet and assumed to be metres, produces refinement and measurement numbers that are internally consistent but physically wrong. **Non-manifold widening** turns a tolerated topological flaw into a visible hole once decimation collapses the surrounding edges. **Batch-table loss** drops per-feature attributes — asset IDs, classifications, material keys — during a simplification or tiling step, breaking every downstream analytic join. **Vertical-datum steps** appear when ellipsoidal and orthometric heights are mixed across a survey, producing a Z discontinuity at tile edges. Each has a cheap, deterministic assertion that belongs at the boundary it protects.
 
 <figure class="diagram">
-<svg viewBox="0 0 820 360" role="img" aria-labelledby="cpf-t cpf-d" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="6 16 808 330" role="img" aria-labelledby="cpf-t cpf-d" xmlns="http://www.w3.org/2000/svg">
   <title id="cpf-t">Boundary-contract checkpoints between the three twin pipelines</title>
   <desc id="cpf-d">Fundamentals hands values to LOD, which hands values to mesh and point-cloud processing. At the first hand-off a checkpoint asserts one EPSG, metric units, and a manifold surface. At the second checkpoint it asserts measured geometric error, an intact batch table, and consistent vertical datum. A failed checkpoint localises the defect to that exact hand-off.</desc>
+  <rect class="svg-bg" x="6" y="16" width="808" height="330" fill="#ffffff"/>
   <defs>
     <marker id="cpf-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
@@ -63,6 +64,12 @@ Five contracts break most often. **CRS drift** occurs when a transform chain sil
 </svg>
 <figcaption>Each hand-off carries a contract. Checkpoint A guards CRS, units, and topology; checkpoint B guards the error metric, attribute schema, and vertical datum. A failing assert names the boundary that broke it.</figcaption>
 </figure>
+
+What makes these failures a category rather than a list is that each of them is invisible from inside any single stage. The stage that introduces the fault behaves correctly by its own definition — the ingest step really did read the file it was given, the tiler really did write the attributes it was handed — and the stage that exhibits the symptom has no access to the information that would explain it. A tiler cannot know that the heights it received were ellipsoidal, because nothing it can see says so. That is why the remedy is never "check more carefully inside the stage" and always "state the contract at the boundary".
+
+A boundary contract has three parts and all three have to be executable. First, what the producer guarantees: an explicit compound CRS, a stated classification scheme, a bounded deviation, a monotonic error. Second, what the consumer requires, expressed independently rather than by reference to the producer, so that swapping the producer does not silently swap the requirement with it. Third, the assertion itself, run on real data at the hand-off, failing loudly with both the expectation and the observation in the message. Contracts that exist only as the first two parts are documentation, and documentation does not fail a build.
+
+The practical test of whether a contract is real is whether it has ever rejected anything. An assertion that has never fired in six months of builds is either genuinely redundant or, far more often, quietly disabled — asserting on a field that is always absent, comparing against a value derived from the same source it is meant to check, or wrapped in a try block that was added to make the pipeline green. Feeding each gate an input it must refuse, once, is the cheapest way to find out which of the two it is.
 
 ## Step-by-Step Workflow
 
@@ -125,6 +132,44 @@ print(f"faces {len(mesh.faces)}, watertight {mesh.is_watertight}, open edges {op
 
 When this fails, repair before tiling — the procedure is in [fixing non-manifold edges in 3D meshes](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/fixing-non-manifold-edges-in-3d-meshes/), part of the broader [mesh topology basics](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/).
 
+<figure class="diagram">
+<svg viewBox="6 20 744 290" role="img" aria-labelledby="cs-fan-t cs-fan-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="cs-fan-t">One root cause, five unrelated-looking symptoms</title>
+  <desc id="cs-fan-d">A point cloud ingested without a declared vertical datum produces a flood model that dams itself, clearance figures that are wrong by the geoid separation, a visible step where two tile batches meet, terrain that floats above building footings, and a survey comparison that fails. Each is reported by a different team against a different component.</desc>
+  <rect class="svg-bg" x="6" y="20" width="744" height="290" fill="#ffffff"/>
+  <defs>
+    <marker id="cs-fan-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
+    </marker>
+  </defs>
+  <rect x="20" y="118" width="196" height="64" rx="8" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <g fill="#fdf3e0" stroke="#c46a3d" stroke-width="2">
+    <rect x="380" y="34" width="356" height="38" rx="8"/>
+    <rect x="380" y="84" width="356" height="38" rx="8"/>
+    <rect x="380" y="134" width="356" height="38" rx="8"/>
+    <rect x="380" y="184" width="356" height="38" rx="8"/>
+    <rect x="380" y="234" width="356" height="38" rx="8"/>
+  </g>
+  <g stroke="#5b6471" stroke-width="2" fill="none" marker-end="url(#cs-fan-a)">
+    <path d="M216 138 C 280 100 320 70 378 54"/>
+    <path d="M216 144 C 280 124 320 110 378 104"/>
+    <path d="M216 150 L378 153"/>
+    <path d="M216 156 C 280 176 320 190 378 203"/>
+    <path d="M216 162 C 280 200 320 230 378 252"/>
+  </g>
+  <text x="118" y="144" fill="#1f2937" font-size="12.5" text-anchor="middle"><tspan x="118" dy="0" font-weight="600">no declared</tspan><tspan x="118" dy="17">vertical datum at ingest</tspan></text>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="558" y="58">the flood model dams itself behind buildings</text>
+    <text x="558" y="108">clearances are out by the geoid separation</text>
+    <text x="558" y="158">a step appears where two tile batches meet</text>
+    <text x="558" y="208">terrain floats above the building footings</text>
+    <text x="558" y="258">the survey comparison fails on every point</text>
+  </g>
+  <text x="380" y="292" fill="#15384a" font-size="12" text-anchor="middle">Five tickets, five components, five owners — and one assertion at ingest that would have prevented all of them</text>
+</svg>
+<figcaption>Cross-section faults are hard not because they are subtle but because the symptom is always reported far from the cause, by someone who cannot see it.</figcaption>
+</figure>
+
 ### 4. Diff the attribute schema across the tiling hand-off
 
 Batch-table loss is silent: geometry survives, attributes vanish. Capture the source schema before decimation and assert parity on the tiled output so a dropped key fails the build.
@@ -148,6 +193,50 @@ missing = set(source_schema) - set(emitted_schema)
 assert not missing, f"batch table dropped keys across tiling: {missing}"
 print(f"attribute parity held: {sorted(emitted_schema)}")
 ```
+
+<figure class="diagram">
+<svg viewBox="24 -13 692 317" role="img" aria-labelledby="cs-diff-t cs-diff-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="cs-diff-t">An attribute schema diff across the tiling hand-off</title>
+  <desc id="cs-diff-d">The source features carry seven attributes. The batch table written by the tiler carries five. Two were dropped because no mapping existed for them, and nothing in the tiling step treats a missing mapping as an error, so the loss is only visible by comparing the two sets explicitly.</desc>
+  <rect class="svg-bg" x="24" y="-13" width="692" height="317" fill="#ffffff"/>
+  <g fill="#eef5e9" stroke="#4f7a4d" stroke-width="2">
+    <rect x="40" y="60" width="240" height="30" rx="6"/>
+    <rect x="40" y="96" width="240" height="30" rx="6"/>
+    <rect x="40" y="132" width="240" height="30" rx="6"/>
+    <rect x="40" y="168" width="240" height="30" rx="6"/>
+    <rect x="40" y="204" width="240" height="30" rx="6"/>
+  </g>
+  <g fill="#f7dfdc" stroke="#b0413e" stroke-width="2">
+    <rect x="40" y="240" width="240" height="30" rx="6"/>
+  </g>
+  <rect x="40" y="24" width="240" height="30" rx="6" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <g fill="#eef5e9" stroke="#4f7a4d" stroke-width="2">
+    <rect x="440" y="60" width="240" height="30" rx="6"/>
+    <rect x="440" y="96" width="240" height="30" rx="6"/>
+    <rect x="440" y="132" width="240" height="30" rx="6"/>
+    <rect x="440" y="168" width="240" height="30" rx="6"/>
+    <rect x="440" y="204" width="240" height="30" rx="6"/>
+  </g>
+  <g fill="#1f2937" font-size="12" text-anchor="middle">
+    <text x="160" y="44">roof_material</text>
+    <text x="160" y="80">gml_id</text>
+    <text x="160" y="116">year_built</text>
+    <text x="160" y="152">function_code</text>
+    <text x="160" y="188">storeys</text>
+    <text x="160" y="224">height_m</text>
+    <text x="160" y="260">heritage_status</text>
+    <text x="560" y="80">gml_id</text>
+    <text x="560" y="116">year_built</text>
+    <text x="560" y="152">function_code</text>
+    <text x="560" y="188">storeys</text>
+    <text x="560" y="224">height_m</text>
+  </g>
+  <text x="160" y="14" fill="#5b6471" font-size="12" text-anchor="middle">source features — 7 attributes</text>
+  <text x="560" y="44" fill="#5b6471" font-size="12" text-anchor="middle">batch table — 5 attributes</text>
+  <text x="370" y="286" fill="#b0413e" font-size="12.5" text-anchor="middle">Two attributes had no mapping, so the tiler silently omitted them — set difference is the only check that sees this</text>
+</svg>
+<figcaption>Nothing errors, no file is malformed, and the tileset validates. The loss exists only as the difference between two sets that nobody compared.</figcaption>
+</figure>
 
 ### 5. Assert a single consistent vertical datum
 
@@ -215,6 +304,8 @@ Only if your data has no meaningful heights, which is rarely true for a twin. A 
 
 ### Where should these assertions live — in the pipeline or in CI?
 Both. Run them inline in the ingestion and tiling code so a bad dataset fails fast at the boundary it violated, and run the same assertions as CI gates so an incremental rebuild cannot reintroduce a defect a previous fix removed. The checks are cheap metadata operations, so there is no performance reason to run them in only one place; correctness comes from running them everywhere a value crosses a boundary.
+
+A closing note on where these assertions belong. Putting them in the pipeline means they run on every execution, including the ad-hoc ones somebody runs from a laptop, which is where most bad artifacts are actually produced. Putting them in CI means they see the whole artifact and can check properties no single execution can. Both is right, and the duplication is not waste: the pipeline copy catches the fault early, and the CI copy is the one that can block a merge.
 
 ## Related Guides
 

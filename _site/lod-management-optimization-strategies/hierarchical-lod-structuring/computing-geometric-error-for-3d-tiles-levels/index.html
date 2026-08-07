@@ -1,0 +1,681 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <title>Computing Geometric Error for 3D Tiles Levels — 3D Geospatial</title>
+  <meta name="description" content="Derive geometricError per tile level from measured Hausdorff deviation instead of halving a guess, assert monotonicity, and check what it means in pixels.">
+  <meta name="keywords" content="3D geospatial, digital twin, point cloud, mesh pipeline, LOD, 3D Tiles, Cesium, PDAL, Open3D, Python, CI/CD">
+  <meta name="author" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta name="theme-color" content="#1f6b8a" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f171d" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+
+  
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem("theme");
+        var theme = (stored === "dark" || stored === "light") ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    })();
+  </script>
+  <meta name="generator" content="Eleventy">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="googlebot" content="index,follow,max-image-preview:large">
+
+  
+  <link rel="canonical" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/computing-geometric-error-for-3d-tiles-levels/">
+  <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">
+
+  
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/icon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+
+  
+  <link rel="apple-touch-icon" href="/assets/img/icon-180.png">
+  <link rel="mask-icon" href="/assets/img/logo.svg" color="#1f6b8a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="3D Geospatial">
+  <meta name="application-name" content="3D Geospatial">
+
+  
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Computing Geometric Error for 3D Tiles Levels — 3D Geospatial">
+  <meta property="og:description" content="Derive geometricError per tile level from measured Hausdorff deviation instead of halving a guess, assert monotonicity, and check what it means in pixels.">
+  <meta property="og:url" content="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/computing-geometric-error-for-3d-tiles-levels/">
+  <meta property="og:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+  <meta property="og:site_name" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta property="og:locale" content="en_US">
+  
+  <meta property="article:published_time" content="2026-08-07T02:39:36.516Z">
+  <meta property="article:modified_time" content="2026-08-07T02:39:36.516Z">
+  <meta property="article:publisher" content="https://www.3d-geospatial.com/">
+  
+
+  
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Computing Geometric Error for 3D Tiles Levels — 3D Geospatial">
+  <meta name="twitter:description" content="Derive geometricError per tile level from measured Hausdorff deviation instead of halving a guess, assert monotonicity, and check what it means in pixels.">
+  <meta name="twitter:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta name="twitter:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+
+  
+  <link rel="preload" href="/assets/css/styles.css?v=546adeb511" as="style">
+  
+
+  <link rel="stylesheet" href="/assets/css/styles.css?v=546adeb511">
+
+  
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.3d-geospatial.com/#organization",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "url": "https://www.3d-geospatial.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/icon-512.png",
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://www.3d-geospatial.com/#website",
+      "url": "https://www.3d-geospatial.com/",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "description": "Build reliable 3D spatial data pipelines for digital twins — point clouds, meshes, LOD strategies, Python processing, and CI/CD automation.",
+      "inLanguage": "en",
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      }
+    },
+    {
+      "@type": "TechArticle",
+      "@id": "https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/computing-geometric-error-for-3d-tiles-levels/#article",
+      "isPartOf": {
+        "@id": "https://www.3d-geospatial.com/#website"
+      },
+      "headline": "Computing Geometric Error for 3D Tiles Levels",
+      "name": "Computing Geometric Error for 3D Tiles Levels",
+      "description": "Derive geometricError per tile level from measured Hausdorff deviation instead of halving a guess, assert monotonicity, and check what it means in pixels.",
+      "url": "https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/computing-geometric-error-for-3d-tiles-levels/",
+      "mainEntityOfPage": "https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/computing-geometric-error-for-3d-tiles-levels/",
+      "inLanguage": "en",
+      "datePublished": "2026-08-07T02:39:36.516Z",
+      "dateModified": "2026-08-07T02:39:36.516Z",
+      "author": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "image": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/og-cover.png",
+        "width": 1200,
+        "height": 630
+      },
+      "breadcrumb": {
+        "@id": "https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/computing-geometric-error-for-3d-tiles-levels/#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/computing-geometric-error-for-3d-tiles-levels/#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://www.3d-geospatial.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "LOD Management Optimization Strategies",
+          "item": "https://www.3d-geospatial.com/lod-management-optimization-strategies/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Hierarchical LOD Structuring",
+          "item": "https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "name": "Computing Geometric Error For 3D Tiles Levels",
+          "item": "https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/computing-geometric-error-for-3d-tiles-levels/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  
+<header class="site-header" role="banner">
+  <div class="container site-header__inner">
+    <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+      <img src="/assets/img/logo.svg" alt="" class="brand__mark" width="36" height="36">
+      <span class="brand__name">
+        3D Geospatial
+        <small>Digital Twin Automation</small>
+      </span>
+    </a>
+
+    <button class="theme-toggle" type="button" data-theme-toggle
+            aria-label="Switch to dark theme" title="Switch to dark theme">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4.2"/>
+        <path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/>
+      </svg>
+    </button>
+
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>
+      <span class="nav-toggle__icon" aria-hidden="true"><span></span></span>
+      Menu
+    </button>
+
+    <nav class="primary-nav" id="primary-nav" aria-label="Primary">
+      
+      <a href="https://www.3d-geospatial.com/" >
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/>
+        </svg>
+        Home
+      </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2 3 7l9 5 9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 17l9 5 9-5"/>
+            </svg>
+          
+          3D Geospatial Fundamentals
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/" aria-current="page">
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+          
+          LOD Management &amp; Optimization
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="6" cy="6" r="1.5"/><circle cx="12" cy="6" r="1.5"/><circle cx="18" cy="6" r="1.5"/>
+              <circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/>
+              <circle cx="6" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="18" cy="18" r="1.5"/>
+            </svg>
+          
+          Point Cloud &amp; Mesh Pipelines
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <path d="M12 9v4"/><path d="M12 17h.01"/>
+            </svg>
+          
+          Troubleshooting &amp; Reliability
+        </a>
+      
+    </nav>
+  </div>
+</header>
+
+
+  <main id="main">
+    
+
+
+<div class="container">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    
+      
+        <a href="https://www.3d-geospatial.com/">Home</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management Optimization Strategies</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <span class="current">Computing Geometric Error For 3D Tiles Levels</span>
+      
+    
+  </nav>
+
+  <div class="content-page">
+    <article class="article">
+      <h1 id="computing-geometric-error-for-3d-tiles-levels" tabindex="-1"><a class="heading-link" href="#computing-geometric-error-for-3d-tiles-levels"><span>Computing Geometric Error for 3D Tiles Levels</span></a></h1>
+<p>This page derives the <code>geometricError</code> value on every node of a 3D Tiles tree from something measurable — the actual deviation between a level’s geometry and the source — instead of the usual practice of picking a root value and halving it down the tree. The number is in metres, the client divides it by camera distance to decide whether to refine, and getting it wrong produces either a tileset that never sharpens or one that fetches far more than it draws. Neither failure raises an error anywhere.</p>
+<h2 id="why-you-hit-this" tabindex="-1"><a class="heading-link" href="#why-you-hit-this"><span>Why you hit this</span></a></h2>
+<p><code>geometricError</code> is the only tuning knob a tileset exposes to a client it has never met. Every runtime decision — refine or stop, fetch or skip, which of two siblings to load first — comes from comparing this one number against a screen-space threshold. Teams usually seed it from the root’s bounding-volume diagonal and halve at each level, which is a reasonable prior and is wrong the moment decimation is not uniform: a level that removed 90% of a facade’s triangles and 10% of a roof’s does not have one error. The result is a city where some blocks refine correctly and others sit blurred at a level the client believes is good enough.</p>
+<p>The tree this attaches to is built in <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/">hierarchical LOD structuring</a>; the deviation it is derived from comes out of <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/">automated mesh decimation</a>.</p>
+<h2 id="prerequisites" tabindex="-1"><a class="heading-link" href="#prerequisites"><span>Prerequisites</span></a></h2>
+<ul>
+<li>Python 3.10+ with <code>trimesh&gt;=4.0</code>, <code>numpy&gt;=1.24</code> and <code>scipy&gt;=1.11</code> (for the KD-tree behind the deviation measurement).</li>
+<li>A source mesh and the decimated meshes for each LOD level, all on the same local origin and in the same projected metric CRS.</li>
+<li>The tile tree already built, so each node knows its bounding volume and its children.</li>
+</ul>
+<h2 id="step-by-step" tabindex="-1"><a class="heading-link" href="#step-by-step"><span>Step-by-Step</span></a></h2>
+<h3 id="1-measure-the-deviation-each-level-actually-introduced" tabindex="-1"><a class="heading-link" href="#1-measure-the-deviation-each-level-actually-introduced"><span>1. Measure the deviation each level actually introduced</span></a></h3>
+<p>Geometric error is defined as the maximum distance between the rendered geometry and the geometry it stands in for. That is a Hausdorff distance, and it is measurable rather than assumable.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> numpy <span class="token keyword">as</span> np
+<span class="token keyword">import</span> trimesh
+<span class="token keyword">from</span> scipy<span class="token punctuation">.</span>spatial <span class="token keyword">import</span> cKDTree
+
+<span class="token keyword">def</span> <span class="token function">deviation</span><span class="token punctuation">(</span>source<span class="token punctuation">:</span> trimesh<span class="token punctuation">.</span>Trimesh<span class="token punctuation">,</span> simplified<span class="token punctuation">:</span> trimesh<span class="token punctuation">.</span>Trimesh<span class="token punctuation">,</span> samples<span class="token punctuation">:</span> <span class="token builtin">int</span> <span class="token operator">=</span> <span class="token number">200_000</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""One-sided Hausdorff: how far the simplified surface strays from the source."""</span>
+    pts<span class="token punctuation">,</span> _ <span class="token operator">=</span> trimesh<span class="token punctuation">.</span>sample<span class="token punctuation">.</span>sample_surface<span class="token punctuation">(</span>simplified<span class="token punctuation">,</span> samples<span class="token punctuation">)</span>
+    tree <span class="token operator">=</span> cKDTree<span class="token punctuation">(</span>source<span class="token punctuation">.</span>vertices<span class="token punctuation">)</span>
+    d_vertex<span class="token punctuation">,</span> _ <span class="token operator">=</span> tree<span class="token punctuation">.</span>query<span class="token punctuation">(</span>pts<span class="token punctuation">,</span> k<span class="token operator">=</span><span class="token number">1</span><span class="token punctuation">)</span>
+    <span class="token comment"># closest_point is exact but slow; run it only on the worst 1% found above.</span>
+    worst <span class="token operator">=</span> pts<span class="token punctuation">[</span>np<span class="token punctuation">.</span>argsort<span class="token punctuation">(</span>d_vertex<span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token operator">-</span>samples <span class="token operator">//</span> <span class="token number">100</span><span class="token punctuation">:</span><span class="token punctuation">]</span><span class="token punctuation">]</span>
+    closest<span class="token punctuation">,</span> d_exact<span class="token punctuation">,</span> _ <span class="token operator">=</span> trimesh<span class="token punctuation">.</span>proximity<span class="token punctuation">.</span>closest_point<span class="token punctuation">(</span>source<span class="token punctuation">,</span> worst<span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token builtin">float</span><span class="token punctuation">(</span>d_exact<span class="token punctuation">.</span><span class="token builtin">max</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>percentile<span class="token punctuation">(</span>d_vertex<span class="token punctuation">,</span> <span class="token number">95</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+
+src <span class="token operator">=</span> trimesh<span class="token punctuation">.</span>load<span class="token punctuation">(</span><span class="token string">"block_lod0.ply"</span><span class="token punctuation">,</span> force<span class="token operator">=</span><span class="token string">"mesh"</span><span class="token punctuation">)</span>
+<span class="token keyword">for</span> level <span class="token keyword">in</span> <span class="token builtin">range</span><span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">,</span> <span class="token number">5</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    simp <span class="token operator">=</span> trimesh<span class="token punctuation">.</span>load<span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"block_lod</span><span class="token interpolation"><span class="token punctuation">{</span>level<span class="token punctuation">}</span></span><span class="token string">.ply"</span></span><span class="token punctuation">,</span> force<span class="token operator">=</span><span class="token string">"mesh"</span><span class="token punctuation">)</span>
+    hmax<span class="token punctuation">,</span> p95 <span class="token operator">=</span> deviation<span class="token punctuation">(</span>src<span class="token punctuation">,</span> simp<span class="token punctuation">)</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"LOD </span><span class="token interpolation"><span class="token punctuation">{</span>level<span class="token punctuation">}</span></span><span class="token string">: Hausdorff </span><span class="token interpolation"><span class="token punctuation">{</span>hmax<span class="token punctuation">:</span><span class="token format-spec">.3f</span><span class="token punctuation">}</span></span><span class="token string"> m, 95th percentile </span><span class="token interpolation"><span class="token punctuation">{</span>p95<span class="token punctuation">:</span><span class="token format-spec">.3f</span><span class="token punctuation">}</span></span><span class="token string"> m"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Sampling the simplified surface and querying against the source — rather than the reverse — is the direction that matters. It answers “how far is what I am drawing from the truth”, which is the question the client’s refinement test is implicitly asking. The two-stage approach keeps it affordable: a fast vertex-KD-tree pass over every sample, then the exact point-to-triangle computation on only the worst one per cent.</p>
+<figure class="diagram">
+<svg viewBox="26 24 688 260" role="img" aria-labelledby="ge-haus-t ge-haus-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="ge-haus-t">Which surface you sample decides which question you answer</title>
+  <desc id="ge-haus-d">Sampling the simplified surface and measuring to the source asks how far the drawn geometry strays from the truth, which is what the client's refinement test needs. Sampling the source and measuring to the simplified surface asks a different question and typically returns a smaller number, because the source has detail the simplification never had to approximate.</desc>
+  <rect class="svg-bg" x="26" y="24" width="688" height="260" fill="#ffffff"/>
+  <defs>
+    <marker id="ge-haus-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#b0413e"/>
+    </marker>
+  </defs>
+  <polyline points="40,150 90,146 140,152 180,110 200,110 230,150 280,146 330,150"
+            fill="none" stroke="#5b6471" stroke-width="2.5" stroke-dasharray="6 4"/>
+  <polyline points="40,154 120,150 200,142 280,150 330,152" fill="none" stroke="#1f6b8a" stroke-width="2.5"/>
+  <g fill="#1f6b8a">
+    <circle cx="80" cy="151" r="3"/><circle cx="140" cy="148" r="3"/>
+    <circle cx="200" cy="142" r="3"/><circle cx="260" cy="147" r="3"/>
+  </g>
+  <line x1="190" y1="142" x2="190" y2="110" stroke="#b0413e" stroke-width="2" marker-end="url(#ge-haus-a)"/>
+  <polyline points="410,150 460,146 510,152 550,110 570,110 600,150 650,146 700,150"
+            fill="none" stroke="#5b6471" stroke-width="2.5" stroke-dasharray="6 4"/>
+  <polyline points="410,154 490,150 570,142 650,150 700,152" fill="none" stroke="#4f7a4d" stroke-width="2.5"/>
+  <g fill="#5b6471">
+    <circle cx="450" cy="147" r="3"/><circle cx="510" cy="152" r="3"/>
+    <circle cx="560" cy="110" r="3"/><circle cx="630" cy="148" r="3"/>
+  </g>
+  <text x="185" y="52" fill="#1f6b8a" font-size="12.5" text-anchor="middle" font-weight="600">sample the simplified surface — 0.51 m</text>
+  <text x="555" y="52" fill="#4f7a4d" font-size="12.5" text-anchor="middle" font-weight="600">sample the source — 0.19 m</text>
+  <text x="185" y="200" fill="#1f2937" font-size="12" text-anchor="middle">&quot;how far is what I draw from the truth&quot;</text>
+  <text x="555" y="200" fill="#1f2937" font-size="12" text-anchor="middle">&quot;how well is the source represented on average&quot;</text>
+  <text x="370" y="240" fill="#15384a" font-size="12.5" text-anchor="middle">Dashed is the source, solid the simplification. Only the left question is the one geometricError is defined as.</text>
+  <text x="370" y="266" fill="#5b6471" font-size="12" text-anchor="middle">The collapsed parapet is the entire difference between the two numbers</text>
+</svg>
+<figcaption>Both are legitimate measurements and only one of them is geometric error. The direction is not a detail — it is a factor of two or three on a typical building.</figcaption>
+</figure>
+<h3 id="2-take-the-maximum-over-the-subtree-not-the-node" tabindex="-1"><a class="heading-link" href="#2-take-the-maximum-over-the-subtree-not-the-node"><span>2. Take the maximum over the subtree, not the node</span></a></h3>
+<p>A parent node stands in for everything beneath it, so its error is the largest deviation anywhere in its subtree — not the deviation of its own geometry.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">assign_errors</span><span class="token punctuation">(</span>node<span class="token punctuation">,</span> measured<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Post-order walk: a node's error is max(its own deviation, its children's errors)."""</span>
+    <span class="token keyword">if</span> <span class="token keyword">not</span> node<span class="token punctuation">[</span><span class="token string">"children"</span><span class="token punctuation">]</span><span class="token punctuation">:</span>
+        node<span class="token punctuation">[</span><span class="token string">"geometricError"</span><span class="token punctuation">]</span> <span class="token operator">=</span> measured<span class="token punctuation">[</span>node<span class="token punctuation">[</span><span class="token string">"id"</span><span class="token punctuation">]</span><span class="token punctuation">]</span>
+        <span class="token keyword">return</span> node<span class="token punctuation">[</span><span class="token string">"geometricError"</span><span class="token punctuation">]</span>
+    child_max <span class="token operator">=</span> <span class="token builtin">max</span><span class="token punctuation">(</span>assign_errors<span class="token punctuation">(</span>c<span class="token punctuation">,</span> measured<span class="token punctuation">)</span> <span class="token keyword">for</span> c <span class="token keyword">in</span> node<span class="token punctuation">[</span><span class="token string">"children"</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    node<span class="token punctuation">[</span><span class="token string">"geometricError"</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token builtin">max</span><span class="token punctuation">(</span>measured<span class="token punctuation">[</span>node<span class="token punctuation">[</span><span class="token string">"id"</span><span class="token punctuation">]</span><span class="token punctuation">]</span><span class="token punctuation">,</span> child_max<span class="token punctuation">)</span>
+    <span class="token keyword">return</span> node<span class="token punctuation">[</span><span class="token string">"geometricError"</span><span class="token punctuation">]</span>
+
+root <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token string">"id"</span><span class="token punctuation">:</span> <span class="token string">"r"</span><span class="token punctuation">,</span> <span class="token string">"children"</span><span class="token punctuation">:</span> <span class="token punctuation">[</span>
+    <span class="token punctuation">{</span><span class="token string">"id"</span><span class="token punctuation">:</span> <span class="token string">"r0"</span><span class="token punctuation">,</span> <span class="token string">"children"</span><span class="token punctuation">:</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">}</span><span class="token punctuation">,</span> <span class="token punctuation">{</span><span class="token string">"id"</span><span class="token punctuation">:</span> <span class="token string">"r1"</span><span class="token punctuation">,</span> <span class="token string">"children"</span><span class="token punctuation">:</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+    <span class="token punctuation">{</span><span class="token string">"id"</span><span class="token punctuation">:</span> <span class="token string">"r2"</span><span class="token punctuation">,</span> <span class="token string">"children"</span><span class="token punctuation">:</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">}</span><span class="token punctuation">,</span> <span class="token punctuation">{</span><span class="token string">"id"</span><span class="token punctuation">:</span> <span class="token string">"r3"</span><span class="token punctuation">,</span> <span class="token string">"children"</span><span class="token punctuation">:</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+<span class="token punctuation">]</span><span class="token punctuation">}</span>
+measured <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token string">"r"</span><span class="token punctuation">:</span> <span class="token number">2.10</span><span class="token punctuation">,</span> <span class="token string">"r0"</span><span class="token punctuation">:</span> <span class="token number">0.42</span><span class="token punctuation">,</span> <span class="token string">"r1"</span><span class="token punctuation">:</span> <span class="token number">0.51</span><span class="token punctuation">,</span> <span class="token string">"r2"</span><span class="token punctuation">:</span> <span class="token number">0.38</span><span class="token punctuation">,</span> <span class="token string">"r3"</span><span class="token punctuation">:</span> <span class="token number">0.47</span><span class="token punctuation">}</span>
+assign_errors<span class="token punctuation">(</span>root<span class="token punctuation">,</span> measured<span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token punctuation">{</span>n<span class="token punctuation">[</span><span class="token string">"id"</span><span class="token punctuation">]</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>n<span class="token punctuation">[</span><span class="token string">"geometricError"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span> <span class="token keyword">for</span> n <span class="token keyword">in</span> <span class="token punctuation">[</span>root<span class="token punctuation">]</span> <span class="token operator">+</span> root<span class="token punctuation">[</span><span class="token string">"children"</span><span class="token punctuation">]</span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>This is where the halving heuristic diverges from reality. A parent whose four children deviate by 0.42, 0.51, 0.38 and 0.47 m has an error of at least 0.51, because refining it must be worthwhile wherever any child is worse. Halving from the root would have produced a number unrelated to any of them.</p>
+<figure class="diagram">
+<svg viewBox="10 30 718 264" role="img" aria-labelledby="ge-max-t ge-max-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="ge-max-t">A parent's error is the worst case beneath it</title>
+  <desc id="ge-max-d">Four children deviate from the source by 0.42, 0.51, 0.38 and 0.47 metres. The parent that stands in for all four must declare at least 0.51, the worst of them, because refining it has to be worthwhile wherever any child is worse. Averaging them would understate the error and stop refinement too early.</desc>
+  <rect class="svg-bg" x="10" y="30" width="718" height="264" fill="#ffffff"/>
+  <defs>
+    <marker id="ge-max-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
+    </marker>
+  </defs>
+  <rect x="270" y="44" width="200" height="52" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <g fill="#eef5e9" stroke="#4f7a4d" stroke-width="2">
+    <rect x="24" y="170" width="150" height="52" rx="8"/>
+    <rect x="204" y="170" width="150" height="52" rx="8"/>
+    <rect x="384" y="170" width="150" height="52" rx="8"/>
+    <rect x="564" y="170" width="150" height="52" rx="8"/>
+  </g>
+  <rect x="204" y="170" width="150" height="52" rx="8" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <g stroke="#5b6471" stroke-width="2" fill="none" marker-end="url(#ge-max-a)">
+    <path d="M310 96 C 240 124 180 140 108 166"/>
+    <path d="M340 96 C 320 124 300 140 278 166"/>
+    <path d="M400 96 C 420 124 440 140 460 166"/>
+    <path d="M430 96 C 500 124 560 140 632 166"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="370" y="76">parent — 0.51 m</text>
+    <text x="99" y="202">0.42 m</text>
+    <text x="279" y="202">0.51 m</text>
+    <text x="459" y="202">0.38 m</text>
+    <text x="639" y="202">0.47 m</text>
+  </g>
+  <text x="279" y="244" fill="#c46a3d" font-size="12" text-anchor="middle">the worst child sets the parent</text>
+  <text x="370" y="276" fill="#15384a" font-size="12.5" text-anchor="middle">Average them (0.45) and the client stops refining while one quarter of the block is still 13% worse than it believes</text>
+</svg>
+<figcaption>The maximum is not a conservative choice, it is the definition. A parent stands in for its whole subtree, so its error is the subtree's worst case.</figcaption>
+</figure>
+<h3 id="3-assert-strict-monotonicity-down-the-tree" tabindex="-1"><a class="heading-link" href="#3-assert-strict-monotonicity-down-the-tree"><span>3. Assert strict monotonicity down the tree</span></a></h3>
+<p>The client refines while the parent’s error exceeds the threshold and the child’s does not. If a child’s error is greater than or equal to its parent’s, that comparison never becomes favourable and the subtree is never fetched.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">assert_monotonic</span><span class="token punctuation">(</span>node<span class="token punctuation">,</span> path<span class="token operator">=</span><span class="token string">"root"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">for</span> i<span class="token punctuation">,</span> child <span class="token keyword">in</span> <span class="token builtin">enumerate</span><span class="token punctuation">(</span>node<span class="token punctuation">[</span><span class="token string">"children"</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        pe<span class="token punctuation">,</span> ce <span class="token operator">=</span> node<span class="token punctuation">[</span><span class="token string">"geometricError"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> child<span class="token punctuation">[</span><span class="token string">"geometricError"</span><span class="token punctuation">]</span>
+        <span class="token keyword">assert</span> ce <span class="token operator">&lt;</span> pe<span class="token punctuation">,</span> <span class="token punctuation">(</span>
+            <span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>path<span class="token punctuation">}</span></span><span class="token string">/</span><span class="token interpolation"><span class="token punctuation">{</span>i<span class="token punctuation">}</span></span><span class="token string">: child error </span><span class="token interpolation"><span class="token punctuation">{</span>ce<span class="token punctuation">:</span><span class="token format-spec">.3f</span><span class="token punctuation">}</span></span><span class="token string"> >= parent </span><span class="token interpolation"><span class="token punctuation">{</span>pe<span class="token punctuation">:</span><span class="token format-spec">.3f</span><span class="token punctuation">}</span></span><span class="token string"> — "</span></span>
+            <span class="token string">"refinement stops here and the subtree is unreachable"</span><span class="token punctuation">)</span>
+        assert_monotonic<span class="token punctuation">(</span>child<span class="token punctuation">,</span> <span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>path<span class="token punctuation">}</span></span><span class="token string">/</span><span class="token interpolation"><span class="token punctuation">{</span>i<span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token boolean">True</span>
+
+assert_monotonic<span class="token punctuation">(</span>root<span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"geometricError decreases strictly at every edge"</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Run this in CI, not by hand. The reference validator does not check it, the tileset stays perfectly valid with an inversion in it, and the only symptom is a region of the city that refuses to sharpen however close the camera gets.</p>
+<h3 id="4-convert-the-number-into-pixels-before-trusting-it" tabindex="-1"><a class="heading-link" href="#4-convert-the-number-into-pixels-before-trusting-it"><span>4. Convert the number into pixels before trusting it</span></a></h3>
+<p><code>geometricError</code> is in metres. What decides refinement is its projection onto the screen, which depends on viewport height and field of view — so the same tileset behaves differently on a laptop and a 4K display.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> math
+
+<span class="token keyword">def</span> <span class="token function">screen_space_error</span><span class="token punctuation">(</span>geometric_error_m<span class="token punctuation">,</span> distance_m<span class="token punctuation">,</span> viewport_h_px<span class="token punctuation">,</span> fov_y_deg<span class="token operator">=</span><span class="token number">60.0</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">return</span> <span class="token punctuation">(</span>geometric_error_m <span class="token operator">*</span> viewport_h_px<span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token punctuation">(</span><span class="token number">2.0</span> <span class="token operator">*</span> distance_m <span class="token operator">*</span> math<span class="token punctuation">.</span>tan<span class="token punctuation">(</span>math<span class="token punctuation">.</span>radians<span class="token punctuation">(</span>fov_y_deg<span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token number">2.0</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+
+<span class="token keyword">for</span> h <span class="token keyword">in</span> <span class="token punctuation">(</span><span class="token number">900</span><span class="token punctuation">,</span> <span class="token number">1440</span><span class="token punctuation">,</span> <span class="token number">2160</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">for</span> d <span class="token keyword">in</span> <span class="token punctuation">(</span><span class="token number">200</span><span class="token punctuation">,</span> <span class="token number">800</span><span class="token punctuation">,</span> <span class="token number">3000</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        sse <span class="token operator">=</span> screen_space_error<span class="token punctuation">(</span><span class="token number">0.51</span><span class="token punctuation">,</span> d<span class="token punctuation">,</span> h<span class="token punctuation">)</span>
+        verdict <span class="token operator">=</span> <span class="token string">"refine"</span> <span class="token keyword">if</span> sse <span class="token operator">></span> <span class="token number">16</span> <span class="token keyword">else</span> <span class="token string">"stop"</span>
+        <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"viewport </span><span class="token interpolation"><span class="token punctuation">{</span>h<span class="token punctuation">}</span></span><span class="token string">px  distance </span><span class="token interpolation"><span class="token punctuation">{</span>d<span class="token punctuation">:</span><span class="token format-spec">>4</span><span class="token punctuation">}</span></span><span class="token string"> m  ->  </span><span class="token interpolation"><span class="token punctuation">{</span>sse<span class="token punctuation">:</span><span class="token format-spec">5.1f</span><span class="token punctuation">}</span></span><span class="token string"> px  </span><span class="token interpolation"><span class="token punctuation">{</span>verdict<span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>The output is the check worth doing before shipping. A <code>maxScreenSpaceError</code> of 16 tuned against a 900-pixel viewport refines roughly 2.4× more aggressively at 2160 pixels, which is the usual explanation for a tileset that streams comfortably in development and saturates a connection on a large monitor.</p>
+<figure class="diagram">
+<svg viewBox="72 6 628 284" role="img" aria-labelledby="ge-px-t ge-px-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="ge-px-t">The same tileset on three viewport heights</title>
+  <desc id="ge-px-d">A tile with half a metre of geometric error, viewed from eight hundred metres, projects to about seven pixels of error on a 900-pixel viewport, eleven on a 1440-pixel one and seventeen on a 2160-pixel one. A threshold of sixteen pixels therefore stops refining on two of the three and keeps going on the third.</desc>
+  <rect class="svg-bg" x="72" y="6" width="628" height="284" fill="#ffffff"/>
+  <text x="380" y="34" fill="#1f2937" font-size="13" text-anchor="middle" font-weight="600">geometricError 0.51 m at 800 m, under a 16-pixel threshold</text>
+  <g stroke-width="2">
+    <rect x="180" y="66" width="140" height="34" rx="4" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="180" y="116" width="220" height="34" rx="4" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="180" y="166" width="340" height="34" rx="4" fill="#f7dfdc" stroke="#b0413e"/>
+  </g>
+  <path d="M500 56 V212" fill="none" stroke="#b0413e" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="500" y="48" fill="#b0413e" font-size="12" text-anchor="middle">maxScreenSpaceError = 16 px</text>
+  <g fill="#1f2937" font-size="12.5" text-anchor="start">
+    <text x="332" y="88">900 px viewport — 7.1 px, stops</text>
+    <text x="412" y="138">1440 px viewport — 11.3 px, stops</text>
+    <text x="532" y="188">2160 px — 17.0 px, refines</text>
+  </g>
+  <text x="380" y="248" fill="#15384a" font-size="12.5" text-anchor="middle">Nothing about the tileset changed. The viewport did, and it moved the tile across the threshold.</text>
+  <text x="380" y="272" fill="#5b6471" font-size="12" text-anchor="middle">Tune maxScreenSpaceError against the largest display you intend to support, then verify on the smallest</text>
+</svg>
+<figcaption>Pixels, not metres, are what the runtime compares. A threshold that has never been checked against a large display is a bandwidth surprise waiting for a demo.</figcaption>
+</figure>
+<h3 id="5-write-the-values-into-the-tileset-and-record-the-derivation" tabindex="-1"><a class="heading-link" href="#5-write-the-values-into-the-tileset-and-record-the-derivation"><span>5. Write the values into the tileset and record the derivation</span></a></h3>
+<p>The tileset carries the number; the manifest should carry where it came from, so a later rebuild can reproduce it.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> json
+
+<span class="token keyword">def</span> <span class="token function">to_tileset</span><span class="token punctuation">(</span>node<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    out <span class="token operator">=</span> <span class="token punctuation">{</span>
+        <span class="token string">"boundingVolume"</span><span class="token punctuation">:</span> <span class="token punctuation">{</span><span class="token string">"box"</span><span class="token punctuation">:</span> node<span class="token punctuation">[</span><span class="token string">"box"</span><span class="token punctuation">]</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+        <span class="token string">"geometricError"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>node<span class="token punctuation">[</span><span class="token string">"geometricError"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"refine"</span><span class="token punctuation">:</span> <span class="token string">"REPLACE"</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+    <span class="token keyword">if</span> node<span class="token punctuation">[</span><span class="token string">"children"</span><span class="token punctuation">]</span><span class="token punctuation">:</span>
+        out<span class="token punctuation">[</span><span class="token string">"children"</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token punctuation">[</span>to_tileset<span class="token punctuation">(</span>c<span class="token punctuation">)</span> <span class="token keyword">for</span> c <span class="token keyword">in</span> node<span class="token punctuation">[</span><span class="token string">"children"</span><span class="token punctuation">]</span><span class="token punctuation">]</span>
+    <span class="token keyword">else</span><span class="token punctuation">:</span>
+        out<span class="token punctuation">[</span><span class="token string">"content"</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token string">"uri"</span><span class="token punctuation">:</span> <span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>node<span class="token punctuation">[</span><span class="token string">'id'</span><span class="token punctuation">]</span><span class="token punctuation">}</span></span><span class="token string">.b3dm"</span></span><span class="token punctuation">}</span>
+    <span class="token keyword">return</span> out
+
+tileset <span class="token operator">=</span> <span class="token punctuation">{</span>
+    <span class="token string">"asset"</span><span class="token punctuation">:</span> <span class="token punctuation">{</span><span class="token string">"version"</span><span class="token punctuation">:</span> <span class="token string">"1.1"</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+    <span class="token string">"geometricError"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>root<span class="token punctuation">[</span><span class="token string">"geometricError"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token string">"root"</span><span class="token punctuation">:</span> to_tileset<span class="token punctuation">(</span>root<span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token string">"extras"</span><span class="token punctuation">:</span> <span class="token punctuation">{</span>
+        <span class="token string">"errorDerivation"</span><span class="token punctuation">:</span> <span class="token string">"one-sided Hausdorff, 200k surface samples, max over subtree"</span><span class="token punctuation">,</span>
+        <span class="token string">"sourceMesh"</span><span class="token punctuation">:</span> <span class="token string">"block_lod0.ply"</span><span class="token punctuation">,</span>
+        <span class="token string">"measuredAt"</span><span class="token punctuation">:</span> <span class="token string">"2026-08-07"</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span><span class="token punctuation">,</span>
+<span class="token punctuation">}</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span>json<span class="token punctuation">.</span>dumps<span class="token punctuation">(</span>tileset<span class="token punctuation">,</span> indent<span class="token operator">=</span><span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token number">400</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+</code></pre></div>
+<h2 id="expected-output-verification" tabindex="-1"><a class="heading-link" href="#expected-output-verification"><span>Expected Output &amp; Verification</span></a></h2>
+<p>A healthy run prints a strictly decreasing sequence, roughly but not exactly halving:</p>
+<div class="codeblock" data-lang="text"><div class="codeblock__bar"><span class="codeblock__lang">text</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-text" tabindex="0" role="group" aria-label="text code sample"><code class="language-text">LOD 1: Hausdorff 0.104 m, 95th percentile 0.021 m
+LOD 2: Hausdorff 0.238 m, 95th percentile 0.049 m
+LOD 3: Hausdorff 0.511 m, 95th percentile 0.118 m
+LOD 4: Hausdorff 1.207 m, 95th percentile 0.284 m
+geometricError decreases strictly at every edge
+</code></pre></div>
+<p>Two things to read out of it. The Hausdorff figure is consistently four to five times the 95th percentile, which is normal — the maximum is set by a handful of collapsed features while the bulk of the surface is far closer. And the ratio between levels is around 2.2 rather than exactly 2, which is why deriving beats halving: the real decimation did not produce a clean factor of two, and a tileset that claims it did is misinforming the client at every level.</p>
+<p>If the sequence is not strictly decreasing, the decimation chain is at fault rather than the measurement — a level that removed fewer triangles than its parent, or a mesh that was decimated from the wrong source.</p>
+<h2 id="common-errors" tabindex="-1"><a class="heading-link" href="#common-errors"><span>Common Errors</span></a></h2>
+<p><strong><code>geometricError</code> of 0 on an interior node.</strong> Zero means “this geometry is exact”, so the client stops refining immediately and never loads the children. Only a leaf whose content is the source geometry should be zero, and even then only if it genuinely is.</p>
+<p><strong>Error measured on the wrong side.</strong> Sampling the source and querying the simplified surface answers a different question and typically returns a smaller number. Sample the simplified surface, query the source.</p>
+<p><strong>Values derived before the local-origin shift.</strong> Deviation computed against raw UTM coordinates in float32 inherits the coordinate quantum — several centimetres at a 585,000 m easting — and reports it as geometric error. Shift to a local origin first.</p>
+<h2 id="frequently-asked-questions" tabindex="-1"><a class="heading-link" href="#frequently-asked-questions"><span>Frequently Asked Questions</span></a></h2>
+<h3 id="can-i-keep-using-the-halving-heuristic" tabindex="-1"><a class="heading-link" href="#can-i-keep-using-the-halving-heuristic"><span>Can I keep using the halving heuristic?</span></a></h3>
+<p>As a starting point, yes; as the shipped value, only if you have confirmed the decimation really is uniform across archetypes. It rarely is. Deriving costs one measurement pass at build time and removes an entire class of “some blocks never sharpen” reports.</p>
+<h3 id="what-root-geometricerror-should-a-city-tileset-use" tabindex="-1"><a class="heading-link" href="#what-root-geometricerror-should-a-city-tileset-use"><span>What root geometricError should a city tileset use?</span></a></h3>
+<p>Whatever the measurement gives you — typically a few hundred metres for a city-wide root, because the root’s geometry stands in for everything. Setting it artificially high makes the first refinement fire immediately; setting it low makes the tileset appear empty until the camera is close.</p>
+<h3 id="does-draco-compression-change-the-number" tabindex="-1"><a class="heading-link" href="#does-draco-compression-change-the-number"><span>Does Draco compression change the number?</span></a></h3>
+<p>Slightly. Quantization moves vertices onto a lattice, so it adds its own deviation on top of the decimation’s. If the quantization lattice is fine relative to the decimation error — which it should be — the addition is negligible; if you are quantizing aggressively, measure after encoding rather than before.</p>
+<h2 id="related-guides" tabindex="-1"><a class="heading-link" href="#related-guides"><span>Related Guides</span></a></h2>
+<ul>
+<li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring</a> — the tree these values attach to</li>
+<li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/implementing-quadtree-lod-for-urban-models/">Implementing Quadtree LOD for Urban Models</a> — building the tree itself</li>
+<li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/">Automated Mesh Decimation for Digital Twins</a> — where the deviation comes from</li>
+<li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/">Streaming &amp; Runtime Diagnostics</a> — diagnosing an inversion from the client side</li>
+</ul>
+<p>Back to <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring</a>.</p>
+
+
+      
+      
+
+      <div class="related-nav">
+        
+
+        
+          <div>
+            <h3>Related</h3>
+            <div class="related-grid">
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/implementing-quadtree-lod-for-urban-models/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Implementing Quadtree LOD for Urban Models</span>
+                </a>
+              
+            </div>
+          </div>
+        
+      </div>
+    </article>
+
+    
+    <aside class="toc" aria-label="On this page" data-toc hidden>
+      <h4>On this page</h4>
+      <ul></ul>
+    </aside>
+  </div>
+</div>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+  <div class="container site-footer__inner">
+    <div class="site-footer__brand">
+      <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+        <img src="/assets/img/logo-mark.svg" alt="" class="brand__mark" width="36" height="36">
+        <span class="brand__name">
+          3D Geospatial
+          <small>Digital Twin Automation</small>
+        </span>
+      </a>
+      <p>Engineering-grade guides on point cloud processing, mesh pipelines, LOD strategies, and CI/CD automation for digital twin platforms.</p>
+      <a class="footer-social" href="https://github.com/3d-geospatial" aria-label="3D Geospatial on GitHub" rel="noopener" target="_blank">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+          <path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.53-1.34-1.3-1.7-1.3-1.7-1.06-.72.08-.71.08-.71 1.17.08 1.79 1.2 1.79 1.2 1.04 1.79 2.73 1.27 3.4.97.1-.75.4-1.27.73-1.56-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.19-3.08-.12-.3-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.75.11 3.05.74.8 1.19 1.83 1.19 3.08 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.07.78 2.15v3.18c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5Z"/>
+        </svg>
+        <span>GitHub</span>
+      </a>
+    </div>
+
+    <div class="site-footer__col">
+      <h4>Sections</h4>
+      <ul>
+        <li><a href="https://www.3d-geospatial.com/">Home</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management &amp; Optimization</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/">Point Cloud &amp; Mesh Pipelines</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/">Troubleshooting &amp; Reliability</a></li>
+        
+      </ul>
+    </div>
+
+    
+      <div class="site-footer__col">
+        <h4>3D Geospatial Fundamentals</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/">3D Format Standards Comparison</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems for 3D Assets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/">Digital Elevation Model Workflows</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/">Spatial Indexing and Tiling Schemes for 3D Data</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>LOD Management &amp; Optimization</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/">Automated Tile Generation for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/">Cesium ion Upload Automation for 3D Tilesets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/">glTF LOD Generation With Draco Compression</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/">Streaming Sync Patterns for 3D Geospatial</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Point Cloud &amp; Mesh Pipelines</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/">Automated Mesh Decimation for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/">CI/CD Automation for Spatial Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/">Point Cloud Filtering Techniques</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/">Surface Reconstruction for Geospatial Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/">Texture Mapping Workflows for Digital Twins</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Troubleshooting &amp; Reliability</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/">Cross-Section Failure Modes in Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/">Data Validation &amp; QA Gates for 3D Tiles</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/">Streaming &amp; Runtime Diagnostics for 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+  </div>
+  <div class="container site-footer__bottom">
+    <span>© 2026 3D Geospatial &amp; Digital Twin Automation</span>
+    <span>Built with Eleventy · PWA-enabled</span>
+  </div>
+</footer>
+
+
+  <script src="/assets/js/site.js?v=b99aa9f971" defer></script>
+  
+</body>
+</html>

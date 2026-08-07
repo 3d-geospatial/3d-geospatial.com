@@ -68,6 +68,38 @@ tileset = json.loads(open("tileset/tileset.json").read())
 violations = collect_violations(tileset["root"])
 ```
 
+<figure class="diagram">
+<svg viewBox="8 18 744 286" role="img" aria-labelledby="wv-cov-t wv-cov-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="wv-cov-t">What the reference validator covers, and what it cannot</title>
+  <desc id="wv-cov-d">The 3d-tiles-validator checks that a tileset conforms to the specification: structure, containment, binary layout, required properties and content resolution. It cannot check anything that depends on knowing which dataset the tileset was supposed to be, which is where every domain assertion lives.</desc>
+  <rect class="svg-bg" x="8" y="18" width="744" height="286" fill="#ffffff"/>
+  <text x="200" y="46" fill="#4f7a4d" font-size="12.5" text-anchor="middle" font-weight="600">the validator checks</text>
+  <text x="560" y="46" fill="#b0413e" font-size="12.5" text-anchor="middle" font-weight="600">only you can check</text>
+    <rect x="40" y="64" width="320" height="30" rx="6" fill="#eef5e9" stroke="#4f7a4d" stroke-width="1.5"/>
+    <text x="200" y="84" fill="#1f2937" font-size="12" text-anchor="middle">JSON structure against the schema</text>
+    <rect x="40" y="102" width="320" height="30" rx="6" fill="#eef5e9" stroke="#4f7a4d" stroke-width="1.5"/>
+    <text x="200" y="122" fill="#1f2937" font-size="12" text-anchor="middle">bounding-volume containment</text>
+    <rect x="40" y="140" width="320" height="30" rx="6" fill="#eef5e9" stroke="#4f7a4d" stroke-width="1.5"/>
+    <text x="200" y="160" fill="#1f2937" font-size="12" text-anchor="middle">b3dm and glb binary layout</text>
+    <rect x="40" y="178" width="320" height="30" rx="6" fill="#eef5e9" stroke="#4f7a4d" stroke-width="1.5"/>
+    <text x="200" y="198" fill="#1f2937" font-size="12" text-anchor="middle">required properties and types</text>
+    <rect x="40" y="216" width="320" height="30" rx="6" fill="#eef5e9" stroke="#4f7a4d" stroke-width="1.5"/>
+    <text x="200" y="236" fill="#1f2937" font-size="12" text-anchor="middle">content URI resolution</text>
+    <rect x="400" y="64" width="320" height="30" rx="6" fill="#f7dfdc" stroke="#b0413e" stroke-width="1.5"/>
+    <text x="560" y="84" fill="#1f2937" font-size="12" text-anchor="middle">is the CRS the one you intended?</text>
+    <rect x="400" y="102" width="320" height="30" rx="6" fill="#f7dfdc" stroke="#b0413e" stroke-width="1.5"/>
+    <text x="560" y="122" fill="#1f2937" font-size="12" text-anchor="middle">does the root transform land on Earth?</text>
+    <rect x="400" y="140" width="320" height="30" rx="6" fill="#f7dfdc" stroke="#b0413e" stroke-width="1.5"/>
+    <text x="560" y="160" fill="#1f2937" font-size="12" text-anchor="middle">did any attribute get dropped?</text>
+    <rect x="400" y="178" width="320" height="30" rx="6" fill="#f7dfdc" stroke="#b0413e" stroke-width="1.5"/>
+    <text x="560" y="198" fill="#1f2937" font-size="12" text-anchor="middle">is the geometric error monotonic?</text>
+    <rect x="400" y="216" width="320" height="30" rx="6" fill="#f7dfdc" stroke="#b0413e" stroke-width="1.5"/>
+    <text x="560" y="236" fill="#1f2937" font-size="12" text-anchor="middle">is this the current dataset?</text>
+  <text x="380" y="286" fill="#15384a" font-size="12.5" text-anchor="middle">The right column is not a gap in the tool — none of it is expressible without knowing what the tileset was meant to contain</text>
+</svg>
+<figcaption>Running the validator is necessary and nowhere near sufficient. Everything in the right-hand column has to be written against your own project's facts.</figcaption>
+</figure>
+
 ### 3. Verify the root transform resolves to EPSG:4978
 
 This is the check the validator cannot make. The root `transform` is a column-major 4×4 matrix; its translation column is the tile origin in ECEF metres, and its three rotation columns must form an orthonormal East-North-Up basis. Convert the origin back to geographic coordinates with `pyproj` and assert it lands on the ellipsoid near the expected site.
@@ -105,6 +137,29 @@ if root_tf:
 ```
 
 An origin that converts to a height of millions of metres, or a longitude on the wrong continent, is the classic EPSG:4978 placement bug — geometry reprojected straight from a projected CRS to ECEF without the EPSG:4979 geographic hop.
+
+<figure class="diagram">
+<svg viewBox="66 24 608 280" role="img" aria-labelledby="wv-rad-t wv-rad-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="wv-rad-t">Checking the root transform by its distance from the geocentre</title>
+  <desc id="wv-rad-d">In the geocentric frame every point on Earth's surface sits between roughly 6.35 and 6.39 million metres from the origin. A root transform whose translation falls outside that band has not been reprojected: a translation near zero puts the tileset at the centre of the planet, and one far outside puts it in orbit.</desc>
+  <rect class="svg-bg" x="66" y="24" width="608" height="280" fill="#ffffff"/>
+  <circle cx="300" cy="150" r="96" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <circle cx="300" cy="150" r="112" fill="none" stroke="#4f7a4d" stroke-width="2" stroke-dasharray="6 4"/>
+  <circle cx="300" cy="150" r="5" fill="#b0413e"/>
+  <circle cx="392" cy="122" r="6" fill="#4f7a4d"/>
+  <circle cx="520" cy="72" r="6" fill="#b0413e"/>
+  <text x="300" y="176" fill="#b0413e" font-size="11.5" text-anchor="middle">|t| ≈ 0</text>
+  <text x="300" y="270" fill="#5b6471" font-size="12" text-anchor="middle">geocentric EPSG:4978</text>
+  <g fill="#1f2937" font-size="12" text-anchor="start">
+    <text x="440" y="150">valid — 6.37×10⁶ m from the geocentre</text>
+    <text x="440" y="180">the tileset renders where the city is</text>
+    <text x="440" y="60">too far — the tileset is in orbit</text>
+    <text x="80" y="60">too near — the tileset is at the planet&#39;s core</text>
+  </g>
+  <text x="370" y="286" fill="#15384a" font-size="12" text-anchor="middle">assert 6.0e6 &lt; |t| &lt; 6.6e6 — three lines that catch the single most common tiling mistake</text>
+</svg>
+<figcaption>The check is crude and it is decisive: no correct root transform for a terrestrial tileset falls outside that band, and every forgotten reprojection does.</figcaption>
+</figure>
 
 ### 4. Compose the checks into one gate that exits non-zero
 
@@ -152,9 +207,10 @@ Call the gate from the CI job so its exit code decides the pipeline. In GitHub A
 ```
 
 <figure class="diagram">
-<svg viewBox="0 0 820 290" role="img" aria-labelledby="ci-t ci-d" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="6 26 813 231" role="img" aria-labelledby="ci-t ci-d" xmlns="http://www.w3.org/2000/svg">
   <title id="ci-t">CI gate combining the validator with custom invariant checks</title>
   <desc id="ci-d">A commit triggers the reference 3d-tiles-validator, then custom numpy invariant checks; their combined exit code either allows the merge on zero or blocks the pull request on a non-zero result.</desc>
+  <rect class="svg-bg" x="6" y="26" width="813" height="231" fill="#ffffff"/>
   <defs>
     <marker id="ci-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
@@ -211,6 +267,8 @@ $ echo $?
 
 A valid EPSG:4978 origin near the site converts to a longitude and latitude within a degree of the expected location and a height between roughly −1,000 and 9,000 m; anything else is the placement bug and the gate exits 1.
 
+Pin the validator version in the workflow. A newer release can add checks that fail an artifact which previously passed, which is usually good news but is very poor news when it arrives unannounced in the middle of a release. Upgrade it deliberately, in its own change, so a new failure is attributable to the upgrade rather than to the build under test.
+
 ## Common Errors
 
 **`Error: Cannot find module '3d-tiles-validator'`.** The validator is not installed in the CI image, or `npx` resolved a cached older name. Install it explicitly with `npm install --global 3d-tiles-validator` in the job, or invoke `npx --yes 3d-tiles-validator` so the runner fetches it non-interactively rather than prompting and hanging the job.
@@ -220,6 +278,8 @@ A valid EPSG:4978 origin near the site converts to a longitude and latitude with
 **The gate exits 0 despite a visibly wrong tileset.** No `transform` was present, so the transform check was skipped, and the geometry happened to satisfy monotonicity and containment while sitting in the wrong CRS. Assert that a root transform exists when the tileset is meant for CesiumJS, and pair this gate with the [CRS and units check](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/asserting-crs-and-units-with-pyproj/) on the source data so a wrong-CRS input is caught before tiling.
 
 **The job passes but the CI runner had no network.** `npx --yes` silently succeeded because the validator was cached from a previous run, so a fresh runner with the package absent and no registry access would instead hang or fail to resolve it. Install `3d-tiles-validator` as an explicit, version-pinned dependency in the job image rather than fetching it on demand, and treat a missing validator as a hard failure — a gate that cannot run is not a gate that passed.
+
+Treat the gate's own output as an interface. Printing one line per violation, prefixed with the tileset path and the check name, means a failing run can be triaged from the CI summary without opening the log, and it makes the output greppable when the same gate runs across a hundred shards in a matrix.
 
 ## Related Guides
 

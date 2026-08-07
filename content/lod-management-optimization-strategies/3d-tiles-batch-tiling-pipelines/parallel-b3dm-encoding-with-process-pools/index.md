@@ -5,9 +5,10 @@ This guide parallelises the glTF→`b3dm`+Draco encode across CPU cores using Py
 You hit this the moment a [batch tiling pipeline](https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/) grows past a few hundred shards: the encode is embarrassingly parallel — each tile is independent — but a naive `for` loop pins one core while the other fifteen idle, and every `3d-tiles-tools` call pays a fresh Node startup. The fix is a bounded process pool over deterministically chunked jobs.
 
 <figure class="diagram">
-<svg viewBox="0 0 820 300" role="img" aria-labelledby="ppool-t ppool-d" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="6 33 810 234" role="img" aria-labelledby="ppool-t ppool-d" xmlns="http://www.w3.org/2000/svg">
   <title id="ppool-t">Chunked leaf jobs distributed across per-core worker processes</title>
   <desc id="ppool-d">A sorted list of leaf jobs is split by a chunker into one contiguous chunk per physical core, each chunk is encoded by a worker process running the subprocess batch, and the futures are collected into byte-stable outputs plus a separate failure list.</desc>
+  <rect class="svg-bg" x="6" y="33" width="810" height="234" fill="#ffffff"/>
   <defs>
     <marker id="ppool-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
@@ -101,6 +102,48 @@ workers = min(physical_workers(), len(jobs)) or 1
 print(f"encoding with {workers} worker processes")
 ```
 
+<figure class="diagram">
+<svg viewBox="5 4 710 328" role="img" aria-labelledby="pb-pool-t pb-pool-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="pb-pool-t">Encoding throughput against process-pool size</title>
+  <desc id="pb-pool-d">Throughput rises almost linearly up to the number of physical cores, gains only a few per cent from the hyperthreads above that, and then falls as workers contend for memory bandwidth and disk. The best pool size is the count of physical cores, not of logical processors.</desc>
+  <rect class="svg-bg" x="5" y="4" width="710" height="328" fill="#ffffff"/>
+  <text x="370" y="32" fill="#1f2937" font-size="13" text-anchor="middle" font-weight="600">Adding workers past the physical core count costs throughput, it does not buy it</text>
+  <path d="M60 60 V250 H700" fill="none" stroke="#5b6471" stroke-width="1.5"/>
+  <polyline points="70,225 110,202 190,158 270,120 350,90 430,82 510,84 590,95 670,111" fill="none" stroke="#1f6b8a" stroke-width="2.5"/>
+  <g fill="#1f6b8a">
+    <circle cx="70" cy="225" r="4"/>
+    <circle cx="110" cy="202" r="4"/>
+    <circle cx="190" cy="158" r="4"/>
+    <circle cx="270" cy="120" r="4"/>
+    <circle cx="350" cy="90" r="4"/>
+    <circle cx="430" cy="82" r="4"/>
+    <circle cx="510" cy="84" r="4"/>
+    <circle cx="590" cy="95" r="4"/>
+    <circle cx="670" cy="111" r="4"/>
+  </g>
+  <path d="M350 60 V250" fill="none" stroke="#4f7a4d" stroke-width="2" stroke-dasharray="6 4"/>
+  <path d="M510 60 V250" fill="none" stroke="#b0413e" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="350" y="52" fill="#4f7a4d" font-size="12" text-anchor="middle">8 physical cores</text>
+  <text x="556" y="52" fill="#b0413e" font-size="12" text-anchor="middle">16 logical — throughput falling</text>
+  <g fill="#1f2937" font-size="11.5" text-anchor="middle">
+    <text x="70" y="272">1</text>
+    <text x="110" y="272">2</text>
+    <text x="190" y="272">4</text>
+    <text x="270" y="272">6</text>
+    <text x="350" y="272">8</text>
+    <text x="430" y="272">10</text>
+    <text x="510" y="272">12</text>
+    <text x="590" y="272">14</text>
+    <text x="670" y="272">16</text>
+  </g>
+  <text x="380" y="294" fill="#5b6471" font-size="12" text-anchor="middle">worker processes</text>
+  <text x="34" y="150" fill="#5b6471" font-size="12" text-anchor="middle">tiles</text>
+  <text x="34" y="166" fill="#5b6471" font-size="12" text-anchor="middle">/ min</text>
+  <text x="370" y="314" fill="#15384a" font-size="12" text-anchor="middle">Measure it on the target machine — the knee moves with mesh size, because the limit is memory bandwidth, not CPU</text>
+</svg>
+<figcaption>The curve is flat, then negative. Sizing the pool from <code>os.cpu_count()</code> lands on the far side of the knee on every hyperthreaded machine.</figcaption>
+</figure>
+
 ### 3. Chunk jobs to amortise Node startup
 
 Each `3d-tiles-tools` invocation starts a Node runtime (tens to hundreds of milliseconds). For thousands of tiny leaves that startup dwarfs the encode. Split the sorted job list into one contiguous chunk per worker so a worker starts Node a handful of times, not once per tile.
@@ -149,6 +192,49 @@ def encode_chunk(chunk):
             tmp.unlink(missing_ok=True)
     return ok, failures
 ```
+
+<figure class="diagram">
+<svg viewBox="46 28 664 234" role="img" aria-labelledby="pb-chunk-t pb-chunk-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="pb-chunk-t">Node startup cost, per job and per chunk</title>
+  <desc id="pb-chunk-d">Dispatching one job per worker invocation pays the Node interpreter's startup cost before every tile, which for small tiles is most of the wall clock. Sending a chunk of jobs to a single invocation pays that cost once and amortises it across the whole chunk.</desc>
+  <rect class="svg-bg" x="46" y="28" width="664" height="234" fill="#ffffff"/>
+  <g fill="#f7dfdc" stroke="#b0413e" stroke-width="1.5">
+    <rect x="60" y="70" width="46" height="30" rx="3"/>
+    <rect x="166" y="70" width="46" height="30" rx="3"/>
+    <rect x="272" y="70" width="46" height="30" rx="3"/>
+    <rect x="378" y="70" width="46" height="30" rx="3"/>
+    <rect x="484" y="70" width="46" height="30" rx="3"/>
+    <rect x="590" y="70" width="46" height="30" rx="3"/>
+  </g>
+  <g fill="#e3f0f4" stroke="#1f6b8a" stroke-width="1.5">
+    <rect x="106" y="70" width="60" height="30" rx="3"/>
+    <rect x="212" y="70" width="60" height="30" rx="3"/>
+    <rect x="318" y="70" width="60" height="30" rx="3"/>
+    <rect x="424" y="70" width="60" height="30" rx="3"/>
+    <rect x="530" y="70" width="60" height="30" rx="3"/>
+    <rect x="636" y="70" width="60" height="30" rx="3"/>
+  </g>
+  <rect x="60" y="160" width="46" height="30" rx="3" fill="#f7dfdc" stroke="#b0413e" stroke-width="1.5"/>
+  <g fill="#e3f0f4" stroke="#1f6b8a" stroke-width="1.5">
+    <rect x="106" y="160" width="60" height="30" rx="3"/>
+    <rect x="166" y="160" width="60" height="30" rx="3"/>
+    <rect x="226" y="160" width="60" height="30" rx="3"/>
+    <rect x="286" y="160" width="60" height="30" rx="3"/>
+    <rect x="346" y="160" width="60" height="30" rx="3"/>
+    <rect x="406" y="160" width="60" height="30" rx="3"/>
+  </g>
+  <text x="60" y="56" fill="#1f2937" font-size="12.5" text-anchor="start" font-weight="600">one job per invocation — 696 ms for six tiles</text>
+  <text x="60" y="146" fill="#1f2937" font-size="12.5" text-anchor="start" font-weight="600">one chunk per invocation — 466 ms for the same six</text>
+  <text x="60" y="122" fill="#b0413e" font-size="11.5" text-anchor="start">red blocks are interpreter startup: paid six times</text>
+  <text x="60" y="212" fill="#4f7a4d" font-size="11.5" text-anchor="start">paid once, then six encodes back to back</text>
+  <text x="380" y="244" fill="#15384a" font-size="12" text-anchor="middle">The saving grows as tiles get smaller, which is exactly when a city has the most of them</text>
+</svg>
+<figcaption>Chunking is not about parallelism at all — it is about how often you pay for a cold interpreter. Size chunks so a worker runs for seconds, not milliseconds.</figcaption>
+</figure>
+
+The pool size and the chunk size answer different questions, and it is worth keeping them apart. Pool size is a contention question: how many encodes can run at once before they start competing for the same memory bandwidth and the same disk queue. Chunk size is an overhead question: how much work each invocation must carry before the fixed cost of starting it stops mattering. Tuning one to compensate for the other produces a configuration that stops working the moment the tile size changes.
+
+There is also a determinism cost to get right. A pool returns results in completion order, which varies run to run, so anything that consumes the results — a manifest, a tileset index, a content hash — has to re-sort them into the job order before writing. The cheapest way to guarantee that is to have each worker return its input index alongside its output, then sort on that index before serialising. Skipping the sort produces builds that are byte-different on every run for no reason other than scheduling jitter, which in turn defeats the content-hash comparison the incremental pipeline depends on.
 
 ### 5. Run the pool and aggregate results deterministically
 
@@ -212,6 +298,8 @@ time python encode_pool.py                    # compare against a serial baselin
 ```
 
 Expect roughly a 6–7x speedup on 8 physical cores (not the full 8x — Node startup and the final `os.replace` are serial per tile), and identical `sha256` sums for every `b3dm` across two runs.
+
+Keep the encoder's stdout out of the parent process. A pool of eight workers each streaming progress lines through a shared pipe will spend real time serialising on that pipe, and on a slow terminal it can dominate the run. Redirect worker output to per-job log files and surface only the failures; the logs are more useful afterwards anyway, because they are attributable to a specific tile.
 
 ## Common Errors
 

@@ -39,9 +39,10 @@ A hierarchical LOD index answers one question per node every frame: *is this nod
 **Screen-space error ties it together.** Each node stores a `geometricError` in metres — roughly the worst-case position deviation between that node's simplified geometry and the true surface. At runtime the engine projects that metre value to pixels: `sse = geometricError × viewport_height / (2 × distance × tan(fov/2))`. When `sse` drops below the budget (16 px), the node is good enough and refinement stops. This is why the index must live in a metric CRS — `geometricError` is meaningless in degrees.
 
 <figure class="diagram">
-<svg viewBox="0 0 720 360" role="img" aria-labelledby="hlod-qt-t hlod-qt-d" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="26 -6 602 340" role="img" aria-labelledby="hlod-qt-t hlod-qt-d" xmlns="http://www.w3.org/2000/svg">
   <title id="hlod-qt-t">Quadtree subdivision over an urban extent with LOD levels</title>
   <desc id="hlod-qt-d">A square urban extent is recursively divided into quadrants across three levels of detail; the root covers the whole extent at coarse geometric error, while denser building clusters split deeper to finer error, and a side legend maps each level to its geometric error in metres.</desc>
+  <rect class="svg-bg" x="26" y="-6" width="602" height="340" fill="#ffffff"/>
   <defs>
     <marker id="hlod-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
@@ -160,6 +161,37 @@ assign_error(root, diag)
 print(f"root geometricError = {root.geometric_error:.2f} m  (diag {diag:.1f} m)")
 ```
 
+<figure class="diagram">
+<svg viewBox="8 5 716 301" role="img" aria-labelledby="hl-ge-t hl-ge-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="hl-ge-t">Geometric error per depth, and what an inversion does</title>
+  <desc id="hl-ge-d">Geometric error halves with each level of the tree, from five hundred and twelve metres at the root down to thirty-two at depth four. Depth three here is authored at one hundred and forty metres, which is larger than its parent's one hundred and twenty-eight, so the client's refinement test never becomes true and the subtree below it is never requested.</desc>
+  <rect class="svg-bg" x="8" y="5" width="716" height="301" fill="#ffffff"/>
+  <text x="360" y="34" fill="#1f2937" font-size="13" text-anchor="middle" font-weight="600">Error must fall strictly with depth — the client refines on the comparison, not on the level number</text>
+  <rect x="130" y="62" width="440" height="26" rx="4" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="130" y="102" width="220" height="26" rx="4" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="130" y="142" width="110" height="26" rx="4" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="130" y="182" width="120" height="26" rx="4" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <rect x="130" y="222" width="27" height="26" rx="4" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <g fill="#1f2937" font-size="12.5">
+    <text x="118" y="80" text-anchor="end">depth 0</text>
+    <text x="118" y="120" text-anchor="end">depth 1</text>
+    <text x="118" y="160" text-anchor="end">depth 2</text>
+    <text x="118" y="200" text-anchor="end">depth 3</text>
+    <text x="118" y="240" text-anchor="end">depth 4</text>
+  </g>
+  <g fill="#1f2937" font-size="12.5">
+    <text x="580" y="80" text-anchor="start">geometricError 512 m</text>
+    <text x="360" y="120" text-anchor="start">geometricError 256 m</text>
+    <text x="250" y="160" text-anchor="start">geometricError 128 m</text>
+    <text x="260" y="200" text-anchor="start">geometricError 140 m</text>
+    <text x="167" y="240" text-anchor="start">geometricError 32 m</text>
+  </g>
+  <text x="360" y="270" fill="#b0413e" font-size="12.5" text-anchor="middle">Depth 3 exceeds its parent, so refinement stops there and depth 4 is never fetched — the tileset simply looks blurry</text>
+  <text x="360" y="288" fill="#5b6471" font-size="12" text-anchor="middle">Assert monotonicity across every parent–child pair before the tileset ships; the validator does not treat it as an error</text>
+</svg>
+<figcaption>An inversion has no error message and no missing file. It presents as a region of the city that refuses to sharpen however close the camera gets.</figcaption>
+</figure>
+
 ### 4. Convert error to a screen-space refinement test
 
 Mirror the runtime test in Python so you can validate thresholds offline. This projects each node's metre error to pixels at a given camera distance and FOV, exactly as a 3D Tiles engine does, letting you confirm the tree refines and stops where you expect.
@@ -176,6 +208,33 @@ sse = screen_space_error(root.geometric_error, distance_m=800.0)
 print(f"root SSE at 800 m = {sse:.1f} px  ->",
       "refine" if sse > TARGET_SSE_PX else "stop")
 ```
+
+<figure class="diagram">
+<svg viewBox="43 6 763 304" role="img" aria-labelledby="hl-sse-t hl-sse-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="hl-sse-t">How geometric error becomes a pixel count</title>
+  <desc id="hl-sse-d">A tile at distance d carries a geometric error e expressed in metres. The client projects that error onto the screen through the vertical field of view and the viewport height, giving a screen-space error in pixels. It refines the tile whenever that pixel figure exceeds the configured maximum.</desc>
+  <rect class="svg-bg" x="43" y="6" width="763" height="304" fill="#ffffff"/>
+  <defs>
+    <marker id="hl-sse-a" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
+    </marker>
+  </defs>
+  <path d="M60 150 L96 132 L96 168 Z" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <path d="M96 150 L660 56 M96 150 L660 244" fill="none" stroke="#5b6471" stroke-width="1.5" stroke-dasharray="5 4"/>
+  <path d="M200 128 V172" fill="none" stroke="#1f6b8a" stroke-width="3"/>
+  <path d="M560 108 h120 v84 h-120 Z" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <path d="M600 120 V172" fill="none" stroke="#c46a3d" stroke-width="3.5"/>
+  <path d="M96 268 H600" fill="none" stroke="#5b6471" stroke-width="1.5" marker-start="url(#hl-sse-a)" marker-end="url(#hl-sse-a)"/>
+  <text x="348" y="262" fill="#5b6471" font-size="12" text-anchor="middle">d — distance from camera to tile centre</text>
+  <text x="620" y="146" fill="#c46a3d" font-size="12" text-anchor="start">e — geometric error, in metres</text>
+  <text x="200" y="118" fill="#1f6b8a" font-size="12" text-anchor="middle">ρ — pixels</text>
+  <text x="200" y="192" fill="#5b6471" font-size="11.5" text-anchor="middle">viewport</text>
+  <text x="78" y="186" fill="#5b6471" font-size="11.5" text-anchor="middle">camera</text>
+  <text x="380" y="34" fill="#1f2937" font-size="13" text-anchor="middle" font-weight="600">ρ = e · H / (2 · d · tan(fov / 2))  —  refine while ρ &gt; maxScreenSpaceError</text>
+  <text x="380" y="292" fill="#15384a" font-size="12" text-anchor="middle">Doubling the viewport height doubles ρ, so a maxSSE tuned on a laptop over-refines on a 4K display</text>
+</svg>
+<figcaption>Nothing in the tileset is measured in pixels. The runtime turns metres into pixels using the viewport and field of view, which is why the same tileset behaves differently on two screens.</figcaption>
+</figure>
 
 ### 5. Build a bounding-volume hierarchy for fast culling
 

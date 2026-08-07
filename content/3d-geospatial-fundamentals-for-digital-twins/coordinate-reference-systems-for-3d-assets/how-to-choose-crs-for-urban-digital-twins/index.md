@@ -66,6 +66,37 @@ print("max |distortion| ppm:", np.abs(g[:, 3]).max().round(1))
 
 A scale factor within roughly 1:10,000 (100 ppm) over the whole footprint is the usual engineering target; UTM near a zone edge can exceed that, which is the signal to consider a local grid (step 4).
 
+<figure class="diagram">
+<svg viewBox="100 -10 540 322" role="img" aria-labelledby="crs-zone-t crs-zone-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="crs-zone-t">Where a city sits inside a UTM zone decides its distortion</title>
+  <desc id="crs-zone-d">A six-degree UTM zone with its central meridian at scale factor 0.9996 and two standard lines where the scale factor is exactly one. A city near the central meridian carries about minus forty parts per million of distortion; a city near the zone edge carries about plus three hundred and ninety.</desc>
+  <rect class="svg-bg" x="100" y="-10" width="540" height="322" fill="#ffffff"/>
+  <defs>
+    <marker id="crs-zone-a" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
+    </marker>
+  </defs>
+  <line x1="120" y1="26" x2="600" y2="26" stroke="#5b6471" stroke-width="1.5"
+        marker-start="url(#crs-zone-a)" marker-end="url(#crs-zone-a)"/>
+  <text x="360" y="18" fill="#5b6471" font-size="12" text-anchor="middle">6° of longitude</text>
+  <rect x="120" y="40" width="480" height="200" rx="6" fill="#ffffff" stroke="#5b6471" stroke-width="2"/>
+  <line x1="360" y1="40" x2="360" y2="240" stroke="#1f6b8a" stroke-width="2" stroke-dasharray="6 4"/>
+  <line x1="270" y1="40" x2="270" y2="240" stroke="#4f7a4d" stroke-width="2"/>
+  <line x1="450" y1="40" x2="450" y2="240" stroke="#4f7a4d" stroke-width="2"/>
+  <rect x="330" y="150" width="60" height="40" rx="4" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <rect x="528" y="86" width="60" height="40" rx="4" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <text x="360" y="62" fill="#1f6b8a" font-size="11.5" text-anchor="middle">central meridian · k₀ = 0.9996</text>
+  <text x="270" y="228" fill="#4f7a4d" font-size="11.5" text-anchor="middle">k = 1</text>
+  <text x="450" y="228" fill="#4f7a4d" font-size="11.5" text-anchor="middle">k = 1</text>
+  <text x="240" y="268" fill="#4f7a4d" font-size="12" text-anchor="middle">City A, astride the central meridian: −40 ppm</text>
+  <text x="520" y="268" fill="#c46a3d" font-size="12" text-anchor="middle">City B, near the zone edge: +390 ppm</text>
+  <text x="360" y="294" fill="#5b6471" font-size="12" text-anchor="middle">Distortion is a property of where you sit in the zone, never of the zone's name</text>
+</svg>
+<figcaption>Two cities, one zone, an order of magnitude between their distortions. This is why the number has to be measured at your bounding box rather than inferred from the EPSG code.</figcaption>
+</figure>
+
+The asymmetry in those numbers is worth reading carefully. Transverse Mercator shrinks distances between the two standard lines and stretches them outside, so a city straddling the central meridian sits in a shallow negative trough while a city near the zone edge climbs a steep positive slope. Because the slope steepens toward the edge, a footprint near the boundary sees a much wider *spread* of distortion across itself, not merely a larger average — and it is the spread, not the mean, that shows up as inconsistent measurements between neighbourhoods. A constant scale correction can absorb an offset; it cannot absorb a gradient.
+
 ### 3. Check the vertical datum and pair it as a compound CRS
 
 Horizontal choice is only half the frame. Decide the vertical datum explicitly and bind it to the horizontal one so a single EPSG identifier carries both.
@@ -102,6 +133,50 @@ With distortion numbers in hand, choose using the table below. The deciding fact
 | Setup effort | None (off the shelf) | None (off the shelf) | High (define & publish projection params) |
 | Best for | Single-zone cities, quick start | Most municipal twins in-country | High-precision survey/BIM, edge cities |
 
+<figure class="diagram">
+<svg viewBox="2 0 754 294" role="img" aria-labelledby="crs-tree-t crs-tree-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="crs-tree-t">Decision tree for an urban twin's internal horizontal CRS</title>
+  <desc id="crs-tree-d">If a single national grid covers the extent and cadastre alignment is required, pick the national grid. If alignment is not required and measured distortion is within tolerance, a plain UTM zone is enough. When no single grid covers the extent or distortion exceeds tolerance, design a local low-distortion Transverse Mercator anchored at the city centroid.</desc>
+  <rect class="svg-bg" x="2" y="0" width="754" height="294" fill="#ffffff"/>
+  <defs>
+    <marker id="crs-tree-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
+    </marker>
+  </defs>
+  <rect x="16" y="122" width="190" height="64" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="250" y="34" width="190" height="64" rx="8" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <rect x="250" y="206" width="190" height="64" rx="8" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <rect x="490" y="14" width="252" height="56" rx="8" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <rect x="490" y="118" width="252" height="56" rx="8" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <rect x="490" y="224" width="252" height="56" rx="8" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <g stroke="#5b6471" stroke-width="2" fill="none" marker-end="url(#crs-tree-a)">
+    <path d="M206 140 C 226 106 226 88 248 70"/>
+    <path d="M206 168 C 226 202 226 220 248 238"/>
+    <path d="M440 56 C 460 50 468 46 488 42"/>
+    <path d="M440 82 C 462 100 466 118 488 136"/>
+    <path d="M440 228 C 462 202 466 172 488 152"/>
+    <line x1="440" y1="252" x2="488" y2="252"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="111" y="148"><tspan x="111" dy="0">Does one national grid</tspan><tspan x="111" dy="16">cover the whole extent?</tspan></text>
+    <text x="345" y="60"><tspan x="345" dy="0">Must it align with the</tspan><tspan x="345" dy="16">cadastre / open data?</tspan></text>
+    <text x="345" y="232"><tspan x="345" dy="0">Measured distortion</tspan><tspan x="345" dy="16">under 250 ppm?</tspan></text>
+    <text x="616" y="38"><tspan x="616" dy="0">National grid — EPSG:25832,</tspan><tspan x="616" dy="16">2154, 27700, 2056</tspan></text>
+    <text x="616" y="142"><tspan x="616" dy="0">UTM zone — EPSG:326xx / 327xx</tspan><tspan x="616" dy="16">off the shelf, no setup</tspan></text>
+    <text x="616" y="248"><tspan x="616" dy="0">Local low-distortion TM</tspan><tspan x="616" dy="16">anchored at the centroid</tspan></text>
+  </g>
+  <g fill="#5b6471" font-size="11.5" text-anchor="middle">
+    <text x="228" y="106">yes</text>
+    <text x="228" y="200">no</text>
+    <text x="465" y="42">yes</text>
+    <text x="465" y="104">no</text>
+    <text x="465" y="196">yes</text>
+    <text x="465" y="244">no</text>
+  </g>
+</svg>
+<figcaption>Two questions decide it in almost every case: whether one published grid covers the extent, and whether the measured distortion fits inside your survey tolerance.</figcaption>
+</figure>
+
 For most in-country municipal twins, the national grid (EPSG:25832 in much of central Europe, EPSG:2154 / RGF93 Lambert-93 in France, EPSG:27700 in Great Britain, EPSG:2056 in Switzerland) is the right default: stable datum, low distortion, and alignment with the cadastre and open data. Reach for a local engineering grid only when distortion or survey tolerance demands it; accept a plain UTM zone (EPSG:32632, EPSG:32633) when a single zone covers the city and quick interoperability outranks the last few ppm.
 
 ### 5. Document the authoritative CRS and the reprojection boundary
@@ -128,9 +203,10 @@ print("authoritative CRS pinned:", manifest["internal_crs"])
 Commit this manifest alongside the pipeline so every ingest, query, and export job reads the CRS from one place rather than hard-coding it.
 
 <figure class="diagram">
-<svg viewBox="0 0 760 250" role="img" aria-labelledby="crscrs-t crscrs-d" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="1 6 758 178" role="img" aria-labelledby="crscrs-t crscrs-d" xmlns="http://www.w3.org/2000/svg">
   <title id="crscrs-t">CRS decision and reprojection boundary</title>
   <desc id="crscrs-d">Candidate EPSG codes are filtered by scale-factor distortion and vertical datum into one authoritative projected compound CRS used for storage and analysis, which is reprojected to WGS84 3D only at the web-tiling layer.</desc>
+  <rect class="svg-bg" x="1" y="6" width="758" height="178" fill="#ffffff"/>
   <defs>
     <marker id="crscrs-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>

@@ -9,9 +9,10 @@ This guide writes a GitHub Actions workflow that runs a PDAL point-cloud pipelin
 You hit this the moment point-cloud processing needs to be reproducible: a teammate edits a filter threshold, and you want CI to re-run the exact same `pdal` build on the exact same fixture and prove the output still validates before the change can merge. This is the process stage of the broader [CI/CD automation for spatial pipelines](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/) workflow.
 
 <figure class="diagram">
-<svg viewBox="0 0 820 300" role="img" aria-labelledby="gha-pdal-t gha-pdal-d" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="1 36 653 224" role="img" aria-labelledby="gha-pdal-t gha-pdal-d" xmlns="http://www.w3.org/2000/svg">
   <title id="gha-pdal-t">PDAL stage chain and gdalwarp reprojection in a CI job</title>
   <desc id="gha-pdal-d">A PDAL pipeline reads a LAS tile, applies a range filter then a statistical outlier filter, and writes a clean LAS; the result flows into a gdalwarp reprojection to EPSG:4979 and is uploaded as a build artifact.</desc>
+  <rect class="svg-bg" x="1" y="36" width="653" height="224" fill="#ffffff"/>
   <defs>
     <marker id="gha-pdal-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
@@ -102,6 +103,31 @@ gdalwarp \
   terrain/tile_18_3312.tif work/tile_18_3312_4979.tif
 ```
 
+<figure class="diagram">
+<svg viewBox="1 36 758 240" role="img" aria-labelledby="ga-cache-t ga-cache-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="ga-cache-t">Where the minutes go in a GDAL and PDAL job</title>
+  <desc id="ga-cache-d">A cold run spends most of its time installing the GDAL and PROJ stack and downloading transformation grids before any data is touched. Pinning a container image and caching the PROJ data directory removes both, leaving a run that is almost entirely the actual processing.</desc>
+  <rect class="svg-bg" x="1" y="36" width="758" height="240" fill="#ffffff"/>
+  <rect x="60" y="76" width="230" height="34" rx="4" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <rect x="290" y="76" width="120" height="34" rx="4" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <rect x="410" y="76" width="210" height="34" rx="4" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="60" y="160" width="26" height="34" rx="4" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <rect x="86" y="160" width="18" height="34" rx="4" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <rect x="104" y="160" width="210" height="34" rx="4" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <g fill="#1f2937" font-size="12" text-anchor="middle">
+    <text x="175" y="98">conda install gdal pdal — 4m10s</text>
+    <text x="350" y="98">projsync — 2m</text>
+    <text x="515" y="98">the actual processing — 3m30s</text>
+  </g>
+  <text x="60" y="64" fill="#b0413e" font-size="12.5" text-anchor="start" font-weight="600">cold run — 9m40s, and 6m10s of it is setup</text>
+  <text x="60" y="148" fill="#4f7a4d" font-size="12.5" text-anchor="start" font-weight="600">pinned container image, PROJ data cached — 4m10s</text>
+  <text x="330" y="182" fill="#5b6471" font-size="12" text-anchor="start">the same processing, now the whole job</text>
+  <text x="380" y="236" fill="#15384a" font-size="12.5" text-anchor="middle">Caching PROJ data does more than save time: it pins which grid revision the job used, so results stay comparable across runs</text>
+  <text x="380" y="258" fill="#5b6471" font-size="12" text-anchor="middle">Key the cache on the PROJ data release, never on the workflow file</text>
+</svg>
+<figcaption>The setup dominates a spatial CI job until it is pinned. Pinning it also happens to be what makes the run reproducible, so the two motivations point the same way.</figcaption>
+</figure>
+
 ### 3. Drive both tools from the workflow YAML
 
 Run the job in the pinned container, install PDAL, execute the PDAL pipeline with `pdal pipeline`, then the `gdalwarp` step. Trigger on push and pull request so every change is exercised.
@@ -163,6 +189,37 @@ pdal pipeline pipelines/filter_reproject.json \
 
 Because the reader and writer filenames are injected here, the checked-in JSON can carry placeholder paths and the workflow stays the single source of truth for which tile runs. Keep the *filter thresholds* in the JSON, though — they are the reviewed parameters that a gate later asserts against, so they belong under version control rather than scattered across workflow steps.
 
+<figure class="diagram">
+<svg viewBox="10 46 740 234" role="img" aria-labelledby="ga-stage-t ga-stage-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="ga-stage-t">Where a PDAL pipeline can be overridden, and what that costs</title>
+  <desc id="ga-stage-d">Stage options can be set in the committed pipeline JSON, overridden on the command line with double-dash stage arguments, or replaced through a pipeline template. Anything set on the command line does not appear in the committed file, so the run is no longer described by anything in the repository.</desc>
+  <rect class="svg-bg" x="10" y="46" width="740" height="234" fill="#ffffff"/>
+  <defs>
+    <marker id="ga-stage-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
+    </marker>
+  </defs>
+  <rect x="24" y="60" width="200" height="56" rx="8" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <rect x="24" y="150" width="200" height="56" rx="8" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <rect x="300" y="104" width="180" height="58" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="556" y="104" width="180" height="58" rx="8" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <g stroke="#5b6471" stroke-width="2" fill="none" marker-end="url(#ga-stage-a)">
+    <path d="M224 88 C 252 100 268 108 298 118"/>
+    <path d="M224 178 C 252 166 268 158 298 148"/>
+    <path d="M480 133 L554 133"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="124" y="82"><tspan x="124" dy="0">pipeline.json in the repo</tspan><tspan x="124" dy="16">reviewed, diffable, pinned</tspan></text>
+    <text x="124" y="172"><tspan x="124" dy="0">--filters.smrf.scalar=1.4</tspan><tspan x="124" dy="16">on the command line</tspan></text>
+    <text x="390" y="128"><tspan x="390" dy="0">the run PDAL</tspan><tspan x="390" dy="16">actually executes</tspan></text>
+    <text x="646" y="128"><tspan x="646" dy="0">the output, and its</tspan><tspan x="646" dy="16">content hash</tspan></text>
+  </g>
+  <text x="370" y="240" fill="#b0413e" font-size="12.5" text-anchor="middle">Only one of those two inputs is in version control, and both change the bytes that come out</text>
+  <text x="370" y="262" fill="#5b6471" font-size="12" text-anchor="middle">If you override on the command line, echo the resolved pipeline into the artifact so the run stays reconstructable</text>
+</svg>
+<figcaption>Command-line overrides are genuinely useful for a matrix. They just have to be recorded somewhere the artifact carries, or the tile and the recipe stop matching.</figcaption>
+</figure>
+
 ### 5. Verify the PDAL result in the same job
 
 Add a `pdal info` step so the job asserts the clean cloud is non-empty and carries the expected CRS before the artifact is uploaded. Piping through `python3` turns the JSON summary into a hard exit code.
@@ -204,6 +261,12 @@ gdalsrsinfo -o epsg work/tile_18_3312_4979.tif   # -> EPSG:4979
 
 In the Actions run summary the `Upload processed tile` step lists `processed-tile_18_3312` as a downloadable artifact, and re-running the job on an unchanged fixture restores the apt cache so the PDAL install step reports a cache hit.
 
+Two habits keep these jobs debuggable as they grow. The first is to upload the resolved pipeline — the JSON after every override has been applied — as a build artifact. PDAL will print it for you, and having it attached to the run means a result can be reproduced later without reconstructing which matrix entry supplied which argument. Without it, a matrix of twenty shards produces twenty runs whose actual configuration exists only in a shell command that has scrolled past.
+
+The second is to assert on the output rather than on the exit code. PDAL exits zero when a pipeline runs successfully even if a filter matched nothing, so a `filters.range` with a typo in the classification limits produces an empty output and a green build. Checking the point count in the same job — comparing it against the input count and against a floor you chose deliberately — turns that silent case into a failure at the step that caused it.
+
+Both of these matter more in CI than locally, because CI is where nobody is watching the output scroll past. A job that is correct but unattributable costs more time over a year than one that occasionally fails loudly.
+
 ## Common Errors
 
 **`PDAL: readers.las: Global encoding WKT flag not set for point format 6 - 10.`** The `.laz` is LAS 1.4 with a point format that requires a WKT CRS VLR, but the file only carries a legacy GeoTIFF key or none. PDAL cannot infer the CRS, so downstream reprojection is meaningless. Fix: set `default_srs` on `readers.las` (as in step 1) or repair the header with `pdal translate --writers.las.a_srs=EPSG:32618`, and never rely on an unstated CRS.
@@ -211,6 +274,10 @@ In the Actions run summary the `Upload processed tile` step lists `processed-til
 **`ERROR 1: PROJ: proj_create_from_database: crs not found` from gdalwarp.** The container's PROJ database predates the EPSG code you passed, or a typo turned `EPSG:4979` into a non-existent code. Fix: pin a GDAL image recent enough to know the code, verify with `projinfo EPSG:4979`, and pass the authority-qualified string (`EPSG:4979`) rather than a bare number.
 
 **`filters.outlier` removes almost everything, leaving a near-empty cloud.** A `multiplier` set too low (for example `1.0`) combined with a small `mean_k` on a sparse tile flags dense-edge points as outliers. Fix: raise `multiplier` toward 2.5–3.0 and `mean_k` to 8–16, and inspect the flagged fraction in the `pdal info` step — a healthy terrestrial tile loses single-digit percentages, not the bulk of its points.
+
+A last note on the runner itself. GDAL and PDAL are I/O-bound far more often than they are CPU-bound, and the hosted runners give you a modest disk with modest throughput. On a large tile the job will frequently spend more time reading and writing than transforming, which means adding parallelism inside the job makes it slower rather than faster. Where a matrix is available, splitting across runners is nearly always the better lever than splitting across cores within one.
+
+If the source data lives in object storage, read it with a streaming reader rather than downloading it first. Both GDAL and PDAL can read directly from an S3-style URL, and for a pipeline that filters aggressively at its first stage that avoids pulling bytes the run will immediately discard.
 
 ## Related Guides
 

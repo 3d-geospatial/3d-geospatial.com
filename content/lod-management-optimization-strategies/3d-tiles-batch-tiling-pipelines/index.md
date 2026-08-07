@@ -27,9 +27,10 @@ A batch tiling pipeline is a function from `(source features, encoder version)` 
 The organising unit is the **shard**: a rectangular cell of the projected extent that owns every feature whose centroid falls inside it. Sharding turns one intractable job into thousands of independent ones — the property that lets the encode fan out across processes and machines, and lets an incremental rebuild re-encode a single city block without re-reading the region. Each shard becomes an *external* tileset (`tileset.json` + its `b3dm` leaves), and a thin root tileset references those shard tilesets by URI — the "tileset of tilesets" pattern. This keeps the root index tiny (one entry per shard, not per building) and lets the CDN cache unchanged shard tilesets independently. The single-tileset internals — `geometricError` ladders, box bounding volumes, the ENU→ECEF root transform — are unchanged from [automated tile generation](https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/); this guide is only about how thousands of them are scheduled, cached, and merged.
 
 <figure class="diagram">
-<svg viewBox="0 0 840 360" role="img" aria-labelledby="batch-lane-t batch-lane-d" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="6 33 828 323" role="img" aria-labelledby="batch-lane-t batch-lane-d" xmlns="http://www.w3.org/2000/svg">
   <title id="batch-lane-t">Batch tiling pipeline swimlane from shard grid to validated publish</title>
   <desc id="batch-lane-d">A projected shard grid feeds independent encode workers that each run the glTF to b3dm and Draco step; their outputs converge into a tileset-of-tilesets assembly, which is validated and published. A content-hash cache below the lane skips shards whose source is unchanged and streams bounds before loading geometry.</desc>
+  <rect class="svg-bg" x="6" y="33" width="828" height="323" fill="#ffffff"/>
   <defs>
     <marker id="batch-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
@@ -161,6 +162,48 @@ dirty = [k for k, digest in manifest.items() if prev.get(k) != digest]
 print(f"{len(dirty)}/{len(manifest)} shards changed -> re-encoding only those")
 ```
 
+<figure class="diagram">
+<svg viewBox="38 16 696 296" role="img" aria-labelledby="bt-hash-t bt-hash-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="bt-hash-t">Only the shards whose content hash moved get rebuilt</title>
+  <desc id="bt-hash-d">Each shard's inputs are hashed into a manifest. On the next run the hashes are recomputed and compared, and only the two shards whose hash differs are re-encoded. The remaining seven are copied forward untouched, so a small edit costs a small build.</desc>
+  <rect class="svg-bg" x="38" y="16" width="696" height="296" fill="#ffffff"/>
+  <text x="240" y="44" fill="#1f2937" font-size="13" text-anchor="middle" font-weight="600">shard grid, EPSG:32633</text>
+  <text x="240" y="272" fill="#b0413e" font-size="12" text-anchor="middle">shards 0-1 and 2-2: content hash changed</text>
+    <rect x="60" y="70" width="84" height="52" rx="6" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+    <rect x="156" y="70" width="84" height="52" rx="6" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+    <rect x="252" y="70" width="84" height="52" rx="6" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+    <rect x="60" y="132" width="84" height="52" rx="6" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+    <rect x="156" y="132" width="84" height="52" rx="6" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+    <rect x="252" y="132" width="84" height="52" rx="6" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+    <rect x="60" y="194" width="84" height="52" rx="6" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+    <rect x="156" y="194" width="84" height="52" rx="6" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+    <rect x="252" y="194" width="84" height="52" rx="6" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="102" y="96">0-0</text>
+    <text x="198" y="96">0-1</text>
+    <text x="294" y="96">0-2</text>
+    <text x="102" y="158">1-0</text>
+    <text x="198" y="158">1-1</text>
+    <text x="294" y="158">1-2</text>
+    <text x="102" y="220">2-0</text>
+    <text x="198" y="220">2-1</text>
+    <text x="294" y="220">2-2</text>
+  </g>
+  <g text-anchor="middle">
+  </g>
+  <path d="M470 70 h250 v56 h-250 Z" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <path d="M470 148 h250 v56 h-250 Z" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <path d="M470 226 h250 v56 h-250 Z" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="595" y="92"><tspan x="595" dy="0">hash(source geometry +</tspan><tspan x="595" dy="16">encoder version + params)</tspan></text>
+    <text x="595" y="170"><tspan x="595" dy="0">compare against</tspan><tspan x="595" dy="16">manifest.json from last run</tspan></text>
+    <text x="595" y="248"><tspan x="595" dy="0">re-encode 2 shards,</tspan><tspan x="595" dy="16">copy 7 forward unchanged</tspan></text>
+  </g>
+  <text x="370" y="294" fill="#5b6471" font-size="12" text-anchor="middle">The encoder version belongs in the hash — otherwise a toolchain upgrade leaves half the city on the old encoder</text>
+</svg>
+<figcaption>Incremental rebuilds are a hashing problem, not a scheduling one. Everything that can change the output bytes has to be inside the hash, or the manifest lies.</figcaption>
+</figure>
+
 ### 4. Encode each dirty shard as an idempotent batch job
 
 One shard becomes one external tileset. Merge the shard's features into a single batched `.glb` (a `b3dm` is batched by design — one tile, many features, a `_BATCHID` per vertex), encode once through `3d-tiles-tools`, and write to a temp path renamed atomically on success so a killed job never leaves a half-written tile. Parallelising these jobs across cores is covered in [parallel b3dm encoding with process pools](https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/parallel-b3dm-encoding-with-process-pools/).
@@ -247,6 +290,49 @@ root = {"asset": {"version": "1.1"},
 (out_root / "tileset.json").write_text(json.dumps(root, indent=2, sort_keys=True))
 Path("manifest.prev.json").write_text(json.dumps(manifest, indent=2, sort_keys=True))
 ```
+
+<figure class="diagram">
+<svg viewBox="26 26 688 286" role="img" aria-labelledby="bt-tree-t bt-tree-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="bt-tree-t">A tileset of tilesets keeps each shard independently publishable</title>
+  <desc id="bt-tree-d">The root tileset.json holds only bounding volumes and geometric errors, and points at one external tileset.json per shard. Each shard owns its own subtree and content files, so rebuilding one shard rewrites one small file and leaves the rest of the city byte-identical.</desc>
+  <rect class="svg-bg" x="26" y="26" width="688" height="286" fill="#ffffff"/>
+  <defs>
+    <marker id="bt-tree-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
+    </marker>
+  </defs>
+  <rect x="240" y="40" width="260" height="56" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <g fill="#fdf3e0" stroke="#c46a3d" stroke-width="2">
+    <rect x="40" y="140" width="180" height="56" rx="8"/>
+    <rect x="280" y="140" width="180" height="56" rx="8"/>
+    <rect x="520" y="140" width="180" height="56" rx="8"/>
+  </g>
+  <g fill="#eef5e9" stroke="#4f7a4d" stroke-width="2">
+    <rect x="40" y="232" width="180" height="44" rx="8"/>
+    <rect x="280" y="232" width="180" height="44" rx="8"/>
+    <rect x="520" y="232" width="180" height="44" rx="8"/>
+  </g>
+  <g stroke="#5b6471" stroke-width="2" fill="none" marker-end="url(#bt-tree-a)">
+    <path d="M320 96 C 260 112 190 120 132 138"/>
+    <path d="M370 96 V138"/>
+    <path d="M420 96 C 480 112 550 120 608 138"/>
+    <path d="M130 196 V230"/>
+    <path d="M370 196 V230"/>
+    <path d="M610 196 V230"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="370" y="64"><tspan x="370" dy="0" font-weight="600">root tileset.json</tspan><tspan x="370" dy="16">bounds and errors only, no content</tspan></text>
+    <text x="130" y="164"><tspan x="130" dy="0">shard 0-0/tileset.json</tspan><tspan x="130" dy="16">own subtree, own errors</tspan></text>
+    <text x="370" y="164"><tspan x="370" dy="0">shard 0-1/tileset.json</tspan><tspan x="370" dy="16">rebuilt this run</tspan></text>
+    <text x="610" y="164"><tspan x="610" dy="0">shard 0-2/tileset.json</tspan><tspan x="610" dy="16">byte-identical to last run</tspan></text>
+    <text x="130" y="260">*.b3dm content</text>
+    <text x="370" y="260">*.b3dm content</text>
+    <text x="610" y="260">*.b3dm content</text>
+  </g>
+  <text x="370" y="294" fill="#5b6471" font-size="12" text-anchor="middle">The root file is the only shared artefact, so two shards can be rebuilt concurrently without a write conflict</text>
+</svg>
+<figcaption>External tilesets turn the city into independently deployable units. The alternative — one monolithic tileset.json — serialises every rebuild through a single file.</figcaption>
+</figure>
 
 ## Validation & Verification
 

@@ -9,9 +9,10 @@ This guide builds a quadtree LOD index for urban 3D models in Python using `nump
 You hit this problem the moment a digital twin outgrows a single mesh. A city covers tens of square kilometres, and you cannot ship every building at full detail to a browser or game engine — you need an index that answers "which tiles matter for *this* camera" in microseconds. A quadtree gives you that index, but only if it is built in a metric CRS, with a `geometricError` ladder that decreases predictably toward the leaves and bounding boxes that strictly nest. Get any of those wrong and you inherit popping artifacts, distorted tiles, or a 3D Tiles tileset the validator rejects. This page walks the construction end to end so the tree you produce is directly compatible with [hierarchical LOD structuring](https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/) and the [OGC 3D Tiles](https://www.ogc.org/standard/3dtiles/) `geometricError` model.
 
 <figure class="diagram">
-<svg viewBox="0 0 760 300" role="img" aria-labelledby="qtlod-t qtlod-d" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="26 26 668 277" role="img" aria-labelledby="qtlod-t qtlod-d" xmlns="http://www.w3.org/2000/svg">
   <title id="qtlod-t">Quadtree subdivision and geometricError ladder</title>
   <desc id="qtlod-d">A square root node subdivides into four quadrants, each of which subdivides again, while the geometricError value drops by half at each deeper level from root to leaf.</desc>
+  <rect class="svg-bg" x="26" y="26" width="668" height="277" fill="#ffffff"/>
   <defs>
     <marker id="qtlod-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
@@ -160,6 +161,36 @@ print(f"placed {placed}/{len(footprints)} meshes")
 
 Footprints that straddle a quadrant boundary settle at a higher (coarser) node — the deepest one that still contains them whole — which is the correct behaviour: a building spanning two tiles belongs to their shared parent.
 
+<figure class="diagram">
+<svg viewBox="16 6 688 294" role="img" aria-labelledby="qt-strad-t qt-strad-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="qt-strad-t">Three ways to place a footprint that crosses a quad boundary</title>
+  <desc id="qt-strad-d">A building whose footprint spans two quadrants can be promoted to the parent node, which keeps it whole but coarsens it; duplicated into both children, which renders it twice and doubles its bytes; or split along the boundary, which is exact but creates open edges and breaks per-building picking.</desc>
+  <rect class="svg-bg" x="16" y="6" width="688" height="294" fill="#ffffff"/>
+  <g fill="none" stroke="#5b6471" stroke-width="1.5">
+    <path d="M30 50 h150 v150 h-150 Z"/>
+    <path d="M105.0 50 v150 M30 125.0 h150"/>
+    <path d="M280 50 h150 v150 h-150 Z"/>
+    <path d="M355.0 50 v150 M280 125.0 h150"/>
+    <path d="M530 50 h150 v150 h-150 Z"/>
+    <path d="M605.0 50 v150 M530 125.0 h150"/>
+  </g>
+  <path d="M120 110 h70 v50 h-70 Z" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2.5"/>
+  <path d="M370 110 h35 v50 h-35 Z" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2.5"/>
+  <path d="M405 110 h35 v50 h-35 Z" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2.5"/>
+  <path d="M620 110 h35 v50 h-35 Z" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2.5"/>
+  <path d="M655 110 h35 v50 h-35 Z" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2.5"/>
+  <path d="M655 110 V160" fill="none" stroke="#b0413e" stroke-width="3"/>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="105" y="228"><tspan x="105" dy="0" font-weight="600">promote to the parent</tspan><tspan x="105" dy="17">whole, but drawn at the</tspan><tspan x="105" dy="16">parent's coarser error</tspan></text>
+    <text x="355" y="228"><tspan x="355" dy="0" font-weight="600">duplicate into both</tspan><tspan x="355" dy="17">correct at every level,</tspan><tspan x="355" dy="16">at twice the bytes</tspan></text>
+    <text x="605" y="228"><tspan x="605" dy="0" font-weight="600">split on the boundary</tspan><tspan x="605" dy="17">exact, but open edges</tspan><tspan x="605" dy="16">and picking splits in two</tspan></text>
+  </g>
+  <text x="370" y="34" fill="#1f2937" font-size="13" text-anchor="middle" font-weight="600">A footprint that crosses a boundary has no free answer — only three priced ones</text>
+  <text x="370" y="282" fill="#5b6471" font-size="12" text-anchor="middle">Promotion is the usual default: cheap, lossless, and it only costs detail on the minority of buildings that straddle</text>
+</svg>
+<figcaption>Whichever rule you adopt, apply it deterministically from the footprint geometry — a rule that depends on iteration order produces a different tree on every rebuild.</figcaption>
+</figure>
+
 ### 5. Query the visible nodes for a viewport
 
 At runtime you walk the tree, skip nodes outside the viewport rectangle (frustum culling, simplified to a 2D extent here), and descend while the projected `geometric_error` exceeds a pixel tolerance. The screen-space error proxy uses `numpy` for the distance and projection math.
@@ -193,6 +224,39 @@ print(f"{len(visible)} nodes selected for the viewport")
 ```
 
 This is the same descent logic 3D Tiles runtimes use, so the tree slots straight into the broader [LOD management workflow](https://www.3d-geospatial.com/lod-management-optimization-strategies/) and the related [automated tile generation](https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/) and [streaming sync patterns](https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/).
+
+<figure class="diagram">
+<svg viewBox="16 7 662 327" role="img" aria-labelledby="qt-frus-t qt-frus-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="qt-frus-t">Classifying quadtree nodes against the view frustum</title>
+  <desc id="qt-frus-d">In plan view the camera's frustum sweeps across the quadtree. Nodes entirely outside it are discarded without descending. Nodes entirely inside are accepted whole, and their children need no further frustum test. Only nodes that straddle the frustum boundary have to be tested recursively.</desc>
+  <rect class="svg-bg" x="16" y="7" width="662" height="327" fill="#ffffff"/>
+    <rect x="60" y="60" width="86" height="52" rx="4" fill="#ffffff" stroke="#5b6471" stroke-width="1.5"/>
+    <rect x="150" y="60" width="86" height="52" rx="4" fill="#ffffff" stroke="#5b6471" stroke-width="1.5"/>
+    <rect x="240" y="60" width="86" height="52" rx="4" fill="#ffffff" stroke="#5b6471" stroke-width="1.5"/>
+    <rect x="330" y="60" width="86" height="52" rx="4" fill="#ffffff" stroke="#5b6471" stroke-width="1.5"/>
+    <rect x="60" y="116" width="86" height="52" rx="4" fill="#ffffff" stroke="#5b6471" stroke-width="1.5"/>
+    <rect x="150" y="116" width="86" height="52" rx="4" fill="#fdf3e0" stroke="#c46a3d" stroke-width="1.5"/>
+    <rect x="240" y="116" width="86" height="52" rx="4" fill="#fdf3e0" stroke="#c46a3d" stroke-width="1.5"/>
+    <rect x="330" y="116" width="86" height="52" rx="4" fill="#ffffff" stroke="#5b6471" stroke-width="1.5"/>
+    <rect x="60" y="172" width="86" height="52" rx="4" fill="#fdf3e0" stroke="#c46a3d" stroke-width="1.5"/>
+    <rect x="150" y="172" width="86" height="52" rx="4" fill="#eef5e9" stroke="#4f7a4d" stroke-width="1.5"/>
+    <rect x="240" y="172" width="86" height="52" rx="4" fill="#eef5e9" stroke="#4f7a4d" stroke-width="1.5"/>
+    <rect x="330" y="172" width="86" height="52" rx="4" fill="#fdf3e0" stroke="#c46a3d" stroke-width="1.5"/>
+    <rect x="60" y="228" width="86" height="52" rx="4" fill="#ffffff" stroke="#5b6471" stroke-width="1.5"/>
+    <rect x="150" y="228" width="86" height="52" rx="4" fill="#fdf3e0" stroke="#c46a3d" stroke-width="1.5"/>
+    <rect x="240" y="228" width="86" height="52" rx="4" fill="#fdf3e0" stroke="#c46a3d" stroke-width="1.5"/>
+    <rect x="330" y="228" width="86" height="52" rx="4" fill="#ffffff" stroke="#5b6471" stroke-width="1.5"/>
+  <path d="M370 300 L150 44 M370 300 L590 44" fill="none" stroke="#1f6b8a" stroke-width="2" stroke-dasharray="7 4"/>
+  <path d="M360 300 h20 v14 h-20 Z" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <g fill="#1f2937" font-size="12" text-anchor="start">
+    <text x="30" y="34">fully inside — accept, and skip the test on every descendant</text>
+    <text x="392" y="34">straddling — descend and test the children</text>
+  </g>
+  <text x="370" y="290" fill="#5b6471" font-size="11.5" text-anchor="middle">camera</text>
+  <text x="370" y="316" fill="#5b6471" font-size="12" text-anchor="middle">Unshaded nodes are outside the frustum: rejected at the parent, so their subtrees are never visited at all</text>
+</svg>
+<figcaption>The saving is in the two early exits. A node fully inside or fully outside terminates the recursion, so a deep tree costs no more per frame than a shallow one over the same visible area.</figcaption>
+</figure>
 
 ## Expected Output & Verification
 

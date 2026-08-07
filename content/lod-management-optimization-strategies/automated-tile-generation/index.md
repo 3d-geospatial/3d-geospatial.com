@@ -27,9 +27,10 @@ A 3D Tiles tileset is a tree. The root `tileset.json` declares an `asset.version
 This makes `geometricError` the load-bearing number in the whole system. It is the **world-space distance, in metres, between this tile's simplified geometry and the ground truth it approximates.** It must decrease monotonically with depth: the root is coarse (large error, e.g. 512 m for a city), each level roughly halves it, and leaves hold the full-resolution geometry at `geometricError` 0. Get the scale wrong and you either over-refine (every tile loads at once, defeating the purpose) or under-refine (blurry geometry that never sharpens). Because tiles live in EPSG:4978, that distance is a true metric distance on the ellipsoid, not a pixel or a projected unit.
 
 <figure class="diagram">
-<svg viewBox="0 0 820 360" role="img" aria-labelledby="tile-tree-t tile-tree-d" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="46 11 728 355" role="img" aria-labelledby="tile-tree-t tile-tree-d" xmlns="http://www.w3.org/2000/svg">
   <title id="tile-tree-t">Tileset quadtree with geometricError decreasing by depth</title>
   <desc id="tile-tree-d">A root tile with a large geometric error refines into four children with half the error, which refine again into leaf tiles with zero error holding full-resolution content; the renderer stops refining once a tile's screen-space error falls below the budget.</desc>
+  <rect class="svg-bg" x="46" y="11" width="728" height="355" fill="#ffffff"/>
   <defs>
     <marker id="tile-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
@@ -132,6 +133,53 @@ for glb in sorted(Path("blocks_enu").glob("*.glb")):
     })
 ```
 
+<figure class="diagram">
+<svg viewBox="32 1 725 307" role="img" aria-labelledby="at-bv-t at-bv-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="at-bv-t">Three bounding volumes over the same cluster of buildings</title>
+  <desc id="at-bv-d">A geographic region is axis-aligned in longitude and latitude, so a diagonal block of buildings leaves a large amount of empty volume inside it. An oriented bounding box rotates to the cluster and encloses far less air. A sphere is the cheapest volume to test against but the loosest fit of the three.</desc>
+  <rect class="svg-bg" x="32" y="1" width="725" height="307" fill="#ffffff"/>
+  <path d="M46 70 h186 v126 h-186 Z" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <path d="M280 130 L465 55 L498 136 L313 211 Z" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <circle cx="639" cy="133" r="104" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <g fill="#ffffff" stroke="#5b6471" stroke-width="1.5">
+    <rect x="60" y="148" width="22" height="16" rx="2"/>
+    <rect x="94" y="132" width="22" height="16" rx="2"/>
+    <rect x="128" y="116" width="22" height="16" rx="2"/>
+    <rect x="162" y="100" width="22" height="16" rx="2"/>
+    <rect x="196" y="84" width="22" height="16" rx="2"/>
+    <rect x="76" y="166" width="22" height="16" rx="2"/>
+    <rect x="110" y="150" width="22" height="16" rx="2"/>
+    <rect x="144" y="134" width="22" height="16" rx="2"/>
+    <rect x="178" y="118" width="22" height="16" rx="2"/>
+    <rect x="310" y="148" width="22" height="16" rx="2"/>
+    <rect x="344" y="132" width="22" height="16" rx="2"/>
+    <rect x="378" y="116" width="22" height="16" rx="2"/>
+    <rect x="412" y="100" width="22" height="16" rx="2"/>
+    <rect x="446" y="84" width="22" height="16" rx="2"/>
+    <rect x="326" y="166" width="22" height="16" rx="2"/>
+    <rect x="360" y="150" width="22" height="16" rx="2"/>
+    <rect x="394" y="134" width="22" height="16" rx="2"/>
+    <rect x="428" y="118" width="22" height="16" rx="2"/>
+    <rect x="560" y="148" width="22" height="16" rx="2"/>
+    <rect x="594" y="132" width="22" height="16" rx="2"/>
+    <rect x="628" y="116" width="22" height="16" rx="2"/>
+    <rect x="662" y="100" width="22" height="16" rx="2"/>
+    <rect x="696" y="84" width="22" height="16" rx="2"/>
+    <rect x="576" y="166" width="22" height="16" rx="2"/>
+    <rect x="610" y="150" width="22" height="16" rx="2"/>
+    <rect x="644" y="134" width="22" height="16" rx="2"/>
+    <rect x="678" y="118" width="22" height="16" rx="2"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="139" y="256"><tspan x="139" dy="0" font-weight="600">region</tspan><tspan x="139" dy="17">axis-aligned in lon/lat</tspan><tspan x="139" dy="16">loosest on a diagonal block</tspan></text>
+    <text x="389" y="256"><tspan x="389" dy="0" font-weight="600">box</tspan><tspan x="389" dy="17">oriented to the cluster</tspan><tspan x="389" dy="16">tightest, 12 floats to store</tspan></text>
+    <text x="639" y="256"><tspan x="639" dy="0" font-weight="600">sphere</tspan><tspan x="639" dy="17">cheapest frustum test</tspan><tspan x="639" dy="16">loosest fit of the three</tspan></text>
+  </g>
+  <text x="390" y="30" fill="#1f2937" font-size="13" text-anchor="middle" font-weight="600">The volume you pick decides how much empty space a client loads before it can reject a tile</text>
+</svg>
+<figcaption>Fit and test cost pull in opposite directions. Regions are the default because they are trivial to compute, and they are also the reason a diagonal street grid over-fetches.</figcaption>
+</figure>
+
 ### 3. Group leaves into a quadtree and assign depth
 
 Partition the dataset extent recursively in the local East-North plane until each cell holds at most `max_per_tile` leaves. The depth of each cell drives its `geometricError`.
@@ -226,6 +274,40 @@ tileset = {"asset": {"version": "1.1"},
            "root": root}
 (out_dir / "tileset.json").write_text(json.dumps(tileset, indent=2))
 ```
+
+<figure class="diagram">
+<svg viewBox="26 -3 734 245" role="img" aria-labelledby="at-b3dm-t at-b3dm-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="at-b3dm-t">The byte layout of a b3dm tile</title>
+  <desc id="at-b3dm-d">A b3dm file is a twenty-eight byte header followed by the feature table JSON and binary, the batch table JSON and binary, and finally the embedded glTF payload. Every section length is declared in the header, and each section must start on an eight-byte boundary.</desc>
+  <rect class="svg-bg" x="26" y="-3" width="734" height="245" fill="#ffffff"/>
+  <text x="390" y="26" fill="#1f2937" font-size="13" text-anchor="middle" font-weight="600">b3dm — five small sections and one large one, all located by lengths in the header</text>
+  <rect x="40" y="80" width="60" height="52" rx="4" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="100" y="80" width="96" height="52" rx="4" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <rect x="196" y="80" width="56" height="52" rx="4" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <rect x="252" y="80" width="110" height="52" rx="4" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <rect x="362" y="80" width="64" height="52" rx="4" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <rect x="426" y="80" width="320" height="52" rx="4" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <g fill="#1f2937" font-size="11.5" text-anchor="middle">
+    <text x="70" y="60">header</text>
+    <text x="148" y="44">feature table JSON</text>
+    <text x="224" y="60">feature table binary</text>
+    <text x="307" y="44">batch table JSON</text>
+    <text x="394" y="60">batch table binary</text>
+    <text x="586" y="44">glTF (GLB) payload</text>
+  </g>
+  <g fill="#5b6471" font-size="11" text-anchor="middle">
+    <text x="70" y="152">28 B</text>
+    <text x="148" y="168">96 B</text>
+    <text x="224" y="152">40 B</text>
+    <text x="307" y="168">220 B</text>
+    <text x="394" y="152">64 B</text>
+    <text x="586" y="168">318,000 B</text>
+  </g>
+  <text x="390" y="200" fill="#b0413e" font-size="12.5" text-anchor="middle">Get one declared length wrong and the glTF starts one byte late — the tile fails to parse with no clue where</text>
+  <text x="390" y="224" fill="#5b6471" font-size="12" text-anchor="middle">Pad each JSON section with spaces and each binary section with zeros to the next 8-byte boundary before writing the header</text>
+</svg>
+<figcaption>The payload is 99% of the bytes and none of the difficulty. Everything that breaks lives in the five short sections in front of it.</figcaption>
+</figure>
 
 ### 6. (Optional) Automate the Cesium ion upload
 

@@ -13,9 +13,10 @@ Raw acquisition density almost never equals delivered density. A campaign flown 
 A second trap is units. Density is meaningless without an explicit metric coordinate reference system. Compute ppsm on a geographic CRS such as EPSG:4326 and your "square metre" is actually a square degree — the number is off by ten orders of magnitude. Every density check below assumes the cloud is already in a projected metric CRS; for a US east-coast corridor that is EPSG:32618 (UTM zone 18N), where X and Y are eastings and northings in metres.
 
 <figure class="diagram">
-<svg viewBox="0 0 720 250" role="img" aria-labelledby="lidens-t lidens-d" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="0 26 720 198" role="img" aria-labelledby="lidens-t lidens-d" xmlns="http://www.w3.org/2000/svg">
   <title id="lidens-t">Corridor density verification flow</title>
   <desc id="lidens-d">A LAZ scan in EPSG:32618 is binned into a one-metre grid, the points-per-square-metre of each cell is compared to the corridor target, and cells below target are flagged and written to a Parquet quality record.</desc>
+  <rect class="svg-bg" x="0" y="26" width="720" height="198" fill="#ffffff"/>
   <defs>
     <marker id="lidens-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
@@ -113,6 +114,53 @@ status = "PASS" if sparse_pct <= 5.0 else "FAIL"
 print(f"acceptance (<=5% sparse): {status}")
 ```
 
+<figure class="diagram">
+<svg viewBox="4 11 732 287" role="img" aria-labelledby="pd-corr-t pd-corr-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="pd-corr-t">Where a corridor survey loses density, and why</title>
+  <desc id="pd-corr-d">A density strip along a transmission corridor. Two cells beneath a bridge deck hold no returns because the deck occludes the sensor, and two cells in the conductor's shadow are thin because the wire itself intercepts pulses. Both are contiguous runs rather than scattered speckle, so both trace to a physical cause.</desc>
+  <rect class="svg-bg" x="4" y="11" width="732" height="287" fill="#ffffff"/>
+  <defs>
+    <marker id="pd-corr-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
+    </marker>
+  </defs>
+  <path d="M40 62 C 220 44 480 44 700 62" fill="none" stroke="#5b6471" stroke-width="2.5"/>
+  <path d="M40 74 C 220 56 480 56 700 74" fill="none" stroke="#5b6471" stroke-width="2.5"/>
+  <path d="M214 46 h72 v22 h-72 Z" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+    <rect x="40" y="120" width="26" height="54" rx="3" fill="#eef5e9" stroke="#4f7a4d" stroke-width="1.5"/>
+    <rect x="70" y="120" width="26" height="54" rx="3" fill="#eef5e9" stroke="#4f7a4d" stroke-width="1.5"/>
+    <rect x="100" y="120" width="26" height="54" rx="3" fill="#eef5e9" stroke="#4f7a4d" stroke-width="1.5"/>
+    <rect x="130" y="120" width="26" height="54" rx="3" fill="#eef5e9" stroke="#4f7a4d" stroke-width="1.5"/>
+    <rect x="160" y="120" width="26" height="54" rx="3" fill="#eef5e9" stroke="#4f7a4d" stroke-width="1.5"/>
+    <rect x="190" y="120" width="26" height="54" rx="3" fill="#eef5e9" stroke="#4f7a4d" stroke-width="1.5"/>
+    <rect x="220" y="120" width="26" height="54" rx="3" fill="#f7dfdc" stroke="#b0413e" stroke-width="1.5"/>
+    <rect x="250" y="120" width="26" height="54" rx="3" fill="#f7dfdc" stroke="#b0413e" stroke-width="1.5"/>
+    <rect x="280" y="120" width="26" height="54" rx="3" fill="#eef5e9" stroke="#4f7a4d" stroke-width="1.5"/>
+    <rect x="310" y="120" width="26" height="54" rx="3" fill="#eef5e9" stroke="#4f7a4d" stroke-width="1.5"/>
+    <rect x="340" y="120" width="26" height="54" rx="3" fill="#eef5e9" stroke="#4f7a4d" stroke-width="1.5"/>
+    <rect x="370" y="120" width="26" height="54" rx="3" fill="#eef5e9" stroke="#4f7a4d" stroke-width="1.5"/>
+    <rect x="400" y="120" width="26" height="54" rx="3" fill="#eef5e9" stroke="#4f7a4d" stroke-width="1.5"/>
+    <rect x="430" y="120" width="26" height="54" rx="3" fill="#eef5e9" stroke="#4f7a4d" stroke-width="1.5"/>
+    <rect x="460" y="120" width="26" height="54" rx="3" fill="#eef5e9" stroke="#4f7a4d" stroke-width="1.5"/>
+    <rect x="490" y="120" width="26" height="54" rx="3" fill="#fdf3e0" stroke="#c46a3d" stroke-width="1.5"/>
+    <rect x="520" y="120" width="26" height="54" rx="3" fill="#fdf3e0" stroke="#c46a3d" stroke-width="1.5"/>
+    <rect x="550" y="120" width="26" height="54" rx="3" fill="#eef5e9" stroke="#4f7a4d" stroke-width="1.5"/>
+    <rect x="580" y="120" width="26" height="54" rx="3" fill="#eef5e9" stroke="#4f7a4d" stroke-width="1.5"/>
+    <rect x="610" y="120" width="26" height="54" rx="3" fill="#eef5e9" stroke="#4f7a4d" stroke-width="1.5"/>
+    <rect x="640" y="120" width="26" height="54" rx="3" fill="#eef5e9" stroke="#4f7a4d" stroke-width="1.5"/>
+    <rect x="670" y="120" width="26" height="54" rx="3" fill="#eef5e9" stroke="#4f7a4d" stroke-width="1.5"/>
+  <path d="M250 70 V116" fill="none" stroke="#b0413e" stroke-width="2" stroke-dasharray="5 3" marker-end="url(#pd-corr-a)"/>
+  <path d="M520 60 V116" fill="none" stroke="#c46a3d" stroke-width="2" stroke-dasharray="5 3" marker-end="url(#pd-corr-a)"/>
+  <text x="250" y="38" fill="#1f6b8a" font-size="12" text-anchor="middle">bridge deck</text>
+  <text x="560" y="42" fill="#5b6471" font-size="12" text-anchor="middle">conductor pair</text>
+  <text x="250" y="200" fill="#b0413e" font-size="12" text-anchor="middle">0 returns — the deck occludes the sensor</text>
+  <text x="520" y="222" fill="#c46a3d" font-size="12" text-anchor="middle">thin — the wire intercepts the pulses beneath it</text>
+  <text x="370" y="256" fill="#1f2937" font-size="12.5" text-anchor="middle">Neither run is a density problem. One needs an oblique pass, the other needs the clearance measured off the wire itself.</text>
+  <text x="370" y="280" fill="#5b6471" font-size="12" text-anchor="middle">1 m cells along the corridor centreline</text>
+</svg>
+<figcaption>A corridor's sparse cells cluster around exactly the assets the survey exists to measure, which is why a corridor-wide average passes while the clearance calculation fails.</figcaption>
+</figure>
+
 ### 4. Persist flagged cells as Parquet for the QA record
 
 Write the sparse-cell centres and their ppsm to a columnar `pyarrow` table. Parquet keeps the audit artefact small and lets the GIS team load failing zones directly into QGIS or a corridor overlay without re-running the scan.
@@ -163,6 +211,57 @@ Targets are stated in ppsm for the delivered, classified cloud — not raw retur
 | Broad terrain / right-of-way | 8–15 | Earthwork volumes, watershed, regional planning | ±10–15 cm |
 
 These bands sit inside the wider [Point Cloud Density Standards](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/) framework. For authoritative accuracy benchmarks, cross-reference the [USGS 3DEP Lidar Base Specification](https://pubs.usgs.gov/tm/11b4/) and the ASPRS Positional Accuracy Standards.
+
+<figure class="diagram">
+<svg viewBox="-23 2 806 304" role="img" aria-labelledby="pd-ladder-t pd-ladder-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="pd-ladder-t">From points per square metre to the feature size it actually resolves</title>
+  <desc id="pd-ladder-d">Nominal point spacing is one over the square root of the density, and a feature needs roughly three spacings across it before it is reliably reconstructed. Two points per square metre resolves landform, eight resolves kerbs and roof planes, twenty resolves signage and bearings, and fifty is what conductors and bolts require.</desc>
+  <rect class="svg-bg" x="-23" y="2" width="806" height="304" fill="#ffffff"/>
+  <text x="380" y="30" fill="#1f2937" font-size="13" text-anchor="middle" font-weight="600">spacing = 1 / √density · a feature needs about three spacings across it to survive</text>
+  <g fill="#5b6471" font-size="12" text-anchor="middle">
+    <text x="95" y="54">points per m²</text>
+    <text x="251" y="54">nominal spacing</text>
+    <text x="422" y="54">smallest resolved</text>
+    <text x="618" y="54">what that buys you</text>
+  </g>
+    <rect x="30" y="70" width="130" height="40" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+    <rect x="176" y="70" width="150" height="40" rx="8" fill="#ffffff" stroke="#5b6471" stroke-width="2"/>
+    <rect x="342" y="70" width="160" height="40" rx="8" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+    <rect x="518" y="70" width="200" height="40" rx="8" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+    <rect x="30" y="122" width="130" height="40" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+    <rect x="176" y="122" width="150" height="40" rx="8" fill="#ffffff" stroke="#5b6471" stroke-width="2"/>
+    <rect x="342" y="122" width="160" height="40" rx="8" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+    <rect x="518" y="122" width="200" height="40" rx="8" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+    <rect x="30" y="174" width="130" height="40" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+    <rect x="176" y="174" width="150" height="40" rx="8" fill="#ffffff" stroke="#5b6471" stroke-width="2"/>
+    <rect x="342" y="174" width="160" height="40" rx="8" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+    <rect x="518" y="174" width="200" height="40" rx="8" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+    <rect x="30" y="226" width="130" height="40" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+    <rect x="176" y="226" width="150" height="40" rx="8" fill="#ffffff" stroke="#5b6471" stroke-width="2"/>
+    <rect x="342" y="226" width="160" height="40" rx="8" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+    <rect x="518" y="226" width="200" height="40" rx="8" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="95" y="95">2 /m²</text>
+    <text x="251" y="95">0.71 m</text>
+    <text x="422" y="95">≈ 2.1 m</text>
+    <text x="618" y="95">landform, flood extent</text>
+    <text x="95" y="147">8 /m²</text>
+    <text x="251" y="147">0.35 m</text>
+    <text x="422" y="147">≈ 1.1 m</text>
+    <text x="618" y="147">kerbs, ditch banks, roof planes</text>
+    <text x="95" y="199">20 /m²</text>
+    <text x="251" y="199">0.22 m</text>
+    <text x="422" y="199">≈ 0.67 m</text>
+    <text x="618" y="199">signage, bearings, parapets</text>
+    <text x="95" y="251">50 /m²</text>
+    <text x="251" y="251">0.14 m</text>
+    <text x="422" y="251">≈ 0.42 m</text>
+    <text x="618" y="251">conductors, bolts, expansion joints</text>
+  </g>
+  <text x="380" y="288" fill="#5b6471" font-size="12" text-anchor="middle">Write the specification against the smallest asset the twin must measure, then read the density off this relation — not the other way round</text>
+</svg>
+<figcaption>Density is a means, not a requirement. Naming the feature first makes the number defensible and stops corridor specs from being copied between projects with different assets.</figcaption>
+</figure>
 
 ## Expected Output & Verification
 

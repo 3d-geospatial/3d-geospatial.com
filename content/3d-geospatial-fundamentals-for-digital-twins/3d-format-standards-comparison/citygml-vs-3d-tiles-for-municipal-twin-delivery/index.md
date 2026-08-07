@@ -5,9 +5,10 @@ This page settles a decision municipal twin teams face constantly: should a city
 You hit this the moment a planning department that has invested years in a CityGML register — stored in EPSG:25832 (ETRS89 / UTM zone 32N), the standard grid across much of central Europe — wants it live in a web viewer. CityGML has no streaming path: a single municipal export can be gigabytes of verbose XML that no browser will parse. The resolution is a one-way derivation, and the two formats' respective strengths make the split natural rather than a compromise.
 
 <figure class="diagram">
-<svg viewBox="0 0 840 320" role="img" aria-labelledby="cgml-3dt-t cgml-3dt-d" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="6 56 828 247" role="img" aria-labelledby="cgml-3dt-t cgml-3dt-d" xmlns="http://www.w3.org/2000/svg">
   <title id="cgml-3dt-t">Store in CityGML, stream via 3D Tiles</title>
   <desc id="cgml-3dt-d">A CityGML store in EPSG:25832 holding building semantics and LOD0 to LOD4 geometry is converted by a reprojection and tiling step into a 3D Tiles tileset in EPSG:4978, whose batch table preserves the per-feature attributes for a streaming Cesium client.</desc>
+  <rect class="svg-bg" x="6" y="56" width="828" height="247" fill="#ffffff"/>
   <defs>
     <marker id="cgml-3dt-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
@@ -51,6 +52,43 @@ Read this as a division of labour, not a ranking — most municipal twins run bo
 | Best at | Regulatory archival, city-wide analysis | Browser delivery of the whole city |
 
 **Verdict.** Do not choose one. Keep CityGML as the single source of truth for the municipal register — it is the only format here that stores building semantics, LOD0–LOD4, and a validating schema together — and treat 3D Tiles as a disposable, versioned derivative generated in CI. Convert in the direction CityGML → 3D Tiles only, never the reverse, because the tileset physically cannot reconstruct the ADE attributes or the LOD4 interior geometry it never stored. When a planner edits the register, regenerate the affected tiles; the authoritative model and the streamed one stay in lockstep because one is computed from the other.
+
+<figure class="diagram">
+<svg viewBox="28 4 692 258" role="img" aria-labelledby="cg-lod-t cg-lod-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="cg-lod-t">The same building at each CityGML level of detail</title>
+  <desc id="cg-lod-d">LOD0 is the two-dimensional footprint, LOD1 an extruded flat-topped block, LOD2 adds the modelled roof shape, LOD3 adds facade openings such as doors and windows, and LOD4 adds interior structure. Each is an authored property of the feature rather than a runtime choice.</desc>
+  <rect class="svg-bg" x="28" y="4" width="692" height="258" fill="#ffffff"/>
+  <text x="380" y="32" fill="#1f2937" font-size="13" text-anchor="middle" font-weight="600">CityGML level of detail is a property of the feature, authored once</text>
+    <path d="M50 182 L70 190 L130 190 L110 182 Z" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+    <path d="M192 130 H272 V190 H192 Z" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+    <path d="M334 130 H414 V190 H334 Z" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+    <path d="M328 130 L374 102 L420 130 Z" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+    <path d="M476 130 H556 V190 H476 Z" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+    <path d="M470 130 L516 102 L562 130 Z" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+    <path d="M507 190 V166 H525 V190" fill="#ffffff" stroke="#5b6471" stroke-width="1.5"/>
+    <path d="M488 142 h14 v14 h-14 Z" fill="#ffffff" stroke="#5b6471" stroke-width="1.5"/>
+    <path d="M488 168 h14 v14 h-14 Z" fill="#ffffff" stroke="#5b6471" stroke-width="1.5"/>
+    <path d="M536 142 h14 v14 h-14 Z" fill="#ffffff" stroke="#5b6471" stroke-width="1.5"/>
+    <path d="M536 168 h14 v14 h-14 Z" fill="#ffffff" stroke="#5b6471" stroke-width="1.5"/>
+    <path d="M618 130 H698 V190 H618 Z" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+    <path d="M612 130 L658 102 L704 130 Z" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+    <path d="M649 190 V166 H667 V190" fill="#ffffff" stroke="#5b6471" stroke-width="1.5"/>
+    <path d="M630 142 h14 v14 h-14 Z" fill="#ffffff" stroke="#5b6471" stroke-width="1.5"/>
+    <path d="M630 168 h14 v14 h-14 Z" fill="#ffffff" stroke="#5b6471" stroke-width="1.5"/>
+    <path d="M678 142 h14 v14 h-14 Z" fill="#ffffff" stroke="#5b6471" stroke-width="1.5"/>
+    <path d="M678 168 h14 v14 h-14 Z" fill="#ffffff" stroke="#5b6471" stroke-width="1.5"/>
+    <path d="M658 190 V130 M618 162 H698" fill="none" stroke="#4f7a4d" stroke-width="1.5" stroke-dasharray="5 3"/>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="90" y="216">LOD0 · footprint</text>
+    <text x="232" y="216">LOD1 · block</text>
+    <text x="374" y="216">LOD2 · roof shape</text>
+    <text x="516" y="216">LOD3 · openings</text>
+    <text x="658" y="216">LOD4 · interior</text>
+  </g>
+  <text x="380" y="244" fill="#5b6471" font-size="12" text-anchor="middle">3D Tiles refinement is a different axis — it pages by screen-space error, and cannot invent an LOD it was never given</text>
+</svg>
+<figcaption>Five authored levels, not five render qualities. This is why a tileset derived from an LOD1 register can never show a roof, however far the camera zooms in.</figcaption>
+</figure>
 
 ## Prerequisites
 
@@ -161,6 +199,51 @@ subprocess.run([
 print("wrote tileset/tileset.json in EPSG:4978 with", len(records), "batched features")
 ```
 
+<figure class="diagram">
+<svg viewBox="5 -4 770 273" role="img" aria-labelledby="cg-batch-t cg-batch-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="cg-batch-t">Batch-table rows are matched to b3dm features by position alone</title>
+  <desc id="cg-batch-d">The b3dm feature array and the batch table are joined only by index: feature zero takes row zero, feature one takes row one, and so on. Nothing in the format records which building a row belongs to, so any re-sorting between writing the geometry and writing the table silently attaches every attribute to the wrong building.</desc>
+  <rect class="svg-bg" x="5" y="-4" width="770" height="273" fill="#ffffff"/>
+  <defs>
+    <marker id="cg-batch-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#4f7a4d"/>
+    </marker>
+  </defs>
+  <text x="140" y="24" fill="#5b6471" font-size="12" text-anchor="middle">b3dm feature array, in write order</text>
+  <text x="590" y="24" fill="#5b6471" font-size="12" text-anchor="middle">batch_table.json columns, by row index</text>
+  <g fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2">
+    <rect x="30" y="40" width="220" height="40" rx="8"/>
+    <rect x="30" y="88" width="220" height="40" rx="8"/>
+    <rect x="30" y="136" width="220" height="40" rx="8"/>
+    <rect x="30" y="184" width="220" height="40" rx="8"/>
+  </g>
+  <g fill="#eef5e9" stroke="#4f7a4d" stroke-width="2">
+    <rect x="430" y="40" width="320" height="40" rx="8"/>
+    <rect x="430" y="88" width="320" height="40" rx="8"/>
+    <rect x="430" y="136" width="320" height="40" rx="8"/>
+    <rect x="430" y="184" width="320" height="40" rx="8"/>
+  </g>
+  <g stroke="#4f7a4d" stroke-width="2" marker-end="url(#cg-batch-a)">
+    <line x1="250" y1="60" x2="428" y2="60"/>
+    <line x1="250" y1="108" x2="428" y2="108"/>
+    <line x1="250" y1="156" x2="428" y2="156"/>
+    <line x1="250" y1="204" x2="428" y2="204"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="140" y="65">feature 0 · BLDG_0041</text>
+    <text x="140" y="113">feature 1 · BLDG_0042</text>
+    <text x="140" y="161">feature 2 · BLDG_0043</text>
+    <text x="140" y="209">feature 3 · BLDG_0044</text>
+    <text x="590" y="65">gml_id[0] = BLDG_0041 · year_built 1974</text>
+    <text x="590" y="113">gml_id[1] = BLDG_0042 · year_built 1908</text>
+    <text x="590" y="161">gml_id[2] = BLDG_0043 · year_built 2011</text>
+    <text x="590" y="209">gml_id[3] = BLDG_0044 · year_built 1963</text>
+  </g>
+  <text x="390" y="250" fill="#b0413e" font-size="12.5" text-anchor="middle">Nothing but position joins the two. Re-sort either side and every pick returns a neighbour&#39;s attributes, with no error anywhere.</text>
+</svg>
+<figcaption>The join is positional and unchecked. Build the geometry and the batch table in one pass, and assert the counts match before the tileset is written.</figcaption>
+</figure>
+
 ## Expected Output & Verification
 
 A correct run leaves a `tileset/tileset.json` whose root sits on the ellipsoid and whose leaves carry the batched attributes. Assert the CRS placement and the semantic survival, then validate the schema:
@@ -194,6 +277,8 @@ npx 3d-tiles-validator --tilesetFile tileset/tileset.json
 ```
 
 The [OGC 3D Tiles specification](https://www.ogc.org/standard/3dtiles/) requires a non-negative, monotonically decreasing `geometricError` and parent-contained bounding volumes — the validator checks both.
+
+One operational note before the failure list. Because the tileset is a derivative, its rebuild has to be triggered by the register rather than scheduled. Planning departments edit CityGML continuously and in small increments, so a nightly full re-tile is both wasteful and slow to reflect an edit. Keying the rebuild on the changed `gml:id` set, and re-tiling only the shards those buildings fall into, keeps the viewer within minutes of the register at a fraction of the compute.
 
 ## Common Errors
 

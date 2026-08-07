@@ -9,9 +9,10 @@ This page turns a **DEM raster** — a GeoTIFF of elevations — into a watertig
 You hit this the moment a terrain surface has to be geometry rather than a raster: a Cesium or game-engine twin needs a mesh to occlude buildings, cast shadows, and let the camera skim the ground, and analysis like cut-and-fill needs a continuous triangulated surface. The DEM already exists — produced by the [digital elevation model workflows](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/) that rasterize, void-fill, and hydro-flatten a point cloud — so this guide starts from a clean GeoTIFF and ends at a mesh, and the two things that break it are mishandled nodata (which pulls spikes down to the fill value) and a CRS left implicit (which mis-scales or mis-places the surface).
 
 <figure class="diagram">
-<svg viewBox="0 0 800 300" role="img" aria-labelledby="demmesh-t demmesh-d" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="16 43 778 231" role="img" aria-labelledby="demmesh-t demmesh-d" xmlns="http://www.w3.org/2000/svg">
   <title id="demmesh-t">DEM raster to triangulated terrain mesh</title>
   <desc id="demmesh-d">A regular grid of DEM cells with elevation values becomes a lattice of vertices, each carrying its easting, northing, and height; adjacent vertices are joined into two triangles per cell to form a continuous terrain mesh.</desc>
+  <rect class="svg-bg" x="16" y="43" width="778" height="231" fill="#ffffff"/>
   <defs>
     <marker id="demmesh-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
@@ -110,6 +111,71 @@ faces = np.vstack([
 print("faces:", len(faces))
 ```
 
+The index arithmetic is mechanical, but the diagonal is not. Splitting every cell the same way is the standard approach and it is anisotropic: a ridge or a kerb that happens to run against the chosen diagonal is spanned by two triangles that average across it, losing up to half the feature's height, while the same feature aligned with the diagonal survives intact. For terrain at metre resolution this rarely matters; for a 0.25 m grid carrying kerbs, ditch banks, and crowned roads it produces a systematic bias whose direction is fixed by your code. If the features you care about have a dominant orientation, choose the diagonal that matches it — or split each cell into four triangles around a centre vertex interpolated from the four corners, which costs twice the geometry and removes the directional bias entirely.
+
+<figure class="diagram">
+<svg viewBox="-14 31 692 269" role="img" aria-labelledby="tm-grid-t tm-grid-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="tm-grid-t">Two triangles per cell, and why the diagonal direction matters</title>
+  <desc id="tm-grid-d">A regular DEM grid is triangulated by splitting every cell along one diagonal, giving two triangles per cell with vertex indices derived from row times column count plus column. When a ridge crest runs along the chosen diagonal the crest survives; when the diagonal cuts across the crest, the two triangles average it away and the ridge loses height.</desc>
+  <rect class="svg-bg" x="-14" y="31" width="692" height="269" fill="#ffffff"/>
+  <g fill="none" stroke="#5b6471" stroke-width="1.5">
+    <path d="M40 70 V235"/>
+    <path d="M95 70 V235"/>
+    <path d="M150 70 V235"/>
+    <path d="M205 70 V235"/>
+    <path d="M40 70 H205"/>
+    <path d="M40 125 H205"/>
+    <path d="M40 180 H205"/>
+    <path d="M40 235 H205"/>
+  </g>
+  <g fill="none" stroke="#1f6b8a" stroke-width="1.5">
+    <path d="M40 70 L95 125"/>
+    <path d="M95 70 L150 125"/>
+    <path d="M150 70 L205 125"/>
+    <path d="M40 125 L95 180"/>
+    <path d="M95 125 L150 180"/>
+    <path d="M150 125 L205 180"/>
+    <path d="M40 180 L95 235"/>
+    <path d="M95 180 L150 235"/>
+    <path d="M150 180 L205 235"/>
+  </g>
+  <g fill="#1f6b8a">
+    <circle cx="40" cy="70" r="3.5"/>
+    <circle cx="95" cy="70" r="3.5"/>
+    <circle cx="150" cy="70" r="3.5"/>
+    <circle cx="205" cy="70" r="3.5"/>
+    <circle cx="40" cy="125" r="3.5"/>
+    <circle cx="95" cy="125" r="3.5"/>
+    <circle cx="150" cy="125" r="3.5"/>
+    <circle cx="205" cy="125" r="3.5"/>
+    <circle cx="40" cy="180" r="3.5"/>
+    <circle cx="95" cy="180" r="3.5"/>
+    <circle cx="150" cy="180" r="3.5"/>
+    <circle cx="205" cy="180" r="3.5"/>
+    <circle cx="40" cy="235" r="3.5"/>
+    <circle cx="95" cy="235" r="3.5"/>
+    <circle cx="150" cy="235" r="3.5"/>
+    <circle cx="205" cy="235" r="3.5"/>
+  </g>
+  <g fill="#5b6471" font-size="11.5" text-anchor="middle">
+    <text x="40" y="58">0</text>
+    <text x="95" y="58">1</text>
+    <text x="150" y="58">2</text>
+    <text x="205" y="58">3</text>
+  </g>
+  <text x="122" y="264" fill="#1f2937" font-size="12" text-anchor="middle">v = i·ncols + j</text>
+  <text x="122" y="282" fill="#5b6471" font-size="11.5" text-anchor="middle">(v, v+1, v+ncols) and (v+1, v+ncols+1, v+ncols)</text>
+  <path d="M400 90 H620 V240 H400 Z" fill="none" stroke="#5b6471" stroke-width="1.5"/>
+  <path d="M400 240 L620 90" fill="none" stroke="#fdf3e0" stroke-width="12"/>
+  <path d="M400 240 L620 90" fill="none" stroke="#c46a3d" stroke-width="2.5" stroke-dasharray="7 4"/>
+  <path d="M400 90 L620 240" fill="none" stroke="#b0413e" stroke-width="2"/>
+  <text x="510" y="76" fill="#c46a3d" font-size="12" text-anchor="middle">terrain ridge crest</text>
+  <text x="510" y="264" fill="#4f7a4d" font-size="12" text-anchor="middle">a diagonal along the crest keeps its height</text>
+  <text x="510" y="282" fill="#b0413e" font-size="12" text-anchor="middle">the other diagonal averages it away — up to 0.4 m lost</text>
+</svg>
+<figcaption>The index arithmetic is the easy half. The diagonal is a modelling choice: a fixed direction quietly flattens every crest that runs the other way.</figcaption>
+</figure>
+
 ### 4. Build the mesh and (optionally) decimate to a TIN
 
 Assemble a `trimesh` object, shift to a local origin so the large UTM eastings do not overflow float32 on export, and quadric-decimate to a TIN. Terrain is smooth over most of its area, so a target of 20–40% of the faces typically holds sub-decimetre vertical error while shrinking the payload.
@@ -128,6 +194,48 @@ tin = mesh.simplify_quadric_decimation(target)
 print("post-decimation:", len(tin.faces), "faces")
 np.save("terrain_origin_utm.npy", origin)      # re-add at placement time
 ```
+
+<figure class="diagram">
+<svg viewBox="22 6 686 316" role="img" aria-labelledby="tm-tin-t tm-tin-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="tm-tin-t">Regular grid sampling versus a TIN over the same profile</title>
+  <desc id="tm-tin-d">A terrain profile sampled on a regular grid places a vertex under every cell, so most vertices land on flat ground where they describe nothing. The same profile as a triangulated irregular network keeps vertices only at breaks of slope, reproducing the shape with a fraction of the geometry.</desc>
+  <rect class="svg-bg" x="22" y="6" width="686" height="316" fill="#ffffff"/>
+  <polyline points="40,130 90,128 140,126 190,124 240,100 290,62 340,58 390,92 440,118 490,120 540,121 590,122 640,123 690,124" fill="none" stroke="#1f6b8a" stroke-width="2.5"/>
+  <g fill="#1f6b8a">
+    <circle cx="40" cy="130" r="4"/>
+    <circle cx="90" cy="128" r="4"/>
+    <circle cx="140" cy="126" r="4"/>
+    <circle cx="190" cy="124" r="4"/>
+    <circle cx="240" cy="100" r="4"/>
+    <circle cx="290" cy="62" r="4"/>
+    <circle cx="340" cy="58" r="4"/>
+    <circle cx="390" cy="92" r="4"/>
+    <circle cx="440" cy="118" r="4"/>
+    <circle cx="490" cy="120" r="4"/>
+    <circle cx="540" cy="121" r="4"/>
+    <circle cx="590" cy="122" r="4"/>
+    <circle cx="640" cy="123" r="4"/>
+    <circle cx="690" cy="124" r="4"/>
+  </g>
+  <text x="40" y="34" fill="#1f6b8a" font-size="12.5" text-anchor="start" font-weight="600">regular grid — a vertex under every cell</text>
+  <text x="40" y="164" fill="#5b6471" font-size="12" text-anchor="start">eight of these fourteen sit on flat ground and describe nothing</text>
+  <polyline points="40,270 90,268 140,266 190,264 240,240 290,202 340,198 390,232 440,258 490,260 540,261 590,262 640,263 690,264" fill="none" stroke="#e6e0d4" stroke-width="2"/>
+  <polyline points="40,270 190,264 240,240 290,202 340,198 390,232 440,258 690,264" fill="none" stroke="#4f7a4d" stroke-width="2.5"/>
+  <g fill="#4f7a4d">
+    <circle cx="40" cy="270" r="4"/>
+    <circle cx="190" cy="264" r="4"/>
+    <circle cx="240" cy="240" r="4"/>
+    <circle cx="290" cy="202" r="4"/>
+    <circle cx="340" cy="198" r="4"/>
+    <circle cx="390" cy="232" r="4"/>
+    <circle cx="440" cy="258" r="4"/>
+    <circle cx="690" cy="264" r="4"/>
+  </g>
+  <text x="40" y="188" fill="#4f7a4d" font-size="12.5" text-anchor="start" font-weight="600">TIN — vertices only at breaks of slope</text>
+  <text x="40" y="304" fill="#5b6471" font-size="12" text-anchor="start">eight vertices, the same crest and toe, and a stated maximum vertical error</text>
+</svg>
+<figcaption>Decimation to a TIN is not a quality trade so much as a redistribution: the vertices move to where the surface actually changes.</figcaption>
+</figure>
 
 ### 5. Reproject or export with an explicit CRS
 
@@ -179,6 +287,8 @@ extent E 999.5 m  N 999.5 m  H 4.2–61.8 m
 ```
 
 The extent should match the raster's ground coverage and the height range should match the DEM's min/max — if heights are off by ~30 m, the vertical datum was dropped somewhere; confirm EPSG:5703 travelled through. A terrain mesh is rarely fully watertight at the tile edge, which is expected; stitch adjacent tiles at delivery rather than forcing a closed volume here.
+
+One habit is worth adopting before any of these errors can occur: write the raster's CRS, cell size, nodata value and vertex count into the mesh sidecar at the moment of export, not afterwards. Every failure below is easier to diagnose when the mesh states what it was built from.
 
 ## Common Errors
 

@@ -20,9 +20,10 @@ You need a working Python spatial stack and a classified point cloud as input. P
 A point cloud stores elevation at scattered XY locations; a DEM stores it on a regular grid. The three products differ only in which returns you keep before gridding. A **DTM** (Digital Terrain Model) uses bare-earth returns only (class 2) and represents the ground beneath vegetation and buildings. A **DSM** (Digital Surface Model) keeps the first/highest return at each location, so it follows rooftops and canopy. **DEM** is the generic word for a rasterized elevation grid and is whichever of the two your filtering produced — so always say which.
 
 <figure class="diagram">
-<svg viewBox="0 0 640 260" role="img" aria-labelledby="dem-xsec-t dem-xsec-d" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="6 26 628 228" role="img" aria-labelledby="dem-xsec-t dem-xsec-d" xmlns="http://www.w3.org/2000/svg">
   <title id="dem-xsec-t">DTM versus DSM cross-section</title>
   <desc id="dem-xsec-d">A side view of terrain with a building and a tree: the DSM line follows the tops of the building and canopy while the DTM line follows the bare ground beneath them.</desc>
+  <rect class="svg-bg" x="6" y="26" width="628" height="228" fill="#ffffff"/>
   <defs>
     <marker id="dem-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
@@ -145,6 +146,47 @@ with rasterio.open("dtm_18N_filled.tif", "w", **profile) as dst:
 
 Flag holes wider than your interpolation tolerance (say, voids spanning more than `window_size * 4` cells) rather than filling them blindly — a 40 m interpolated patch under a river is a fiction the flood model will trust. The two-pass structure above is deliberate: `method="linear"` interpolates cleanly inside the convex hull of known cells but returns `NaN` outside it, so the `nearest` pass exists only to backfill the raster's exterior margins. If you let `nearest` fill interior holes too, you get blocky plateaus where a void should have sloped; reserve it strictly for the hull exterior, and consider masking that exterior back to no-data entirely if those cells fall outside your real survey footprint. Where terrain is smooth and you want continuous curvature across filled gaps, `method="cubic"` reads better at the cost of occasional overshoot near steep breaklines — never use it across a cliff edge.
 
+<figure class="diagram">
+<svg viewBox="6 -3 758 268" role="img" aria-labelledby="dem-void-t dem-void-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="dem-void-t">How three interpolators fill the same void</title>
+  <desc id="dem-void-d">The same terrain profile with the same gap, filled three ways. A triangulated irregular network draws a straight line across the void. Inverse distance weighting sags toward the local mean and flattens the middle. Kriging follows the modelled trend and continues the slope through the gap.</desc>
+  <rect class="svg-bg" x="6" y="-3" width="758" height="268" fill="#ffffff"/>
+  <text x="385" y="26" fill="#1f2937" font-size="13" text-anchor="middle" font-weight="600">One void, three fills — and only the measured ends are data</text>
+  <g fill="none" stroke="#e6e0d4" stroke-width="2">
+    <path d="M20 40 H250 V190 H20 Z"/>
+    <path d="M270 40 H500 V190 H270 Z"/>
+    <path d="M520 40 H750 V190 H520 Z"/>
+  </g>
+  <g fill="none" stroke="#e6e0d4" stroke-width="1.5" stroke-dasharray="4 4">
+    <path d="M95 112 V178 M175 112 V178"/>
+    <path d="M345 112 V178 M425 112 V178"/>
+    <path d="M595 112 V178 M675 112 V178"/>
+  </g>
+  <g fill="none" stroke="#4f7a4d" stroke-width="2.5">
+    <path d="M35 150 L95 138"/><path d="M175 128 L235 120"/>
+    <path d="M285 150 L345 138"/><path d="M425 128 L485 120"/>
+    <path d="M535 150 L595 138"/><path d="M675 128 L735 120"/>
+  </g>
+  <g fill="none" stroke="#c46a3d" stroke-width="2.5" stroke-dasharray="6 4">
+    <path d="M95 138 L175 128"/>
+    <path d="M345 138 C 372 148 398 148 425 128"/>
+    <path d="M595 138 C 620 133 650 130 675 128"/>
+  </g>
+  <g fill="#5b6471" font-size="11.5" text-anchor="middle">
+    <text x="135" y="106">void</text>
+    <text x="385" y="106">void</text>
+    <text x="635" y="106">void</text>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="135" y="212"><tspan x="135" dy="0" font-weight="600">TIN</tspan><tspan x="135" dy="17">a straight line between the edges</tspan></text>
+    <text x="385" y="212"><tspan x="385" dy="0" font-weight="600">IDW</tspan><tspan x="385" dy="17">sags toward the local mean</tspan></text>
+    <text x="635" y="212"><tspan x="635" dy="0" font-weight="600">Kriging</tspan><tspan x="635" dy="17">continues the modelled trend</tspan></text>
+  </g>
+  <text x="385" y="246" fill="#5b6471" font-size="12" text-anchor="middle">Whichever you pick, the filled span is inference — ship a mask band so a consumer can tell it from measurement</text>
+</svg>
+<figcaption>The three fills disagree most where the void is widest, which is exactly where a hydrological model is most sensitive to them.</figcaption>
+</figure>
+
 ### 4. Hydro-flatten water bodies
 
 Lakes and wide rivers should read as flat (or monotonically downhill for rivers). Burn a constant pool elevation into each waterbody polygon using `rasterio.features.rasterize`. The polygons come from a hydrography layer reprojected into the same EPSG:32618:
@@ -204,6 +246,34 @@ for path, arr, prof in [("dtm_tileA.tif", arr_a, prof_a), ("dtm_tileB.tif", arr_
 ```
 
 The durable fix is to grid every tile from a cloud clipped with a one-tile-width buffer, then crop to the nominal extent after filling — that way interpolation near the edge sees real neighbouring points, not a hard boundary.
+
+<figure class="diagram">
+<svg viewBox="16 6 731 264" role="img" aria-labelledby="dem-seam-t dem-seam-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="dem-seam-t">Interpolating tile by tile builds a ridge at every boundary</title>
+  <desc id="dem-seam-d">On the left, two tiles are interpolated in isolation, so neither has data past its own edge and the profile across their shared boundary shows a ridge. On the right, both tiles are interpolated with a shared overlap buffer, so each has real points beyond its edge and the profile crosses the boundary smoothly.</desc>
+  <rect class="svg-bg" x="16" y="6" width="731" height="264" fill="#ffffff"/>
+  <g fill="none" stroke="#5b6471" stroke-width="2">
+    <path d="M30 46 H190 V166 H30 Z"/><path d="M190 46 H350 V166 H190 Z"/>
+    <path d="M410 46 H570 V166 H410 Z"/><path d="M570 46 H730 V166 H570 Z"/>
+  </g>
+  <path d="M540 46 H600 V166 H540 Z" fill="none" stroke="#4f7a4d" stroke-width="2" stroke-dasharray="6 4"/>
+  <path d="M190 46 V166" fill="none" stroke="#b0413e" stroke-width="3.5"/>
+  <path d="M570 46 V166" fill="none" stroke="#4f7a4d" stroke-width="2"/>
+  <path d="M30 226 L150 220 L190 202 L230 220 L350 214" fill="none" stroke="#b0413e" stroke-width="2.5"/>
+  <path d="M410 226 L530 220 L570 218 L610 220 L730 214" fill="none" stroke="#4f7a4d" stroke-width="2.5"/>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="190" y="34">each tile interpolated alone</text>
+    <text x="570" y="34">shared overlap buffer on both tiles</text>
+  </g>
+  <g fill="#5b6471" font-size="11.5" text-anchor="middle">
+    <text x="190" y="186">profile across the boundary</text>
+    <text x="570" y="186">profile across the boundary</text>
+  </g>
+  <text x="190" y="252" fill="#b0413e" font-size="12" text-anchor="middle">a permanent ridge in every derived hillshade</text>
+  <text x="570" y="252" fill="#4f7a4d" font-size="12" text-anchor="middle">continuous — the buffer supplies the missing neighbours</text>
+</svg>
+<figcaption>The ridge is not a rendering artefact. Each tile's edge cells were interpolated from one side only, so both surfaces bend upward as they run out of neighbours.</figcaption>
+</figure>
 
 ## Validation & Verification
 

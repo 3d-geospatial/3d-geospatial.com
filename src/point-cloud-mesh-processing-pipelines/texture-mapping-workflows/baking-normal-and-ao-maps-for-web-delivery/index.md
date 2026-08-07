@@ -9,9 +9,10 @@ Baking normal and ambient-occlusion maps means transferring the surface detail o
 You hit this the moment [automated mesh decimation](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/) takes a 40 M-triangle photogrammetric facade down to a web budget and the rooflines, mullions, and stone relief vanish with the triangles. Baking is how that detail survives: it is measured once, at build time, from the high-poly source and stored as an image the GPU samples per pixel, so the low-poly mesh shades as if the geometry were still there. It sits at the end of the [texture mapping workflows](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/), after the diffuse atlas is produced.
 
 <figure class="diagram">
-<svg viewBox="0 0 820 300" role="img" aria-labelledby="bake-t bake-d" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="2 26 816 246" role="img" aria-labelledby="bake-t bake-d" xmlns="http://www.w3.org/2000/svg">
   <title id="bake-t">Normal and AO baking from high-poly to low-poly glTF</title>
   <desc id="bake-d">A high-poly mesh and a decimated low-poly mesh with a cage feed a ray-cast sampling stage, which emits a tangent-space normal map and an ambient-occlusion map that are packed into a glTF normalTexture and occlusionTexture.</desc>
+  <rect class="svg-bg" x="2" y="26" width="816" height="246" fill="#ffffff"/>
   <defs>
     <marker id="bake-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
@@ -111,6 +112,36 @@ origins = np.asarray(origins); normals = np.asarray(normals)
 normals /= np.linalg.norm(normals, axis=1, keepdims=True)
 ```
 
+<figure class="diagram">
+<svg viewBox="46 93 648 187" role="img" aria-labelledby="bk-cage-t bk-cage-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="bk-cage-t">The cage decides how far a bake ray may travel</title>
+  <desc id="bk-cage-d">Rays are cast from the low-poly surface along its normals to find the high-poly detail. A cage that is too tight stops short of recessed detail and leaves holes in the map. One that is too loose lets a ray reach past the intended feature and pick up a neighbouring surface, which shows up as a smeared patch.</desc>
+  <rect class="svg-bg" x="46" y="93" width="648" height="187" fill="#ffffff"/>
+  <defs>
+    <marker id="bk-cage-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
+    </marker>
+  </defs>
+  <path d="M60 190 H680" fill="none" stroke="#1f6b8a" stroke-width="3"/>
+  <path d="M60 154 C 140 150 180 168 220 152 C 260 136 300 176 340 150 C 400 112 440 178 500 148 C 560 120 620 168 680 152"
+        fill="none" stroke="#c46a3d" stroke-width="2.5"/>
+  <path d="M60 128 H680" fill="none" stroke="#4f7a4d" stroke-width="2" stroke-dasharray="6 4"/>
+  <g stroke="#5b6471" stroke-width="1.5" marker-end="url(#bk-cage-a)">
+    <path d="M120 188 V132"/>
+    <path d="M240 188 V132"/>
+    <path d="M360 188 V132"/>
+    <path d="M480 188 V132"/>
+    <path d="M600 188 V132"/>
+  </g>
+  <text x="66" y="208" fill="#1f6b8a" font-size="12" text-anchor="start">low-poly surface — where the UVs live</text>
+  <text x="66" y="146" fill="#c46a3d" font-size="12" text-anchor="start">high-poly detail</text>
+  <text x="66" y="120" fill="#4f7a4d" font-size="12" text-anchor="start">cage — the maximum ray distance</text>
+  <text x="370" y="240" fill="#15384a" font-size="12.5" text-anchor="middle">Too tight and recessed detail never gets hit; too loose and a ray finds the wall behind the balcony</text>
+  <text x="370" y="262" fill="#5b6471" font-size="12" text-anchor="middle">Start at 1.5× the largest peak-to-valley distance you measured between the two meshes, then tighten</text>
+</svg>
+<figcaption>Almost every bad bake is a cage problem rather than a sampling one. Measuring the actual displacement between the meshes turns the parameter into arithmetic.</figcaption>
+</figure>
+
 ### 4. Bake the tangent-space normal map
 
 Cast each cage ray into the high-poly, read the hit triangle's interpolated normal, and rotate it into the low-poly surface's tangent frame (T, B, N). Tangent-space normals are what glTF expects, because they stay valid as the mesh moves and animates. Encode the unit vector into the 0–255 RGB range.
@@ -156,6 +187,28 @@ for i, (o, n) in enumerate(zip(origins, normals)):
     x, y = texel_xy[i]
     aomap[y, x] = int(np.clip(ao, 0, 1) * 255)
 ```
+
+<figure class="diagram">
+<svg viewBox="19 14 702 288" role="img" aria-labelledby="bk-space-t bk-space-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="bk-space-t">Why the normal map has to be tangent space</title>
+  <desc id="bk-space-d">An object-space normal map stores directions in the model's own frame, so it is only correct while the model never rotates and never reuses a UV island. A tangent-space map stores directions relative to the surface, so the same map stays correct under any rotation and can be shared by mirrored or repeated islands.</desc>
+  <rect class="svg-bg" x="19" y="14" width="702" height="288" fill="#ffffff"/>
+  <path d="M56 70 h280 v70 h-280 Z" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <path d="M56 160 h280 v70 h-280 Z" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <path d="M404 70 h280 v70 h-280 Z" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <path d="M404 160 h280 v70 h-280 Z" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="196" y="98"><tspan x="196" dy="0" font-weight="600">object space</tspan><tspan x="196" dy="17">directions in the model frame</tspan></text>
+    <text x="196" y="188"><tspan x="196" dy="0">rotate the building 90°</tspan><tspan x="196" dy="17">and every normal is wrong</tspan></text>
+    <text x="544" y="98"><tspan x="544" dy="0" font-weight="600">tangent space</tspan><tspan x="544" dy="17">directions relative to the surface</tspan></text>
+    <text x="544" y="188"><tspan x="544" dy="0">rotation-invariant, and mirrored</tspan><tspan x="544" dy="17">islands can share one region</tspan></text>
+  </g>
+  <text x="370" y="42" fill="#1f2937" font-size="13" text-anchor="middle" font-weight="600">glTF's normalTexture is defined as tangent space — an object-space map is not a variant, it is wrong</text>
+  <text x="370" y="264" fill="#5b6471" font-size="12" text-anchor="middle">Which means the mesh must carry TANGENT, or the runtime has to derive it from the UVs and get the handedness right</text>
+  <text x="370" y="284" fill="#b0413e" font-size="12" text-anchor="middle">A flipped green channel is the usual symptom: lighting looks inverted on every recess</text>
+</svg>
+<figcaption>The distinction only matters once the asset is instanced, mirrored, or rotated — which is exactly what a city of repeated building types does.</figcaption>
+</figure>
 
 ### 6. Pack into a glTF with normalTexture and occlusionTexture
 

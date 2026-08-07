@@ -15,9 +15,10 @@ The economic case is sharper than it first appears. Once geometry is anchored to
 Two failure classes dominate this conversion: silent axis-order swaps (PROJ's CRS database declares EPSG:4326 as latitude-first, so the naive call flips your coordinates) and ignored vertical datums (GNSS gives ellipsoidal height; your twin almost certainly wants orthometric height relative to a geoid). Both produce output that looks plausible and is wrong by metres. The steps below close off both. For the broader question of which target CRS to pick, see [Coordinate Reference Systems for 3D Assets](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/).
 
 <figure class="diagram">
-<svg viewBox="0 0 760 230" role="img" aria-labelledby="wgs84-conv-t wgs84-conv-d" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="1 36 758 192" role="img" aria-labelledby="wgs84-conv-t wgs84-conv-d" xmlns="http://www.w3.org/2000/svg">
   <title id="wgs84-conv-t">WGS84 to projected transform pipeline</title>
   <desc id="wgs84-conv-d">WGS84 longitude, latitude and ellipsoidal height in EPSG:4326 pass through a pyproj Transformer with always_xy true, producing easting, northing and orthometric height in the compound CRS EPSG:32618 plus 5703, then an inverse transform verifies the round trip.</desc>
+  <rect class="svg-bg" x="1" y="36" width="758" height="192" fill="#ffffff"/>
   <defs>
     <marker id="wgs84-conv-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
@@ -77,6 +78,34 @@ lon, lat = -73.985428, 40.748817          # Empire State Building
 easting, northing = fwd.transform(lon, lat)
 print(f"E={easting:.3f}  N={northing:.3f}")
 ```
+
+The flag matters because nothing downstream will tell you it was missing. Both orderings produce two finite numbers in the right units, both survive a JSON schema, and both write cleanly into a LAS header. Only the position is wrong, and the amount it is wrong by depends on the site — which is why a fixture near the equator can pass while the same code puts a northern city two time zones east.
+
+<figure class="diagram">
+<svg viewBox="6 2 708 290" role="img" aria-labelledby="wgs-axis-t wgs-axis-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="wgs-axis-t">The same two numbers under both axis orders</title>
+  <desc id="wgs-axis-d">With always_xy set to true, the pair minus 73.985 and 40.749 is read as longitude then latitude and projects onto Manhattan. Without it, PROJ applies EPSG:4326's authority order of latitude then longitude, the same pair is read backwards, and the point lands thousands of kilometres away with no error raised.</desc>
+  <rect class="svg-bg" x="6" y="2" width="708" height="290" fill="#ffffff"/>
+  <path d="M20 46 H340 V226 H20 Z" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <path d="M380 46 H700 V226 H380 Z" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <g stroke="#e6e0d4" stroke-width="1.5">
+    <path d="M100 46 V226 M180 46 V226 M260 46 V226"/>
+    <path d="M20 96 H340 M20 136 H340 M20 176 H340"/>
+    <path d="M460 46 V226 M540 46 V226 M620 46 V226"/>
+    <path d="M380 96 H700 M380 136 H700 M380 176 H700"/>
+  </g>
+  <circle cx="180" cy="136" r="8" fill="#1f6b8a"/>
+  <circle cx="646" cy="86" r="8" fill="#b0413e"/>
+  <text x="180" y="30" fill="#4f7a4d" font-size="12.5" text-anchor="middle" font-weight="600">always_xy=True — read as (lon, lat)</text>
+  <text x="540" y="30" fill="#b0413e" font-size="12.5" text-anchor="middle" font-weight="600">default order — read as (lat, lon)</text>
+  <text x="180" y="164" fill="#1f2937" font-size="11.5" text-anchor="middle">Manhattan, as intended</text>
+  <text x="600" y="112" fill="#1f2937" font-size="11.5" text-anchor="middle">nowhere near the site</text>
+  <text x="180" y="252" fill="#1f2937" font-size="12" text-anchor="middle">E 585 016 · N 4 511 322</text>
+  <text x="540" y="252" fill="#1f2937" font-size="12" text-anchor="middle">E 6 721 013 · N 4 520 459</text>
+  <text x="360" y="274" fill="#5b6471" font-size="12" text-anchor="middle">Both calls return two finite numbers in metres. Only one of them is a place.</text>
+</svg>
+<figcaption>The axis-order bug never raises. It returns plausible eastings and northings, which is precisely why it reaches production and is discovered by an analyst rather than a test.</figcaption>
+</figure>
 
 ### 2. Transform whole arrays in one vectorized call
 
@@ -141,6 +170,41 @@ las.x, las.y, las.z = e, n, z
 las.header.add_crs("EPSG:32618+5703")          # stamp the new CRS
 las.write("survey_utm18n_navd88.laz")
 ```
+
+The `add_crs()` call in the last line is the part teams skip, and it is what makes the file self-describing. A LAS 1.4 file can carry its CRS in either of two variable-length records — the legacy GeoTIFF key VLR that older producers write, or the OGC WKT VLR that LAS 1.4 prefers — and a bit in the public header block (`global_encoding` bit 4) declares which one is authoritative. Write new coordinates without updating those records and you ship a file whose points are UTM/NAVD88 and whose header still swears they are WGS84; every reader then does something defensible and different.
+
+<figure class="diagram">
+<svg viewBox="10 12 740 276" role="img" aria-labelledby="wgs-vlr-t wgs-vlr-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="wgs-vlr-t">Where a LAS file keeps its CRS, and which record wins</title>
+  <desc id="wgs-vlr-d">A LAS 1.4 file holds its public header block, then optionally a legacy GeoTIFF key variable-length record, an OGC WKT variable-length record, and finally the point records. Readers prefer the WKT record when global encoding bit 4 is set; if both records exist and disagree, different readers pick differently and the file becomes ambiguous.</desc>
+  <rect class="svg-bg" x="10" y="12" width="740" height="276" fill="#ffffff"/>
+  <defs>
+    <marker id="wgs-vlr-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
+    </marker>
+  </defs>
+  <rect x="24" y="26" width="250" height="52" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="24" y="94" width="250" height="52" rx="8" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <rect x="24" y="162" width="250" height="52" rx="8" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <rect x="24" y="230" width="250" height="44" rx="8" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <rect x="430" y="40" width="306" height="76" rx="8" fill="#ffffff" stroke="#5b6471" stroke-width="2"/>
+  <rect x="430" y="166" width="306" height="76" rx="8" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <g stroke="#5b6471" stroke-width="2" fill="none" marker-end="url(#wgs-vlr-a)">
+    <path d="M274 52 C 340 52 360 68 428 78"/>
+    <path d="M274 188 C 340 188 360 196 428 204"/>
+    <path d="M274 120 C 340 120 360 150 428 196"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="149" y="47"><tspan x="149" dy="0">public header block</tspan><tspan x="149" dy="16">global_encoding bit 4 → WKT</tspan></text>
+    <text x="149" y="115"><tspan x="149" dy="0">VLR: GeoTIFF keys</tspan><tspan x="149" dy="16">legacy producers</tspan></text>
+    <text x="149" y="183"><tspan x="149" dy="0">VLR: OGC WKT</tspan><tspan x="149" dy="16">LAS 1.4 preferred</tspan></text>
+    <text x="149" y="257">point records — X, Y, Z</text>
+    <text x="583" y="66"><tspan x="583" dy="0">header.parse_crs() returns the WKT record</tspan><tspan x="583" dy="16">when the bit is set, and otherwise falls</tspan><tspan x="583" dy="16">back to the GeoTIFF keys</tspan></text>
+    <text x="583" y="192"><tspan x="583" dy="0">Both present and disagreeing: readers split.</tspan><tspan x="583" dy="16">add_crs() rewrites the WKT record — set the</tspan><tspan x="583" dy="16">bit and drop the stale GeoTIFF keys.</tspan></text>
+  </g>
+</svg>
+<figcaption>Two records can describe the CRS and a header bit decides which one counts. Rewriting coordinates without rewriting both is how a file ends up meaning two things at once.</figcaption>
+</figure>
 
 ## Expected Output & Verification
 

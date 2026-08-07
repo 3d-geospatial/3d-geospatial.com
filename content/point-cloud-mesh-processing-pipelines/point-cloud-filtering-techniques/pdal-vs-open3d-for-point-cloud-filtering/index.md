@@ -5,9 +5,10 @@ Both [PDAL](https://pdal.io/) and [Open3D](https://www.open3d.org/) can strip ou
 You hit this decision the moment your filtering step outgrows a one-off script. If you already have both installed after reading the broader [point cloud filtering techniques](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/) guide, the question is no longer *how* to run statistical outlier removal but *which engine owns the stage* — because the choice dictates whether your CRS is preserved automatically, whether a billion-point survey fits in RAM, and whether the run is reproducible from a committed JSON file or a Python notebook.
 
 <figure class="diagram">
-<svg viewBox="0 0 800 360" role="img" aria-labelledby="pdvo-t pdvo-d" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="2 34 796 308" role="img" aria-labelledby="pdvo-t pdvo-d" xmlns="http://www.w3.org/2000/svg">
   <title id="pdvo-t">Capability matrix: PDAL versus Open3D per filtering task</title>
   <desc id="pdvo-d">A three-column table lists five filtering tasks and the corresponding PDAL stage and Open3D method for each: statistical outlier removal, radius outlier removal, voxel downsampling, ground classification, and reading a CRS from a LAS header.</desc>
+  <rect class="svg-bg" x="2" y="34" width="796" height="308" fill="#ffffff"/>
   <rect x="16" y="48" width="232" height="40" rx="8" fill="#1f6b8a" stroke="#1f6b8a" stroke-width="2"/>
   <rect x="264" y="48" width="256" height="40" rx="8" fill="#1f6b8a" stroke="#1f6b8a" stroke-width="2"/>
   <rect x="536" y="48" width="248" height="40" rx="8" fill="#1f6b8a" stroke="#1f6b8a" stroke-width="2"/>
@@ -147,9 +148,83 @@ ground.execute()
 
 ## Performance on large .laz
 
+<figure class="diagram">
+<svg viewBox="29 2 685 300" role="img" aria-labelledby="po-mem-t po-mem-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="po-mem-t">Streaming stages against a whole-cloud array</title>
+  <desc id="po-mem-d">PDAL moves points through its stage chain in fixed-size views, so peak memory is set by the view size rather than by the file. Open3D materialises the entire cloud as numpy arrays and every filter allocates another copy, so peak memory scales with the survey and crosses the machine's limit somewhere around a billion points.</desc>
+  <rect class="svg-bg" x="29" y="2" width="685" height="300" fill="#ffffff"/>
+  <path d="M70 60 V218 H700" fill="none" stroke="#5b6471" stroke-width="1.5"/>
+  <polyline points="90,212 200,208 310,205 420,203 530,201 640,200" fill="none" stroke="#4f7a4d" stroke-width="2.5"/>
+  <polyline points="90,206 200,180 310,150 420,120 530,88 640,66" fill="none" stroke="#c46a3d" stroke-width="2.5"/>
+  <path d="M70 96 H700" fill="none" stroke="#b0413e" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="700" y="90" fill="#b0413e" font-size="12" text-anchor="end">machine RAM</text>
+  <text x="392" y="196" fill="#4f7a4d" font-size="12" text-anchor="middle">PDAL — flat, set by the view size</text>
+  <text x="440" y="112" fill="#c46a3d" font-size="12" text-anchor="middle">Open3D — one array per filter, per cloud</text>
+  <g fill="#1f2937" font-size="11.5" text-anchor="middle">
+    <text x="90" y="238">50 M</text>
+    <text x="200" y="238">100 M</text>
+    <text x="310" y="238">250 M</text>
+    <text x="420" y="238">500 M</text>
+    <text x="530" y="238">1 B</text>
+    <text x="640" y="238">2 B</text>
+  </g>
+  <text x="380" y="262" fill="#5b6471" font-size="12" text-anchor="middle">points in the survey</text>
+  <text x="370" y="30" fill="#1f2937" font-size="13" text-anchor="middle" font-weight="600">Peak memory as the survey grows — the axis that decides the choice</text>
+  <text x="370" y="284" fill="#15384a" font-size="12" text-anchor="middle">Open3D is not slower; it simply has to hold the cloud, so above a few hundred million points it stops being an option</text>
+</svg>
+<figcaption>Both libraries filter at similar speed per point. What separates them at survey scale is whether the whole cloud has to be resident to do it.</figcaption>
+</figure>
+
 PDAL streams. Stages such as `filters.range`, `filters.voxelcentroid`, and the outlier filters run in a streaming mode that processes points in fixed-size buffers, and `filters.splitter` or `filters.chipper` tile a multi-billion-point survey so nothing exceeds memory. A national-grid `.laz` that would never fit in RAM flows through a PDAL pipeline on a modest machine.
 
 Open3D holds everything resident. A `PointCloud` over 50 M points already wants several gigabytes, and `remove_statistical_outlier` builds a KD-tree over the whole array, so you must tile the cloud yourself — read with `laspy.open(...).chunk_iterator(n)`, filter each chunk, buffer the tile edges, and merge — reproducing by hand the chunking PDAL does declaratively. Where PDAL is memory-bounded by design, Open3D is memory-bounded by your discipline.
+
+<figure class="diagram">
+<svg viewBox="10 12 720 262" role="img" aria-labelledby="po-crs-t po-crs-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="po-crs-t">Which library carries the coordinate reference system for you</title>
+  <desc id="po-crs-d">A PDAL pipeline reads the CRS from the LAS header, threads it through every stage, and writes it back into the output header. Open3D reads only the coordinates, so the CRS exists solely in whatever variable the caller kept, and the written file carries none unless the caller writes it separately.</desc>
+  <rect class="svg-bg" x="10" y="12" width="720" height="262" fill="#ffffff"/>
+  <defs>
+    <marker id="po-crs-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
+    </marker>
+  </defs>
+  <g fill="#eef5e9" stroke="#4f7a4d" stroke-width="2">
+    <rect x="24" y="54" width="150" height="50" rx="8"/>
+    <rect x="224" y="54" width="150" height="50" rx="8"/>
+    <rect x="424" y="54" width="150" height="50" rx="8"/>
+    <rect x="600" y="54" width="116" height="50" rx="8"/>
+  </g>
+  <g fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2">
+    <rect x="24" y="164" width="150" height="50" rx="8"/>
+    <rect x="424" y="164" width="150" height="50" rx="8"/>
+  </g>
+  <rect x="224" y="164" width="150" height="50" rx="8" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <rect x="600" y="164" width="116" height="50" rx="8" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <g stroke="#5b6471" stroke-width="2" marker-end="url(#po-crs-a)">
+    <line x1="174" y1="79" x2="222" y2="79"/>
+    <line x1="374" y1="79" x2="422" y2="79"/>
+    <line x1="574" y1="79" x2="598" y2="79"/>
+    <line x1="174" y1="189" x2="222" y2="189"/>
+    <line x1="374" y1="189" x2="422" y2="189"/>
+    <line x1="574" y1="189" x2="598" y2="189"/>
+  </g>
+  <g fill="#1f2937" font-size="12" text-anchor="middle">
+    <text x="99" y="84">readers.las</text>
+    <text x="299" y="84">filters.outlier</text>
+    <text x="499" y="84">filters.smrf</text>
+    <text x="658" y="84">writers.las</text>
+    <text x="99" y="184"><tspan x="99" dy="0">read_point_cloud</tspan><tspan x="99" dy="15">coordinates only</tspan></text>
+    <text x="299" y="184"><tspan x="299" dy="0">CRS lives in your</tspan><tspan x="299" dy="15">own variable now</tspan></text>
+    <text x="499" y="184"><tspan x="499" dy="0">numpy operations</tspan><tspan x="499" dy="15">unaware of it</tspan></text>
+    <text x="658" y="184"><tspan x="658" dy="0">written file</tspan><tspan x="658" dy="15">has no CRS</tspan></text>
+  </g>
+  <text x="24" y="40" fill="#4f7a4d" font-size="12.5" text-anchor="start" font-weight="600">PDAL — the header travels with the points</text>
+  <text x="24" y="150" fill="#b0413e" font-size="12.5" text-anchor="start" font-weight="600">Open3D — the header stops at the reader</text>
+  <text x="370" y="256" fill="#5b6471" font-size="12" text-anchor="middle">Neither behaviour is wrong; only one of them survives being handed to a colleague six months later</text>
+</svg>
+<figcaption>This is the difference that decides most pipelines. Open3D's speed is real, and so is the fact that its output is a bag of numbers whose frame is documented nowhere.</figcaption>
+</figure>
 
 ## Decision table
 

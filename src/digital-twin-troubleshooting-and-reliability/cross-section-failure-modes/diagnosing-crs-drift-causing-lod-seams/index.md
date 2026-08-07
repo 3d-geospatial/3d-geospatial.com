@@ -9,9 +9,10 @@ This guide finds and fixes the coordinate-system drift that appears as visible s
 You hit this the moment two surveys, two tiling runs, or two teams contribute tiles that should abut but do not: a hairline crack of background shows between neighbouring tiles, or one tile sits a few centimetres proud of the next. The geometry looks correct in isolation, every tile validates, and yet the join is wrong — the signature of a transform chain that drifted somewhere between source and tileset root.
 
 <figure class="diagram">
-<svg viewBox="0 0 780 320" role="img" aria-labelledby="cds-t cds-d" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="11 31 741 295" role="img" aria-labelledby="cds-t cds-d" xmlns="http://www.w3.org/2000/svg">
   <title id="cds-t">How transform-chain drift becomes a seam between adjacent tiles</title>
   <desc id="cds-d">A transform chain runs from the source frame EPSG:32618 plus 5703, through geographic-3D EPSG:4979, to the ECEF render frame EPSG:4978. If the chain is not self-consistent, adjacent tiles A and B placed by it fail to abut, and the residual drift opens as a seam gap between them.</desc>
+  <rect class="svg-bg" x="11" y="31" width="741" height="295" fill="#ffffff"/>
   <defs>
     <marker id="cds-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
@@ -128,6 +129,46 @@ assert src_unit <= {"metre", "meter"}, f"source frame is not metric: {src_unit}"
 
 Expect `EPSG:32618` projected in metres, `EPSG:4979` geographic in degrees, `EPSG:4978` geocentric in metres. A degree-based frame reaching the tiler is the mix that produces seams scaled by latitude.
 
+<figure class="diagram">
+<svg viewBox="26 24 708 272" role="img" aria-labelledby="dr-shear-t dr-shear-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="dr-shear-t">A drift seam grows with distance; a datum seam does not</title>
+  <desc id="dr-shear-d">Two tile rows measured against the same control line. A transform-chain drift produces a lateral offset that increases the further a tile sits from the origin, because the error is proportional to the coordinate. A vertical datum mismatch produces a constant offset that is identical at every tile.</desc>
+  <rect class="svg-bg" x="26" y="24" width="708" height="272" fill="#ffffff"/>
+  <path d="M60 96 H700" fill="none" stroke="#5b6471" stroke-width="1.5" stroke-dasharray="5 4"/>
+  <g fill="#f7dfdc" stroke="#b0413e" stroke-width="2">
+    <rect x="80" y="88" width="90" height="28" rx="4"/>
+    <rect x="220" y="86" width="90" height="28" rx="4"/>
+    <rect x="360" y="82" width="90" height="28" rx="4"/>
+    <rect x="500" y="76" width="90" height="28" rx="4"/>
+    <rect x="620" y="68" width="90" height="28" rx="4"/>
+  </g>
+  <path d="M60 212 H700" fill="none" stroke="#5b6471" stroke-width="1.5" stroke-dasharray="5 4"/>
+  <g fill="#fdf3e0" stroke="#c46a3d" stroke-width="2">
+    <rect x="80" y="196" width="90" height="28" rx="4"/>
+    <rect x="220" y="196" width="90" height="28" rx="4"/>
+    <rect x="360" y="196" width="90" height="28" rx="4"/>
+    <rect x="500" y="196" width="90" height="28" rx="4"/>
+    <rect x="620" y="196" width="90" height="28" rx="4"/>
+  </g>
+  <text x="60" y="52" fill="#b0413e" font-size="12.5" text-anchor="start" font-weight="600">transform-chain drift — offset grows with the coordinate</text>
+  <text x="60" y="170" fill="#c46a3d" font-size="12.5" text-anchor="start" font-weight="600">vertical datum mismatch — offset is the same everywhere</text>
+  <g fill="#5b6471" font-size="11.5" text-anchor="middle">
+    <text x="125" y="140">2 mm</text>
+    <text x="265" y="140">9 mm</text>
+    <text x="405" y="140">24 mm</text>
+    <text x="545" y="140">51 mm</text>
+    <text x="665" y="140">88 mm</text>
+    <text x="125" y="248">334 mm</text>
+    <text x="265" y="248">334 mm</text>
+    <text x="405" y="248">334 mm</text>
+    <text x="545" y="248">334 mm</text>
+    <text x="665" y="248">334 mm</text>
+  </g>
+  <text x="380" y="278" fill="#15384a" font-size="12.5" text-anchor="middle">Measure the residual at four tiles across the extent and the two causes separate immediately — no re-tiling required</text>
+</svg>
+<figcaption>The single most useful diagnostic here is the shape of the residual across the extent, not its size at any one tile.</figcaption>
+</figure>
+
 ### 4. Assert tile bounds are monotonic and nested
 
 Even with a clean CRS, drift in per-tile transforms shows up as bounding volumes that no longer nest — a child pokes outside its parent, and the gap between them renders as a seam. Walk the tree and assert containment in the render frame.
@@ -155,6 +196,28 @@ tileset = json.loads(open("tileset/tileset.json").read())
 assert_nested(tileset["root"])
 print("bounding volumes nest cleanly")
 ```
+
+<figure class="diagram">
+<svg viewBox="46 8 718 286" role="img" aria-labelledby="dr-nest-t dr-nest-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="dr-nest-t">A child bounding volume that escapes its parent</title>
+  <desc id="dr-nest-d">The specification requires each tile's bounding volume to contain all of its children's. When a child is computed in a different frame from its parent, it can protrude past the parent's boundary. The client culls against the parent first, so the protruding part is discarded before its own tile is ever considered, and the geometry there simply never appears.</desc>
+  <rect class="svg-bg" x="46" y="8" width="718" height="286" fill="#ffffff"/>
+  <path d="M60 50 h300 v180 h-300 Z" fill="none" stroke="#1f6b8a" stroke-width="2.5"/>
+  <path d="M90 80 h120 v120 h-120 Z" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <path d="M230 80 h110 v120 h-110 Z" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <path d="M420 50 h300 v180 h-300 Z" fill="none" stroke="#1f6b8a" stroke-width="2.5"/>
+  <path d="M450 80 h120 v120 h-120 Z" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <path d="M590 80 h160 v120 h-160 Z" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <text x="210" y="36" fill="#4f7a4d" font-size="12.5" text-anchor="middle" font-weight="600">contained — every child inside the parent</text>
+  <text x="570" y="36" fill="#b0413e" font-size="12.5" text-anchor="middle" font-weight="600">escaped — a child protrudes past the parent</text>
+  <text x="210" y="252" fill="#1f2937" font-size="12" text-anchor="middle">culling the parent correctly culls the whole subtree</text>
+  <text x="570" y="252" fill="#b0413e" font-size="12" text-anchor="middle">the protruding strip is culled with the parent and never drawn</text>
+  <text x="370" y="276" fill="#5b6471" font-size="12" text-anchor="middle">Symptom: a band of the city that is missing from certain camera angles and present from others</text>
+</svg>
+<figcaption>Containment is not an aesthetic property of the tree. It is the assumption hierarchical culling is built on, and violating it deletes geometry silently.</figcaption>
+</figure>
+
+Both checks belong in CI rather than in a debugging session, and both are cheap. The residual-shape test needs four control points and one transform per point; the containment test is a single pass over the tileset tree comparing each node's volume against the union of its children's. Neither requires the tiles themselves, only `tileset.json` and a handful of coordinates, so both run in under a second on a city-scale tree and can sit in the same gate as the schema check.
 
 ### 5. Localise the seam to a specific tile pair
 
@@ -191,6 +254,8 @@ neighbour gap 0.31 mm
 ```
 
 A drifting tileset breaks exactly one of these first: multiple frames in step 1, a residual in millimetres-to-metres in step 2, a degree-based source in step 3, escaping bounds in step 4, or a centimetre gap in step 5. The step that trips names the layer that drifted — coordinate chain, units, or per-tile transform — so the fix is targeted rather than a full re-tile of the survey.
+
+Record the residuals from step 2 in the build artifact, not just in the console. A single run tells you whether the pipeline is correct today; a series of them tells you when it stopped being correct, which is the question you will actually be asked.
 
 ## Common Errors
 

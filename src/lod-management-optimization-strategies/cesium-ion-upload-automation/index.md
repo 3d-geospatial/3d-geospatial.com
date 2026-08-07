@@ -30,9 +30,10 @@ The ion REST API models an upload as a short-lived state machine anchored to one
 Once the bytes are in S3, `POST`-ing the `onComplete` request flips the asset out of `AWAITING_FILES` and hands it to the tiling engine. From there the asset walks `NOT_STARTED` → `IN_PROGRESS` → `COMPLETE`, or diverts to `ERROR`/`DATA_ERROR` if the source is malformed. Tiling is asynchronous and can take seconds or an hour, so the client polls `GET /v1/assets/{id}` on a backoff until it reads a terminal status. The whole dance is safe to automate because every step is a plain HTTP call with a JSON envelope — the only non-`requests` piece is the S3 transfer, and `boto3` handles that with the temporary credentials verbatim. The child walkthrough, [automating ion tileset uploads with the REST API](https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/automating-ion-tileset-uploads-with-the-rest-api/), implements exactly this loop end to end.
 
 <figure class="diagram">
-<svg viewBox="0 0 820 350" role="img" aria-labelledby="ion-life-t ion-life-d" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="6 26 813 290" role="img" aria-labelledby="ion-life-t ion-life-d" xmlns="http://www.w3.org/2000/svg">
   <title id="ion-life-t">Cesium ion upload lifecycle from create asset to COMPLETE</title>
   <desc id="ion-life-d">A client creates an asset with a POST call, receives temporary S3 credentials, uploads the tileset directory with boto3, posts an onComplete signal, then polls the asset status endpoint in a loop until it reads a terminal COMPLETE state or an ERROR state.</desc>
+  <rect class="svg-bg" x="6" y="26" width="813" height="290" fill="#ffffff"/>
   <defs>
     <marker id="ion-life-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
@@ -125,6 +126,40 @@ source_dir = Path("tileset")
 digest = source_digest(source_dir)
 existing_id = find_existing(session, digest)
 ```
+
+<figure class="diagram">
+<svg viewBox="10 28 714 248" role="img" aria-labelledby="ion-scope-t ion-scope-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="ion-scope-t">Which ion token scope each call in the pipeline needs</title>
+  <desc id="ion-scope-d">Creating an asset and signalling upload completion need the assets write scope. Polling an asset's status needs only the read scope. Serving the finished tileset to a browser needs a separate, read-only token. Issuing one token with every scope to all three means a leaked viewer token can delete the city.</desc>
+  <rect class="svg-bg" x="10" y="28" width="714" height="248" fill="#ffffff"/>
+  <defs>
+    <marker id="ion-scope-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
+    </marker>
+  </defs>
+  <rect x="24" y="42" width="190" height="52" rx="8" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <rect x="24" y="112" width="190" height="52" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="24" y="182" width="190" height="52" rx="8" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <rect x="420" y="42" width="290" height="52" rx="8" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <rect x="420" y="112" width="290" height="52" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="420" y="182" width="290" height="52" rx="8" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <g stroke="#5b6471" stroke-width="2" marker-end="url(#ion-scope-a)">
+    <line x1="214" y1="68" x2="418" y2="68"/>
+    <line x1="214" y1="138" x2="418" y2="138"/>
+    <line x1="214" y1="208" x2="418" y2="208"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="119" y="74">assets:write</text>
+    <text x="119" y="144">assets:read</text>
+    <text x="119" y="214">assets:read (viewer)</text>
+    <text x="565" y="63"><tspan x="565" dy="0">POST /v1/assets · POST …/uploadComplete</tspan><tspan x="565" dy="16">runs in CI only</tspan></text>
+    <text x="565" y="133"><tspan x="565" dy="0">GET /v1/assets/{id} — status polling</tspan><tspan x="565" dy="16">runs in CI only</tspan></text>
+    <text x="565" y="203"><tspan x="565" dy="0">the browser fetching the tileset</tspan><tspan x="565" dy="16">shipped in client JavaScript</tspan></text>
+  </g>
+  <text x="370" y="258" fill="#b0413e" font-size="12.5" text-anchor="middle">The third token is public by construction. Give it write scope and a page-source view is enough to replace the city.</text>
+</svg>
+<figcaption>Three callers, three lifetimes, three blast radii. The convenience of one token is paid for entirely by the one that ships to the browser.</figcaption>
+</figure>
 
 ### 3. Create the asset and receive S3 credentials
 
@@ -221,6 +256,42 @@ finish_upload(session, on_complete)
 final = poll_until_done(session, asset_id)
 print(f"asset {final['id']} is {final['status']} at {final['percentComplete']}%")
 ```
+
+<figure class="diagram">
+<svg viewBox="6 16 748 290" role="img" aria-labelledby="ion-swap-t ion-swap-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="ion-swap-t">Publishing a new tileset version without a visible gap</title>
+  <desc id="ion-swap-d">The source hash is compared against a ledger. If it is unchanged the upload is skipped entirely. If it has changed, a new asset is created and uploaded alongside the live one, and only once it reaches COMPLETE is the alias the viewer reads repointed. The previous asset is archived rather than deleted, so a rollback is one alias write.</desc>
+  <rect class="svg-bg" x="6" y="16" width="748" height="290" fill="#ffffff"/>
+  <defs>
+    <marker id="ion-swap-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
+    </marker>
+  </defs>
+  <rect x="20" y="112" width="164" height="58" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="234" y="30" width="164" height="52" rx="8" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <rect x="234" y="132" width="164" height="58" rx="8" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <rect x="448" y="132" width="150" height="58" rx="8" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <rect x="448" y="222" width="292" height="52" rx="8" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <rect x="632" y="122" width="108" height="78" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <g stroke="#5b6471" stroke-width="2" fill="none" marker-end="url(#ion-swap-a)">
+    <path d="M184 128 C 206 100 210 78 232 62"/>
+    <path d="M184 152 L232 156"/>
+    <line x1="398" y1="161" x2="446" y2="161"/>
+    <path d="M598 161 L630 161"/>
+    <path d="M598 180 C 612 206 616 226 630 240" stroke-dasharray="0"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="102" y="136"><tspan x="102" dy="0">hash the source</tspan><tspan x="102" dy="16">compare to the ledger</tspan></text>
+    <text x="316" y="61">unchanged — skip entirely</text>
+    <text x="316" y="156"><tspan x="316" dy="0">create asset N+1</tspan><tspan x="316" dy="16">upload beside the live one</tspan></text>
+    <text x="523" y="156"><tspan x="523" dy="0">poll until</tspan><tspan x="523" dy="16">COMPLETE</tspan></text>
+    <text x="686" y="156"><tspan x="686" dy="0">repoint</tspan><tspan x="686" dy="16">the alias</tspan></text>
+    <text x="594" y="252">archive asset N — rollback is one alias write</text>
+  </g>
+  <text x="380" y="288" fill="#5b6471" font-size="12" text-anchor="middle">Nothing the viewer reads changes until the new asset is finished, so a failed upload is invisible rather than an outage</text>
+</svg>
+<figcaption>Uploading in place makes every publish a window of broken tiles. Uploading beside and swapping an alias makes the same publish atomic and its reversal trivial.</figcaption>
+</figure>
 
 ## Validation & Verification
 

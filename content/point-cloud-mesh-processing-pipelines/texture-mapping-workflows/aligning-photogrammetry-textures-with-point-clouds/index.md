@@ -17,9 +17,10 @@ This page assumes a single projected CRS throughout — worked examples use **EP
 A 3×3 intrinsic matrix for a 4000×3000 image with a 35 mm-equivalent lens looks like `K = [[3200, 0, 2000], [0, 3200, 1500], [0, 0, 1]]` — `f_x ≈ f_y` in pixels, principal point near the image centre.
 
 <figure class="diagram">
-<svg viewBox="0 0 720 240" role="img" aria-labelledby="apt-proj-t apt-proj-d" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="6 32 708 142" role="img" aria-labelledby="apt-proj-t apt-proj-d" xmlns="http://www.w3.org/2000/svg">
   <title id="apt-proj-t">Pinhole projection of a surface point</title>
   <desc id="apt-proj-d">A world point is transformed by the camera pose into the camera frame, projected through the intrinsic matrix onto the image plane to give a pixel, and the sampled colour is carried back to the point only if it passes the depth test.</desc>
+  <rect class="svg-bg" x="6" y="32" width="708" height="142" fill="#ffffff"/>
   <defs>
     <marker id="apt-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
@@ -67,6 +68,45 @@ for cam in raw["cameras"]:
 
 print(f"loaded {len(cameras)} cameras, first centre = {(-cameras[0]['R'].T @ cameras[0]['t']).round(2)}")
 ```
+
+<figure class="diagram">
+<svg viewBox="43 14 676 290" role="img" aria-labelledby="ap-conv-t ap-conv-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="ap-conv-t">Two camera conventions that look identical in a file</title>
+  <desc id="ap-conv-d">A computer-vision camera looks down positive Z with Y pointing down the image. An OpenGL-style camera looks down negative Z with Y pointing up. The rotation matrices are the same size and both invert cleanly, so nothing in the file says which one you have — only the projected result does.</desc>
+  <rect class="svg-bg" x="43" y="14" width="676" height="290" fill="#ffffff"/>
+  <defs>
+    <marker id="ap-conv-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#1f6b8a"/>
+    </marker>
+    <marker id="ap-conv-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#c46a3d"/>
+    </marker>
+  </defs>
+  <g stroke="#1f6b8a" stroke-width="2.5" marker-end="url(#ap-conv-a)">
+    <path d="M150 150 L300 150"/>
+    <path d="M150 150 L150 236"/>
+    <path d="M150 150 L92 96"/>
+  </g>
+  <g stroke="#c46a3d" stroke-width="2.5" marker-end="url(#ap-conv-b)">
+    <path d="M530 150 L680 150"/>
+    <path d="M530 150 L530 64"/>
+    <path d="M530 150 L472 204"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" font-weight="600">
+    <text x="308" y="155">X</text>
+    <text x="142" y="256">Y (down)</text>
+    <text x="72" y="88">Z (forward)</text>
+    <text x="688" y="155">X</text>
+    <text x="522" y="54">Y (up)</text>
+    <text x="440" y="222">−Z (forward)</text>
+  </g>
+  <text x="190" y="42" fill="#1f6b8a" font-size="12.5" text-anchor="middle" font-weight="600">computer vision — COLMAP, OpenCV</text>
+  <text x="570" y="42" fill="#c46a3d" font-size="12.5" text-anchor="middle" font-weight="600">graphics — OpenGL, glTF, Metashape export</text>
+  <text x="380" y="270" fill="#15384a" font-size="12.5" text-anchor="middle">Get it wrong and every point projects behind the camera, or the image lands upside down with no error raised</text>
+  <text x="380" y="286" fill="#5b6471" font-size="12" text-anchor="middle">Test it on one point you can identify by eye before running the whole cloud</text>
+</svg>
+<figcaption>The convention is the first thing to establish and the last thing any file states. One recognisable point projected by hand settles it in a minute.</figcaption>
+</figure>
 
 ### 2. Transform points into the camera frame
 
@@ -122,6 +162,34 @@ for cam in cameras:
     depth[idx] = z
     hits[idx] += 1
 ```
+
+<figure class="diagram">
+<svg viewBox="44 41 693 241" role="img" aria-labelledby="ap-dep-t ap-dep-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="ap-dep-t">A per-pixel depth buffer decides which point a pixel belongs to</title>
+  <desc id="ap-dep-d">Several points can project to the same pixel: one on the facade the camera can see and one on the wall behind it. Keeping only the nearest depth per pixel means the hidden point is never coloured, which is what stops the rear wall from inheriting the front wall's texture.</desc>
+  <rect class="svg-bg" x="44" y="41" width="693" height="241" fill="#ffffff"/>
+  <defs>
+    <marker id="ap-dep-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
+    </marker>
+  </defs>
+  <path d="M70 140 L110 118 L110 162 Z" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <path d="M190 76 V212" fill="none" stroke="#5b6471" stroke-width="2"/>
+  <path d="M370 92 V196" fill="none" stroke="#4f7a4d" stroke-width="4"/>
+  <path d="M600 76 V212" fill="none" stroke="#b0413e" stroke-width="4"/>
+  <path d="M110 140 L596 140" fill="none" stroke="#5b6471" stroke-width="2" marker-end="url(#ap-dep-a)"/>
+  <circle cx="370" cy="140" r="6" fill="#4f7a4d"/>
+  <circle cx="600" cy="140" r="6" fill="#b0413e"/>
+  <circle cx="190" cy="140" r="5" fill="#1f6b8a"/>
+  <text x="190" y="68" fill="#5b6471" font-size="12" text-anchor="middle">image plane — one pixel</text>
+  <text x="370" y="84" fill="#4f7a4d" font-size="12" text-anchor="middle">front facade — depth 18.2 m</text>
+  <text x="600" y="68" fill="#b0413e" font-size="12" text-anchor="middle">rear wall — depth 31.7 m</text>
+  <text x="370" y="230" fill="#4f7a4d" font-size="12.5" text-anchor="middle">kept: nearest depth wins the pixel</text>
+  <text x="600" y="230" fill="#b0413e" font-size="12.5" text-anchor="middle">rejected: never coloured from this camera</text>
+  <text x="370" y="264" fill="#15384a" font-size="12.5" text-anchor="middle">Without the test both points read the same pixel, and the rear wall is painted with the front of the building</text>
+</svg>
+<figcaption>This is the check that turns projective texturing from a demo into a pipeline. A tolerance of a few centimetres on the depth comparison avoids fighting between coplanar points.</figcaption>
+</figure>
 
 ### 5. Bake the result and write a coloured asset
 

@@ -5,9 +5,10 @@ Screened Poisson and the Delaunay family — ball-pivoting (BPA) and alpha shape
 You reach this decision after cleaning a cloud and before committing a reconstruction algorithm to your pipeline. The single-parameter tuning of one algorithm belongs in [Poisson surface reconstruction parameters](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/poisson-surface-reconstruction-parameters/); the question here is prior to that — which of the two philosophies your data and your downstream use actually want.
 
 <figure class="diagram">
-<svg viewBox="0 0 820 340" role="img" aria-labelledby="pvd-t pvd-d" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="26 6 768 326" role="img" aria-labelledby="pvd-t pvd-d" xmlns="http://www.w3.org/2000/svg">
   <title id="pvd-t">Decision diagram for Poisson versus Delaunay reconstruction</title>
   <desc id="pvd-d">A top decision node asks what the surface must guarantee; a left branch to closure selects screened Poisson with a depth ladder and density trimming, and a right branch to fidelity selects Delaunay or ball-pivoting with spacing-derived radii and open holes.</desc>
+  <rect class="svg-bg" x="26" y="6" width="768" height="326" fill="#ffffff"/>
   <defs>
     <marker id="pvd-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
@@ -128,9 +129,61 @@ print(f"Poisson extrapolated ~{extrapolated:.1%} | "
       f"BPA left ~{unconnected:.1%} of points unmeshed")
 ```
 
+<figure class="diagram">
+<svg viewBox="-1 56 714 250" role="img" aria-labelledby="pv-noise-t pv-noise-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="pv-noise-t">The one measurement that decides the family</title>
+  <desc id="pv-noise-d">Compare the residual noise amplitude in the filtered cloud against the smallest feature the model must keep. When noise is well below the feature size, an interpolating method reproduces both. When noise approaches the feature size, no interpolating method can separate them and the averaging behaviour of an implicit solver is the only way through.</desc>
+  <rect class="svg-bg" x="-1" y="56" width="714" height="250" fill="#ffffff"/>
+  <path d="M60 210 H690" fill="none" stroke="#5b6471" stroke-width="1.5"/>
+  <path d="M60 210 V70" fill="none" stroke="#5b6471" stroke-width="1.5"/>
+  <path d="M60 210 L690 70" fill="none" stroke="#5b6471" stroke-width="2" stroke-dasharray="6 4"/>
+  <path d="M84 92 h250 v90 h-250 Z" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <path d="M400 116 h270 v82 h-270 Z" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="209" y="128"><tspan x="209" dy="0" font-weight="600">noise ≪ feature</tspan><tspan x="209" dy="17">ball pivoting or alpha shape</tspan><tspan x="209" dy="16">keeps the corner and the detail</tspan></text>
+    <text x="535" y="146"><tspan x="535" dy="0" font-weight="600">noise ≈ feature</tspan><tspan x="535" dy="17">Poisson — averaging is the only</tspan><tspan x="535" dy="16">way to separate them</tspan></text>
+  </g>
+  <text x="375" y="240" fill="#5b6471" font-size="12" text-anchor="middle">residual noise amplitude after filtering (m)</text>
+  <text x="34" y="140" fill="#5b6471" font-size="12" text-anchor="middle">feature</text>
+  <text x="34" y="156" fill="#5b6471" font-size="12" text-anchor="middle">size</text>
+  <text x="370" y="270" fill="#15384a" font-size="12.5" text-anchor="middle">Both numbers are measurable: noise from the plane-fit residual on a flat wall, feature size from the specification</text>
+  <text x="370" y="288" fill="#5b6471" font-size="12" text-anchor="middle">Everything else — watertightness, speed, parameter count — follows from that one comparison</text>
+</svg>
+<figcaption>The debate is usually conducted in preferences. It resolves in one measurement per dataset, and the answer changes between a TLS scan and a UAV block.</figcaption>
+</figure>
+
 ## Parameters that control each
 
 Poisson exposes a smooth continuum of resolution through `depth` (each step roughly multiplies memory and runtime by up to 8x) plus `scale`, `linear_fit`, and the density-trim quantile — a coherent knob set covered in the [parameter-tuning guide](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/poisson-surface-reconstruction-parameters/). BPA is controlled almost entirely by its radius list: too small and the ball falls through sparse patches leaving holes, too large and it bridges across real gaps and reintroduces the over-smoothing you switched away from Poisson to avoid. Alpha shapes have the single `alpha` radius with the same trade-off. The practical consequence is that Poisson degrades gracefully as you tune one number, while BPA is bimodal — a radius is either sufficient for a region or it is not — which is why BPA needs the multi-radius list and Poisson does not.
+
+<figure class="diagram">
+<svg viewBox="53 24 668 256" role="img" aria-labelledby="pv-hole-t pv-hole-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="pv-hole-t">A real gap, reconstructed by each family</title>
+  <desc id="pv-hole-d">A doorway with no returns behind it. Poisson always closes the surface, so it stretches a low-confidence shell across the opening that has to be trimmed away afterwards. Ball pivoting leaves the opening as a boundary, which is faithful but produces a mesh that is not watertight and cannot be used for volumetrics without a separate capping step.</desc>
+  <rect class="svg-bg" x="53" y="24" width="668" height="256" fill="#ffffff"/>
+  <g fill="#1f6b8a">
+    <circle cx="70" cy="180" r="3"/><circle cx="104" cy="178" r="3"/><circle cx="138" cy="182" r="3"/>
+    <circle cx="172" cy="176" r="3"/><circle cx="206" cy="180" r="3"/>
+    <circle cx="300" cy="180" r="3"/><circle cx="334" cy="176" r="3"/>
+  </g>
+  <path d="M70 180 L206 178 M300 180 L334 176" fill="none" stroke="#5b6471" stroke-width="2.5"/>
+  <path d="M206 178 C 240 150 268 150 300 180" fill="none" stroke="#c46a3d" stroke-width="2.5" stroke-dasharray="6 4"/>
+  <g fill="#1f6b8a">
+    <circle cx="440" cy="180" r="3"/><circle cx="474" cy="178" r="3"/><circle cx="508" cy="182" r="3"/>
+    <circle cx="542" cy="176" r="3"/><circle cx="576" cy="180" r="3"/>
+    <circle cx="670" cy="180" r="3"/><circle cx="704" cy="176" r="3"/>
+  </g>
+  <path d="M440 180 L576 178 M670 180 L704 176" fill="none" stroke="#4f7a4d" stroke-width="2.5"/>
+  <text x="200" y="52" fill="#c46a3d" font-size="12.5" text-anchor="middle" font-weight="600">Poisson — always closes</text>
+  <text x="570" y="52" fill="#4f7a4d" font-size="12.5" text-anchor="middle" font-weight="600">ball pivoting — leaves the boundary</text>
+  <text x="253" y="132" fill="#c46a3d" font-size="11.5" text-anchor="middle">invented shell</text>
+  <text x="623" y="200" fill="#4f7a4d" font-size="11.5" text-anchor="middle">open</text>
+  <text x="200" y="230" fill="#1f2937" font-size="12" text-anchor="middle">watertight, but the doorway is now a wall</text>
+  <text x="570" y="230" fill="#1f2937" font-size="12" text-anchor="middle">faithful, but no volume can be computed from it</text>
+  <text x="370" y="262" fill="#15384a" font-size="12.5" text-anchor="middle">Both need a second step: one to trim the invention away, the other to cap the opening deliberately</text>
+</svg>
+<figcaption>Neither family gives a gap the treatment you want by default. What differs is whether the correction is a deletion or an addition — and deletions are far easier to bound.</figcaption>
+</figure>
 
 ## Decision table
 

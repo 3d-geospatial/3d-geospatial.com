@@ -32,25 +32,26 @@ P_cam = R · P + t
 The pixel coordinate is `(u/w, v/w)`. That single chain — `R|t` then `K`, then the perspective divide — is the whole of camera projection.
 
 <figure class="diagram">
-<svg viewBox="0 0 760 320" role="img" aria-labelledby="tex-proj-t tex-proj-d" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="32 32 678 291" role="img" aria-labelledby="tex-proj-t tex-proj-d" xmlns="http://www.w3.org/2000/svg">
   <title id="tex-proj-t">Pinhole camera projection onto a mesh</title>
   <desc id="tex-proj-d">A camera centre projects a ray through the image plane to a point on the mesh surface; the world point is transformed by R and t into the camera frame, then by the intrinsic matrix K into pixel coordinates u and v.</desc>
+  <rect class="svg-bg" x="32" y="32" width="678" height="291" fill="#ffffff"/>
   <defs>
     <marker id="tex-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
     </marker>
   </defs>
   <circle cx="90" cy="160" r="9" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
-  <rect x="300" y="80" width="120" height="160" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <path d="M300 72 L420 92 L420 252 L300 232 Z" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
   <path d="M600 70 Q650 160 600 250 L660 260 Q700 160 660 60 Z" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
-  <circle cx="360" cy="135" r="5" fill="#1f6b8a"/>
+  <circle cx="360" cy="156" r="5" fill="#1f6b8a"/>
   <circle cx="632" cy="150" r="6" fill="#4f7a4d"/>
   <line x1="99" y1="160" x2="628" y2="151" stroke="#5b6471" stroke-width="2" marker-end="url(#tex-arrow)"/>
   <line x1="150" y1="250" x2="150" y2="190" stroke="#5b6471" stroke-width="2" marker-end="url(#tex-arrow)"/>
   <line x1="150" y1="250" x2="210" y2="250" stroke="#5b6471" stroke-width="2" marker-end="url(#tex-arrow)"/>
   <text x="90" y="135" fill="#1f2937" font-size="13" text-anchor="middle">camera centre</text>
-  <text x="360" y="70" fill="#1f2937" font-size="13" text-anchor="middle">image plane</text>
-  <text x="360" y="160" fill="#1f2937" font-size="12" text-anchor="middle">(u, v)</text>
+  <text x="360" y="60" fill="#1f2937" font-size="13" text-anchor="middle">image plane</text>
+  <text x="360" y="182" fill="#1f2937" font-size="12" text-anchor="middle">(u, v)</text>
   <text x="655" y="290" fill="#1f2937" font-size="13" text-anchor="middle">mesh point P</text>
   <text x="150" y="180" fill="#5b6471" font-size="12" text-anchor="middle">Z</text>
   <text x="225" y="254" fill="#5b6471" font-size="12" text-anchor="start">X</text>
@@ -155,6 +156,42 @@ for ci, cam in enumerate(cameras):
     best_score[take] = score[take]
 ```
 
+<figure class="diagram">
+<svg viewBox="25 6 782 296" role="img" aria-labelledby="tx-score-t tx-score-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="tx-score-t">Scoring cameras for one face</title>
+  <desc id="tx-score-d">Three cameras can see the same facade. The first views it almost head on from close range and wins. The second is far away, so its texels cover more ground and its detail is poorer. The third has a grazing angle, which stretches every texel along the wall. Occlusion is checked separately, because a camera can score well and still be looking at a tree.</desc>
+  <rect class="svg-bg" x="25" y="6" width="782" height="296" fill="#ffffff"/>
+  <defs>
+    <marker id="tx-score-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
+    </marker>
+  </defs>
+  <path d="M470 78 V222" fill="none" stroke="#1f6b8a" stroke-width="4"/>
+  <text x="486" y="152" fill="#1f6b8a" font-size="12" text-anchor="start">the face</text>
+  <path d="M120 148 h34 v20 h-34 Z" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <path d="M150 82 h34 v20 h-34 Z" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <path d="M300 232 h34 v20 h-34 Z" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <g stroke="#5b6471" stroke-width="2" marker-end="url(#tx-score-a)">
+    <path d="M156 158 L466 152"/>
+    <path d="M186 96 L466 132"/>
+    <path d="M336 240 L466 206"/>
+  </g>
+  <g fill="#1f2937" font-size="12" text-anchor="start">
+    <text x="40" y="132">camera A — 18 m, 8° off normal</text>
+    <text x="40" y="66">camera B — 52 m, 14° off normal</text>
+    <text x="40" y="270">camera C — 24 m, 71° off normal</text>
+  </g>
+  <g fill="#5b6471" font-size="11.5" text-anchor="start">
+    <text x="560" y="86">score 0.94 — chosen</text>
+    <text x="560" y="112">score 0.41 — texels 3× coarser</text>
+    <text x="560" y="192">score 0.09 — texels smeared along the wall</text>
+  </g>
+  <text x="380" y="34" fill="#1f2937" font-size="13" text-anchor="middle" font-weight="600">Score = cos(angle to the face normal) ÷ distance², then reject anything occluded</text>
+  <text x="380" y="284" fill="#15384a" font-size="12" text-anchor="middle">Angle matters more than distance: a grazing camera cannot be rescued by being close</text>
+</svg>
+<figcaption>Grazing views are the ones that look plausible in a camera list and produce the smeared, striped facades that get blamed on the mesh.</figcaption>
+</figure>
+
 ### 4. Bake into a texture atlas
 
 Allocate an atlas, give each triangle a small fixed cell, and for every face sample its chosen camera at the three corners to set the corner colours (a flat-shaded bake; subdivide the cell for full per-texel sampling). Write per-vertex UVs that index the atlas.
@@ -205,6 +242,33 @@ for cam, m in zip(cameras, means):
     cam.image = (np.where(bal <= 0.0031308, bal * 12.92,
                           1.055 * bal ** (1 / 2.4) - 0.055) * 255).astype(np.uint8)
 ```
+
+<figure class="diagram">
+<svg viewBox="18 24 734 256" role="img" aria-labelledby="tx-exp-t tx-exp-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="tx-exp-t">Why an atlas built from many photographs looks like patchwork</title>
+  <desc id="tx-exp-d">Adjacent faces textured from different photographs inherit those photographs' exposure and white balance, so the atlas shows visible tiles even though the geometry is continuous. Estimating a per-image gain and offset from the overlaps, then applying it before baking, removes the seam without touching the geometry.</desc>
+  <rect class="svg-bg" x="18" y="24" width="734" height="256" fill="#ffffff"/>
+  <g stroke="#5b6471" stroke-width="1.5">
+    <rect x="50" y="66" width="70" height="110" fill="#e3f0f4"/>
+    <rect x="120" y="66" width="70" height="110" fill="#fdf3e0"/>
+    <rect x="190" y="66" width="70" height="110" fill="#eef5e9"/>
+    <rect x="260" y="66" width="70" height="110" fill="#e3f0f4"/>
+  </g>
+  <g stroke="#5b6471" stroke-width="1.5" fill="#e3f0f4">
+    <rect x="430" y="66" width="70" height="110"/>
+    <rect x="500" y="66" width="70" height="110"/>
+    <rect x="570" y="66" width="70" height="110"/>
+    <rect x="640" y="66" width="70" height="110"/>
+  </g>
+  <text x="190" y="52" fill="#b0413e" font-size="12.5" text-anchor="middle" font-weight="600">four source photographs, four exposures</text>
+  <text x="570" y="52" fill="#4f7a4d" font-size="12.5" text-anchor="middle" font-weight="600">after per-image gain and offset</text>
+  <text x="190" y="204" fill="#1f2937" font-size="12" text-anchor="middle">geometry is continuous; the tiling is entirely radiometric</text>
+  <text x="570" y="204" fill="#1f2937" font-size="12" text-anchor="middle">one continuous facade, same geometry, same photographs</text>
+  <text x="370" y="240" fill="#15384a" font-size="12.5" text-anchor="middle">Solve the gains globally from the overlaps, not pairwise — a chain of pairwise corrections drifts across the block</text>
+  <text x="370" y="262" fill="#5b6471" font-size="12" text-anchor="middle">Then blend only the last few texels at each boundary, to hide what the global fit could not</text>
+</svg>
+<figcaption>Colour balancing is a global least-squares problem over the image graph. Local blending applied without it just moves the seam a few texels.</figcaption>
+</figure>
 
 ### 6. Attach UVs and export
 

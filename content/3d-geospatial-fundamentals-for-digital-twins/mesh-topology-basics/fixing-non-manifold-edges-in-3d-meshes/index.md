@@ -7,20 +7,21 @@ You hit non-manifold edges constantly when assembling a digital twin from hetero
 That single defect breaks watertightness, so `is_watertight` returns `False`; it makes Boolean operations (union, difference for footprint clipping) produce garbage because the algorithm cannot decide which side of the surface is interior; it crashes slicers when you 3D-print a model for fabrication review; and it leaves CityGML LOD2 ingestion rejecting the geometry outright, since the OGC schema requires manifold solids for building volumes. Downstream, the same ambiguity corrupts ray-casting for shadow and line-of-sight analysis, because a ray crossing a triple-shared edge has no well-defined entry or exit. The fix is cheap at mesh time and expensive once the twin is in production, so it belongs in your ingestion gate, not your incident backlog.
 
 <figure class="diagram">
-<svg viewBox="0 0 520 260" role="img" aria-labelledby="nme-t nme-d" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="-44 1 520 263" role="img" aria-labelledby="nme-t nme-d" xmlns="http://www.w3.org/2000/svg">
   <title id="nme-t">A non-manifold edge shared by three faces</title>
   <desc id="nme-d">A manifold edge on the left is shared by exactly two faces, while a non-manifold edge on the right has a third face joined along the same edge, making it shared by three faces.</desc>
+  <rect class="svg-bg" x="-44" y="1" width="520" height="263" fill="#ffffff"/>
   <defs>
     <marker id="nme-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
     </marker>
   </defs>
-  <polygon points="60,40 60,180 150,150 150,70" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
-  <polygon points="60,40 60,180 -30,150 -30,70" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2" transform="translate(120,0)"/>
+  <path d="M60 40 L60 180 L150 150 L150 70 Z" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <path d="M60 40 L60 180 L-30 150 L-30 70 Z" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2" transform="translate(120,0)"/>
   <line x1="60" y1="40" x2="60" y2="180" stroke="#1f2937" stroke-width="4"/>
-  <polygon points="370,40 370,180 460,150 460,70" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
-  <polygon points="370,40 370,180 280,150 280,70" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
-  <polygon points="370,40 370,180 420,250 420,110" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <path d="M370 40 L370 180 L460 150 L460 70 Z" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <path d="M370 40 L370 180 L280 150 L280 70 Z" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <path d="M370 40 L370 180 L420 250 L420 110 Z" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
   <line x1="370" y1="40" x2="370" y2="180" stroke="#c46a3d" stroke-width="4"/>
   <text x="148" y="215" fill="#1f2937" font-size="13" text-anchor="middle">Manifold: edge in 2 faces</text>
   <text x="370" y="30" fill="#1f2937" font-size="13" text-anchor="middle">Non-manifold: edge in 3 faces</text>
@@ -71,6 +72,33 @@ print(f"  over-shared (>2):  {(edge_counts > 2).sum()}")
 ```
 
 Edges with count 1 are open boundaries (holes or dangling faces); edges with count `>2` are the classic non-manifold over-sharing the diagram shows. Both must reach exactly 2 before the mesh is watertight.
+
+<figure class="diagram">
+<svg viewBox="78 3 691 299" role="img" aria-labelledby="nm-hist-t nm-hist-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="nm-hist-t">Edges grouped by how many faces use them</title>
+  <desc id="nm-hist-d">Counting faces per edge sorts a mesh's edges into four groups. Edges used by one face are boundaries. Edges used by two faces are manifold and should be the overwhelming majority. Edges used by three or more faces are non-manifold and leave surface orientation undefined. Bar lengths are on a logarithmic scale.</desc>
+  <rect class="svg-bg" x="78" y="3" width="691" height="299" fill="#ffffff"/>
+  <text x="390" y="32" fill="#1f2937" font-size="13" text-anchor="middle" font-weight="600">One pass over the edge–face table classifies every edge in the mesh</text>
+  <rect x="150" y="60" width="184" height="30" rx="6" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <rect x="150" y="112" width="300" height="30" rx="6" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <rect x="150" y="164" width="123" height="30" rx="6" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <rect x="150" y="216" width="67" height="30" rx="6" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <g fill="#1f2937" font-size="12.5">
+    <text x="140" y="80" text-anchor="end">1 face</text>
+    <text x="140" y="132" text-anchor="end">2 faces</text>
+    <text x="140" y="184" text-anchor="end">3 faces</text>
+    <text x="140" y="236" text-anchor="end">4+ faces</text>
+  </g>
+  <g fill="#1f2937" font-size="12">
+    <text x="344" y="80" text-anchor="start">3,120 edges — boundary edge — a hole, or the patch's own rim</text>
+    <text x="460" y="132" text-anchor="start">486,400 edges — manifold — the only healthy count</text>
+    <text x="283" y="184" text-anchor="start">214 edges — non-manifold — orientation is undefined here</text>
+    <text x="227" y="236" text-anchor="start">18 edges — usually a duplicated patch welded onto the surface</text>
+  </g>
+  <text x="390" y="284" fill="#5b6471" font-size="12" text-anchor="middle">Bar length is logarithmic — the 232 broken edges that matter would be invisible on a linear axis</text>
+</svg>
+<figcaption>The distribution is the diagnosis. A healthy closed mesh has almost everything in the two-face bar; anything in the three-plus bars has to be resolved before the surface has a well-defined inside.</figcaption>
+</figure>
 
 ### 2. Merge coincident vertices and drop degenerate faces
 
@@ -144,6 +172,32 @@ m = o3d.io.read_triangle_mesh("building_block_repaired.ply")
 print("non-manifold edges:", len(m.get_non_manifold_edges()))
 print("watertight:", m.is_watertight())
 ```
+
+<figure class="diagram">
+<svg viewBox="29 2 682 274" role="img" aria-labelledby="nm-euler-t nm-euler-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="nm-euler-t">What the Euler characteristic should come out at</title>
+  <desc id="nm-euler-d">Vertices minus edges plus faces equals two for a closed surface with no handles, one for a surface with a single boundary such as an open patch, and zero for a torus or any surface carrying one handle. Each additional hole lowers the value by one, and each additional handle lowers it by two.</desc>
+  <rect class="svg-bg" x="29" y="2" width="682" height="274" fill="#ffffff"/>
+  <text x="370" y="30" fill="#1f2937" font-size="13" text-anchor="middle" font-weight="600">χ = V − E + F, and what each value is telling you</text>
+  <circle cx="120" cy="120" r="52" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2.5"/>
+  <path d="M300 68 h104 v104 h-104 Z" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2.5"/>
+  <path d="M300 68 h104" fill="none" stroke="#c46a3d" stroke-width="4" stroke-dasharray="7 4"/>
+  <ellipse cx="600" cy="120" rx="62" ry="46" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2.5"/>
+  <ellipse cx="600" cy="120" rx="22" ry="14" fill="#ffffff" stroke="#c46a3d" stroke-width="2.5"/>
+  <g fill="#1f2937" font-size="13" text-anchor="middle" font-weight="600">
+    <text x="120" y="206">χ = 2</text>
+    <text x="352" y="206">χ = 1</text>
+    <text x="600" y="206">χ = 0</text>
+  </g>
+  <g fill="#5b6471" font-size="12" text-anchor="middle">
+    <text x="120" y="228">closed, no handles</text>
+    <text x="352" y="228">one open boundary</text>
+    <text x="600" y="228">one handle (torus)</text>
+  </g>
+  <text x="370" y="258" fill="#15384a" font-size="12" text-anchor="middle">Each extra boundary loop costs 1; each extra handle costs 2 — so an arcaded building at χ = −4 can be perfectly valid</text>
+</svg>
+<figcaption>χ is a shape statement, not a pass mark. Assert the value your model should have — an open terrain patch is never going to reach two, and forcing it there means capping a hole that belongs.</figcaption>
+</figure>
 
 ## Expected Output & Verification
 

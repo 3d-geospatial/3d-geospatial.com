@@ -14,9 +14,10 @@ You reach for this the first time you want a hosted preview from CI instead of d
 The asset moves through a small status machine once you signal completion; the script's job is to drive it to a terminal state and fail loudly on `ERROR`.
 
 <figure class="diagram">
-<svg viewBox="0 0 800 300" role="img" aria-labelledby="ion-fsm-t ion-fsm-d" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="6 36 788 226" role="img" aria-labelledby="ion-fsm-t ion-fsm-d" xmlns="http://www.w3.org/2000/svg">
   <title id="ion-fsm-t">Cesium ion asset status state machine</title>
   <desc id="ion-fsm-d">After onComplete an asset moves from AWAITING_FILES to NOT_STARTED to IN_PROGRESS; the client polls IN_PROGRESS in a loop until it transitions to the terminal COMPLETE state or to the terminal ERROR or DATA_ERROR state.</desc>
+  <rect class="svg-bg" x="6" y="36" width="788" height="226" fill="#ffffff"/>
   <defs>
     <marker id="ion-fsm-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
@@ -81,6 +82,29 @@ print(f"created asset {asset_id}")
 ```
 
 The response is the only place the temporary credentials appear, so capture `uploadLocation` and `on_complete` immediately rather than re-requesting them — a second `POST` would allocate a *different* asset with a *different* S3 prefix. The `assetMetadata.id` is the permanent handle you will reference from CesiumJS; everything else in the response is short-lived scaffolding for this one publish.
+
+<figure class="diagram">
+<svg viewBox="9 19 742 253" role="img" aria-labelledby="ion-cred-t ion-cred-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="ion-cred-t">Temporary upload credentials against a long upload</title>
+  <desc id="ion-cred-d">The credentials returned with an asset are valid for about an hour. A forty-eight minute upload finishes comfortably inside that window. A seventy-five minute upload does not: the session expires part way through and every remaining part fails with an access-denied error, leaving the asset stuck awaiting data.</desc>
+  <rect class="svg-bg" x="9" y="19" width="742" height="253" fill="#ffffff"/>
+  <rect x="60" y="66" width="440" height="26" rx="4" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <rect x="60" y="118" width="352" height="26" rx="4" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="60" y="166" width="440" height="26" rx="4" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="500" y="166" width="110" height="26" rx="4" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <path d="M500 52 V206" fill="none" stroke="#b0413e" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="500" y="46" fill="#b0413e" font-size="12" text-anchor="middle">credentials expire — 60 min</text>
+  <g fill="#1f2937" font-size="12.5" text-anchor="start">
+    <text x="60" y="60">credential validity window</text>
+    <text x="60" y="112">upload A — 48 min, finishes inside the window</text>
+    <text x="60" y="160">upload B — 75 min, does not</text>
+  </g>
+  <text x="555" y="212" fill="#b0413e" font-size="12" text-anchor="middle">403 on every remaining part</text>
+  <text x="380" y="238" fill="#15384a" font-size="12.5" text-anchor="middle">The asset stays in AWAITING_DATA, so nothing errors loudly — the pipeline simply polls a status that will never change</text>
+  <text x="380" y="254" fill="#5b6471" font-size="12" text-anchor="middle">Estimate the upload from measured throughput; if it approaches the window, split the source or re-create the asset and restart</text>
+</svg>
+<figcaption>The failure is asymmetric: the upload half fails immediately and the polling half succeeds forever. Time-box the poll or it will wait out the whole CI job.</figcaption>
+</figure>
 
 ### 2. Upload the tileset directory with boto3
 
@@ -167,6 +191,63 @@ print(f"asset {final['id']} COMPLETE — {final['bytes'] / 1e6:.1f} MB in EPSG:4
 ```
 
 The backoff is what keeps this loop a good citizen: it starts at five seconds and doubles to a sixty-second ceiling, so a job that tiles in ten seconds is caught quickly while an hour-long city-scale job does not burn thousands of requests against your rate limit. Surfacing `statusMessage` on failure matters because ion's message names the actual defect — an unreferenced content URI, an unsupported extension, a missing CRS — which turns a red build into a one-line fix instead of a guessing game. To keep the run idempotent across repeated CI invocations, record `asset_id` alongside a hash of the source so a later run can skip an unchanged tileset, exactly as the parent [Cesium ion upload automation](https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/) workflow describes.
+
+<figure class="diagram">
+<svg viewBox="-3 19 766 315" role="img" aria-labelledby="ion-err-t ion-err-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="ion-err-t">Reading an ion failure and deciding whether to retry</title>
+  <desc id="ion-err-d">Six signals a pipeline sees, what each one means, and what to do. Two are permanent and must not be retried: a bad token and an invalid source. Two are transient and warrant a bounded retry. One means a step was skipped, and one means success.</desc>
+  <rect class="svg-bg" x="-3" y="19" width="766" height="315" fill="#ffffff"/>
+  <g fill="#5b6471" font-size="12" text-anchor="middle">
+    <text x="115" y="46">what you observe</text>
+    <text x="363" y="46">what it means</text>
+    <text x="628" y="46">what to do</text>
+  </g>
+    <rect x="20" y="58" width="190" height="30" rx="6" fill="#f7dfdc" stroke="#b0413e" stroke-width="1.5"/>
+    <rect x="218" y="58" width="290" height="30" rx="6" fill="#f7dfdc" stroke="#b0413e" stroke-width="1.5"/>
+    <rect x="516" y="58" width="224" height="30" rx="6" fill="#f7dfdc" stroke="#b0413e" stroke-width="1.5"/>
+    <rect x="20" y="98" width="190" height="30" rx="6" fill="#f7dfdc" stroke="#b0413e" stroke-width="1.5"/>
+    <rect x="218" y="98" width="290" height="30" rx="6" fill="#f7dfdc" stroke="#b0413e" stroke-width="1.5"/>
+    <rect x="516" y="98" width="224" height="30" rx="6" fill="#f7dfdc" stroke="#b0413e" stroke-width="1.5"/>
+    <rect x="20" y="138" width="190" height="30" rx="6" fill="#fdf3e0" stroke="#c46a3d" stroke-width="1.5"/>
+    <rect x="218" y="138" width="290" height="30" rx="6" fill="#fdf3e0" stroke="#c46a3d" stroke-width="1.5"/>
+    <rect x="516" y="138" width="224" height="30" rx="6" fill="#fdf3e0" stroke="#c46a3d" stroke-width="1.5"/>
+    <rect x="20" y="178" width="190" height="30" rx="6" fill="#f7dfdc" stroke="#b0413e" stroke-width="1.5"/>
+    <rect x="218" y="178" width="290" height="30" rx="6" fill="#f7dfdc" stroke="#b0413e" stroke-width="1.5"/>
+    <rect x="516" y="178" width="224" height="30" rx="6" fill="#f7dfdc" stroke="#b0413e" stroke-width="1.5"/>
+    <rect x="20" y="218" width="190" height="30" rx="6" fill="#fdf3e0" stroke="#c46a3d" stroke-width="1.5"/>
+    <rect x="218" y="218" width="290" height="30" rx="6" fill="#fdf3e0" stroke="#c46a3d" stroke-width="1.5"/>
+    <rect x="516" y="218" width="224" height="30" rx="6" fill="#fdf3e0" stroke="#c46a3d" stroke-width="1.5"/>
+    <rect x="20" y="258" width="190" height="30" rx="6" fill="#eef5e9" stroke="#4f7a4d" stroke-width="1.5"/>
+    <rect x="218" y="258" width="290" height="30" rx="6" fill="#eef5e9" stroke="#4f7a4d" stroke-width="1.5"/>
+    <rect x="516" y="258" width="224" height="30" rx="6" fill="#eef5e9" stroke="#4f7a4d" stroke-width="1.5"/>
+  <g fill="#1f2937" font-size="12" text-anchor="middle">
+    <text x="115" y="78">HTTP 401</text>
+    <text x="363" y="78">the access token is wrong or revoked</text>
+    <text x="628" y="78">fix the secret; do not retry</text>
+    <text x="115" y="118">HTTP 403 on S3</text>
+    <text x="363" y="118">the temporary credentials expired</text>
+    <text x="628" y="118">re-create the asset and re-upload</text>
+    <text x="115" y="158">status AWAITING_DATA</text>
+    <text x="363" y="158">ion never saw an uploadComplete</text>
+    <text x="628" y="158">POST uploadComplete, then poll</text>
+    <text x="115" y="198">status DATA_ERROR</text>
+    <text x="363" y="198">the source is invalid for its sourceType</text>
+    <text x="628" y="198">fix the tileset; retrying cannot help</text>
+    <text x="115" y="238">status ERROR</text>
+    <text x="363" y="238">an internal failure on ion's side</text>
+    <text x="628" y="238">retry once with backoff, then alert</text>
+    <text x="115" y="278">status COMPLETE</text>
+    <text x="363" y="278">tiles are served</text>
+    <text x="628" y="278">record the asset id in the ledger</text>
+  </g>
+  <text x="380" y="316" fill="#b0413e" font-size="12.5" text-anchor="middle">DATA_ERROR is the one that costs money: an unbounded retry loop re-uploads the same broken source until the job times out</text>
+</svg>
+<figcaption>Retry policy has to be keyed on the signal, not on the fact that something failed. Half of these get worse with a retry.</figcaption>
+</figure>
+
+Distinguishing the permanent failures from the transient ones is what makes this loop safe to run unattended. `DATA_ERROR` and a rejected token are terminal: nothing about waiting or repeating changes the outcome, and a naive retry wrapper turns a two-minute failure into a forty-minute one that still fails. `ERROR` and a network fault are transient and deserve a bounded retry with exponential backoff. The remaining case — an asset that sits in `AWAITING_DATA` — is neither, because it means a step in your own code did not run, and the fix is upstream rather than in the retry policy.
+
+Give the poll a deadline as well as an interval. A tileset of a few hundred megabytes typically reaches `COMPLETE` in one to five minutes, so a ceiling of fifteen minutes is generous while still failing the job in a useful time. Without a deadline, the AWAITING_DATA case above polls a status that will never change until the CI runner's own timeout kills it, and the log gives no indication of which step was skipped.
 
 ## Expected Output & Verification
 

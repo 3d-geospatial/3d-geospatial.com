@@ -5,9 +5,10 @@ Preserving UV seams during mesh decimation means reducing a textured mesh's tria
 You hit this the moment a textured web asset comes back from decimation looking scrambled: the geometry is fine but the texture crawls, because the [automated mesh decimation](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/) pass treated UV-seam edges as ordinary interior edges and collapsed them. A UV seam is a curve where the texture atlas is cut so a 3D surface can be flattened; along it, one spatial vertex owns two or more different texture coordinates. Merge across it and there is no single UV that can be right, so the atlas tears.
 
 <figure class="diagram">
-<svg viewBox="0 0 820 260" role="img" aria-labelledby="uvs-t uvs-d" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="2 52 816 198" role="img" aria-labelledby="uvs-t uvs-d" xmlns="http://www.w3.org/2000/svg">
   <title id="uvs-t">Seam-preserving decimation pipeline</title>
   <desc id="uvs-d">A textured mesh with UVs and materials is split into per-material UV islands, each island is decimated with its seam and boundary vertices pinned, and the islands are merged back into a low-poly textured mesh whose atlas is intact.</desc>
+  <rect class="svg-bg" x="2" y="52" width="816" height="198" fill="#ffffff"/>
   <defs>
     <marker id="uvs-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
@@ -65,6 +66,28 @@ for name, g in (tm.geometry.items() if isinstance(tm, trimesh.Scene)
 
 Each distinct material is decimated separately in step 3 — merging vertices across a material boundary is as damaging as crossing a UV seam, because the two sides index different textures.
 
+<figure class="diagram">
+<svg viewBox="4 35 732 267" role="img" aria-labelledby="uv-seam-t uv-seam-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="uv-seam-t">A seam vertex is one position with two texture coordinates</title>
+  <desc id="uv-seam-d">Where two UV islands meet, the mesh holds a single point in space but two entries in the texture coordinate array. A decimator that reasons only about position sees one vertex, collapses it, and silently merges the two texture coordinates into one — which drags the texture across the island boundary.</desc>
+  <rect class="svg-bg" x="4" y="35" width="732" height="267" fill="#ffffff"/>
+  <path d="M60 78 h140 v130 h-140 Z" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <path d="M200 78 h140 v130 h-140 Z" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <circle cx="200" cy="110" r="5" fill="#1f6b8a"/>
+  <circle cx="200" cy="176" r="5" fill="#c46a3d"/>
+  <text x="200" y="62" fill="#5b6471" font-size="12" text-anchor="middle">one position, two UVs</text>
+  <path d="M430 78 h140 v130 h-140 Z" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <path d="M570 78 h140 v130 h-140 Z" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <path d="M556 78 h28 v130 h-28 Z" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <text x="570" y="62" fill="#b0413e" font-size="12" text-anchor="middle">after the collapse — one UV</text>
+  <text x="200" y="234" fill="#1f2937" font-size="12" text-anchor="middle">the islands sample independently</text>
+  <text x="570" y="234" fill="#b0413e" font-size="12" text-anchor="middle">a band of the wrong texture along the seam</text>
+  <text x="370" y="266" fill="#15384a" font-size="12.5" text-anchor="middle">The geometry after the collapse is fine. Only the texture is wrong, which is why the defect survives every topology check.</text>
+  <text x="370" y="284" fill="#5b6471" font-size="12" text-anchor="middle">Lock seam vertices, or split the mesh on its islands and decimate each one independently</text>
+</svg>
+<figcaption>Position-only decimators are not broken; they are simply unaware that the attribute arrays are longer than the vertex array. Locking the seam is the cheapest correction.</figcaption>
+</figure>
+
 ### 2. Split the mesh on its UV islands
 
 Splitting the mesh into connected UV islands converts every internal seam into an *open boundary* of a submesh. That is the trick that makes the rest work: the decimator already knows how to protect open boundaries, so once seams are boundaries, seam preservation is free.
@@ -113,6 +136,31 @@ print(f"decimated to {kept:,} triangles across {len(decimated)} islands")
 ```
 
 A `boundary_weight` of `1000` makes collapsing a seam edge astronomically expensive relative to an interior edge, so the solver exhausts every flat interior collapse first and only touches a seam if there is no alternative — which, at a 4× reduction, there always is.
+
+<figure class="diagram">
+<svg viewBox="-18 32 776 244" role="img" aria-labelledby="uv-split-t uv-split-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="uv-split-t">Splitting on islands versus locking the seam</title>
+  <desc id="uv-split-d">Splitting the mesh into one submesh per UV island lets each be decimated independently and guarantees the seam survives, but the boundary vertices are then never simplified, so the seam ends up denser than the surface around it. Locking the seam within one mesh keeps the connectivity but relies on the decimator honouring the constraint.</desc>
+  <rect class="svg-bg" x="-18" y="32" width="776" height="244" fill="#ffffff"/>
+  <path d="M50 76 h150 v120 h-150 Z" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <path d="M216 76 h150 v120 h-150 Z" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <g fill="#1f6b8a">
+    <circle cx="200" cy="90" r="3.5"/><circle cx="200" cy="108" r="3.5"/><circle cx="200" cy="126" r="3.5"/>
+    <circle cx="200" cy="144" r="3.5"/><circle cx="200" cy="162" r="3.5"/><circle cx="200" cy="180" r="3.5"/>
+  </g>
+  <path d="M420 76 h300 v120 h-300 Z" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <path d="M570 76 V196" fill="none" stroke="#4f7a4d" stroke-width="2" stroke-dasharray="5 4"/>
+  <g fill="#4f7a4d">
+    <circle cx="570" cy="96" r="3.5"/><circle cx="570" cy="136" r="3.5"/><circle cx="570" cy="176" r="3.5"/>
+  </g>
+  <text x="208" y="60" fill="#1f2937" font-size="12.5" text-anchor="middle" font-weight="600">split on islands, decimate separately</text>
+  <text x="570" y="60" fill="#1f2937" font-size="12.5" text-anchor="middle" font-weight="600">one mesh, seam vertices locked</text>
+  <text x="208" y="226" fill="#c46a3d" font-size="12" text-anchor="middle">seam survives, but stays at full density</text>
+  <text x="570" y="226" fill="#4f7a4d" font-size="12" text-anchor="middle">seam simplifies with the rest, if the tool honours the lock</text>
+  <text x="370" y="258" fill="#15384a" font-size="12.5" text-anchor="middle">Splitting is guaranteed and wasteful; locking is efficient and depends on the decimator. Verify with a UV-island count either way.</text>
+</svg>
+<figcaption>Both approaches are defensible. The check that settles it is the same: count UV islands and seam-vertex pairs before and after, and require them to match.</figcaption>
+</figure>
 
 ### 4. Attribute-aware alternative: gltfpack simplification
 
@@ -182,6 +230,8 @@ UV-area-ratio CV = 0.24  (seam tears push this up)
 
 A coefficient of variation near the input's is the pass signal; a jump to 0.8 or higher means a seam was collapsed. Confirm the glTF is still valid and its accessors line up with `gltf-validator block_lod1.glb`, which reports the UV accessor count so you can check it did not desync from the position count.
 
+Verify with a count rather than with a screenshot. Comparing the number of UV islands and the number of seam-vertex pairs before and after decimation is a two-line check that catches every variant of this failure, including the ones that only show at a texture resolution nobody inspects. A visual check finds the worst instance; the count finds all of them.
+
 ## Common Errors
 
 **Textures appear scrambled or swim after decimation.** `boundary_weight` was left at `0` (or the default), so `open3d` collapsed UV-seam edges like any interior edge. Set it high (100–1000) and split on UV islands first (steps 2–3) so seams are boundaries; re-verify the UV-area-ratio CV did not spike.
@@ -189,6 +239,8 @@ A coefficient of variation near the input's is the pass signal; a jump to 0.8 or
 **`ValueError: UV array length does not match vertices` on export.** A collapse merged two vertices that carried different UVs, so the per-corner UV array no longer maps 1:1 to the geometry. This is the desync a crossed seam produces — decimate per island so no collapse spans a seam, and assert `len(visual.uv) >= len(vertices)` before writing.
 
 **One material's texture bleeds onto another.** The mesh was decimated as a single object, so a collapse merged vertices across a material boundary. Enumerate materials in step 1 and decimate each material group separately, exactly as you do for UV islands — a material boundary is a hard seam even when the UVs look continuous.
+
+Run the island and seam counts as part of the decimation step itself rather than as a separate QA pass. A check that lives beside the code it guards is one that gets updated when that code changes; one that lives in a different repository is one that quietly stops matching.
 
 ## Related Guides
 

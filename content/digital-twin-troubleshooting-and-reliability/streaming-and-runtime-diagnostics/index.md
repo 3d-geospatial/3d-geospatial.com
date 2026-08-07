@@ -23,9 +23,10 @@ Every 3D Tiles runtime executes the same loop each frame: derive the view frustu
 Almost every runtime fault is one of those stages disagreeing with another. Popping is the queue draining slower than the camera reveals tiles. Over-fetching is the SSE threshold or the bounding volumes admitting tiles the frame never needed. OOM is the cache accepting more than the budget because eviction is absent or too lazy. "Never refines" and "loads all at once" are both `geometricError`-scale faults — the projected error never crosses, or always crosses, the pixel threshold regardless of distance. Diagnosis therefore means instrumenting each stage's inputs and outputs, then comparing them against what the SSE equation says should happen. Because the equation is deterministic, you can replay a captured frame in Python and prove which stage is lying before you touch the client.
 
 <figure class="diagram">
-<svg viewBox="0 0 860 340" role="img" aria-labelledby="srd-t srd-d" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="6 26 788 320" role="img" aria-labelledby="srd-t srd-d" xmlns="http://www.w3.org/2000/svg">
   <title id="srd-t">Per-frame runtime diagnostic loop for a 3D Tiles client</title>
   <desc id="srd-d">Each frame the client reads camera pose and velocity, culls tiles against the frustum, computes screen-space error per tile, orders refinement requests in a priority queue, and passes them through a memory-budget gate that either uploads to the GPU within budget or evicts the least-recently-used tile when over budget, repeating every frame.</desc>
+  <rect class="svg-bg" x="6" y="26" width="788" height="320" fill="#ffffff"/>
   <defs>
     <marker id="srd-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
@@ -59,7 +60,7 @@ Almost every runtime fault is one of those stages disagreeing with another. Popp
   </g>
   <text x="670" y="185" fill="#1f2937" font-size="13" text-anchor="middle">Memory-budget gate (VRAM)</text>
   <text x="670" y="278" fill="#1f2937" font-size="13" text-anchor="middle">LRU evict oldest tile</text>
-  <text x="529" y="172" fill="#5b6471" font-size="11" text-anchor="middle">within budget</text>
+  <text x="530" y="172" fill="#5b6471" font-size="11" text-anchor="middle">in budget</text>
   <text x="700" y="238" fill="#5b6471" font-size="11" text-anchor="middle">over budget</text>
   <rect x="20" y="306" width="760" height="26" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
   <text x="400" y="323" fill="#1f2937" font-size="12" text-anchor="middle">Per-frame loop: cull, compute SSE, queue, and gate against the budget every rendered frame</text>
@@ -148,6 +149,23 @@ for max_sse in (8, 16, 24, 32):
 
 Raising `maximumScreenSpaceError` from 16 toward 24–32 cuts refinement count directly. If the ratio stays high even at a coarse threshold, the cause is loose bounding volumes admitting off-screen tiles — re-tile with tight boxes, since the cull runs on the bounds the tiler wrote.
 
+<figure class="diagram">
+<svg viewBox="26 6 688 284" role="img" aria-labelledby="sd-over-t sd-over-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="sd-over-t">The over-fetch signature: bytes in against pixels out</title>
+  <desc id="sd-over-d">Plotting bytes downloaded against triangles actually drawn separates a slow network from an over-fetching client. When both rise together the client is loading what it needs. When bytes climb while drawn geometry stays flat, tiles are being fetched and then culled, which points at loose bounding volumes or a screen-space error threshold that is too tight.</desc>
+  <rect class="svg-bg" x="26" y="6" width="688" height="284" fill="#ffffff"/>
+  <path d="M70 56 V214 H690" fill="none" stroke="#5b6471" stroke-width="1.5"/>
+  <polyline points="90,206 170,186 250,162 330,140 410,118 490,96 570,76 650,62" fill="none" stroke="#c46a3d" stroke-width="2.5"/>
+  <polyline points="90,208 170,196 250,190 330,186 410,184 490,183 570,182 650,182" fill="none" stroke="#4f7a4d" stroke-width="2.5"/>
+  <text x="600" y="52" fill="#c46a3d" font-size="12" text-anchor="middle">bytes downloaded</text>
+  <text x="600" y="200" fill="#4f7a4d" font-size="12" text-anchor="middle">triangles drawn</text>
+  <text x="380" y="244" fill="#5b6471" font-size="12" text-anchor="middle">seconds of camera movement</text>
+  <text x="370" y="34" fill="#1f2937" font-size="13" text-anchor="middle" font-weight="600">Bytes rising while drawn geometry stays flat is over-fetching, not a slow link</text>
+  <text x="370" y="272" fill="#15384a" font-size="12" text-anchor="middle">Loose bounding volumes and an over-tight maxSSE both produce this shape; the tileset&#39;s volume type tells you which</text>
+</svg>
+<figcaption>The ratio, not either series alone, is the diagnostic. A fast network hides over-fetching completely until the tileset grows.</figcaption>
+</figure>
+
 ### 4. Diagnose tiles that never refine or load all at once
 
 Both are `geometricError`-scale faults. If a leaf's projected SSE never exceeds the threshold even at point-blank range, the authored error is too small and detail never loads; if the root's SSE always exceeds it, every tile refines immediately. Sweep the SSE across a distance range to see which regime you are in.
@@ -228,6 +246,65 @@ print(f"dispatching {len(fetch_now)} tiles; {len(frame_candidates)} candidates s
 
 A `max_in_flight` of 4–8 matches typical browser per-host connection limits; deferring the tail to the next frame keeps the socket pool from thrashing and lets the highest-SSE tiles win the bandwidth.
 
+<figure class="diagram">
+<svg viewBox="2 6 756 316" role="img" aria-labelledby="sd-mat-t sd-mat-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="sd-mat-t">One number separates each runtime symptom from the others</title>
+  <desc id="sd-mat-d">Five streaming symptoms that look similar in a viewer are each distinguished by a single measurable quantity: queue drain time, the ratio of bytes fetched to triangles drawn, the ratio of child to parent geometric error, VRAM headroom at the moment of a stall, and the number of requests in flight per host.</desc>
+  <rect class="svg-bg" x="2" y="6" width="756" height="316" fill="#ffffff"/>
+  <g fill="#5b6471" font-size="11.5" text-anchor="middle">
+    <text x="116" y="50">what the user reports</text>
+    <text x="324" y="50">the number to measure</text>
+    <text x="480" y="50">threshold</text>
+    <text x="641" y="50">the fix</text>
+  </g>
+    <rect x="16" y="64" width="200" height="32" rx="6" fill="#f7dfdc" stroke="#b0413e" stroke-width="1.5"/>
+    <rect x="226" y="64" width="196" height="32" rx="6" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="1.5"/>
+    <rect x="432" y="64" width="96" height="32" rx="6" fill="#fdf3e0" stroke="#c46a3d" stroke-width="1.5"/>
+    <rect x="538" y="64" width="206" height="32" rx="6" fill="#eef5e9" stroke="#4f7a4d" stroke-width="1.5"/>
+    <rect x="16" y="106" width="200" height="32" rx="6" fill="#f7dfdc" stroke="#b0413e" stroke-width="1.5"/>
+    <rect x="226" y="106" width="196" height="32" rx="6" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="1.5"/>
+    <rect x="432" y="106" width="96" height="32" rx="6" fill="#fdf3e0" stroke="#c46a3d" stroke-width="1.5"/>
+    <rect x="538" y="106" width="206" height="32" rx="6" fill="#eef5e9" stroke="#4f7a4d" stroke-width="1.5"/>
+    <rect x="16" y="148" width="200" height="32" rx="6" fill="#f7dfdc" stroke="#b0413e" stroke-width="1.5"/>
+    <rect x="226" y="148" width="196" height="32" rx="6" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="1.5"/>
+    <rect x="432" y="148" width="96" height="32" rx="6" fill="#fdf3e0" stroke="#c46a3d" stroke-width="1.5"/>
+    <rect x="538" y="148" width="206" height="32" rx="6" fill="#eef5e9" stroke="#4f7a4d" stroke-width="1.5"/>
+    <rect x="16" y="190" width="200" height="32" rx="6" fill="#f7dfdc" stroke="#b0413e" stroke-width="1.5"/>
+    <rect x="226" y="190" width="196" height="32" rx="6" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="1.5"/>
+    <rect x="432" y="190" width="96" height="32" rx="6" fill="#fdf3e0" stroke="#c46a3d" stroke-width="1.5"/>
+    <rect x="538" y="190" width="206" height="32" rx="6" fill="#eef5e9" stroke="#4f7a4d" stroke-width="1.5"/>
+    <rect x="16" y="232" width="200" height="32" rx="6" fill="#f7dfdc" stroke="#b0413e" stroke-width="1.5"/>
+    <rect x="226" y="232" width="196" height="32" rx="6" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="1.5"/>
+    <rect x="432" y="232" width="96" height="32" rx="6" fill="#fdf3e0" stroke="#c46a3d" stroke-width="1.5"/>
+    <rect x="538" y="232" width="206" height="32" rx="6" fill="#eef5e9" stroke="#4f7a4d" stroke-width="1.5"/>
+  <g fill="#1f2937" font-size="11.5" text-anchor="middle">
+    <text x="116" y="85">tiles pop in abruptly</text>
+    <text x="324" y="85">queue drain time</text>
+    <text x="480" y="85">&gt; 400 ms</text>
+    <text x="641" y="85">prefetch earlier, or crossfade</text>
+    <text x="116" y="127">far more bytes than pixels</text>
+    <text x="324" y="127">bytes ÷ drawn triangles</text>
+    <text x="480" y="127">&gt; 8× baseline</text>
+    <text x="641" y="127">raise maxSSE, tighten volumes</text>
+    <text x="116" y="169">nothing ever refines</text>
+    <text x="324" y="169">child error ÷ parent error</text>
+    <text x="480" y="169">≥ 1.0</text>
+    <text x="641" y="169">fix the error inversion</text>
+    <text x="116" y="211">frame stalls every few seconds</text>
+    <text x="324" y="211">VRAM headroom at a stall</text>
+    <text x="480" y="211">&lt; 5%</text>
+    <text x="641" y="211">lower the budget, evict earlier</text>
+    <text x="116" y="253">requests time out in bursts</text>
+    <text x="324" y="253">in-flight request count</text>
+    <text x="480" y="253">&gt; 6 per host</text>
+    <text x="641" y="253">add backpressure to the queue</text>
+  </g>
+  <text x="380" y="34" fill="#1f2937" font-size="13" text-anchor="middle" font-weight="600">All five look like &quot;the tiles are slow&quot; and none of them shares a remedy</text>
+  <text x="380" y="304" fill="#15384a" font-size="12" text-anchor="middle">Instrument all five once and every future report resolves to one row instead of a bisect</text>
+</svg>
+<figcaption>Runtime symptoms converge in description and diverge in cause. Naming the discriminating measurement per symptom is what makes the report actionable.</figcaption>
+</figure>
+
 ## Validation & Verification
 
 Confirm each fix with a measured before/after, not a visual impression. SSE must fall monotonically with distance for a fixed error, the cache must never exceed its budget, and the over-fetch ratio must drop after a threshold change.
@@ -286,6 +363,8 @@ Start below the device's available GPU memory with headroom for textures and the
 ### Can I diagnose these faults without touching the client source?
 
 Yes. Capture the client's per-tile state as a frame trace and run every diagnostic in this guide offline in Python. The SSE equation, over-fetch ratio, and cache model are all deterministic, so you can prove which stage is at fault and validate a threshold change before implementing it in the runtime.
+
+Instrument these five measurements once and leave them in. They cost a few microseconds per frame, they are the difference between a bug report that says "it feels slow" and one that names a row in the matrix above, and they are the only evidence available when the problem reproduces on a viewer's machine and not on yours.
 
 ## Related Guides
 

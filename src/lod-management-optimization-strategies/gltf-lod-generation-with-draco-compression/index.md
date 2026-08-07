@@ -31,9 +31,10 @@ A discrete LOD chain is an ordered list of independent meshes of the same featur
 Draco is orthogonal to the LOD chain. It compresses one mesh by quantizing each attribute to a fixed number of integer bits over that attribute's range, then entropy-coding the connectivity with the edgebreaker algorithm. Quantization is the only lossy step and the only one that touches accuracy: a POSITION quantized to `n` bits across a bounding box of extent `E` metres carries a worst-case positional error of about `E / 2^n`. For a 30 m building at 14 bits that is roughly 30 / 16384 ≈ 1.8 mm — invisible — while the connectivity coding is lossless. So the two dials are separate: decimation sets how many triangles a level has (and its `geometricError`), and Draco quantization sets how many bytes those triangles cost (and a sub-millimetre floor under the position error). You choose the triangle budget for the screen-space footprint and the quantization bits for the accuracy tolerance, then measure both.
 
 <figure class="diagram">
-<svg viewBox="0 0 820 330" role="img" aria-labelledby="gld-chain-t gld-chain-d" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="16 41 788 282" role="img" aria-labelledby="gld-chain-t gld-chain-d" xmlns="http://www.w3.org/2000/svg">
   <title id="gld-chain-t">glTF LOD chain with Draco payloads shrinking per level</title>
   <desc id="gld-chain-d">A full-resolution LOD0 mesh is quadric-decimated into LOD1 and LOD2 with falling triangle counts and rising geometricError, and each level is Draco-compressed into a b3dm payload whose byte size shrinks from megabytes to kilobytes.</desc>
+  <rect class="svg-bg" x="16" y="41" width="788" height="282" fill="#ffffff"/>
   <defs>
     <marker id="gld-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
@@ -194,6 +195,39 @@ comp_paths = {name: draco_encode(p, comp_dir / p.name)
               for name, p in raw_paths.items()}
 ```
 
+<figure class="diagram">
+<svg viewBox="64 2 651 308" role="img" aria-labelledby="dr-attr-t dr-attr-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="dr-attr-t">Where Draco's savings actually come from</title>
+  <desc id="dr-attr-d">Bytes by attribute for one building mesh before and after Draco encoding, drawn at the same scale. Indices compress hardest because connectivity is highly predictable, and normals nearly as hard because they are quantized onto an octahedral lattice. Positions give back the least, since they carry the coordinates the quantization budget exists to protect.</desc>
+  <rect class="svg-bg" x="64" y="2" width="651" height="308" fill="#ffffff"/>
+  <text x="380" y="30" fill="#1f2937" font-size="13" text-anchor="middle" font-weight="600">One building mesh: 4.97 MB uncompressed, 0.82 MB after Draco — both bars at the same scale</text>
+  <rect x="110" y="208" width="110" height="42" rx="3" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="110" y="157" width="110" height="51" rx="3" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <rect x="110" y="106" width="110" height="51" rx="3" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <rect x="110" y="72" width="110" height="34" rx="3" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <rect x="470" y="244" width="110" height="6" rx="2" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="1.5"/>
+  <rect x="470" y="233" width="110" height="11" rx="2" fill="#fdf3e0" stroke="#c46a3d" stroke-width="1.5"/>
+  <rect x="470" y="229" width="110" height="4" rx="2" fill="#eef5e9" stroke="#4f7a4d" stroke-width="1.5"/>
+  <rect x="470" y="222" width="110" height="7" rx="2" fill="#f7dfdc" stroke="#b0413e" stroke-width="1.5"/>
+  <g fill="#1f2937" font-size="11.5" text-anchor="start">
+    <text x="232" y="233">indices — 1180 kB</text>
+    <text x="232" y="186">POSITION — 1420 kB</text>
+    <text x="232" y="135">NORMAL — 1420 kB</text>
+    <text x="232" y="93">TEXCOORD_0 — 946 kB</text>
+  </g>
+  <g fill="#1f2937" font-size="11.5" text-anchor="start">
+    <text x="596" y="132">indices −86%</text>
+    <text x="596" y="154">POSITION −77%</text>
+    <text x="596" y="176">NORMAL −92%</text>
+    <text x="596" y="198">TEXCOORD_0 −77%</text>
+  </g>
+  <text x="165" y="270" fill="#5b6471" font-size="12.5" text-anchor="middle">before</text>
+  <text x="525" y="270" fill="#5b6471" font-size="12.5" text-anchor="middle">after, 14-bit positions</text>
+  <text x="380" y="292" fill="#15384a" font-size="12" text-anchor="middle">Positions give back the least of the four, so raising the position budget costs far less than the ratio suggests</text>
+</svg>
+<figcaption>The attribute you are most tempted to squeeze is the one that gives back the least. Spend the bits on POSITION and take the savings from connectivity and normals instead.</figcaption>
+</figure>
+
 ### 6. Verify the extension, then wrap as b3dm
 
 A Draco encode that silently no-ops produces a valid but uncompressed glTF, so assert `KHR_draco_mesh_compression` is actually declared before wrapping the level as a `b3dm` tile. Parse the GLB JSON chunk directly — no extra dependency — then convert with `3d-tiles-tools`.
@@ -257,6 +291,35 @@ print(verify_encode("lods_raw/building_LOD0.glb", "lods_draco/building_LOD0.glb"
 ```
 
 **Expected values.** For a 180k-triangle building spanning roughly 30 m, POSITION at 14 bits gives a decoded worst-case drift of a few millimetres (well under the 1 cm gate), and the `.glb` shrinks from tens of megabytes to a few — a 6–12× ratio is typical for closed manifold geometry, higher when normals and texcoords dominate the vertex. A ratio near 1.0 means the extension did not apply; a decoded drift of tens of centimetres means too few position bits for the extent. Finally, run the assembled tileset through `3d-tiles-validator` so the client never receives a `b3dm` whose inner glTF requires an extension the tileset forgot to advertise.
+
+<figure class="diagram">
+<svg viewBox="56 2 665 330" role="img" aria-labelledby="dr-lvl-t dr-lvl-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="dr-lvl-t">Draco compression level against encode time and output size</title>
+  <desc id="dr-lvl-d">Raising the compression level from zero to seven takes most of the size reduction available. Past seven the curve is nearly flat while encode time keeps climbing steeply, so levels nine and ten cost several times the CPU for under one per cent more saving.</desc>
+  <rect class="svg-bg" x="56" y="2" width="665" height="330" fill="#ffffff"/>
+  <text x="380" y="30" fill="#1f2937" font-size="13" text-anchor="middle" font-weight="600">Level 7 is where the size curve flattens and the time curve does not</text>
+  <path d="M70 56 V250 H700" fill="none" stroke="#5b6471" stroke-width="1.5"/>
+  <polyline points="80,76 204,160 328,205 452,230 514,237 576,240 638,242 700,243" fill="none" stroke="#1f6b8a" stroke-width="2.5"/>
+  <polyline points="80,246 204,242 328,236 452,225 514,215 576,192 638,150 700,70" fill="none" stroke="#c46a3d" stroke-width="2.5"/>
+  <path d="M514 56 V250" fill="none" stroke="#4f7a4d" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="514" y="48" fill="#4f7a4d" font-size="12" text-anchor="middle">level 7</text>
+  <text x="196" y="112" fill="#1f6b8a" font-size="12" text-anchor="start">output size</text>
+  <text x="590" y="120" fill="#c46a3d" font-size="12" text-anchor="middle">encode time</text>
+  <g fill="#1f2937" font-size="11.5" text-anchor="middle">
+    <text x="80" y="272">0</text>
+    <text x="204" y="272">2</text>
+    <text x="328" y="272">4</text>
+    <text x="452" y="272">6</text>
+    <text x="514" y="272">7</text>
+    <text x="576" y="272">8</text>
+    <text x="638" y="272">9</text>
+    <text x="700" y="272">10</text>
+  </g>
+  <text x="380" y="294" fill="#5b6471" font-size="12" text-anchor="middle">compression level</text>
+  <text x="380" y="314" fill="#15384a" font-size="12" text-anchor="middle">Level 10 buys 2.4% over level 7 for five times the encode time — across a city that is hours, not seconds</text>
+</svg>
+<figcaption>Encode cost is paid once per build and download cost is paid once per viewer, so the trade only favours the high levels for assets that are genuinely static.</figcaption>
+</figure>
 
 ## Performance & Scale
 

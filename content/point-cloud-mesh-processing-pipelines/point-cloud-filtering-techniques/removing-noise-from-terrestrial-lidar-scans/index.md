@@ -7,9 +7,10 @@ You hit this because a raw TLS station is never clean. A Faro, Leica, or Riegl s
 TLS noise is not one phenomenon, and that is why a single filter never does the job. Atmospheric and particulate scatter — rain, fog, dust, snow — shows up as a sparse diffuse haze scattered evenly through the air, with no local structure. Multipath and edge fringe is the opposite: where the laser beam straddles a sharp edge or reflects off glass or polished metal, returns split between the near and far surface, producing small but internally dense clumps of ghost points offset a few centimetres from the real geometry. Statistical outlier removal is built for the first kind and radius outlier removal for the second, which is why the production answer is a two-stage pass rather than one aggressive filter. The third category — registration and sensor artifacts such as station misalignment or IMU drift — is not noise in the per-point sense and is not solved here; it belongs to the alignment stage, where ICP with robust rejection handles systematic offsets between scan stations.
 
 <figure class="diagram">
-<svg viewBox="0 0 760 220" role="img" aria-labelledby="tlsnoise-t tlsnoise-d" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="1 56 758 108" role="img" aria-labelledby="tlsnoise-t tlsnoise-d" xmlns="http://www.w3.org/2000/svg">
   <title id="tlsnoise-t">TLS noise removal stages</title>
   <desc id="tlsnoise-d">A raw scan flows through statistical outlier removal to drop atmospheric scatter, then radius outlier removal to drop isolated multipath clusters, producing a cleaned cloud in the same projected CRS.</desc>
+  <rect class="svg-bg" x="1" y="56" width="758" height="108" fill="#ffffff"/>
   <defs>
     <marker id="tlsnoise-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
@@ -82,6 +83,49 @@ print(f"SOR removed {removed_sor:,} points "
 
 `remove_statistical_outlier` returns the filtered cloud and the indices it kept (`keep_sor`). Apply the same index list to intensity or RGB arrays so attributes stay aligned with the points. The two parameters trade off against each other: `sor_k` sets how many neighbours define "local", so a larger value smooths over local density variation and is more forgiving on sparsely sampled facades, while a smaller value reacts to every thin protrusion. `sor_std` sets the cut line on the resulting distribution. On dense, evenly-sampled indoor scans you can run `sor_k=20, sor_std=2.0` confidently; on long-range outdoor stations where point spacing grows with distance, raise `sor_k` toward 30 so the far field is not mistaken for outliers. Tune both on a 10% random subset of the scan first — the statistics are stable enough that subset behaviour predicts full-scan behaviour, and you avoid waiting minutes per iteration on a 15 M-point cloud.
 
+<figure class="diagram">
+<svg viewBox="-2 4 744 300" role="img" aria-labelledby="tls-std-t tls-std-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="tls-std-t">Where sor_std actually cuts</title>
+  <desc id="tls-std-d">A histogram of each point's mean distance to its k nearest neighbours. The threshold sits at the mean plus sor_std standard deviations, so lowering sor_std slides the cut left into the body of the distribution and starts removing surface points rather than noise.</desc>
+  <rect class="svg-bg" x="-2" y="4" width="744" height="300" fill="#ffffff"/>
+  <text x="370" y="32" fill="#1f2937" font-size="13" text-anchor="middle" font-weight="600">Mean distance to the k nearest neighbours, per point</text>
+  <rect x="90" y="212" width="36" height="3" rx="3" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="138" y="197" width="36" height="18" rx="3" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="186" y="156" width="36" height="59" rx="3" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="234" y="102" width="36" height="113" rx="3" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="282" y="65" width="36" height="150" rx="3" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="330" y="96" width="36" height="119" rx="3" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="378" y="146" width="36" height="69" rx="3" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="426" y="185" width="36" height="30" rx="3" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="474" y="203" width="36" height="12" rx="3" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <rect x="522" y="210" width="36" height="5" rx="3" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <rect x="570" y="213" width="36" height="2" rx="3" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <rect x="618" y="214" width="36" height="1" rx="3" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <path d="M80 215 H700" fill="none" stroke="#5b6471" stroke-width="1.5"/>
+  <path d="M474 54 V222" fill="none" stroke="#b0413e" stroke-width="2" stroke-dasharray="6 4"/>
+  <path d="M330 54 V222" fill="none" stroke="#c46a3d" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="474" y="48" fill="#b0413e" font-size="12" text-anchor="middle">sor_std = 2.0 — cuts 1.1%</text>
+  <text x="300" y="48" fill="#c46a3d" font-size="12" text-anchor="middle">sor_std = 1.0 — cuts 19%</text>
+  <g fill="#1f2937" font-size="11" text-anchor="middle">
+    <text x="108" y="234">0.02</text>
+    <text x="156" y="234">0.04</text>
+    <text x="204" y="234">0.06</text>
+    <text x="252" y="234">0.08</text>
+    <text x="300" y="234">0.10</text>
+    <text x="348" y="234">0.12</text>
+    <text x="396" y="234">0.14</text>
+    <text x="444" y="234">0.16</text>
+    <text x="492" y="234">0.18</text>
+    <text x="540" y="234">0.20</text>
+    <text x="588" y="234">0.24</text>
+    <text x="636" y="234">0.30</text>
+  </g>
+  <text x="370" y="258" fill="#5b6471" font-size="12" text-anchor="middle">mean neighbour distance (m)</text>
+  <text x="370" y="286" fill="#15384a" font-size="12" text-anchor="middle">Below about 1.5 the threshold enters the bulk of the distribution, and the filter starts thinning the surface it was meant to clean</text>
+</svg>
+<figcaption>The parameter is a position on this curve, not a strength setting. Plot the distribution once for a representative scan and the right value stops being a guess.</figcaption>
+</figure>
+
 ### 3. Radius outlier removal
 
 SOR leaves behind small dense clumps — multipath ghosts at corners and on glass that are internally consistent but isolated from real geometry. Radius filtering drops any point with fewer than `min_neighbors` points inside a sphere of `radius` metres.
@@ -98,6 +142,42 @@ print(f"Radius filter removed {removed_rad:,} points "
 ```
 
 Because `radius` is in metres, this step is only correct on a metric CRS — another reason to reproject geographic scans before filtering. Set `radius` to roughly two to three times your scanner's nominal point spacing at the working range: a TLS station sampling at 0.01 m wants a `radius` near 0.03 m, so a genuine surface point reliably finds its `min_neighbors` while an isolated ghost a few centimetres off the wall does not. Keep `min_neighbors` modest (5–15). Pushing it higher does remove more fringe, but it also clips genuinely thin features — handrails, rebar, conduit, sign posts — that legitimately have few neighbours within the sphere. When in doubt, prefer a slightly larger `radius` over a larger `min_neighbors`; the former tolerates sparse-but-real geometry, the latter punishes it.
+
+<figure class="diagram">
+<svg viewBox="-1 48 742 244" role="img" aria-labelledby="tls-ord-t tls-ord-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="tls-ord-t">Why statistical removal runs before radius removal</title>
+  <desc id="tls-ord-d">Statistical outlier removal computes a mean and standard deviation over the whole cloud, so a cluster of far-field noise inflates both and moves the threshold outward. Removing the isolated points first with a radius test would change those statistics; running the statistical pass first, while the distribution still contains the noise it is meant to describe, is what keeps the threshold meaningful.</desc>
+  <rect class="svg-bg" x="-1" y="48" width="742" height="244" fill="#ffffff"/>
+  <defs>
+    <marker id="tls-ord-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
+    </marker>
+  </defs>
+  <rect x="24" y="62" width="180" height="56" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="256" y="62" width="200" height="56" rx="8" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <rect x="508" y="62" width="208" height="56" rx="8" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <rect x="24" y="166" width="180" height="56" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="256" y="166" width="200" height="56" rx="8" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <rect x="508" y="166" width="208" height="56" rx="8" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <g stroke="#5b6471" stroke-width="2" marker-end="url(#tls-ord-a)">
+    <line x1="204" y1="90" x2="254" y2="90"/>
+    <line x1="456" y1="90" x2="506" y2="90"/>
+    <line x1="204" y1="194" x2="254" y2="194"/>
+    <line x1="456" y1="194" x2="506" y2="194"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="114" y="95">raw scan</text>
+    <text x="356" y="85"><tspan x="356" dy="0">statistical removal</tspan><tspan x="356" dy="16">threshold set on real noise</tspan></text>
+    <text x="612" y="85"><tspan x="612" dy="0">radius removal</tspan><tspan x="612" dy="16">clears the last stragglers</tspan></text>
+    <text x="114" y="199">raw scan</text>
+    <text x="356" y="189"><tspan x="356" dy="0">radius removal first</tspan><tspan x="356" dy="16">far-field cluster gone</tspan></text>
+    <text x="612" y="189"><tspan x="612" dy="0">statistical removal now sees</tspan><tspan x="612" dy="16">a tighter σ and over-cuts</tspan></text>
+  </g>
+  <text x="370" y="256" fill="#15384a" font-size="12.5" text-anchor="middle">The statistical test describes the distribution it is given. Cleaning the distribution first is what makes it cut into the surface.</text>
+  <text x="370" y="274" fill="#5b6471" font-size="12" text-anchor="middle">Same two filters, same parameters, different result — order is part of the configuration</text>
+</svg>
+<figcaption>Both orders are defensible in isolation and only one is stable across scans. Fix the order in the pipeline definition rather than leaving it to whoever calls the functions.</figcaption>
+</figure>
 
 ### 4. Restore the origin shift and save
 

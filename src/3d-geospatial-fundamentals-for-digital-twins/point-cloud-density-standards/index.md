@@ -26,9 +26,10 @@ The other axis is the **density-versus-accuracy trade-off**. Higher density narr
 Density also varies systematically within a single tile, not just between tiles. Flight-line overlap doubles density along swath edges; nadir strips are denser than far-range returns; vegetation multiplies returns while water and dark asphalt absorb them and leave gaps. Because of this, a useful density specification is never a single number — it is a target paired with a uniformity requirement, typically expressed as a minimum density that must hold across some fraction of cells. That is why the validation step reports a 5th-percentile density rather than a mean: the percentile is what protects the worst-served regions of the twin where extraction actually fails.
 
 <figure class="diagram">
-<svg viewBox="0 0 760 300" role="img" aria-labelledby="pcd-bin-t pcd-bin-d" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="6 1 668 293" role="img" aria-labelledby="pcd-bin-t pcd-bin-d" xmlns="http://www.w3.org/2000/svg">
   <title id="pcd-bin-t">Grid binning of points into density cells</title>
   <desc id="pcd-bin-d">Scattered survey points fall into a regular grid of one-metre cells; each cell counts the points inside it and divides by its area to yield points per square metre, with denser cells shaded darker.</desc>
+  <rect class="svg-bg" x="6" y="1" width="668" height="293" fill="#ffffff"/>
   <defs>
     <marker id="pcd-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
@@ -162,6 +163,46 @@ def density_by_stratum(las_path: str, cell_size: float = 1.0) -> dict:
 print(density_by_stratum("survey_2024.laz"))
 ```
 
+<figure class="diagram">
+<svg viewBox="46 16 678 288" role="img" aria-labelledby="pcd-pulse-t pcd-pulse-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="pcd-pulse-t">One pulse, three returns — why point density is not pulse density</title>
+  <desc id="pcd-pulse-d">A single laser pulse leaving the sensor strikes the top of a tree canopy, a lower branch, and finally bare ground, recording three returns. Point density counts all three; pulse density counts the one shot that produced them. Over canopy the two figures diverge by a factor of two or more, while over bare asphalt they are identical.</desc>
+  <rect class="svg-bg" x="46" y="16" width="678" height="288" fill="#ffffff"/>
+  <defs>
+    <marker id="pcd-pulse-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
+    </marker>
+  </defs>
+  <path d="M60 236 H420" fill="none" stroke="#4f7a4d" stroke-width="2.5"/>
+  <path d="M420 236 H660" fill="none" stroke="#5b6471" stroke-width="2.5"/>
+  <ellipse cx="300" cy="150" rx="78" ry="52" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <path d="M300 202 V236" fill="none" stroke="#4f7a4d" stroke-width="3"/>
+  <path d="M96 42 L340 236" fill="none" stroke="#5b6471" stroke-width="2" marker-end="url(#pcd-pulse-a)"/>
+  <path d="M60 30 h72 v24 h-72 Z" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <g fill="#c46a3d">
+    <circle cx="230" cy="148" r="6"/>
+    <circle cx="273" cy="182" r="6"/>
+    <circle cx="340" cy="236" r="6"/>
+  </g>
+  <g fill="#c46a3d" font-size="11.5" text-anchor="start">
+    <text x="150" y="144">return 1 — canopy top</text>
+    <text x="290" y="196">return 2 — lower branch</text>
+    <text x="352" y="232">return 3 — bare ground</text>
+  </g>
+  <text x="96" y="46" fill="#1f2937" font-size="12" text-anchor="middle">1 pulse</text>
+  <text x="240" y="262" fill="#4f7a4d" font-size="12" text-anchor="middle">vegetated ground</text>
+  <text x="540" y="262" fill="#5b6471" font-size="12" text-anchor="middle">bare asphalt — 1 return per pulse</text>
+  <path d="M470 60 h240 v50 h-240 Z" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <path d="M470 126 h240 v50 h-240 Z" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="590" y="80"><tspan x="590" dy="0">pulse density 8 /m²</tspan><tspan x="590" dy="16">what the flight plan controls</tspan></text>
+    <text x="590" y="146"><tspan x="590" dy="0">point density 19 /m²</tspan><tspan x="590" dy="16">what the LAS file reports</tspan></text>
+  </g>
+  <text x="370" y="286" fill="#15384a" font-size="12" text-anchor="middle">A specification written in points passes over canopy and fails over the car park it was really about</text>
+</svg>
+<figcaption>The multiplier between the two numbers is a property of the land cover, not of the survey. Write acceptance criteria against whichever one the analysis actually depends on.</figcaption>
+</figure>
+
 ### 4. Reduce the grid to acceptance statistics
 
 A mean hides gaps. The figures that determine acceptance are the 5th percentile (worst-served regions), the fraction of empty cells, and the implied nominal point spacing.
@@ -181,6 +222,47 @@ def density_summary(grid: np.ndarray) -> dict:
 
 print(density_summary(grid))
 ```
+
+<figure class="diagram">
+<svg viewBox="45 0 670 300" role="img" aria-labelledby="pcd-hist-t pcd-hist-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="pcd-hist-t">A passing mean over a failing tail</title>
+  <desc id="pcd-hist-d">A histogram of per-cell point density across a survey. The mean and the median both sit comfortably above the eight per square metre requirement, but the left tail below the requirement still holds nine per cent of the cells, and those cells are contiguous rather than scattered.</desc>
+  <rect class="svg-bg" x="45" y="0" width="670" height="300" fill="#ffffff"/>
+  <text x="380" y="28" fill="#1f2937" font-size="13" text-anchor="middle" font-weight="600">Per-cell density across the survey — the mean is not the acceptance test</text>
+  <rect x="90" y="208" width="40" height="2" rx="3" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <rect x="144" y="201" width="40" height="9" rx="3" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <rect x="198" y="186" width="40" height="24" rx="3" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="252" y="149" width="40" height="61" rx="3" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="306" y="96" width="40" height="114" rx="3" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="360" y="60" width="40" height="150" rx="3" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="414" y="80" width="40" height="130" rx="3" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="468" y="128" width="40" height="82" rx="3" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="522" y="170" width="40" height="40" rx="3" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="576" y="196" width="40" height="14" rx="3" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="630" y="206" width="40" height="4" rx="3" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <path d="M70 210 H720" fill="none" stroke="#5b6471" stroke-width="1.5"/>
+  <path d="M198 46 V216" fill="none" stroke="#b0413e" stroke-width="2" stroke-dasharray="6 4"/>
+  <path d="M414 46 V216" fill="none" stroke="#4f7a4d" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="198" y="40" fill="#b0413e" font-size="12" text-anchor="middle">required 8 /m²</text>
+  <text x="414" y="40" fill="#4f7a4d" font-size="12" text-anchor="middle">median 14.2 /m²</text>
+  <g fill="#1f2937" font-size="11.5" text-anchor="middle">
+    <text x="110" y="228">4</text>
+    <text x="164" y="228">6</text>
+    <text x="218" y="228">8</text>
+    <text x="272" y="228">10</text>
+    <text x="326" y="228">12</text>
+    <text x="380" y="228">14</text>
+    <text x="434" y="228">16</text>
+    <text x="488" y="228">18</text>
+    <text x="542" y="228">20</text>
+    <text x="596" y="228">22</text>
+    <text x="650" y="228">24</text>
+  </g>
+  <text x="380" y="252" fill="#5b6471" font-size="12" text-anchor="middle">points per square metre</text>
+  <text x="380" y="282" fill="#b0413e" font-size="12.5" text-anchor="middle">9% of cells fall left of the requirement — and they are contiguous, not scattered, so they map to one flight line</text>
+</svg>
+<figcaption>Accept on the low percentile and the spatial clustering of failures, never on the mean. A survey whose sparse cells form one continuous strip has a different remedy from one whose sparse cells are speckle.</figcaption>
+</figure>
 
 ## Validation & Verification
 

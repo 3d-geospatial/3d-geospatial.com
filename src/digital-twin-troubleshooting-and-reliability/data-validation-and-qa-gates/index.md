@@ -29,9 +29,10 @@ A validation gate is a check that has the authority to stop the pipeline. It has
 The invariants worth gating are the ones that render silently wrong. Schema validity catches structural corruption in `tileset.json`. `geometricError` monotonicity (child ≤ parent) catches the inversion that makes a client refine into coarser geometry. Bounding-volume containment (child box inside parent box) catches the culling error that hides visible tiles. CRS and units catch the geographic-versus-projected mistake that makes every distance meaningless. LAS header checks catch scale, offset, and CRS drift in the source cloud. Mesh watertightness catches the holes that decimation turns into gaps. None of these is caught by "it looked fine in the viewer" — they need executable assertions with expected values, which is what the gates provide. Encode the boundary contract as code, not as a wiki page nobody reads at three in the morning.
 
 <figure class="diagram">
-<svg viewBox="0 0 860 300" role="img" aria-labelledby="qa-t qa-d" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="6 26 858 232" role="img" aria-labelledby="qa-t qa-d" xmlns="http://www.w3.org/2000/svg">
   <title id="qa-t">Validation gate funnel from raw tiling output to publish</title>
   <desc id="qa-d">Raw tiling output passes through a schema gate, a geometry gate, and a CRS gate in sequence; output that clears all three is published to the CDN, while any gate that fails rejects the build with a non-zero exit code and blocks publishing.</desc>
+  <rect class="svg-bg" x="6" y="26" width="858" height="232" fill="#ffffff"/>
   <defs>
     <marker id="qa-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
@@ -67,6 +68,12 @@ The invariants worth gating are the ones that render silently wrong. Schema vali
 </svg>
 <figcaption>Each gate asserts one invariant and passes or rejects the build; only output clearing the schema, geometry, and CRS gates reaches the CDN.</figcaption>
 </figure>
+
+Every gate here shares a design that is worth stating plainly, because it is what separates a gate from a warning. A gate has a single, binary outcome that the build system can act on; it reports every violation it found rather than the first; it prints the expected value beside the observed one, so a failure is actionable without re-running anything; and it is registered as a required check, so a merge cannot route around it. A check missing any one of those four is a diagnostic, which is useful, but it will not stop a bad artifact from shipping.
+
+The second design question is what a gate should do about a violation it cannot classify. The temptation is to warn and continue, on the grounds that a false positive blocking a release is worse than a real defect reaching one. In practice that reasoning inverts within a quarter: warnings accumulate, the log stops being read, and the gate becomes decorative. The more durable pattern is to fail on everything and maintain an explicit, dated allowlist of known exceptions with an owner against each — so the exceptions are visible, countable, and uncomfortable enough to get fixed.
+
+Finally, a gate is only worth what its last failure proved. An assertion that has never rejected anything has not been shown to work; it has only been shown not to complain. Feeding each gate a deliberately broken fixture — a tileset with an inverted geometric error, a LAS file with no CRS, a mesh with a hole — and requiring it to refuse them is the cheapest way to keep the suite honest, and it costs one extra test file per gate.
 
 ## Step-by-Step Workflow
 
@@ -136,6 +143,40 @@ geometry_gate(tileset["root"])
 ```
 
 The monotonicity invariant is the single most common silent failure in tiling; the deep dive on wiring it, plus the transform check, is [writing 3d-tiles-validator checks in CI](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/writing-3d-tiles-validator-checks-in-ci/).
+
+<figure class="diagram">
+<svg viewBox="24 8 712 290" role="img" aria-labelledby="dv-mono-t dv-mono-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="dv-mono-t">The two tree invariants a validator will not check for you</title>
+  <desc id="dv-mono-d">Geometric error must fall strictly from parent to child, and each parent's bounding volume must contain every child's. Both are properties of a pair of nodes rather than of any single node, so a per-node schema check cannot express either, and the reference validator only checks the second.</desc>
+  <rect class="svg-bg" x="24" y="8" width="712" height="290" fill="#ffffff"/>
+  <defs>
+    <marker id="dv-mono-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
+    </marker>
+  </defs>
+  <rect x="120" y="48" width="180" height="44" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="40" y="150" width="150" height="44" rx="8" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <rect x="230" y="150" width="150" height="44" rx="8" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <g stroke="#5b6471" stroke-width="2" fill="none" marker-end="url(#dv-mono-a)">
+    <path d="M180 92 C 160 116 140 128 118 146"/>
+    <path d="M250 92 C 268 116 288 128 306 146"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="210" y="76">parent — error 128 m</text>
+    <text x="115" y="178">child — 64 m</text>
+    <text x="305" y="178">child — 140 m</text>
+  </g>
+  <text x="210" y="234" fill="#b0413e" font-size="12" text-anchor="middle">larger than its parent — refinement stops here</text>
+  <path d="M440 48 h260 v146 h-260 Z" fill="none" stroke="#1f6b8a" stroke-width="2.5"/>
+  <path d="M462 74 h100 v96 h-100 Z" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <path d="M582 74 h140 v96 h-140 Z" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <text x="570" y="36" fill="#1f2937" font-size="12.5" text-anchor="middle">bounding-volume containment</text>
+  <text x="570" y="234" fill="#b0413e" font-size="12" text-anchor="middle">a child crossing the boundary is culled with it</text>
+  <text x="370" y="258" fill="#15384a" font-size="12.5" text-anchor="middle">Both are pairwise properties, so no per-node schema can express them — they need their own pass over the tree</text>
+  <text x="370" y="280" fill="#5b6471" font-size="12" text-anchor="middle">And both fail silently: no error, no missing file, just geometry that refuses to appear or refine</text>
+</svg>
+<figcaption>These are the two checks worth writing yourself. Everything else in a tileset gate is available off the shelf.</figcaption>
+</figure>
 
 ### 3. CRS and units gate with pyproj
 
@@ -271,6 +312,40 @@ all gates passed
 
 Expected verdicts: EPSG:4326 rejected, EPSG:32618 accepted, an inverted `geometricError` raised, an empty `.laz` rejected, and a non-watertight `.ply` flagged with a broken-face count. The runner exits 0 only when all six clear.
 
+<figure class="diagram">
+<svg viewBox="8 6 744 312" role="img" aria-labelledby="dv-order-t dv-order-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="dv-order-t">Gate cost, and therefore gate order</title>
+  <desc id="dv-order-d">The static checks cost seconds and the browser-based ones cost minutes. Ordering the gate cheapest first means a build with a broken CRS fails in four seconds instead of after a ten-minute render, and the expensive checks only ever run on artifacts that already passed everything cheap.</desc>
+  <rect class="svg-bg" x="8" y="6" width="744" height="312" fill="#ffffff"/>
+  <text x="380" y="34" fill="#1f2937" font-size="13" text-anchor="middle" font-weight="600">Run them cheapest first — the expensive ones then only ever see plausible artifacts</text>
+  <rect x="300" y="58" width="18" height="22" rx="4" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <rect x="300" y="90" width="18" height="22" rx="4" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <rect x="300" y="122" width="18" height="22" rx="4" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <rect x="300" y="154" width="18" height="22" rx="4" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <rect x="300" y="186" width="50" height="22" rx="4" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <rect x="300" y="218" width="220" height="22" rx="4" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <rect x="300" y="250" width="399" height="22" rx="4" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <g fill="#1f2937" font-size="12">
+    <text x="290" y="74" text-anchor="end">term / schema lint</text>
+    <text x="328" y="74" text-anchor="start" font-size="11.5">2 s</text>
+    <text x="290" y="106" text-anchor="end">geometry invariants</text>
+    <text x="328" y="106" text-anchor="start" font-size="11.5">6 s</text>
+    <text x="290" y="138" text-anchor="end">CRS and unit assertions</text>
+    <text x="328" y="138" text-anchor="start" font-size="11.5">4 s</text>
+    <text x="290" y="170" text-anchor="end">LAS header checks</text>
+    <text x="328" y="170" text-anchor="start" font-size="11.5">9 s</text>
+    <text x="290" y="202" text-anchor="end">3d-tiles-validator</text>
+    <text x="360" y="202" text-anchor="start" font-size="11.5">48 s</text>
+    <text x="290" y="234" text-anchor="end">watertightness over all meshes</text>
+    <text x="530" y="234" text-anchor="start" font-size="11.5">210 s</text>
+    <text x="290" y="266" text-anchor="end">headless render + screenshot diff</text>
+    <text x="709" y="266" text-anchor="start" font-size="11.5">380 s</text>
+  </g>
+  <text x="380" y="300" fill="#15384a" font-size="12" text-anchor="middle">Total 659 s if everything runs, 21 s to fail a build whose CRS is wrong — the ordering is worth more than any single optimisation</text>
+</svg>
+<figcaption>Ordering is free and compounding. Every cheap gate you put in front of the render is a class of failure the render never has to reproduce.</figcaption>
+</figure>
+
 ## Performance & Scale
 
 The cost ordering matters at city scale. Schema validation and the CRS gate are effectively free and should run on every commit. The geometry traversal is linear in tile count — a few hundred thousand tiles validate in seconds if `_box_extent` stays vectorized and the walk is iterative rather than deeply recursive. The `3d-tiles-validator` and the per-mesh watertightness checks dominate, so scope them: validate the whole tileset structure every run, but only re-run the watertightness gate on meshes whose source hash changed, cached the same way incremental tiling caches its `.b3dm` outputs. LAS header checks are header-only reads, so they scale to thousands of tiles cheaply — never parse the full point records to check a header. Run the cheap gates as a fast pre-commit hook and the expensive ones in the CI job, so a developer gets the schema and CRS verdict in under a second and the full funnel runs before publish.
@@ -302,6 +377,8 @@ Extend the JSON Schema in step 1 to cover the 3D Metadata schema classes your ti
 ### Where do these gates run in a real pipeline?
 
 In CI, between the tiling job and the deploy job, as a required check. The cheap gates also belong in a pre-commit hook for fast local feedback. The CI wiring — caching, matrix jobs, and artifact promotion — is covered in the CI/CD automation guide linked below; this page defines what each gate asserts, not the runner it executes in.
+
+One last practical point: keep the gate runnable outside CI. A developer who can run the same command locally and get the same verdict will fix the fault before opening a pull request; one who has to push and wait six minutes to see the result will start disabling checks. The gate and the CI step should differ only in who invokes them.
 
 ## Related Guides
 
