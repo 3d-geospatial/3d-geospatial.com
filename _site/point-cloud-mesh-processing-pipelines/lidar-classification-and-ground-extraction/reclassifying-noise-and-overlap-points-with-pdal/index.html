@@ -1,0 +1,702 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <title>Reclassifying Noise and Overlap Points with PDAL — 3D Geospatial</title>
+  <meta name="description" content="Mark ASPRS class 7 noise and class 12 overlap correctly with PDAL, keep the withheld bit separate from classification, and stop flight-line overlap doubling density.">
+  <meta name="keywords" content="3D geospatial, digital twin, point cloud, mesh pipeline, LOD, 3D Tiles, Cesium, PDAL, Open3D, Python, CI/CD">
+  <meta name="author" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta name="theme-color" content="#1f6b8a" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f171d" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+
+  
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem("theme");
+        var theme = (stored === "dark" || stored === "light") ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    })();
+  </script>
+  <meta name="generator" content="Eleventy">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="googlebot" content="index,follow,max-image-preview:large">
+
+  
+  <link rel="canonical" href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/reclassifying-noise-and-overlap-points-with-pdal/">
+  <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">
+
+  
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/icon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+
+  
+  <link rel="apple-touch-icon" href="/assets/img/icon-180.png">
+  <link rel="mask-icon" href="/assets/img/logo.svg" color="#1f6b8a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="3D Geospatial">
+  <meta name="application-name" content="3D Geospatial">
+
+  
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Reclassifying Noise and Overlap Points with PDAL — 3D Geospatial">
+  <meta property="og:description" content="Mark ASPRS class 7 noise and class 12 overlap correctly with PDAL, keep the withheld bit separate from classification, and stop flight-line overlap doubling density.">
+  <meta property="og:url" content="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/reclassifying-noise-and-overlap-points-with-pdal/">
+  <meta property="og:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+  <meta property="og:site_name" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta property="og:locale" content="en_US">
+  
+  <meta property="article:published_time" content="2026-08-07T08:49:13.181Z">
+  <meta property="article:modified_time" content="2026-08-07T08:49:13.181Z">
+  <meta property="article:publisher" content="https://www.3d-geospatial.com/">
+  
+
+  
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Reclassifying Noise and Overlap Points with PDAL — 3D Geospatial">
+  <meta name="twitter:description" content="Mark ASPRS class 7 noise and class 12 overlap correctly with PDAL, keep the withheld bit separate from classification, and stop flight-line overlap doubling density.">
+  <meta name="twitter:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta name="twitter:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+
+  
+  <link rel="preload" href="/assets/css/styles.css?v=546adeb511" as="style">
+  
+
+  <link rel="stylesheet" href="/assets/css/styles.css?v=546adeb511">
+
+  
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.3d-geospatial.com/#organization",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "url": "https://www.3d-geospatial.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/icon-512.png",
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://www.3d-geospatial.com/#website",
+      "url": "https://www.3d-geospatial.com/",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "description": "Build reliable 3D spatial data pipelines for digital twins — point clouds, meshes, LOD strategies, Python processing, and CI/CD automation.",
+      "inLanguage": "en",
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      }
+    },
+    {
+      "@type": "TechArticle",
+      "@id": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/reclassifying-noise-and-overlap-points-with-pdal/#article",
+      "isPartOf": {
+        "@id": "https://www.3d-geospatial.com/#website"
+      },
+      "headline": "Reclassifying Noise and Overlap Points with PDAL",
+      "name": "Reclassifying Noise and Overlap Points with PDAL",
+      "description": "Mark ASPRS class 7 noise and class 12 overlap correctly with PDAL, keep the withheld bit separate from classification, and stop flight-line overlap doubling density.",
+      "url": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/reclassifying-noise-and-overlap-points-with-pdal/",
+      "mainEntityOfPage": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/reclassifying-noise-and-overlap-points-with-pdal/",
+      "inLanguage": "en",
+      "datePublished": "2026-08-07T08:49:13.181Z",
+      "dateModified": "2026-08-07T08:49:13.181Z",
+      "author": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "image": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/og-cover.png",
+        "width": 1200,
+        "height": 630
+      },
+      "breadcrumb": {
+        "@id": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/reclassifying-noise-and-overlap-points-with-pdal/#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/reclassifying-noise-and-overlap-points-with-pdal/#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://www.3d-geospatial.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Point Cloud Mesh Processing Pipelines",
+          "item": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Lidar Classification And Ground Extraction",
+          "item": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "name": "Reclassifying Noise And Overlap Points With Pdal",
+          "item": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/reclassifying-noise-and-overlap-points-with-pdal/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  
+<header class="site-header" role="banner">
+  <div class="container site-header__inner">
+    <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+      <img src="/assets/img/logo.svg" alt="" class="brand__mark" width="36" height="36">
+      <span class="brand__name">
+        3D Geospatial
+        <small>Digital Twin Automation</small>
+      </span>
+    </a>
+
+    <button class="theme-toggle" type="button" data-theme-toggle
+            aria-label="Switch to dark theme" title="Switch to dark theme">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4.2"/>
+        <path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/>
+      </svg>
+    </button>
+
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>
+      <span class="nav-toggle__icon" aria-hidden="true"><span></span></span>
+      Menu
+    </button>
+
+    <nav class="primary-nav" id="primary-nav" aria-label="Primary">
+      
+      <a href="https://www.3d-geospatial.com/" >
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/>
+        </svg>
+        Home
+      </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2 3 7l9 5 9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 17l9 5 9-5"/>
+            </svg>
+          
+          3D Geospatial Fundamentals
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+          
+          LOD Management &amp; Optimization
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/" aria-current="page">
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="6" cy="6" r="1.5"/><circle cx="12" cy="6" r="1.5"/><circle cx="18" cy="6" r="1.5"/>
+              <circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/>
+              <circle cx="6" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="18" cy="18" r="1.5"/>
+            </svg>
+          
+          Point Cloud &amp; Mesh Pipelines
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <path d="M12 9v4"/><path d="M12 17h.01"/>
+            </svg>
+          
+          Troubleshooting &amp; Reliability
+        </a>
+      
+    </nav>
+  </div>
+</header>
+
+
+  <main id="main">
+    
+
+
+<div class="container">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    
+      
+        <a href="https://www.3d-geospatial.com/">Home</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/">Point Cloud Mesh Processing Pipelines</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">Lidar Classification And Ground Extraction</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <span class="current">Reclassifying Noise And Overlap Points With Pdal</span>
+      
+    
+  </nav>
+
+  <div class="content-page">
+    <article class="article">
+      <h1 id="reclassifying-noise-and-overlap-points-with-pdal" tabindex="-1"><a class="heading-link" href="#reclassifying-noise-and-overlap-points-with-pdal"><span>Reclassifying Noise and Overlap Points with PDAL</span></a></h1>
+<p>This page covers the two ASPRS classes that are routinely mishandled and quietly corrupt every downstream statistic — <strong>class 7 (low/high noise)</strong> and <strong>class 12 (overlap)</strong> — and the withheld bit that is not a class at all. Getting these right is what makes a density figure mean something, stops a stray return two metres underground from dragging the terrain surface with it, and prevents flight-line overlap from reporting twice the coverage a survey actually achieved.</p>
+<h2 id="why-you-hit-this" tabindex="-1"><a class="heading-link" href="#why-you-hit-this"><span>Why you hit this</span></a></h2>
+<p>Noise and overlap are the classes nobody specifies and everybody assumes. A delivery may arrive with noise already marked, marked as class 1 (unclassified), silently deleted, or flagged with the withheld bit and left in class 2. Each of those needs different handling, and treating them the same means either discarding real measurements or keeping returns that do not correspond to any surface. The overlap case is worse because it is invisible: a cloud with unmarked flight-line overlap looks like a denser survey, and a <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">density acceptance check</a> run over it passes a specification the survey did not meet.</p>
+<h2 id="prerequisites" tabindex="-1"><a class="heading-link" href="#prerequisites"><span>Prerequisites</span></a></h2>
+<ul>
+<li>PDAL 2.6+ with Python bindings, plus <code>laspy&gt;=2.5</code> and <code>numpy&gt;=1.24</code>.</li>
+<li>LAS 1.4 point format 6 or 7. Formats 0–5 store classification in a 5-bit field with the synthetic, key-point and withheld flags packed into the same byte, which is the origin of most of the confusion below.</li>
+<li>A cloud in a projected metric CRS, with <code>PointSourceId</code> populated — it identifies the flight line and is what makes overlap detectable.</li>
+</ul>
+<h2 id="step-by-step" tabindex="-1"><a class="heading-link" href="#step-by-step"><span>Step-by-Step</span></a></h2>
+<h3 id="1-find-out-what-the-delivery-actually-did" tabindex="-1"><a class="heading-link" href="#1-find-out-what-the-delivery-actually-did"><span>1. Find out what the delivery actually did</span></a></h3>
+<p>Before changing anything, count what is there. The withheld bit and the classification field are separate, and a file can use either, both or neither.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> laspy
+<span class="token keyword">import</span> numpy <span class="token keyword">as</span> np
+
+las <span class="token operator">=</span> laspy<span class="token punctuation">.</span>read<span class="token punctuation">(</span><span class="token string">"survey_delivery.laz"</span><span class="token punctuation">)</span>
+cls <span class="token operator">=</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>las<span class="token punctuation">.</span>classification<span class="token punctuation">)</span>
+codes<span class="token punctuation">,</span> counts <span class="token operator">=</span> np<span class="token punctuation">.</span>unique<span class="token punctuation">(</span>cls<span class="token punctuation">,</span> return_counts<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"point format:"</span><span class="token punctuation">,</span> las<span class="token punctuation">.</span>header<span class="token punctuation">.</span>point_format<span class="token punctuation">.</span><span class="token builtin">id</span><span class="token punctuation">)</span>
+<span class="token keyword">for</span> c<span class="token punctuation">,</span> n <span class="token keyword">in</span> <span class="token builtin">zip</span><span class="token punctuation">(</span>codes<span class="token punctuation">,</span> counts<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"  class </span><span class="token interpolation"><span class="token punctuation">{</span>c<span class="token punctuation">:</span><span class="token format-spec">>3</span><span class="token punctuation">}</span></span><span class="token string">: </span><span class="token interpolation"><span class="token punctuation">{</span>n<span class="token punctuation">:</span><span class="token format-spec">>12,</span><span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+
+<span class="token comment"># The withheld bit lives outside the classification field.</span>
+<span class="token keyword">if</span> <span class="token builtin">hasattr</span><span class="token punctuation">(</span>las<span class="token punctuation">,</span> <span class="token string">"withheld"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    w <span class="token operator">=</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>las<span class="token punctuation">.</span>withheld<span class="token punctuation">)</span><span class="token punctuation">.</span>astype<span class="token punctuation">(</span><span class="token builtin">bool</span><span class="token punctuation">)</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"withheld flag set on </span><span class="token interpolation"><span class="token punctuation">{</span>w<span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span><span class="token format-spec">,</span><span class="token punctuation">}</span></span><span class="token string"> points "</span></span>
+          <span class="token string-interpolation"><span class="token string">f"(</span><span class="token interpolation"><span class="token punctuation">{</span><span class="token number">100</span> <span class="token operator">*</span> w<span class="token punctuation">.</span>mean<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span><span class="token format-spec">.2f</span><span class="token punctuation">}</span></span><span class="token string">%), of which class 7: </span><span class="token interpolation"><span class="token punctuation">{</span><span class="token punctuation">(</span>cls<span class="token punctuation">[</span>w<span class="token punctuation">]</span> <span class="token operator">==</span> <span class="token number">7</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span><span class="token format-spec">,</span><span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Three outcomes are common and each means something different. Class 7 present with no withheld bits means the producer classified noise and left it in — good, and you decide whether to drop it. Withheld bits set with everything in class 1 means the producer flagged noise without classifying it — the flag is authoritative and the class field is not. Neither present, in a delivery that has clearly been cleaned, means the noise was deleted, which is a data-loss decision somebody made on your behalf.</p>
+<figure class="diagram">
+<svg viewBox="26 46 708 248" role="img" aria-labelledby="rn-fields-t rn-fields-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="rn-fields-t">Classification and the withheld bit are different fields</title>
+  <desc id="rn-fields-d">The classification field says what a point is. The withheld bit says whether it should be used. A point can be class 2 ground and withheld, class 7 noise and not withheld, or any other combination, and code that reads only one of the two fields will act on a subset of what the producer meant.</desc>
+  <rect class="svg-bg" x="26" y="46" width="708" height="248" fill="#ffffff"/>
+  <rect x="40" y="70" width="300" height="48" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="40" y="134" width="300" height="48" rx="8" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="190" y="92"><tspan x="190" dy="0" font-weight="600">classification</tspan><tspan x="190" dy="16">what the point IS — ground, building, noise</tspan></text>
+    <text x="190" y="156"><tspan x="190" dy="0" font-weight="600">withheld bit</tspan><tspan x="190" dy="16">whether the point SHOULD BE USED</tspan></text>
+  </g>
+  <g stroke-width="2">
+    <rect x="420" y="60" width="300" height="34" rx="6" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="420" y="102" width="300" height="34" rx="6" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="420" y="144" width="300" height="34" rx="6" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="420" y="186" width="300" height="34" rx="6" fill="#eef5e9" stroke="#4f7a4d"/>
+  </g>
+  <g fill="#1f2937" font-size="12" text-anchor="middle">
+    <text x="570" y="82">class 2, not withheld — use it</text>
+    <text x="570" y="124">class 2, withheld — do not use it</text>
+    <text x="570" y="166">class 7, not withheld — noise, still present</text>
+    <text x="570" y="208">class 7, withheld — noise, excluded</text>
+  </g>
+  <text x="380" y="252" fill="#15384a" font-size="12.5" text-anchor="middle">All four combinations occur in real deliveries, and only reading both fields tells you which one you have</text>
+  <text x="380" y="276" fill="#5b6471" font-size="12" text-anchor="middle">In LAS 1.4 formats 6+ they are separate bytes; in formats 0–5 they share one, which is where the confusion started</text>
+</svg>
+<figcaption>Two independent statements about the same point. A filter that reads classification alone will happily consume points the producer marked as unusable.</figcaption>
+</figure>
+<h3 id="2-classify-noise-by-height-relative-to-the-ground-surface" tabindex="-1"><a class="heading-link" href="#2-classify-noise-by-height-relative-to-the-ground-surface"><span>2. Classify noise by height relative to the ground surface</span></a></h3>
+<p>Absolute elevation thresholds do not survive a hilly site. Height above ground does.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> json
+<span class="token keyword">import</span> pdal
+
+noise <span class="token operator">=</span> <span class="token punctuation">{</span>
+    <span class="token string">"pipeline"</span><span class="token punctuation">:</span> <span class="token punctuation">[</span>
+        <span class="token string">"classified_smrf.laz"</span><span class="token punctuation">,</span>
+        <span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"filters.hag_nn"</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+        <span class="token comment"># Below the ground surface by more than the survey's vertical accuracy: noise.</span>
+        <span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"filters.assign"</span><span class="token punctuation">,</span>
+         <span class="token string">"value"</span><span class="token punctuation">:</span> <span class="token punctuation">[</span><span class="token string">"Classification = 7 WHERE HeightAboveGround &lt; -0.30"</span><span class="token punctuation">]</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+        <span class="token comment"># Absurdly high returns — birds, cloud, multipath off water.</span>
+        <span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"filters.assign"</span><span class="token punctuation">,</span>
+         <span class="token string">"value"</span><span class="token punctuation">:</span> <span class="token punctuation">[</span><span class="token string">"Classification = 7 WHERE HeightAboveGround > 120.0"</span><span class="token punctuation">]</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+        <span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"writers.las"</span><span class="token punctuation">,</span> <span class="token string">"filename"</span><span class="token punctuation">:</span> <span class="token string">"noise_marked.laz"</span><span class="token punctuation">,</span> <span class="token string">"forward"</span><span class="token punctuation">:</span> <span class="token string">"all"</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+    <span class="token punctuation">]</span>
+<span class="token punctuation">}</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span>pdal<span class="token punctuation">.</span>Pipeline<span class="token punctuation">(</span>json<span class="token punctuation">.</span>dumps<span class="token punctuation">(</span>noise<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">.</span>execute<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"points processed"</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>The two thresholds are asymmetric on purpose. Below the surface, anything past the survey’s stated vertical accuracy is physically impossible and can be marked confidently. Above it, the ceiling has to clear the tallest real thing in the extent — a 120 m cutoff is right for a low-rise city and wrong for one with towers, so it belongs in the site manifest rather than hard-coded.</p>
+<figure class="diagram">
+<svg viewBox="42 99 656 193" role="img" aria-labelledby="rn-noise-t rn-noise-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="rn-noise-t">Why one sub-surface return costs a whole neighbourhood of terrain</title>
+  <desc id="rn-noise-d">A ground filter estimates the terrain as the lower envelope of the cloud, so a single multipath return two metres beneath the true surface becomes the local minimum. The estimated ground is pulled down toward it across the filter's whole window, not just at the offending point.</desc>
+  <rect class="svg-bg" x="42" y="99" width="656" height="193" fill="#ffffff"/>
+  <g fill="#1f6b8a">
+    <circle cx="80" cy="150" r="3"/><circle cx="130" cy="148" r="3"/><circle cx="180" cy="152" r="3"/>
+    <circle cx="230" cy="149" r="3"/><circle cx="280" cy="151" r="3"/><circle cx="330" cy="148" r="3"/>
+    <circle cx="380" cy="150" r="3"/><circle cx="430" cy="152" r="3"/><circle cx="480" cy="149" r="3"/>
+    <circle cx="530" cy="151" r="3"/><circle cx="580" cy="150" r="3"/><circle cx="630" cy="149" r="3"/>
+  </g>
+  <circle cx="330" cy="206" r="5" fill="#b0413e"/>
+  <text x="344" y="212" fill="#b0413e" font-size="12" text-anchor="start">one multipath return, 2 m below the surface</text>
+  <path d="M80 152 L630 151" fill="none" stroke="#4f7a4d" stroke-width="2.5"/>
+  <path d="M80 152 L180 156 L260 180 L330 204 L400 180 L480 158 L630 152"
+        fill="none" stroke="#b0413e" stroke-width="2.5" stroke-dasharray="6 4"/>
+  <text x="150" y="126" fill="#4f7a4d" font-size="12" text-anchor="start">true ground, from the real returns</text>
+  <text x="370" y="252" fill="#15384a" font-size="12.5" text-anchor="middle">Which is why noise has to be marked before the ground filter runs, not cleaned out of its output afterwards</text>
+  <text x="370" y="274" fill="#5b6471" font-size="12" text-anchor="middle">Dashed red is what the filter returns once the low point is in scope</text>
+</svg>
+<figcaption>The estimated surface bends over the filter&#39;s whole window, not at one cell, and removing the point afterwards does not undo it: the surrounding ground points were already rejected for sitting too far above a surface that should never have dipped.</figcaption>
+</figure>
+<h3 id="3-mark-flight-line-overlap-as-class-12-do-not-delete-it" tabindex="-1"><a class="heading-link" href="#3-mark-flight-line-overlap-as-class-12-do-not-delete-it"><span>3. Mark flight-line overlap as class 12, do not delete it</span></a></h3>
+<p>Overlap is real measurement collected twice. It should be identifiable and excludable, not discarded.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python">overlap <span class="token operator">=</span> <span class="token punctuation">{</span>
+    <span class="token string">"pipeline"</span><span class="token punctuation">:</span> <span class="token punctuation">[</span>
+        <span class="token string">"noise_marked.laz"</span><span class="token punctuation">,</span>
+        <span class="token comment"># Points seen by more than one flight line within a small radius.</span>
+        <span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"filters.radialdensity"</span><span class="token punctuation">,</span> <span class="token string">"radius"</span><span class="token punctuation">:</span> <span class="token number">1.0</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+        <span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"filters.assign"</span><span class="token punctuation">,</span>
+         <span class="token string">"value"</span><span class="token punctuation">:</span> <span class="token punctuation">[</span><span class="token string">"Classification = 12 WHERE RadialDensity > 18.0 &amp;&amp; Classification == 2"</span><span class="token punctuation">]</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+        <span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"writers.las"</span><span class="token punctuation">,</span> <span class="token string">"filename"</span><span class="token punctuation">:</span> <span class="token string">"overlap_marked.laz"</span><span class="token punctuation">,</span> <span class="token string">"forward"</span><span class="token punctuation">:</span> <span class="token string">"all"</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+    <span class="token punctuation">]</span>
+<span class="token punctuation">}</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span>pdal<span class="token punctuation">.</span>Pipeline<span class="token punctuation">(</span>json<span class="token punctuation">.</span>dumps<span class="token punctuation">(</span>overlap<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">.</span>execute<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"points processed"</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>A density threshold is the crude version and it works where the flight plan is regular. The precise version uses <code>PointSourceId</code> directly: group points into cells, and where a cell contains returns from two or more source ids, the returns from all but the nearest-nadir line are overlap. That is more code and it is the right implementation for a survey whose lines vary in altitude or speed.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> numpy <span class="token keyword">as</span> np
+<span class="token keyword">import</span> laspy
+
+las <span class="token operator">=</span> laspy<span class="token punctuation">.</span>read<span class="token punctuation">(</span><span class="token string">"noise_marked.laz"</span><span class="token punctuation">)</span>
+x<span class="token punctuation">,</span> y <span class="token operator">=</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>las<span class="token punctuation">.</span>x<span class="token punctuation">)</span><span class="token punctuation">,</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>las<span class="token punctuation">.</span>y<span class="token punctuation">)</span>
+src <span class="token operator">=</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>las<span class="token punctuation">.</span>point_source_id<span class="token punctuation">)</span>
+cls <span class="token operator">=</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>las<span class="token punctuation">.</span>classification<span class="token punctuation">)</span>
+
+cell <span class="token operator">=</span> <span class="token number">2.0</span>
+key <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token punctuation">(</span>x <span class="token operator">//</span> cell<span class="token punctuation">)</span><span class="token punctuation">.</span>astype<span class="token punctuation">(</span>np<span class="token punctuation">.</span>int64<span class="token punctuation">)</span> <span class="token operator">&lt;&lt;</span> <span class="token number">32</span><span class="token punctuation">)</span> <span class="token operator">+</span> <span class="token punctuation">(</span>y <span class="token operator">//</span> cell<span class="token punctuation">)</span><span class="token punctuation">.</span>astype<span class="token punctuation">(</span>np<span class="token punctuation">.</span>int64<span class="token punctuation">)</span>
+order <span class="token operator">=</span> np<span class="token punctuation">.</span>argsort<span class="token punctuation">(</span>key<span class="token punctuation">,</span> kind<span class="token operator">=</span><span class="token string">"stable"</span><span class="token punctuation">)</span>
+key_s<span class="token punctuation">,</span> src_s <span class="token operator">=</span> key<span class="token punctuation">[</span>order<span class="token punctuation">]</span><span class="token punctuation">,</span> src<span class="token punctuation">[</span>order<span class="token punctuation">]</span>
+
+<span class="token comment"># Cells whose returns come from more than one flight line.</span>
+boundaries <span class="token operator">=</span> np<span class="token punctuation">.</span>flatnonzero<span class="token punctuation">(</span>np<span class="token punctuation">.</span>diff<span class="token punctuation">(</span>key_s<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">+</span> <span class="token number">1</span>
+multi <span class="token operator">=</span> np<span class="token punctuation">.</span>zeros<span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>key_s<span class="token punctuation">)</span><span class="token punctuation">,</span> dtype<span class="token operator">=</span><span class="token builtin">bool</span><span class="token punctuation">)</span>
+<span class="token keyword">for</span> start<span class="token punctuation">,</span> end <span class="token keyword">in</span> <span class="token builtin">zip</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>r_<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">,</span> boundaries<span class="token punctuation">]</span><span class="token punctuation">,</span> np<span class="token punctuation">.</span>r_<span class="token punctuation">[</span>boundaries<span class="token punctuation">,</span> <span class="token builtin">len</span><span class="token punctuation">(</span>key_s<span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">if</span> <span class="token builtin">len</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>unique<span class="token punctuation">(</span>src_s<span class="token punctuation">[</span>start<span class="token punctuation">:</span>end<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">></span> <span class="token number">1</span><span class="token punctuation">:</span>
+        multi<span class="token punctuation">[</span>start<span class="token punctuation">:</span>end<span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token boolean">True</span>
+
+in_overlap <span class="token operator">=</span> np<span class="token punctuation">.</span>zeros<span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>key<span class="token punctuation">)</span><span class="token punctuation">,</span> dtype<span class="token operator">=</span><span class="token builtin">bool</span><span class="token punctuation">)</span>
+in_overlap<span class="token punctuation">[</span>order<span class="token punctuation">]</span> <span class="token operator">=</span> multi
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>in_overlap<span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span><span class="token format-spec">,</span><span class="token punctuation">}</span></span><span class="token string"> points in multi-line cells "</span></span>
+      <span class="token string-interpolation"><span class="token string">f"(</span><span class="token interpolation"><span class="token punctuation">{</span><span class="token number">100</span> <span class="token operator">*</span> in_overlap<span class="token punctuation">.</span>mean<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span><span class="token format-spec">.1f</span><span class="token punctuation">}</span></span><span class="token string">% of the cloud)"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<figure class="diagram">
+<svg viewBox="12 6 716 274" role="img" aria-labelledby="rn-ovl-t rn-ovl-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="rn-ovl-t">Why unmarked overlap passes a density specification the survey missed</title>
+  <desc id="rn-ovl-d">Two adjacent flight lines overlap by about thirty per cent of their swath width. In the overlap strip the point count is the sum of both lines, so a density check over the whole tile reports a figure well above what either line achieved. Marking the overlap as class 12 lets the check measure single-coverage density instead.</desc>
+  <rect class="svg-bg" x="12" y="6" width="716" height="274" fill="#ffffff"/>
+  <path d="M60 70 h300 v70 h-300 Z" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <path d="M270 70 h300 v70 h-300 Z" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <path d="M270 70 h90 v70 h-90 Z" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <text x="165" y="112" fill="#1f2937" font-size="12" text-anchor="middle">line 1 — 9 pts/m²</text>
+  <text x="465" y="112" fill="#1f2937" font-size="12" text-anchor="middle">line 2 — 9 pts/m²</text>
+  <text x="315" y="160" fill="#b0413e" font-size="12" text-anchor="middle">overlap — 18 pts/m²</text>
+  <text x="315" y="196" fill="#1f2937" font-size="12.5" text-anchor="middle">tile mean: 11.7 pts/m² — comfortably above a 10 pts/m² specification</text>
+  <text x="315" y="222" fill="#b0413e" font-size="12.5" text-anchor="middle">single-coverage density: 9 pts/m² — the specification was missed</text>
+  <text x="370" y="34" fill="#1f2937" font-size="13" text-anchor="middle" font-weight="600">The same cloud, two defensible density figures</text>
+  <text x="370" y="262" fill="#15384a" font-size="12" text-anchor="middle">Class 12 is what lets the acceptance check exclude the double-counted strip and measure what each line actually delivered</text>
+</svg>
+<figcaption>Overlap is not an error and it is not extra coverage. Marking it is what lets a density figure answer the question the specification was written about.</figcaption>
+</figure>
+<h3 id="4-set-the-withheld-bit-rather-than-deleting" tabindex="-1"><a class="heading-link" href="#4-set-the-withheld-bit-rather-than-deleting"><span>4. Set the withheld bit rather than deleting</span></a></h3>
+<p>Deleting is irreversible and the file loses the record that anything was removed. The withheld bit is reversible and self-documenting.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> laspy
+<span class="token keyword">import</span> numpy <span class="token keyword">as</span> np
+
+las <span class="token operator">=</span> laspy<span class="token punctuation">.</span>read<span class="token punctuation">(</span><span class="token string">"overlap_marked.laz"</span><span class="token punctuation">)</span>
+cls <span class="token operator">=</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>las<span class="token punctuation">.</span>classification<span class="token punctuation">)</span>
+
+las<span class="token punctuation">.</span>withheld <span class="token operator">=</span> <span class="token punctuation">(</span>cls <span class="token operator">==</span> <span class="token number">7</span><span class="token punctuation">)</span>          <span class="token comment"># noise excluded by default, still present</span>
+las<span class="token punctuation">.</span>write<span class="token punctuation">(</span><span class="token string">"final_flagged.laz"</span><span class="token punctuation">)</span>
+
+check <span class="token operator">=</span> laspy<span class="token punctuation">.</span>read<span class="token punctuation">(</span><span class="token string">"final_flagged.laz"</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"withheld:"</span><span class="token punctuation">,</span> <span class="token builtin">int</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>check<span class="token punctuation">.</span>withheld<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+      <span class="token string">"| class 7 retained:"</span><span class="token punctuation">,</span> <span class="token builtin">int</span><span class="token punctuation">(</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>check<span class="token punctuation">.</span>classification<span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token number">7</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Class 12 deliberately does not get the withheld bit here. Overlap points are valid measurements — a strip-adjustment or an accuracy assessment wants them — so the right default is “identifiable but included”, with the exclusion applied by whichever consumer needs single coverage.</p>
+<h3 id="5-consume-the-flags-correctly-downstream" tabindex="-1"><a class="heading-link" href="#5-consume-the-flags-correctly-downstream"><span>5. Consume the flags correctly downstream</span></a></h3>
+<p>Every consumer has to state its own policy, and PDAL makes that explicit.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> json
+<span class="token keyword">import</span> pdal
+
+<span class="token comment"># Terrain: ground only, noise and overlap excluded.</span>
+terrain <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token string">"pipeline"</span><span class="token punctuation">:</span> <span class="token punctuation">[</span>
+    <span class="token string">"final_flagged.laz"</span><span class="token punctuation">,</span>
+    <span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"filters.range"</span><span class="token punctuation">,</span> <span class="token string">"limits"</span><span class="token punctuation">:</span> <span class="token string">"Classification[2:2]"</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+    <span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"filters.expression"</span><span class="token punctuation">,</span> <span class="token string">"expression"</span><span class="token punctuation">:</span> <span class="token string">"Withheld == 0"</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+    <span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"writers.gdal"</span><span class="token punctuation">,</span> <span class="token string">"filename"</span><span class="token punctuation">:</span> <span class="token string">"dtm.tif"</span><span class="token punctuation">,</span> <span class="token string">"resolution"</span><span class="token punctuation">:</span> <span class="token number">1.0</span><span class="token punctuation">,</span>
+     <span class="token string">"output_type"</span><span class="token punctuation">:</span> <span class="token string">"idw"</span><span class="token punctuation">,</span> <span class="token string">"gdaldriver"</span><span class="token punctuation">:</span> <span class="token string">"GTiff"</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+<span class="token punctuation">]</span><span class="token punctuation">}</span>
+
+<span class="token comment"># Density acceptance: single coverage, so overlap is dropped.</span>
+density <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token string">"pipeline"</span><span class="token punctuation">:</span> <span class="token punctuation">[</span>
+    <span class="token string">"final_flagged.laz"</span><span class="token punctuation">,</span>
+    <span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"filters.expression"</span><span class="token punctuation">,</span> <span class="token string">"expression"</span><span class="token punctuation">:</span> <span class="token string">"Classification != 12 &amp;&amp; Withheld == 0"</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+    <span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"filters.hexbin"</span><span class="token punctuation">,</span> <span class="token string">"edge_size"</span><span class="token punctuation">:</span> <span class="token number">10.0</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+<span class="token punctuation">]</span><span class="token punctuation">}</span>
+
+<span class="token keyword">for</span> name<span class="token punctuation">,</span> spec <span class="token keyword">in</span> <span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token string">"terrain"</span><span class="token punctuation">,</span> terrain<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token punctuation">(</span><span class="token string">"density"</span><span class="token punctuation">,</span> density<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    p <span class="token operator">=</span> pdal<span class="token punctuation">.</span>Pipeline<span class="token punctuation">(</span>json<span class="token punctuation">.</span>dumps<span class="token punctuation">(</span>spec<span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span>name<span class="token punctuation">,</span> p<span class="token punctuation">.</span>execute<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"points"</span><span class="token punctuation">)</span>
+</code></pre></div>
+<h2 id="expected-output-verification" tabindex="-1"><a class="heading-link" href="#expected-output-verification"><span>Expected Output &amp; Verification</span></a></h2>
+<p>A typical delivery after the full pass:</p>
+<div class="codeblock" data-lang="text"><div class="codeblock__bar"><span class="codeblock__lang">text</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-text" tabindex="0" role="group" aria-label="text code sample"><code class="language-text">point format: 6
+  class   1:    4,102,338
+  class   2:   28,441,902
+  class   5:   11,204,776
+  class   6:    9,880,145
+  class   7:      142,006
+  class  12:    6,318,440
+withheld flag set on 142,006 points (0.23%), of which class 7: 142,006
+1,204,882 points in multi-line cells (2.0% of the cloud)
+</code></pre></div>
+<p>Three sanity checks on those numbers. Noise above roughly one per cent of the cloud is not noise, it is a mis-set threshold or an uncorrected trajectory. Overlap materially above the flight plan’s nominal side-lap — thirty per cent is typical — means lines were flown closer than planned or the detection cell is too large. And every class 7 point should carry the withheld bit if that is your policy; a mismatch between the two counts means the flagging step did not run.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> laspy
+<span class="token keyword">import</span> numpy <span class="token keyword">as</span> np
+
+las <span class="token operator">=</span> laspy<span class="token punctuation">.</span>read<span class="token punctuation">(</span><span class="token string">"final_flagged.laz"</span><span class="token punctuation">)</span>
+cls<span class="token punctuation">,</span> w <span class="token operator">=</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>las<span class="token punctuation">.</span>classification<span class="token punctuation">)</span><span class="token punctuation">,</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>las<span class="token punctuation">.</span>withheld<span class="token punctuation">)</span><span class="token punctuation">.</span>astype<span class="token punctuation">(</span><span class="token builtin">bool</span><span class="token punctuation">)</span>
+
+noise_frac <span class="token operator">=</span> <span class="token punctuation">(</span>cls <span class="token operator">==</span> <span class="token number">7</span><span class="token punctuation">)</span><span class="token punctuation">.</span>mean<span class="token punctuation">(</span><span class="token punctuation">)</span>
+<span class="token keyword">assert</span> noise_frac <span class="token operator">&lt;</span> <span class="token number">0.01</span><span class="token punctuation">,</span> <span class="token string-interpolation"><span class="token string">f"noise is </span><span class="token interpolation"><span class="token punctuation">{</span>noise_frac<span class="token punctuation">:</span><span class="token format-spec">.3%</span><span class="token punctuation">}</span></span><span class="token string"> of the cloud — threshold is wrong"</span></span>
+<span class="token keyword">assert</span> <span class="token punctuation">(</span>cls<span class="token punctuation">[</span>w<span class="token punctuation">]</span> <span class="token operator">==</span> <span class="token number">7</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">all</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"withheld set on something that is not class 7"</span>
+<span class="token keyword">assert</span> <span class="token punctuation">(</span>w<span class="token punctuation">[</span>cls <span class="token operator">==</span> <span class="token number">7</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">all</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"class 7 points exist without the withheld bit"</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"noise and overlap flags are internally consistent"</span><span class="token punctuation">)</span>
+</code></pre></div>
+<h2 id="common-errors" tabindex="-1"><a class="heading-link" href="#common-errors"><span>Common Errors</span></a></h2>
+<p><strong>A density check passes and the survey visibly missed its specification.</strong> Overlap was never marked, so the tile mean includes the double-counted strips. Mark class 12 and exclude it from the acceptance calculation, as in step 5.</p>
+<p><strong>The terrain surface dips sharply in a few places.</strong> Sub-surface noise was not marked, and both SMRF and CSF trust the lowest return. Run the height-above-ground noise pass <em>before</em> the ground filter, not after, so the filter never sees the offending points.</p>
+<p><strong><code>filters.assign</code> silently changes nothing.</strong> The expression referenced <code>HeightAboveGround</code> without a preceding <code>filters.hag_nn</code>, so the dimension does not exist and the WHERE clause matches nothing. PDAL does not error on an unknown dimension in an assignment expression — check that the dimension is present with <code>filters.info</code> first.</p>
+<h2 id="frequently-asked-questions" tabindex="-1"><a class="heading-link" href="#frequently-asked-questions"><span>Frequently Asked Questions</span></a></h2>
+<h3 id="should-i-delete-noise-or-flag-it" tabindex="-1"><a class="heading-link" href="#should-i-delete-noise-or-flag-it"><span>Should I delete noise or flag it?</span></a></h3>
+<p>Flag it. Deleting is irreversible, removes the evidence that anything was removed, and makes a re-run with a different threshold impossible without going back to the original delivery. The withheld bit costs nothing and every serious consumer honours it.</p>
+<h3 id="is-class-12-overlap-or-reserved" tabindex="-1"><a class="heading-link" href="#is-class-12-overlap-or-reserved"><span>Is class 12 overlap or “reserved”?</span></a></h3>
+<p>In the ASPRS LAS 1.4 specification, class 12 is overlap for point formats 0–5 and is deprecated in favour of the dedicated overlap bit for formats 6–10. In practice both are in circulation; write class 12 for compatibility and also set the overlap bit where the format has one.</p>
+<h3 id="what-noise-fraction-should-i-expect" tabindex="-1"><a class="heading-link" href="#what-noise-fraction-should-i-expect"><span>What noise fraction should I expect?</span></a></h3>
+<p>Well under one per cent for airborne LiDAR over land. Terrestrial scans in wet or reflective environments run higher. A figure above a few per cent almost always means the threshold, not the sensor.</p>
+<h2 id="related-guides" tabindex="-1"><a class="heading-link" href="#related-guides"><span>Related Guides</span></a></h2>
+<ul>
+<li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">LiDAR Classification and Ground Extraction</a> — the classification workflow these classes belong to</li>
+<li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a> — the acceptance check that overlap distorts</li>
+<li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/">Point Cloud Filtering Techniques</a> — statistical outlier removal, which is a different job from classifying noise</li>
+</ul>
+<p>Back to <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">LiDAR Classification and Ground Extraction</a>.</p>
+
+
+      
+      
+
+      <div class="related-nav">
+        
+
+        
+          <div>
+            <h3>Related</h3>
+            <div class="related-grid">
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/extracting-building-footprints-from-classified-lidar/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Extracting Building Footprints from Classified LiDAR</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/pdal-smrf-vs-csf-ground-classification/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">PDAL SMRF vs CSF Ground Classification</span>
+                </a>
+              
+            </div>
+          </div>
+        
+      </div>
+    </article>
+
+    
+    <aside class="toc" aria-label="On this page" data-toc hidden>
+      <h4>On this page</h4>
+      <ul></ul>
+    </aside>
+  </div>
+</div>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+  <div class="container site-footer__inner">
+    <div class="site-footer__brand">
+      <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+        <img src="/assets/img/logo-mark.svg" alt="" class="brand__mark" width="36" height="36">
+        <span class="brand__name">
+          3D Geospatial
+          <small>Digital Twin Automation</small>
+        </span>
+      </a>
+      <p>Engineering-grade guides on point cloud processing, mesh pipelines, LOD strategies, and CI/CD automation for digital twin platforms.</p>
+      <a class="footer-social" href="https://github.com/3d-geospatial" aria-label="3D Geospatial on GitHub" rel="noopener" target="_blank">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+          <path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.53-1.34-1.3-1.7-1.3-1.7-1.06-.72.08-.71.08-.71 1.17.08 1.79 1.2 1.79 1.2 1.04 1.79 2.73 1.27 3.4.97.1-.75.4-1.27.73-1.56-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.19-3.08-.12-.3-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.75.11 3.05.74.8 1.19 1.83 1.19 3.08 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.07.78 2.15v3.18c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5Z"/>
+        </svg>
+        <span>GitHub</span>
+      </a>
+    </div>
+
+    <div class="site-footer__col">
+      <h4>Sections</h4>
+      <ul>
+        <li><a href="https://www.3d-geospatial.com/">Home</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management &amp; Optimization</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/">Point Cloud &amp; Mesh Pipelines</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/">Troubleshooting &amp; Reliability</a></li>
+        
+      </ul>
+    </div>
+
+    
+      <div class="site-footer__col">
+        <h4>3D Geospatial Fundamentals</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/">3D Format Standards Comparison</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems for 3D Assets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/">Digital Elevation Model Workflows</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/">Spatial Indexing and Tiling Schemes for 3D Data</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>LOD Management &amp; Optimization</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/">Automated Tile Generation for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/">Cesium ion Upload Automation for 3D Tilesets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/">glTF LOD Generation With Draco Compression</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/">Streaming Sync Patterns for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/">Tileset Metadata and 3D Tiles Next</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Point Cloud &amp; Mesh Pipelines</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/">Automated Mesh Decimation for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/">CI/CD Automation for Spatial Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">LiDAR Classification and Ground Extraction</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/">Point Cloud Filtering Techniques</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/">Surface Reconstruction for Geospatial Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/">Texture Mapping Workflows for Digital Twins</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Troubleshooting &amp; Reliability</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/">Cross-Section Failure Modes in Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/">Data Validation &amp; QA Gates for 3D Tiles</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/">Performance Profiling and Benchmarking</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/">Streaming &amp; Runtime Diagnostics for 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+  </div>
+  <div class="container site-footer__bottom">
+    <span>© 2026 3D Geospatial &amp; Digital Twin Automation</span>
+    <span>Built with Eleventy · PWA-enabled</span>
+  </div>
+</footer>
+
+
+  <script src="/assets/js/site.js?v=b99aa9f971" defer></script>
+  
+</body>
+</html>

@@ -1,0 +1,696 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <title>Extracting Building Footprints from Classified LiDAR — 3D Geospatial</title>
+  <meta name="description" content="Turn ASPRS class 6 into clean polygons: cluster, alpha-shape, regularise to right angles, and validate against a cadastre with IoU before publishing.">
+  <meta name="keywords" content="3D geospatial, digital twin, point cloud, mesh pipeline, LOD, 3D Tiles, Cesium, PDAL, Open3D, Python, CI/CD">
+  <meta name="author" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta name="theme-color" content="#1f6b8a" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f171d" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+
+  
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem("theme");
+        var theme = (stored === "dark" || stored === "light") ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    })();
+  </script>
+  <meta name="generator" content="Eleventy">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="googlebot" content="index,follow,max-image-preview:large">
+
+  
+  <link rel="canonical" href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/extracting-building-footprints-from-classified-lidar/">
+  <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">
+
+  
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/icon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+
+  
+  <link rel="apple-touch-icon" href="/assets/img/icon-180.png">
+  <link rel="mask-icon" href="/assets/img/logo.svg" color="#1f6b8a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="3D Geospatial">
+  <meta name="application-name" content="3D Geospatial">
+
+  
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Extracting Building Footprints from Classified LiDAR — 3D Geospatial">
+  <meta property="og:description" content="Turn ASPRS class 6 into clean polygons: cluster, alpha-shape, regularise to right angles, and validate against a cadastre with IoU before publishing.">
+  <meta property="og:url" content="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/extracting-building-footprints-from-classified-lidar/">
+  <meta property="og:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+  <meta property="og:site_name" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta property="og:locale" content="en_US">
+  
+  <meta property="article:published_time" content="2026-08-07T08:42:52.061Z">
+  <meta property="article:modified_time" content="2026-08-07T08:42:52.061Z">
+  <meta property="article:publisher" content="https://www.3d-geospatial.com/">
+  
+
+  
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Extracting Building Footprints from Classified LiDAR — 3D Geospatial">
+  <meta name="twitter:description" content="Turn ASPRS class 6 into clean polygons: cluster, alpha-shape, regularise to right angles, and validate against a cadastre with IoU before publishing.">
+  <meta name="twitter:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta name="twitter:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+
+  
+  <link rel="preload" href="/assets/css/styles.css?v=546adeb511" as="style">
+  
+
+  <link rel="stylesheet" href="/assets/css/styles.css?v=546adeb511">
+
+  
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.3d-geospatial.com/#organization",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "url": "https://www.3d-geospatial.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/icon-512.png",
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://www.3d-geospatial.com/#website",
+      "url": "https://www.3d-geospatial.com/",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "description": "Build reliable 3D spatial data pipelines for digital twins — point clouds, meshes, LOD strategies, Python processing, and CI/CD automation.",
+      "inLanguage": "en",
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      }
+    },
+    {
+      "@type": "TechArticle",
+      "@id": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/extracting-building-footprints-from-classified-lidar/#article",
+      "isPartOf": {
+        "@id": "https://www.3d-geospatial.com/#website"
+      },
+      "headline": "Extracting Building Footprints from Classified LiDAR",
+      "name": "Extracting Building Footprints from Classified LiDAR",
+      "description": "Turn ASPRS class 6 into clean polygons: cluster, alpha-shape, regularise to right angles, and validate against a cadastre with IoU before publishing.",
+      "url": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/extracting-building-footprints-from-classified-lidar/",
+      "mainEntityOfPage": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/extracting-building-footprints-from-classified-lidar/",
+      "inLanguage": "en",
+      "datePublished": "2026-08-07T08:42:52.061Z",
+      "dateModified": "2026-08-07T08:42:52.061Z",
+      "author": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "image": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/og-cover.png",
+        "width": 1200,
+        "height": 630
+      },
+      "breadcrumb": {
+        "@id": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/extracting-building-footprints-from-classified-lidar/#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/extracting-building-footprints-from-classified-lidar/#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://www.3d-geospatial.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Point Cloud Mesh Processing Pipelines",
+          "item": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Lidar Classification And Ground Extraction",
+          "item": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "name": "Extracting Building Footprints From Classified Lidar",
+          "item": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/extracting-building-footprints-from-classified-lidar/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  
+<header class="site-header" role="banner">
+  <div class="container site-header__inner">
+    <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+      <img src="/assets/img/logo.svg" alt="" class="brand__mark" width="36" height="36">
+      <span class="brand__name">
+        3D Geospatial
+        <small>Digital Twin Automation</small>
+      </span>
+    </a>
+
+    <button class="theme-toggle" type="button" data-theme-toggle
+            aria-label="Switch to dark theme" title="Switch to dark theme">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4.2"/>
+        <path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/>
+      </svg>
+    </button>
+
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>
+      <span class="nav-toggle__icon" aria-hidden="true"><span></span></span>
+      Menu
+    </button>
+
+    <nav class="primary-nav" id="primary-nav" aria-label="Primary">
+      
+      <a href="https://www.3d-geospatial.com/" >
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/>
+        </svg>
+        Home
+      </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2 3 7l9 5 9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 17l9 5 9-5"/>
+            </svg>
+          
+          3D Geospatial Fundamentals
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+          
+          LOD Management &amp; Optimization
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/" aria-current="page">
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="6" cy="6" r="1.5"/><circle cx="12" cy="6" r="1.5"/><circle cx="18" cy="6" r="1.5"/>
+              <circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/>
+              <circle cx="6" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="18" cy="18" r="1.5"/>
+            </svg>
+          
+          Point Cloud &amp; Mesh Pipelines
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <path d="M12 9v4"/><path d="M12 17h.01"/>
+            </svg>
+          
+          Troubleshooting &amp; Reliability
+        </a>
+      
+    </nav>
+  </div>
+</header>
+
+
+  <main id="main">
+    
+
+
+<div class="container">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    
+      
+        <a href="https://www.3d-geospatial.com/">Home</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/">Point Cloud Mesh Processing Pipelines</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">Lidar Classification And Ground Extraction</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <span class="current">Extracting Building Footprints From Classified Lidar</span>
+      
+    
+  </nav>
+
+  <div class="content-page">
+    <article class="article">
+      <h1 id="extracting-building-footprints-from-classified-lidar" tabindex="-1"><a class="heading-link" href="#extracting-building-footprints-from-classified-lidar"><span>Extracting Building Footprints from Classified LiDAR</span></a></h1>
+<p>This page turns the building class of a classified LiDAR cloud into polygon footprints a twin can use — clustering class 6 returns into per-building groups, deriving a boundary with an alpha shape, regularising it to the right angles buildings actually have, and validating the result against a cadastre with intersection-over-union before any of it is published. The output is the layer that joins geometry to attributes, so its quality decides whether a click in the viewer returns the right building.</p>
+<h2 id="why-you-hit-this" tabindex="-1"><a class="heading-link" href="#why-you-hit-this"><span>Why you hit this</span></a></h2>
+<p>A classified cloud tells you which returns hit a building. It does not tell you <em>which</em> building, where its edges are, or what shape it is — and every one of those is needed the moment the twin has to attach an address, a construction year, or an energy rating to geometry. Footprints are also the join key between the point cloud and every municipal register, so an extraction that merges two terraced houses into one polygon quietly merges their attributes too.</p>
+<p>The class this consumes comes out of <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">LiDAR classification and ground extraction</a>; the polygons this produces are what a <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/citygml-vs-3d-tiles-for-municipal-twin-delivery/">CityGML register</a> or a batch table keys on.</p>
+<h2 id="prerequisites" tabindex="-1"><a class="heading-link" href="#prerequisites"><span>Prerequisites</span></a></h2>
+<ul>
+<li>Python 3.10+ with <code>laspy&gt;=2.5</code>, <code>numpy&gt;=1.24</code>, <code>scikit-learn&gt;=1.3</code>, <code>shapely&gt;=2.0</code>, <code>geopandas&gt;=0.14</code> and <code>alphashape&gt;=1.3</code>.</li>
+<li>A cloud with ASPRS class 6 populated and a metric projected CRS — EPSG:32633 in the examples.</li>
+<li>A reference layer for validation: a cadastral footprint set, or a manually digitised sample of thirty to fifty buildings.</li>
+</ul>
+<h2 id="step-by-step" tabindex="-1"><a class="heading-link" href="#step-by-step"><span>Step-by-Step</span></a></h2>
+<h3 id="1-load-class-6-and-cluster-it-into-buildings" tabindex="-1"><a class="heading-link" href="#1-load-class-6-and-cluster-it-into-buildings"><span>1. Load class 6 and cluster it into buildings</span></a></h3>
+<p>DBSCAN is the right clustering choice here because the number of buildings is unknown and the density is roughly uniform within each roof.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> laspy
+<span class="token keyword">import</span> numpy <span class="token keyword">as</span> np
+<span class="token keyword">from</span> sklearn<span class="token punctuation">.</span>cluster <span class="token keyword">import</span> DBSCAN
+
+las <span class="token operator">=</span> laspy<span class="token punctuation">.</span>read<span class="token punctuation">(</span><span class="token string">"classified_full.laz"</span><span class="token punctuation">)</span>
+is_building <span class="token operator">=</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>las<span class="token punctuation">.</span>classification<span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token number">6</span>
+xy <span class="token operator">=</span> np<span class="token punctuation">.</span>column_stack<span class="token punctuation">(</span><span class="token punctuation">[</span>np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>las<span class="token punctuation">.</span>x<span class="token punctuation">)</span><span class="token punctuation">[</span>is_building<span class="token punctuation">]</span><span class="token punctuation">,</span>
+                      np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>las<span class="token punctuation">.</span>y<span class="token punctuation">)</span><span class="token punctuation">[</span>is_building<span class="token punctuation">]</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+
+<span class="token comment"># eps ~= 2-3x point spacing; min_samples excludes chimneys and clutter</span>
+db <span class="token operator">=</span> DBSCAN<span class="token punctuation">(</span>eps<span class="token operator">=</span><span class="token number">1.2</span><span class="token punctuation">,</span> min_samples<span class="token operator">=</span><span class="token number">40</span><span class="token punctuation">,</span> algorithm<span class="token operator">=</span><span class="token string">"ball_tree"</span><span class="token punctuation">)</span><span class="token punctuation">.</span>fit<span class="token punctuation">(</span>xy<span class="token punctuation">)</span>
+labels <span class="token operator">=</span> db<span class="token punctuation">.</span>labels_
+n <span class="token operator">=</span> labels<span class="token punctuation">.</span><span class="token builtin">max</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">+</span> <span class="token number">1</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>is_building<span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span><span class="token format-spec">,</span><span class="token punctuation">}</span></span><span class="token string"> building points → </span><span class="token interpolation"><span class="token punctuation">{</span>n<span class="token punctuation">}</span></span><span class="token string"> clusters, "</span></span>
+      <span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span><span class="token punctuation">(</span>labels <span class="token operator">==</span> <span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span><span class="token format-spec">,</span><span class="token punctuation">}</span></span><span class="token string"> unassigned"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p><code>eps</code> is the parameter that decides whether a terrace becomes one building or six. Set it from the point spacing — two to three times the mean spacing — and check the result against a known terrace before trusting it across the city. Too large and adjoining buildings merge; too small and a roof with a courtyard splits in two.</p>
+<h3 id="2-derive-a-boundary-with-an-alpha-shape" tabindex="-1"><a class="heading-link" href="#2-derive-a-boundary-with-an-alpha-shape"><span>2. Derive a boundary with an alpha shape</span></a></h3>
+<p>A convex hull is wrong for anything but a rectangle. An alpha shape follows concavities, and its single parameter controls how deeply.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> alphashape
+<span class="token keyword">from</span> shapely<span class="token punctuation">.</span>geometry <span class="token keyword">import</span> MultiPoint
+
+<span class="token keyword">def</span> <span class="token function">footprint</span><span class="token punctuation">(</span>points_xy<span class="token punctuation">,</span> alpha<span class="token operator">=</span><span class="token number">0.35</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">if</span> <span class="token builtin">len</span><span class="token punctuation">(</span>points_xy<span class="token punctuation">)</span> <span class="token operator">&lt;</span> <span class="token number">4</span><span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token boolean">None</span>
+    shape <span class="token operator">=</span> alphashape<span class="token punctuation">.</span>alphashape<span class="token punctuation">(</span>points_xy<span class="token punctuation">,</span> alpha<span class="token punctuation">)</span>
+    <span class="token keyword">return</span> shape <span class="token keyword">if</span> shape<span class="token punctuation">.</span>geom_type <span class="token keyword">in</span> <span class="token punctuation">(</span><span class="token string">"Polygon"</span><span class="token punctuation">,</span> <span class="token string">"MultiPolygon"</span><span class="token punctuation">)</span> <span class="token keyword">else</span> <span class="token boolean">None</span>
+
+polys <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token punctuation">}</span>
+<span class="token keyword">for</span> cid <span class="token keyword">in</span> <span class="token builtin">range</span><span class="token punctuation">(</span>n<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    pts <span class="token operator">=</span> xy<span class="token punctuation">[</span>labels <span class="token operator">==</span> cid<span class="token punctuation">]</span>
+    poly <span class="token operator">=</span> footprint<span class="token punctuation">(</span>pts<span class="token punctuation">)</span>
+    <span class="token keyword">if</span> poly <span class="token keyword">is</span> <span class="token keyword">not</span> <span class="token boolean">None</span> <span class="token keyword">and</span> poly<span class="token punctuation">.</span>area <span class="token operator">></span> <span class="token number">25.0</span><span class="token punctuation">:</span>      <span class="token comment"># drop sheds and clutter</span>
+        polys<span class="token punctuation">[</span>cid<span class="token punctuation">]</span> <span class="token operator">=</span> poly
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span><span class="token builtin">len</span><span class="token punctuation">(</span>polys<span class="token punctuation">)</span><span class="token punctuation">}</span></span><span class="token string"> footprints above 25 m²"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Alpha is an inverse length: larger values follow finer concavities and eventually start eating into the shape, smaller values approach the convex hull. Around 0.3–0.5 suits typical building point densities, and the check is visual on a courtyard block — the courtyard should appear as a hole, not be filled and not be cut open.</p>
+<figure class="diagram">
+<svg viewBox="5 6 719 278" role="img" aria-labelledby="bf-alpha-t bf-alpha-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="bf-alpha-t">Convex hull, alpha shape and an over-tight alpha</title>
+  <desc id="bf-alpha-d">A convex hull over an L-shaped building fills the notch entirely. An alpha shape at a suitable value follows the notch and the courtyard. Too large an alpha starts cutting into the boundary between points and produces a ragged, holed polygon.</desc>
+  <rect class="svg-bg" x="5" y="6" width="719" height="278" fill="#ffffff"/>
+  <g fill="#1f6b8a">
+    <circle cx="50" cy="90" r="2.4"/><circle cx="80" cy="90" r="2.4"/><circle cx="110" cy="90" r="2.4"/><circle cx="140" cy="90" r="2.4"/>
+    <circle cx="50" cy="120" r="2.4"/><circle cx="80" cy="120" r="2.4"/><circle cx="110" cy="120" r="2.4"/><circle cx="140" cy="120" r="2.4"/>
+    <circle cx="50" cy="150" r="2.4"/><circle cx="80" cy="150" r="2.4"/>
+    <circle cx="50" cy="180" r="2.4"/><circle cx="80" cy="180" r="2.4"/>
+  </g>
+  <path d="M44 84 H146 V126 H86 V186 H44 Z" fill="none" stroke="#b0413e" stroke-width="2" stroke-dasharray="5 4"/>
+  <path d="M44 84 H146 V126 H44 Z" fill="none" stroke="#b0413e" stroke-width="0"/>
+  <path d="M44 84 L146 84 L146 126 L86 186 L44 186 Z" fill="none" stroke="#b0413e" stroke-width="2.5"/>
+  <g fill="#1f6b8a">
+    <circle cx="300" cy="90" r="2.4"/><circle cx="330" cy="90" r="2.4"/><circle cx="360" cy="90" r="2.4"/><circle cx="390" cy="90" r="2.4"/>
+    <circle cx="300" cy="120" r="2.4"/><circle cx="330" cy="120" r="2.4"/><circle cx="360" cy="120" r="2.4"/><circle cx="390" cy="120" r="2.4"/>
+    <circle cx="300" cy="150" r="2.4"/><circle cx="330" cy="150" r="2.4"/>
+    <circle cx="300" cy="180" r="2.4"/><circle cx="330" cy="180" r="2.4"/>
+  </g>
+  <path d="M294 84 H396 V126 H336 V186 H294 Z" fill="none" stroke="#4f7a4d" stroke-width="2.5"/>
+  <g fill="#1f6b8a">
+    <circle cx="560" cy="90" r="2.4"/><circle cx="590" cy="90" r="2.4"/><circle cx="620" cy="90" r="2.4"/><circle cx="650" cy="90" r="2.4"/>
+    <circle cx="560" cy="120" r="2.4"/><circle cx="590" cy="120" r="2.4"/><circle cx="620" cy="120" r="2.4"/><circle cx="650" cy="120" r="2.4"/>
+    <circle cx="560" cy="150" r="2.4"/><circle cx="590" cy="150" r="2.4"/>
+    <circle cx="560" cy="180" r="2.4"/><circle cx="590" cy="180" r="2.4"/>
+  </g>
+  <path d="M556 86 L590 84 L622 90 L650 86 L654 122 L620 118 L592 126 L594 152 L588 184 L558 186 Z"
+        fill="none" stroke="#c46a3d" stroke-width="2.5"/>
+  <text x="95" y="222" fill="#b0413e" font-size="12.5" text-anchor="middle">convex hull — notch filled</text>
+  <text x="345" y="222" fill="#4f7a4d" font-size="12.5" text-anchor="middle">alpha ≈ 0.35 — notch followed</text>
+  <text x="605" y="222" fill="#c46a3d" font-size="12.5" text-anchor="middle">alpha too large — boundary ragged</text>
+  <text x="380" y="34" fill="#1f2937" font-size="13" text-anchor="middle" font-weight="600">One L-shaped roof, three boundary choices</text>
+  <text x="380" y="266" fill="#15384a" font-size="12" text-anchor="middle">Check alpha on a courtyard block: the courtyard should be a hole, not filled and not cut open</text>
+</svg>
+<figcaption>The middle case is the target. The right-hand failure is easy to miss at city zoom and shows up as a per-building area that is a few per cent low everywhere.</figcaption>
+</figure>
+<h3 id="3-regularise-to-the-angles-buildings-actually-have" tabindex="-1"><a class="heading-link" href="#3-regularise-to-the-angles-buildings-actually-have"><span>3. Regularise to the angles buildings actually have</span></a></h3>
+<p>An alpha shape follows the points, and points are noisy, so the raw boundary has hundreds of vertices and no right angles. Buildings almost always do.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> numpy <span class="token keyword">as</span> np
+<span class="token keyword">from</span> shapely<span class="token punctuation">.</span>geometry <span class="token keyword">import</span> Polygon
+<span class="token keyword">from</span> shapely <span class="token keyword">import</span> affinity
+
+<span class="token keyword">def</span> <span class="token function">dominant_angle</span><span class="token punctuation">(</span>poly<span class="token punctuation">:</span> Polygon<span class="token punctuation">)</span> <span class="token operator">-</span><span class="token operator">></span> <span class="token builtin">float</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Angle of the longest edge, in degrees, wrapped to [0, 90)."""</span>
+    c <span class="token operator">=</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>poly<span class="token punctuation">.</span>exterior<span class="token punctuation">.</span>coords<span class="token punctuation">)</span>
+    seg <span class="token operator">=</span> np<span class="token punctuation">.</span>diff<span class="token punctuation">(</span>c<span class="token punctuation">,</span> axis<span class="token operator">=</span><span class="token number">0</span><span class="token punctuation">)</span>
+    lengths <span class="token operator">=</span> np<span class="token punctuation">.</span>hypot<span class="token punctuation">(</span>seg<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">,</span> seg<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    dx<span class="token punctuation">,</span> dy <span class="token operator">=</span> seg<span class="token punctuation">[</span>np<span class="token punctuation">.</span>argmax<span class="token punctuation">(</span>lengths<span class="token punctuation">)</span><span class="token punctuation">]</span>
+    <span class="token keyword">return</span> <span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>degrees<span class="token punctuation">(</span>np<span class="token punctuation">.</span>arctan2<span class="token punctuation">(</span>dy<span class="token punctuation">,</span> dx<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">%</span> <span class="token number">90.0</span><span class="token punctuation">)</span>
+
+<span class="token keyword">def</span> <span class="token function">regularise</span><span class="token punctuation">(</span>poly<span class="token punctuation">:</span> Polygon<span class="token punctuation">,</span> tol<span class="token punctuation">:</span> <span class="token builtin">float</span> <span class="token operator">=</span> <span class="token number">0.35</span><span class="token punctuation">)</span> <span class="token operator">-</span><span class="token operator">></span> Polygon<span class="token punctuation">:</span>
+    theta <span class="token operator">=</span> dominant_angle<span class="token punctuation">(</span>poly<span class="token punctuation">)</span>
+    rotated <span class="token operator">=</span> affinity<span class="token punctuation">.</span>rotate<span class="token punctuation">(</span>poly<span class="token punctuation">,</span> <span class="token operator">-</span>theta<span class="token punctuation">,</span> origin<span class="token operator">=</span><span class="token string">"centroid"</span><span class="token punctuation">,</span> use_radians<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">)</span>
+    boxed <span class="token operator">=</span> rotated<span class="token punctuation">.</span>simplify<span class="token punctuation">(</span>tol<span class="token punctuation">,</span> preserve_topology<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+    snapped <span class="token operator">=</span> boxed<span class="token punctuation">.</span>envelope <span class="token keyword">if</span> boxed<span class="token punctuation">.</span>area <span class="token operator">/</span> boxed<span class="token punctuation">.</span>envelope<span class="token punctuation">.</span>area <span class="token operator">></span> <span class="token number">0.92</span> <span class="token keyword">else</span> boxed
+    <span class="token keyword">return</span> affinity<span class="token punctuation">.</span>rotate<span class="token punctuation">(</span>snapped<span class="token punctuation">,</span> theta<span class="token punctuation">,</span> origin<span class="token operator">=</span><span class="token string">"centroid"</span><span class="token punctuation">)</span>
+
+regular <span class="token operator">=</span> <span class="token punctuation">{</span>cid<span class="token punctuation">:</span> regularise<span class="token punctuation">(</span>p<span class="token punctuation">)</span> <span class="token keyword">for</span> cid<span class="token punctuation">,</span> p <span class="token keyword">in</span> polys<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span>
+           <span class="token keyword">if</span> p<span class="token punctuation">.</span>geom_type <span class="token operator">==</span> <span class="token string">"Polygon"</span><span class="token punctuation">}</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"regularised"</span><span class="token punctuation">,</span> <span class="token builtin">len</span><span class="token punctuation">(</span>regular<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"footprints"</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>The rotate–simplify–rotate-back pattern is what makes the simplification axis-aware: after rotating the dominant edge onto the X axis, a Douglas–Peucker simplification naturally preserves the axis-aligned edges and removes the noise between them. The <code>envelope</code> substitution snaps a nearly-rectangular footprint to an exact rectangle, which is right for most buildings and wrong for L-shapes — hence the 0.92 area-ratio guard.</p>
+<h3 id="4-write-the-layer-with-a-crs-and-a-stable-id" tabindex="-1"><a class="heading-link" href="#4-write-the-layer-with-a-crs-and-a-stable-id"><span>4. Write the layer with a CRS and a stable id</span></a></h3>
+<p>A footprint without a stable identifier cannot be joined to anything on the next run.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> geopandas <span class="token keyword">as</span> gpd
+<span class="token keyword">import</span> hashlib
+
+<span class="token keyword">def</span> <span class="token function">stable_id</span><span class="token punctuation">(</span>poly<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    c <span class="token operator">=</span> poly<span class="token punctuation">.</span>centroid
+    key <span class="token operator">=</span> <span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span><span class="token builtin">round</span><span class="token punctuation">(</span>c<span class="token punctuation">.</span>x<span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">}</span></span><span class="token string">_</span><span class="token interpolation"><span class="token punctuation">{</span><span class="token builtin">round</span><span class="token punctuation">(</span>c<span class="token punctuation">.</span>y<span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">}</span></span><span class="token string">"</span></span>
+    <span class="token keyword">return</span> <span class="token string">"BLD_"</span> <span class="token operator">+</span> hashlib<span class="token punctuation">.</span>sha1<span class="token punctuation">(</span>key<span class="token punctuation">.</span>encode<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">.</span>hexdigest<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token number">12</span><span class="token punctuation">]</span>
+
+gdf <span class="token operator">=</span> gpd<span class="token punctuation">.</span>GeoDataFrame<span class="token punctuation">(</span>
+    <span class="token punctuation">{</span><span class="token string">"bld_id"</span><span class="token punctuation">:</span> <span class="token punctuation">[</span>stable_id<span class="token punctuation">(</span>p<span class="token punctuation">)</span> <span class="token keyword">for</span> p <span class="token keyword">in</span> regular<span class="token punctuation">.</span>values<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+     <span class="token string">"area_m2"</span><span class="token punctuation">:</span> <span class="token punctuation">[</span><span class="token builtin">round</span><span class="token punctuation">(</span>p<span class="token punctuation">.</span>area<span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span> <span class="token keyword">for</span> p <span class="token keyword">in</span> regular<span class="token punctuation">.</span>values<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+     <span class="token string">"n_points"</span><span class="token punctuation">:</span> <span class="token punctuation">[</span><span class="token builtin">int</span><span class="token punctuation">(</span><span class="token punctuation">(</span>labels <span class="token operator">==</span> cid<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token keyword">for</span> cid <span class="token keyword">in</span> regular<span class="token punctuation">]</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+    geometry<span class="token operator">=</span><span class="token builtin">list</span><span class="token punctuation">(</span>regular<span class="token punctuation">.</span>values<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    crs<span class="token operator">=</span><span class="token string">"EPSG:32633"</span><span class="token punctuation">,</span>
+<span class="token punctuation">)</span>
+gdf<span class="token punctuation">.</span>to_file<span class="token punctuation">(</span><span class="token string">"footprints.gpkg"</span><span class="token punctuation">,</span> layer<span class="token operator">=</span><span class="token string">"buildings"</span><span class="token punctuation">,</span> driver<span class="token operator">=</span><span class="token string">"GPKG"</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span>gdf<span class="token punctuation">.</span>head<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Hashing the rounded centroid gives an id that survives a re-run over the same data and changes only when the building moves — which is exactly the behaviour a change-detection pass wants. An incrementing integer would renumber the whole city whenever one building is added.</p>
+<h3 id="5-validate-against-a-reference-with-intersection-over-union" tabindex="-1"><a class="heading-link" href="#5-validate-against-a-reference-with-intersection-over-union"><span>5. Validate against a reference with intersection-over-union</span></a></h3>
+<p>IoU is the measure that catches both over- and under-segmentation, which a simple count cannot.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> geopandas <span class="token keyword">as</span> gpd
+
+ours <span class="token operator">=</span> gpd<span class="token punctuation">.</span>read_file<span class="token punctuation">(</span><span class="token string">"footprints.gpkg"</span><span class="token punctuation">,</span> layer<span class="token operator">=</span><span class="token string">"buildings"</span><span class="token punctuation">)</span>
+ref <span class="token operator">=</span> gpd<span class="token punctuation">.</span>read_file<span class="token punctuation">(</span><span class="token string">"cadastre.gpkg"</span><span class="token punctuation">)</span><span class="token punctuation">.</span>to_crs<span class="token punctuation">(</span>ours<span class="token punctuation">.</span>crs<span class="token punctuation">)</span>
+
+joined <span class="token operator">=</span> gpd<span class="token punctuation">.</span>sjoin<span class="token punctuation">(</span>ours<span class="token punctuation">,</span> ref<span class="token punctuation">,</span> how<span class="token operator">=</span><span class="token string">"left"</span><span class="token punctuation">,</span> predicate<span class="token operator">=</span><span class="token string">"intersects"</span><span class="token punctuation">)</span>
+rows <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+<span class="token keyword">for</span> _<span class="token punctuation">,</span> r <span class="token keyword">in</span> joined<span class="token punctuation">.</span>dropna<span class="token punctuation">(</span>subset<span class="token operator">=</span><span class="token punctuation">[</span><span class="token string">"index_right"</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">.</span>iterrows<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    a <span class="token operator">=</span> r<span class="token punctuation">.</span>geometry
+    b <span class="token operator">=</span> ref<span class="token punctuation">.</span>geometry<span class="token punctuation">.</span>iloc<span class="token punctuation">[</span><span class="token builtin">int</span><span class="token punctuation">(</span>r<span class="token punctuation">.</span>index_right<span class="token punctuation">)</span><span class="token punctuation">]</span>
+    inter <span class="token operator">=</span> a<span class="token punctuation">.</span>intersection<span class="token punctuation">(</span>b<span class="token punctuation">)</span><span class="token punctuation">.</span>area
+    union <span class="token operator">=</span> a<span class="token punctuation">.</span>union<span class="token punctuation">(</span>b<span class="token punctuation">)</span><span class="token punctuation">.</span>area
+    rows<span class="token punctuation">.</span>append<span class="token punctuation">(</span>inter <span class="token operator">/</span> union <span class="token keyword">if</span> union <span class="token keyword">else</span> <span class="token number">0.0</span><span class="token punctuation">)</span>
+
+<span class="token keyword">import</span> numpy <span class="token keyword">as</span> np
+iou <span class="token operator">=</span> np<span class="token punctuation">.</span>array<span class="token punctuation">(</span>rows<span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"matched </span><span class="token interpolation"><span class="token punctuation">{</span><span class="token builtin">len</span><span class="token punctuation">(</span>iou<span class="token punctuation">)</span><span class="token punctuation">}</span></span><span class="token string"> of </span><span class="token interpolation"><span class="token punctuation">{</span><span class="token builtin">len</span><span class="token punctuation">(</span>ours<span class="token punctuation">)</span><span class="token punctuation">}</span></span><span class="token string"> footprints"</span></span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"IoU median </span><span class="token interpolation"><span class="token punctuation">{</span>np<span class="token punctuation">.</span>median<span class="token punctuation">(</span>iou<span class="token punctuation">)</span><span class="token punctuation">:</span><span class="token format-spec">.3f</span><span class="token punctuation">}</span></span><span class="token string">  |  fraction above 0.7: </span><span class="token interpolation"><span class="token punctuation">{</span><span class="token punctuation">(</span>iou <span class="token operator">></span> <span class="token number">0.7</span><span class="token punctuation">)</span><span class="token punctuation">.</span>mean<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span><span class="token format-spec">.3f</span><span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<figure class="diagram">
+<svg viewBox="26 14 698 272" role="img" aria-labelledby="bf-iou-t bf-iou-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="bf-iou-t">What intersection-over-union detects that a count does not</title>
+  <desc id="bf-iou-d">A merged terrace produces one extracted polygon covering three reference footprints, so each match scores about one third. A split roof produces three polygons against one reference. A well-matched building scores above 0.85. Counting polygons alone reports all three cases as plausible.</desc>
+  <rect class="svg-bg" x="26" y="14" width="698" height="272" fill="#ffffff"/>
+  <path d="M40 80 h200 v90 h-200 Z" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2.5"/>
+  <g fill="none" stroke="#c46a3d" stroke-width="2" stroke-dasharray="5 4">
+    <path d="M44 84 h62 v82 h-62 Z"/><path d="M110 84 h62 v82 h-62 Z"/><path d="M176 84 h60 v82 h-60 Z"/>
+  </g>
+  <path d="M300 80 h160 v90 h-160 Z" fill="none" stroke="#c46a3d" stroke-width="2" stroke-dasharray="5 4"/>
+  <g fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2.5">
+    <path d="M304 84 h48 v82 h-48 Z"/><path d="M356 84 h48 v82 h-48 Z"/><path d="M408 84 h48 v82 h-48 Z"/>
+  </g>
+  <path d="M540 82 h170 v88 h-170 Z" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2.5"/>
+  <path d="M546 86 h162 v82 h-162 Z" fill="none" stroke="#c46a3d" stroke-width="2" stroke-dasharray="5 4"/>
+  <text x="140" y="204" fill="#1f2937" font-size="12.5" text-anchor="middle">merged terrace — IoU ≈ 0.33</text>
+  <text x="380" y="204" fill="#1f2937" font-size="12.5" text-anchor="middle">split roof — IoU ≈ 0.31 each</text>
+  <text x="625" y="204" fill="#1f2937" font-size="12.5" text-anchor="middle">good match — IoU ≈ 0.91</text>
+  <text x="380" y="42" fill="#1f2937" font-size="13" text-anchor="middle" font-weight="600">Solid blue: extracted. Dashed amber: reference.</text>
+  <text x="380" y="240" fill="#15384a" font-size="12.5" text-anchor="middle">Polygon counts are 1-vs-3, 3-vs-1 and 1-vs-1 — only IoU tells you the first two are failures</text>
+  <text x="380" y="268" fill="#5b6471" font-size="12" text-anchor="middle">Tune DBSCAN eps against the merged case and alpha against the split one</text>
+</svg>
+<figcaption>The two failure directions have opposite fixes, and only a per-polygon overlap measure distinguishes them.</figcaption>
+</figure>
+<h2 id="expected-output-verification" tabindex="-1"><a class="heading-link" href="#expected-output-verification"><span>Expected Output &amp; Verification</span></a></h2>
+<p>A representative run over a dense urban tile:</p>
+<div class="codeblock" data-lang="text"><div class="codeblock__bar"><span class="codeblock__lang">text</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-text" tabindex="0" role="group" aria-label="text code sample"><code class="language-text">812,440 building points → 1,284 clusters, 9,102 unassigned
+1,196 footprints above 25 m²
+regularised 1,196 footprints
+matched 1,174 of 1,196 footprints
+IoU median 0.874  |  fraction above 0.7: 0.941
+</code></pre></div>
+<p>An IoU median above about 0.85 with more than 90% of footprints over 0.7 is a usable extraction for a city twin. The twenty-two unmatched polygons are worth inspecting individually rather than tuning away — they are typically new construction absent from the cadastre, which is a finding rather than an error.</p>
+<figure class="diagram">
+<svg viewBox="76 6 721 268" role="img" aria-labelledby="bf-hist-t bf-hist-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="bf-hist-t">The IoU distribution, and what each part of it means</title>
+  <desc id="bf-hist-d">Most footprints cluster above 0.85, which is a good match. A shoulder between 0.4 and 0.7 is usually regularisation trimming or extending an edge. A spike below 0.4 is segmentation: terraces merged or roofs split. Each region has a different remedy.</desc>
+  <rect class="svg-bg" x="76" y="6" width="721" height="268" fill="#ffffff"/>
+  <g stroke-width="2">
+    <rect x="90" y="196" width="52" height="20" rx="3" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="150" y="186" width="52" height="30" rx="3" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="210" y="176" width="52" height="40" rx="3" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="270" y="162" width="52" height="54" rx="3" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="330" y="140" width="52" height="76" rx="3" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="390" y="104" width="52" height="112" rx="3" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="450" y="70" width="52" height="146" rx="3" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="510" y="88" width="52" height="128" rx="3" fill="#eef5e9" stroke="#4f7a4d"/>
+  </g>
+  <path d="M80 216 H600" fill="none" stroke="#5b6471" stroke-width="1.5"/>
+  <g fill="#1f2937" font-size="11.5" text-anchor="middle">
+    <text x="116" y="234">0.3</text><text x="176" y="234">0.4</text><text x="236" y="234">0.5</text>
+    <text x="296" y="234">0.6</text><text x="356" y="234">0.7</text><text x="416" y="234">0.8</text>
+    <text x="476" y="234">0.9</text><text x="536" y="234">1.0</text>
+  </g>
+  <text x="340" y="256" fill="#5b6471" font-size="12" text-anchor="middle">intersection over union</text>
+  <text x="620" y="112" fill="#4f7a4d" font-size="12" text-anchor="start">good match — ship</text>
+  <text x="620" y="172" fill="#c46a3d" font-size="12" text-anchor="start">edge trimming — tune alpha</text>
+  <text x="620" y="200" fill="#b0413e" font-size="12" text-anchor="start">merged or split — tune eps</text>
+  <text x="370" y="34" fill="#1f2937" font-size="13" text-anchor="middle" font-weight="600">Where a footprint lands on this axis names the parameter to change</text>
+</svg>
+<figcaption>The distribution is more useful than the median. Its left tail is a segmentation problem and its middle shoulder is a boundary problem, and they are tuned with different parameters.</figcaption>
+</figure>
+<h2 id="common-errors" tabindex="-1"><a class="heading-link" href="#common-errors"><span>Common Errors</span></a></h2>
+<p><strong>A whole terrace comes out as one polygon.</strong> DBSCAN’s <code>eps</code> is larger than the gap between adjoining roofs — which for a terrace is zero. Terraces need either a smaller <code>eps</code> with a higher <code>min_samples</code>, or a segmentation that uses roof plane normals rather than XY proximity alone.</p>
+<p><strong>Every footprint is a rectangle, including the L-shaped ones.</strong> The <code>envelope</code> substitution in <code>regularise</code> fired because the area ratio guard was too loose. Raise the 0.92 threshold, or drop the substitution and rely on the rotated simplification alone.</p>
+<p><strong><code>TopologyException</code> when computing IoU.</strong> One of the alpha shapes is self-intersecting. Run <code>poly.buffer(0)</code> before any set operation — it is the standard Shapely idiom for repairing a ring that crosses itself.</p>
+<h2 id="frequently-asked-questions" tabindex="-1"><a class="heading-link" href="#frequently-asked-questions"><span>Frequently Asked Questions</span></a></h2>
+<h3 id="should-i-extract-footprints-from-the-point-cloud-or-use-the-cadastre" tabindex="-1"><a class="heading-link" href="#should-i-extract-footprints-from-the-point-cloud-or-use-the-cadastre"><span>Should I extract footprints from the point cloud or use the cadastre?</span></a></h3>
+<p>Use the cadastre where it exists and is current, and extract to find what it is missing. The extraction’s real value in a maintained city is change detection: buildings present in the cloud and absent from the register are new construction, and the reverse is demolition.</p>
+<h3 id="what-minimum-area-should-i-keep" tabindex="-1"><a class="heading-link" href="#what-minimum-area-should-i-keep"><span>What minimum area should I keep?</span></a></h3>
+<p>Twenty-five square metres removes sheds, bin stores and clutter without losing a small house. If the twin needs outbuildings, drop the threshold and expect the polygon count to roughly double.</p>
+<h3 id="can-i-get-building-height-at-the-same-time" tabindex="-1"><a class="heading-link" href="#can-i-get-building-height-at-the-same-time"><span>Can I get building height at the same time?</span></a></h3>
+<p>Yes, and it is nearly free: take the height-above-ground of the class 6 points in each cluster and use a high percentile — the 95th rather than the maximum, so a chimney or an aerial does not set the building height.</p>
+<p>A closing note on when to run this. Footprint extraction is cheap relative to the classification that precedes it, so the temptation is to run it on every delivery and overwrite the layer. Resist that: keep each run’s output versioned by acquisition date and diff successive versions rather than replacing. The diff is the product a city actually wants — new construction, demolition, extensions — and it is only available if the previous extraction still exists. Overwriting turns a change-detection capability into a snapshot, at no saving in compute.</p>
+<p>The other thing worth versioning is the parameter set. <code>eps</code>, <code>min_samples</code> and <code>alpha</code> together determine whether a terrace is one polygon or six, so a diff between two runs with different parameters reports building changes that are really parameter changes. Store all three alongside the layer and refuse to diff two versions that disagree on them.</p>
+<h2 id="related-guides" tabindex="-1"><a class="heading-link" href="#related-guides"><span>Related Guides</span></a></h2>
+<ul>
+<li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">LiDAR Classification and Ground Extraction</a> — producing the class 6 this consumes</li>
+<li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/pdal-smrf-vs-csf-ground-classification/">PDAL SMRF vs CSF Ground Classification</a> — the ground filter beneath it</li>
+<li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/citygml-vs-3d-tiles-for-municipal-twin-delivery/">CityGML vs 3D Tiles for Municipal Twin Delivery</a> — where footprints join attributes</li>
+</ul>
+<p>Back to <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">LiDAR Classification and Ground Extraction</a>.</p>
+
+
+      
+      
+
+      <div class="related-nav">
+        
+
+        
+          <div>
+            <h3>Related</h3>
+            <div class="related-grid">
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/pdal-smrf-vs-csf-ground-classification/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">PDAL SMRF vs CSF Ground Classification</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/reclassifying-noise-and-overlap-points-with-pdal/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Reclassifying Noise and Overlap Points with PDAL</span>
+                </a>
+              
+            </div>
+          </div>
+        
+      </div>
+    </article>
+
+    
+    <aside class="toc" aria-label="On this page" data-toc hidden>
+      <h4>On this page</h4>
+      <ul></ul>
+    </aside>
+  </div>
+</div>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+  <div class="container site-footer__inner">
+    <div class="site-footer__brand">
+      <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+        <img src="/assets/img/logo-mark.svg" alt="" class="brand__mark" width="36" height="36">
+        <span class="brand__name">
+          3D Geospatial
+          <small>Digital Twin Automation</small>
+        </span>
+      </a>
+      <p>Engineering-grade guides on point cloud processing, mesh pipelines, LOD strategies, and CI/CD automation for digital twin platforms.</p>
+      <a class="footer-social" href="https://github.com/3d-geospatial" aria-label="3D Geospatial on GitHub" rel="noopener" target="_blank">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+          <path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.53-1.34-1.3-1.7-1.3-1.7-1.06-.72.08-.71.08-.71 1.17.08 1.79 1.2 1.79 1.2 1.04 1.79 2.73 1.27 3.4.97.1-.75.4-1.27.73-1.56-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.19-3.08-.12-.3-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.75.11 3.05.74.8 1.19 1.83 1.19 3.08 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.07.78 2.15v3.18c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5Z"/>
+        </svg>
+        <span>GitHub</span>
+      </a>
+    </div>
+
+    <div class="site-footer__col">
+      <h4>Sections</h4>
+      <ul>
+        <li><a href="https://www.3d-geospatial.com/">Home</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management &amp; Optimization</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/">Point Cloud &amp; Mesh Pipelines</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/">Troubleshooting &amp; Reliability</a></li>
+        
+      </ul>
+    </div>
+
+    
+      <div class="site-footer__col">
+        <h4>3D Geospatial Fundamentals</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/">3D Format Standards Comparison</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems for 3D Assets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/">Digital Elevation Model Workflows</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/">Spatial Indexing and Tiling Schemes for 3D Data</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>LOD Management &amp; Optimization</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/">Automated Tile Generation for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/">Cesium ion Upload Automation for 3D Tilesets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/">glTF LOD Generation With Draco Compression</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/">Streaming Sync Patterns for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/">Tileset Metadata and 3D Tiles Next</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Point Cloud &amp; Mesh Pipelines</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/">Automated Mesh Decimation for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/">CI/CD Automation for Spatial Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">LiDAR Classification and Ground Extraction</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/">Point Cloud Filtering Techniques</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/">Surface Reconstruction for Geospatial Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/">Texture Mapping Workflows for Digital Twins</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Troubleshooting &amp; Reliability</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/">Cross-Section Failure Modes in Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/">Data Validation &amp; QA Gates for 3D Tiles</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/">Performance Profiling and Benchmarking</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/">Streaming &amp; Runtime Diagnostics for 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+  </div>
+  <div class="container site-footer__bottom">
+    <span>© 2026 3D Geospatial &amp; Digital Twin Automation</span>
+    <span>Built with Eleventy · PWA-enabled</span>
+  </div>
+</footer>
+
+
+  <script src="/assets/js/site.js?v=b99aa9f971" defer></script>
+  
+</body>
+</html>

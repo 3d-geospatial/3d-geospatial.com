@@ -1,0 +1,672 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <title>Profiling PDAL Pipelines with cProfile and py-spy — 3D Geospatial</title>
+  <meta name="description" content="Find where a PDAL job&#39;s wall clock goes: stage timings from pipeline metadata, native flame graphs with py-spy, and separating I/O from filter cost.">
+  <meta name="keywords" content="3D geospatial, digital twin, point cloud, mesh pipeline, LOD, 3D Tiles, Cesium, PDAL, Open3D, Python, CI/CD">
+  <meta name="author" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta name="theme-color" content="#1f6b8a" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f171d" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+
+  
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem("theme");
+        var theme = (stored === "dark" || stored === "light") ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    })();
+  </script>
+  <meta name="generator" content="Eleventy">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="googlebot" content="index,follow,max-image-preview:large">
+
+  
+  <link rel="canonical" href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/profiling-pdal-pipelines-with-cprofile-and-py-spy/">
+  <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">
+
+  
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/icon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+
+  
+  <link rel="apple-touch-icon" href="/assets/img/icon-180.png">
+  <link rel="mask-icon" href="/assets/img/logo.svg" color="#1f6b8a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="3D Geospatial">
+  <meta name="application-name" content="3D Geospatial">
+
+  
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Profiling PDAL Pipelines with cProfile and py-spy — 3D Geospatial">
+  <meta property="og:description" content="Find where a PDAL job&#39;s wall clock goes: stage timings from pipeline metadata, native flame graphs with py-spy, and separating I/O from filter cost.">
+  <meta property="og:url" content="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/profiling-pdal-pipelines-with-cprofile-and-py-spy/">
+  <meta property="og:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+  <meta property="og:site_name" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta property="og:locale" content="en_US">
+  
+  <meta property="article:published_time" content="2026-08-07T09:25:29.608Z">
+  <meta property="article:modified_time" content="2026-08-07T09:25:29.608Z">
+  <meta property="article:publisher" content="https://www.3d-geospatial.com/">
+  
+
+  
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Profiling PDAL Pipelines with cProfile and py-spy — 3D Geospatial">
+  <meta name="twitter:description" content="Find where a PDAL job&#39;s wall clock goes: stage timings from pipeline metadata, native flame graphs with py-spy, and separating I/O from filter cost.">
+  <meta name="twitter:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta name="twitter:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+
+  
+  <link rel="preload" href="/assets/css/styles.css?v=546adeb511" as="style">
+  
+
+  <link rel="stylesheet" href="/assets/css/styles.css?v=546adeb511">
+
+  
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.3d-geospatial.com/#organization",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "url": "https://www.3d-geospatial.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/icon-512.png",
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://www.3d-geospatial.com/#website",
+      "url": "https://www.3d-geospatial.com/",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "description": "Build reliable 3D spatial data pipelines for digital twins — point clouds, meshes, LOD strategies, Python processing, and CI/CD automation.",
+      "inLanguage": "en",
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      }
+    },
+    {
+      "@type": "TechArticle",
+      "@id": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/profiling-pdal-pipelines-with-cprofile-and-py-spy/#article",
+      "isPartOf": {
+        "@id": "https://www.3d-geospatial.com/#website"
+      },
+      "headline": "Profiling PDAL Pipelines with cProfile and py-spy",
+      "name": "Profiling PDAL Pipelines with cProfile and py-spy",
+      "description": "Find where a PDAL job's wall clock goes: stage timings from pipeline metadata, native flame graphs with py-spy, and separating I/O from filter cost.",
+      "url": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/profiling-pdal-pipelines-with-cprofile-and-py-spy/",
+      "mainEntityOfPage": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/profiling-pdal-pipelines-with-cprofile-and-py-spy/",
+      "inLanguage": "en",
+      "datePublished": "2026-08-07T09:25:29.608Z",
+      "dateModified": "2026-08-07T09:25:29.608Z",
+      "author": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "image": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/og-cover.png",
+        "width": 1200,
+        "height": 630
+      },
+      "breadcrumb": {
+        "@id": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/profiling-pdal-pipelines-with-cprofile-and-py-spy/#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/profiling-pdal-pipelines-with-cprofile-and-py-spy/#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://www.3d-geospatial.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Digital Twin Troubleshooting And Reliability",
+          "item": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Performance Profiling And Benchmarking",
+          "item": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "name": "Profiling Pdal Pipelines With Cprofile And Py Spy",
+          "item": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/profiling-pdal-pipelines-with-cprofile-and-py-spy/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  
+<header class="site-header" role="banner">
+  <div class="container site-header__inner">
+    <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+      <img src="/assets/img/logo.svg" alt="" class="brand__mark" width="36" height="36">
+      <span class="brand__name">
+        3D Geospatial
+        <small>Digital Twin Automation</small>
+      </span>
+    </a>
+
+    <button class="theme-toggle" type="button" data-theme-toggle
+            aria-label="Switch to dark theme" title="Switch to dark theme">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4.2"/>
+        <path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/>
+      </svg>
+    </button>
+
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>
+      <span class="nav-toggle__icon" aria-hidden="true"><span></span></span>
+      Menu
+    </button>
+
+    <nav class="primary-nav" id="primary-nav" aria-label="Primary">
+      
+      <a href="https://www.3d-geospatial.com/" >
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/>
+        </svg>
+        Home
+      </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2 3 7l9 5 9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 17l9 5 9-5"/>
+            </svg>
+          
+          3D Geospatial Fundamentals
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+          
+          LOD Management &amp; Optimization
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="6" cy="6" r="1.5"/><circle cx="12" cy="6" r="1.5"/><circle cx="18" cy="6" r="1.5"/>
+              <circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/>
+              <circle cx="6" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="18" cy="18" r="1.5"/>
+            </svg>
+          
+          Point Cloud &amp; Mesh Pipelines
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/" aria-current="page">
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <path d="M12 9v4"/><path d="M12 17h.01"/>
+            </svg>
+          
+          Troubleshooting &amp; Reliability
+        </a>
+      
+    </nav>
+  </div>
+</header>
+
+
+  <main id="main">
+    
+
+
+<div class="container">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    
+      
+        <a href="https://www.3d-geospatial.com/">Home</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/">Digital Twin Troubleshooting And Reliability</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/">Performance Profiling And Benchmarking</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <span class="current">Profiling Pdal Pipelines With Cprofile And Py Spy</span>
+      
+    
+  </nav>
+
+  <div class="content-page">
+    <article class="article">
+      <h1 id="profiling-pdal-pipelines-with-cprofile-and-py-spy" tabindex="-1"><a class="heading-link" href="#profiling-pdal-pipelines-with-cprofile-and-py-spy"><span>Profiling PDAL Pipelines with cProfile and py-spy</span></a></h1>
+<p>This page finds where a PDAL job actually spends its time — using the pipeline’s own stage metadata first, <code>py-spy --native</code> when that is not enough, and <code>cProfile</code> only for the Python that surrounds the pipeline. The recurring finding is that reading and decompressing dominates, and the filters teams spend their time tuning are a minority of the cost, which changes what is worth optimising.</p>
+<h2 id="why-you-hit-this" tabindex="-1"><a class="heading-link" href="#why-you-hit-this"><span>Why you hit this</span></a></h2>
+<p>A PDAL pipeline is a Python object wrapping a C++ execution graph, and that boundary is where naive profiling fails. <code>cProfile</code> sees one call to <code>execute()</code> taking eleven minutes and reports nothing else, because everything below it is native. The result is that people optimise the Python around the pipeline — the file listing, the JSON construction — which is measured in milliseconds, while the eleven minutes stay exactly where they were.</p>
+<h2 id="prerequisites" tabindex="-1"><a class="heading-link" href="#prerequisites"><span>Prerequisites</span></a></h2>
+<ul>
+<li>PDAL 2.6+ with Python bindings, plus <code>py-spy&gt;=0.3</code> (<code>pip install py-spy</code>) and <code>psutil&gt;=5.9</code>.</li>
+<li>Debug symbols available for native frames. The conda-forge PDAL builds carry enough for <code>py-spy --native</code> to resolve stage names.</li>
+<li>A representative tile — tens of millions of points, not a test fixture.</li>
+<li>On Linux, either root or <code>sysctl kernel.yama.ptrace_scope=0</code> so <code>py-spy</code> can attach to a running process.</li>
+</ul>
+<h2 id="step-by-step" tabindex="-1"><a class="heading-link" href="#step-by-step"><span>Step-by-Step</span></a></h2>
+<h3 id="1-read-the-stage-timings-pdal-already-reports" tabindex="-1"><a class="heading-link" href="#1-read-the-stage-timings-pdal-already-reports"><span>1. Read the stage timings PDAL already reports</span></a></h3>
+<p>Before reaching for a profiler, ask the pipeline. PDAL records per-stage metadata including how long each stage ran.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> json
+<span class="token keyword">import</span> pdal
+
+spec <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token string">"pipeline"</span><span class="token punctuation">:</span> <span class="token punctuation">[</span>
+    <span class="token string">"tile_utm33n.laz"</span><span class="token punctuation">,</span>
+    <span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"filters.outlier"</span><span class="token punctuation">,</span> <span class="token string">"method"</span><span class="token punctuation">:</span> <span class="token string">"statistical"</span><span class="token punctuation">,</span> <span class="token string">"mean_k"</span><span class="token punctuation">:</span> <span class="token number">12</span><span class="token punctuation">,</span> <span class="token string">"multiplier"</span><span class="token punctuation">:</span> <span class="token number">2.5</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+    <span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"filters.smrf"</span><span class="token punctuation">,</span> <span class="token string">"window"</span><span class="token punctuation">:</span> <span class="token number">18.0</span><span class="token punctuation">,</span> <span class="token string">"slope"</span><span class="token punctuation">:</span> <span class="token number">0.2</span><span class="token punctuation">,</span> <span class="token string">"threshold"</span><span class="token punctuation">:</span> <span class="token number">0.45</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+    <span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"filters.range"</span><span class="token punctuation">,</span> <span class="token string">"limits"</span><span class="token punctuation">:</span> <span class="token string">"Classification[2:2]"</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+    <span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"writers.las"</span><span class="token punctuation">,</span> <span class="token string">"filename"</span><span class="token punctuation">:</span> <span class="token string">"ground.laz"</span><span class="token punctuation">,</span> <span class="token string">"forward"</span><span class="token punctuation">:</span> <span class="token string">"all"</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+<span class="token punctuation">]</span><span class="token punctuation">}</span>
+
+p <span class="token operator">=</span> pdal<span class="token punctuation">.</span>Pipeline<span class="token punctuation">(</span>json<span class="token punctuation">.</span>dumps<span class="token punctuation">(</span>spec<span class="token punctuation">)</span><span class="token punctuation">)</span>
+n <span class="token operator">=</span> p<span class="token punctuation">.</span>execute<span class="token punctuation">(</span><span class="token punctuation">)</span>
+
+meta <span class="token operator">=</span> p<span class="token punctuation">.</span>metadata<span class="token punctuation">[</span><span class="token string">"metadata"</span><span class="token punctuation">]</span>
+<span class="token keyword">for</span> stage<span class="token punctuation">,</span> m <span class="token keyword">in</span> meta<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">if</span> <span class="token builtin">isinstance</span><span class="token punctuation">(</span>m<span class="token punctuation">,</span> <span class="token builtin">dict</span><span class="token punctuation">)</span> <span class="token keyword">and</span> <span class="token string">"stage_wall_time"</span> <span class="token keyword">in</span> m<span class="token punctuation">:</span>
+        <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>stage<span class="token punctuation">:</span><span class="token format-spec">&lt;28</span><span class="token punctuation">}</span></span><span class="token string"> </span><span class="token interpolation"><span class="token punctuation">{</span>m<span class="token punctuation">[</span><span class="token string">'stage_wall_time'</span><span class="token punctuation">]</span><span class="token punctuation">:</span><span class="token format-spec">8.2f</span><span class="token punctuation">}</span></span><span class="token string">s"</span></span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>n<span class="token punctuation">:</span><span class="token format-spec">,</span><span class="token punctuation">}</span></span><span class="token string"> points through the pipeline"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>This costs nothing and answers the question most of the time. A stage taking 60% of the run is the one to think about, and no flame graph is needed to establish that.</p>
+<h3 id="2-separate-io-from-computation" tabindex="-1"><a class="heading-link" href="#2-separate-io-from-computation"><span>2. Separate I/O from computation</span></a></h3>
+<p>The reader’s time is decompression plus disk, and those respond to completely different fixes. Separating them takes one extra run against an uncompressed copy.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> time
+<span class="token keyword">import</span> json
+<span class="token keyword">import</span> pdal
+
+<span class="token keyword">def</span> <span class="token function">time_read</span><span class="token punctuation">(</span>path<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    t0 <span class="token operator">=</span> time<span class="token punctuation">.</span>perf_counter<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    p <span class="token operator">=</span> pdal<span class="token punctuation">.</span>Pipeline<span class="token punctuation">(</span>json<span class="token punctuation">.</span>dumps<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"pipeline"</span><span class="token punctuation">:</span> <span class="token punctuation">[</span>path<span class="token punctuation">]</span><span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    n <span class="token operator">=</span> p<span class="token punctuation">.</span>execute<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> time<span class="token punctuation">.</span>perf_counter<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">-</span> t0<span class="token punctuation">,</span> n
+
+laz_s<span class="token punctuation">,</span> n <span class="token operator">=</span> time_read<span class="token punctuation">(</span><span class="token string">"tile_utm33n.laz"</span><span class="token punctuation">)</span>
+las_s<span class="token punctuation">,</span> _ <span class="token operator">=</span> time_read<span class="token punctuation">(</span><span class="token string">"tile_utm33n.las"</span><span class="token punctuation">)</span>          <span class="token comment"># same data, uncompressed</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"LAZ </span><span class="token interpolation"><span class="token punctuation">{</span>laz_s<span class="token punctuation">:</span><span class="token format-spec">.1f</span><span class="token punctuation">}</span></span><span class="token string">s | LAS </span><span class="token interpolation"><span class="token punctuation">{</span>las_s<span class="token punctuation">:</span><span class="token format-spec">.1f</span><span class="token punctuation">}</span></span><span class="token string">s | decompression ≈ </span><span class="token interpolation"><span class="token punctuation">{</span>laz_s <span class="token operator">-</span> las_s<span class="token punctuation">:</span><span class="token format-spec">.1f</span><span class="token punctuation">}</span></span><span class="token string">s "</span></span>
+      <span class="token string-interpolation"><span class="token string">f"(</span><span class="token interpolation"><span class="token punctuation">{</span><span class="token number">100</span> <span class="token operator">*</span> <span class="token punctuation">(</span>laz_s <span class="token operator">-</span> las_s<span class="token punctuation">)</span> <span class="token operator">/</span> laz_s<span class="token punctuation">:</span><span class="token format-spec">.0f</span><span class="token punctuation">}</span></span><span class="token string">% of the read)"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>If decompression dominates, the fix is COPC or a chunked reader that decompresses only the extent you need. If raw I/O dominates, the fix is faster storage or reading from object storage in parallel — and the two are frequently confused, with teams switching formats to solve a disk problem.</p>
+<figure class="diagram">
+<svg viewBox="13 46 714 208" role="img" aria-labelledby="pf-io-t pf-io-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="pf-io-t">Splitting a reader's time into disk and decompression</title>
+  <desc id="pf-io-d">Reading a compressed LAZ tile takes 214 seconds. Reading the same data uncompressed takes 61, so decompression accounts for about seventy per cent of the read. The two halves respond to different remedies: faster storage helps the disk half and a chunked or COPC reader helps the decompression half.</desc>
+  <rect class="svg-bg" x="13" y="46" width="714" height="208" fill="#ffffff"/>
+  <g stroke-width="2">
+    <rect x="60" y="60" width="470" height="30" rx="4" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="60" y="98" width="134" height="30" rx="4" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="60" y="150" width="336" height="30" rx="4" fill="#fdf3e0" stroke="#c46a3d"/>
+  </g>
+  <g fill="#1f2937" font-size="12" text-anchor="start">
+    <text x="540" y="80">LAZ read — 214 s</text>
+    <text x="204" y="118">LAS read — 61 s (disk only)</text>
+    <text x="406" y="170">decompression — 153 s, 71% of the read</text>
+  </g>
+  <text x="370" y="212" fill="#15384a" font-size="12.5" text-anchor="middle">Faster storage would recover at most 61 s; a chunked reader that decompresses one extent recovers most of the 153</text>
+  <text x="370" y="236" fill="#5b6471" font-size="12" text-anchor="middle">Two runs and a subtraction, and the optimisation stops being a guess</text>
+</svg>
+<figcaption>Two numbers separate two remedies that are routinely confused. The measurement takes one extra run against an uncompressed copy.</figcaption>
+</figure>
+<h3 id="3-take-a-native-flame-graph-when-a-stage-needs-opening-up" tabindex="-1"><a class="heading-link" href="#3-take-a-native-flame-graph-when-a-stage-needs-opening-up"><span>3. Take a native flame graph when a stage needs opening up</span></a></h3>
+<p>When one stage dominates and you need to know why, sample it with native frames.</p>
+<div class="codeblock" data-lang="bash"><div class="codeblock__bar"><span class="codeblock__lang">bash</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-bash" tabindex="0" role="group" aria-label="bash code sample"><code class="language-bash">python pipeline.py tile_utm33n.laz <span class="token operator">&amp;</span>
+<span class="token assign-left variable">PID</span><span class="token operator">=</span><span class="token variable">$!</span>
+py-spy record <span class="token parameter variable">--pid</span> <span class="token variable">$PID</span> <span class="token parameter variable">--native</span> <span class="token parameter variable">--rate</span> <span class="token number">100</span> <span class="token parameter variable">--duration</span> <span class="token number">120</span> <span class="token punctuation">\</span>
+              <span class="token parameter variable">--format</span> speedscope <span class="token parameter variable">--output</span> profile.json
+<span class="token function">wait</span> <span class="token variable">$PID</span>
+</code></pre></div>
+<p>Then read the profile programmatically rather than only in a viewer, so the finding can go into a commit message:</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> collections
+<span class="token keyword">import</span> json
+
+prof <span class="token operator">=</span> json<span class="token punctuation">.</span>load<span class="token punctuation">(</span><span class="token builtin">open</span><span class="token punctuation">(</span><span class="token string">"profile.json"</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+frames <span class="token operator">=</span> prof<span class="token punctuation">[</span><span class="token string">"shared"</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token string">"frames"</span><span class="token punctuation">]</span>
+weights <span class="token operator">=</span> collections<span class="token punctuation">.</span>Counter<span class="token punctuation">(</span><span class="token punctuation">)</span>
+
+<span class="token keyword">for</span> p <span class="token keyword">in</span> prof<span class="token punctuation">[</span><span class="token string">"profiles"</span><span class="token punctuation">]</span><span class="token punctuation">:</span>
+    <span class="token keyword">for</span> ev <span class="token keyword">in</span> p<span class="token punctuation">[</span><span class="token string">"events"</span><span class="token punctuation">]</span><span class="token punctuation">:</span>
+        <span class="token keyword">if</span> ev<span class="token punctuation">[</span><span class="token string">"type"</span><span class="token punctuation">]</span> <span class="token operator">==</span> <span class="token string">"C"</span><span class="token punctuation">:</span>                      <span class="token comment"># close: a frame finished</span>
+            weights<span class="token punctuation">[</span>frames<span class="token punctuation">[</span>ev<span class="token punctuation">[</span><span class="token string">"frame"</span><span class="token punctuation">]</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token string">"name"</span><span class="token punctuation">]</span><span class="token punctuation">]</span> <span class="token operator">+=</span> ev<span class="token punctuation">[</span><span class="token string">"at"</span><span class="token punctuation">]</span>
+
+total <span class="token operator">=</span> <span class="token builtin">sum</span><span class="token punctuation">(</span>weights<span class="token punctuation">.</span>values<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token keyword">or</span> <span class="token number">1</span>
+<span class="token keyword">for</span> name<span class="token punctuation">,</span> w <span class="token keyword">in</span> weights<span class="token punctuation">.</span>most_common<span class="token punctuation">(</span><span class="token number">12</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span><span class="token number">100</span> <span class="token operator">*</span> w <span class="token operator">/</span> total<span class="token punctuation">:</span><span class="token format-spec">5.1f</span><span class="token punctuation">}</span></span><span class="token string">%  </span><span class="token interpolation"><span class="token punctuation">{</span>name<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token format-spec">70]</span><span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<h3 id="4-use-cprofile-only-for-the-python-around-the-pipeline" tabindex="-1"><a class="heading-link" href="#4-use-cprofile-only-for-the-python-around-the-pipeline"><span>4. Use cProfile only for the Python around the pipeline</span></a></h3>
+<p>There is real Python cost in a batch job — tile enumeration, manifest hashing, result aggregation — and <code>cProfile</code> is the right tool for exactly that.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> cProfile
+<span class="token keyword">import</span> pstats
+
+pr <span class="token operator">=</span> cProfile<span class="token punctuation">.</span>Profile<span class="token punctuation">(</span><span class="token punctuation">)</span>
+pr<span class="token punctuation">.</span>enable<span class="token punctuation">(</span><span class="token punctuation">)</span>
+manifest <span class="token operator">=</span> build_manifest<span class="token punctuation">(</span>tile_paths<span class="token punctuation">)</span>          <span class="token comment"># hashing, globbing, JSON</span>
+dirty <span class="token operator">=</span> select_dirty<span class="token punctuation">(</span>manifest<span class="token punctuation">,</span> previous<span class="token punctuation">)</span>
+pr<span class="token punctuation">.</span>disable<span class="token punctuation">(</span><span class="token punctuation">)</span>
+
+pstats<span class="token punctuation">.</span>Stats<span class="token punctuation">(</span>pr<span class="token punctuation">)</span><span class="token punctuation">.</span>sort_stats<span class="token punctuation">(</span><span class="token string">"tottime"</span><span class="token punctuation">)</span><span class="token punctuation">.</span>print_stats<span class="token punctuation">(</span><span class="token number">10</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Keep it off the <code>execute()</code> call itself. Wrapping a native call in a deterministic profiler adds overhead to the wrapper and measures nothing inside.</p>
+<h3 id="5-watch-memory-alongside-time" tabindex="-1"><a class="heading-link" href="#5-watch-memory-alongside-time"><span>5. Watch memory alongside time</span></a></h3>
+<p>A job that is slow because it is swapping looks in a CPU profile like a job that is slow in whatever function happened to touch memory. Sampling RSS separates the two.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> threading
+<span class="token keyword">import</span> time
+<span class="token keyword">import</span> psutil
+
+<span class="token keyword">def</span> <span class="token function">watch</span><span class="token punctuation">(</span>pid<span class="token punctuation">,</span> out<span class="token punctuation">,</span> interval<span class="token operator">=</span><span class="token number">1.0</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    proc <span class="token operator">=</span> psutil<span class="token punctuation">.</span>Process<span class="token punctuation">(</span>pid<span class="token punctuation">)</span>
+    <span class="token keyword">while</span> proc<span class="token punctuation">.</span>is_running<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">try</span><span class="token punctuation">:</span>
+            out<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">(</span>time<span class="token punctuation">.</span>perf_counter<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> proc<span class="token punctuation">.</span>memory_info<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span>rss <span class="token operator">/</span> <span class="token number">1e9</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+        <span class="token keyword">except</span> psutil<span class="token punctuation">.</span>NoSuchProcess<span class="token punctuation">:</span>
+            <span class="token keyword">break</span>
+        time<span class="token punctuation">.</span>sleep<span class="token punctuation">(</span>interval<span class="token punctuation">)</span>
+
+samples <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+t <span class="token operator">=</span> threading<span class="token punctuation">.</span>Thread<span class="token punctuation">(</span>target<span class="token operator">=</span>watch<span class="token punctuation">,</span> args<span class="token operator">=</span><span class="token punctuation">(</span>os<span class="token punctuation">.</span>getpid<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> samples<span class="token punctuation">)</span><span class="token punctuation">,</span> daemon<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+t<span class="token punctuation">.</span>start<span class="token punctuation">(</span><span class="token punctuation">)</span>
+
+run_pipeline<span class="token punctuation">(</span><span class="token string">"tile_utm33n.laz"</span><span class="token punctuation">)</span>
+peak <span class="token operator">=</span> <span class="token builtin">max</span><span class="token punctuation">(</span>rss <span class="token keyword">for</span> _<span class="token punctuation">,</span> rss <span class="token keyword">in</span> samples<span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"peak RSS </span><span class="token interpolation"><span class="token punctuation">{</span>peak<span class="token punctuation">:</span><span class="token format-spec">.2f</span><span class="token punctuation">}</span></span><span class="token string"> GB over </span><span class="token interpolation"><span class="token punctuation">{</span><span class="token builtin">len</span><span class="token punctuation">(</span>samples<span class="token punctuation">)</span><span class="token punctuation">}</span></span><span class="token string"> samples"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>A monotonically climbing curve is accumulation, a sawtooth is streaming working correctly, and a plateau at the machine’s limit with a slow run is swapping — three different problems that a CPU profile alone reports identically.</p>
+<figure class="diagram">
+<svg viewBox="36 26 679 230" role="img" aria-labelledby="pf-shape-t pf-shape-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="pf-shape-t">Three memory shapes, three different problems</title>
+  <desc id="pf-shape-d">A resident-set curve that climbs monotonically means something is accumulating. A sawtooth means streaming is working and the peak is one chunk. A flat plateau at the machine limit with a slow run means the process is swapping, which a CPU profile misattributes to whichever function touched memory.</desc>
+  <rect class="svg-bg" x="36" y="26" width="679" height="230" fill="#ffffff"/>
+  <path d="M50 40 V190 H700" fill="none" stroke="#5b6471" stroke-width="1.5"/>
+  <path d="M50 70 H700" fill="none" stroke="#b0413e" stroke-width="1.5" stroke-dasharray="5 4"/>
+  <polyline points="70,182 120,168 170,150 220,132 260,112 290,92 310,74" fill="none" stroke="#b0413e" stroke-width="2.5"/>
+  <polyline points="360,180 380,148 382,178 402,146 404,176 424,148 426,178 446,146 448,176 468,150"
+            fill="none" stroke="#4f7a4d" stroke-width="2.5"/>
+  <polyline points="530,120 560,74 600,72 650,73 690,72" fill="none" stroke="#c46a3d" stroke-width="2.5"/>
+  <text x="700" y="64" fill="#b0413e" font-size="11.5" text-anchor="end">machine RAM</text>
+  <text x="190" y="212" fill="#b0413e" font-size="12" text-anchor="middle">accumulating</text>
+  <text x="414" y="212" fill="#4f7a4d" font-size="12" text-anchor="middle">streaming correctly</text>
+  <text x="610" y="212" fill="#c46a3d" font-size="12" text-anchor="middle">swapping</text>
+  <text x="370" y="238" fill="#15384a" font-size="12.5" text-anchor="middle">A CPU profile reports all three as &quot;slow in some function&quot; — the RSS curve names which one you have</text>
+</svg>
+<figcaption>One extra sampling thread distinguishes three failures that a CPU profile cannot tell apart.</figcaption>
+</figure>
+<figure class="diagram">
+<svg viewBox="10 38 720 168" role="img" aria-labelledby="pf-order-t pf-order-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="pf-order-t">The order to reach for each tool</title>
+  <desc id="pf-order-d">Start with stage timings the pipeline already reports, which are free and answer the question most of the time. Escalate to a native sampled profile only when one stage dominates and you need to know why. Reach for a deterministic profiler only for the Python surrounding the pipeline, and never for the pipeline itself.</desc>
+  <rect class="svg-bg" x="10" y="38" width="720" height="168" fill="#ffffff"/>
+  <g stroke-width="2">
+    <rect x="24" y="52" width="216" height="60" rx="8" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="262" y="52" width="216" height="60" rx="8" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="500" y="52" width="216" height="60" rx="8" fill="#e3f0f4" stroke="#1f6b8a"/>
+  </g>
+  <g fill="#1f2937" font-size="12" text-anchor="middle">
+    <text x="132" y="74"><tspan x="132" dy="0" font-weight="600">1 · stage metadata</tspan><tspan x="132" dy="17">free, exact, usually enough</tspan><tspan x="132" dy="16">answers: which stage?</tspan></text>
+    <text x="370" y="74"><tspan x="370" dy="0" font-weight="600">2 · py-spy --native</tspan><tspan x="370" dy="17">cheap, attaches live</tspan><tspan x="370" dy="16">answers: why that stage?</tspan></text>
+    <text x="608" y="74"><tspan x="608" dy="0" font-weight="600">3 · cProfile</tspan><tspan x="608" dy="17">Python around the pipeline</tspan><tspan x="608" dy="16">never on execute()</tspan></text>
+  </g>
+  <text x="370" y="160" fill="#15384a" font-size="12.5" text-anchor="middle">Most investigations end at step one, and every investigation that starts at step three measures the wrong thing</text>
+  <text x="370" y="188" fill="#5b6471" font-size="12" text-anchor="middle">Add the RSS sampler alongside whichever step you are on — it costs one thread and rules out an entire class of cause</text>
+</svg>
+<figcaption>Escalate rather than starting at the most powerful tool. The free measurement answers the question far more often than its cost suggests.</figcaption>
+</figure>
+<h2 id="expected-output-verification" tabindex="-1"><a class="heading-link" href="#expected-output-verification"><span>Expected Output &amp; Verification</span></a></h2>
+<p>A representative profile of a 42-million-point tile:</p>
+<div class="codeblock" data-lang="text"><div class="codeblock__bar"><span class="codeblock__lang">text</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-text" tabindex="0" role="group" aria-label="text code sample"><code class="language-text">readers.las                   214.31s
+filters.outlier                31.88s
+filters.smrf                   47.02s
+filters.range                   2.14s
+writers.las                    38.77s
+42,118,904 points through the pipeline
+
+LAZ 214.1s | LAS 61.3s | decompression ≈ 152.8s (71% of the read)
+peak RSS 3.84 GB over 334 samples
+</code></pre></div>
+<p>Read three things out of that. Reading is 64% of the run and decompression is most of it, so a chunked reader is the highest-value change available. <code>filters.smrf</code> at 14% is worth tuning only after that. And a peak RSS well under the machine’s RAM means the run is not memory-bound, so parallelism is likely to help — which the <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/parallel-b3dm-encoding-with-process-pools/">pool-sizing measurement</a> will confirm.</p>
+<p>Verify the finding before acting on it by re-running three times and checking the shares are stable within a couple of points. A share that moves by ten points between runs is measuring contention.</p>
+<h2 id="common-errors" tabindex="-1"><a class="heading-link" href="#common-errors"><span>Common Errors</span></a></h2>
+<p><strong>The flame graph is one frame deep.</strong> <code>--native</code> was omitted, so everything below the Python boundary is invisible. For PDAL, GDAL and Open3D that is the entire workload.</p>
+<p><strong><code>Permission denied</code> attaching to a process.</strong> Linux <code>ptrace_scope</code> blocks attaching to a non-child. Either run <code>py-spy</code> as root, set <code>sysctl kernel.yama.ptrace_scope=0</code>, or add <code>SYS_PTRACE</code> to the container.</p>
+<p><strong><code>cProfile</code> reports the whole run inside <code>execute</code>.</strong> That is correct and useless. Move the profiler to the Python surrounding the pipeline and sample the pipeline itself.</p>
+<p><strong>The profile attributes far less time than the wall clock.</strong> The process is blocked on I/O, which a sampler records as time in whatever frame is waiting, or the sample rate is too low to catch a stage. Compare attributed time against wall clock explicitly and investigate any large gap.</p>
+<h2 id="frequently-asked-questions" tabindex="-1"><a class="heading-link" href="#frequently-asked-questions"><span>Frequently Asked Questions</span></a></h2>
+<h3 id="can-i-profile-a-pipeline-running-in-a-container-in-ci" tabindex="-1"><a class="heading-link" href="#can-i-profile-a-pipeline-running-in-a-container-in-ci"><span>Can I profile a pipeline running in a container in CI?</span></a></h3>
+<p>Yes. Add <code>--cap-add SYS_PTRACE</code> to the container and run <code>py-spy</code> as a second process against the pipeline’s PID. It is worth doing once when a CI job is unexpectedly slow, and not worth doing on every build.</p>
+<h3 id="does---native-slow-the-pipeline-down" tabindex="-1"><a class="heading-link" href="#does---native-slow-the-pipeline-down"><span>Does <code>--native</code> slow the pipeline down?</span></a></h3>
+<p>Marginally — symbol resolution costs a little per sample, and at 100 Hz that is negligible against a job measured in minutes. It is far cheaper than the distortion <code>cProfile</code> introduces.</p>
+<h3 id="how-do-i-profile-a-streaming-pipeline" tabindex="-1"><a class="heading-link" href="#how-do-i-profile-a-streaming-pipeline"><span>How do I profile a streaming pipeline?</span></a></h3>
+<p>The same way. <code>py-spy</code> samples whatever the process is doing, so a streaming pipeline shows its steady-state distribution directly, which is usually more informative than a whole-run profile of a batch job.</p>
+<p>One more habit is worth building in. Store each profile’s headline numbers — total wall clock, the share of the top stage, peak RSS, and the machine’s core count — in the build artifact next to the output. Profiles are usually taken during an incident and discarded afterwards, so the next incident starts from nothing; a four-line record per run costs nothing and turns “is this slower than it used to be” into a lookup rather than an argument.</p>
+<p>The related discipline is to profile the workload you actually run, not a reduced version of it. Halving the tile size to make the profiling loop faster moves the bottleneck: at forty million points the run is bound by decompression and memory bandwidth, and at four million it is bound by per-call overhead in exactly the functions a profiler makes most visible. The reduced profile is not a faster version of the real one; it is a profile of a different program.</p>
+<h3 id="should-the-rss-sampler-run-in-production-jobs" tabindex="-1"><a class="heading-link" href="#should-the-rss-sampler-run-in-production-jobs"><span>Should the RSS sampler run in production jobs?</span></a></h3>
+<p>Yes. It is one thread, one syscall per second, and it converts “the job died” into a shape that names the cause. Log the peak alongside the chunk size and the worker count and capacity planning becomes interpolation from your own history.</p>
+<h3 id="can-i-compare-profiles-taken-on-different-machines" tabindex="-1"><a class="heading-link" href="#can-i-compare-profiles-taken-on-different-machines"><span>Can I compare profiles taken on different machines?</span></a></h3>
+<p>Only as shares, never as absolute times. Core count, memory bandwidth and disk type move wall clock by more than most optimisations do, so a cross-machine comparison of totals says nothing. The share of the top stage is comparable and is usually the number you actually wanted.</p>
+<h2 id="related-guides" tabindex="-1"><a class="heading-link" href="#related-guides"><span>Related Guides</span></a></h2>
+<ul>
+<li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/">Performance Profiling and Benchmarking</a> — which tool answers which question</li>
+<li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/fixing-memory-oom-in-city-scale-decimation/">Fixing Memory OOM in City-Scale Decimation</a> — when the RSS curve is the finding</li>
+<li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/parallel-b3dm-encoding-with-process-pools/">Parallel b3dm Encoding with Process Pools</a> — sizing a pool once the bottleneck is known</li>
+</ul>
+<p>Back to <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/">Performance Profiling and Benchmarking</a>.</p>
+
+
+      
+      
+
+      <div class="related-nav">
+        
+
+        
+          <div>
+            <h3>Related</h3>
+            <div class="related-grid">
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/benchmarking-draco-decode-on-mobile-gpus/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Benchmarking Draco Decode on Mobile GPUs</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/measuring-tile-load-times-in-the-cesium-frame-loop/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Measuring Tile Load Times in the Cesium Frame Loop</span>
+                </a>
+              
+            </div>
+          </div>
+        
+      </div>
+    </article>
+
+    
+    <aside class="toc" aria-label="On this page" data-toc hidden>
+      <h4>On this page</h4>
+      <ul></ul>
+    </aside>
+  </div>
+</div>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+  <div class="container site-footer__inner">
+    <div class="site-footer__brand">
+      <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+        <img src="/assets/img/logo-mark.svg" alt="" class="brand__mark" width="36" height="36">
+        <span class="brand__name">
+          3D Geospatial
+          <small>Digital Twin Automation</small>
+        </span>
+      </a>
+      <p>Engineering-grade guides on point cloud processing, mesh pipelines, LOD strategies, and CI/CD automation for digital twin platforms.</p>
+      <a class="footer-social" href="https://github.com/3d-geospatial" aria-label="3D Geospatial on GitHub" rel="noopener" target="_blank">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+          <path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.53-1.34-1.3-1.7-1.3-1.7-1.06-.72.08-.71.08-.71 1.17.08 1.79 1.2 1.79 1.2 1.04 1.79 2.73 1.27 3.4.97.1-.75.4-1.27.73-1.56-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.19-3.08-.12-.3-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.75.11 3.05.74.8 1.19 1.83 1.19 3.08 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.07.78 2.15v3.18c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5Z"/>
+        </svg>
+        <span>GitHub</span>
+      </a>
+    </div>
+
+    <div class="site-footer__col">
+      <h4>Sections</h4>
+      <ul>
+        <li><a href="https://www.3d-geospatial.com/">Home</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management &amp; Optimization</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/">Point Cloud &amp; Mesh Pipelines</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/">Troubleshooting &amp; Reliability</a></li>
+        
+      </ul>
+    </div>
+
+    
+      <div class="site-footer__col">
+        <h4>3D Geospatial Fundamentals</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/">3D Format Standards Comparison</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems for 3D Assets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/">Digital Elevation Model Workflows</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/">Spatial Indexing and Tiling Schemes for 3D Data</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>LOD Management &amp; Optimization</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/">Automated Tile Generation for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/">Cesium ion Upload Automation for 3D Tilesets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/">glTF LOD Generation With Draco Compression</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/">Streaming Sync Patterns for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/">Tileset Metadata and 3D Tiles Next</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Point Cloud &amp; Mesh Pipelines</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/">Automated Mesh Decimation for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/">CI/CD Automation for Spatial Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">LiDAR Classification and Ground Extraction</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/">Point Cloud Filtering Techniques</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/">Surface Reconstruction for Geospatial Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/">Texture Mapping Workflows for Digital Twins</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Troubleshooting &amp; Reliability</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/">Cross-Section Failure Modes in Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/">Data Validation &amp; QA Gates for 3D Tiles</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/">Performance Profiling and Benchmarking</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/">Streaming &amp; Runtime Diagnostics for 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+  </div>
+  <div class="container site-footer__bottom">
+    <span>© 2026 3D Geospatial &amp; Digital Twin Automation</span>
+    <span>Built with Eleventy · PWA-enabled</span>
+  </div>
+</footer>
+
+
+  <script src="/assets/js/site.js?v=b99aa9f971" defer></script>
+  
+</body>
+</html>

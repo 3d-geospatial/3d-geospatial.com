@@ -1,0 +1,676 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <title>Detecting and Repairing Self-Intersecting Geometry — 3D Geospatial</title>
+  <meta name="description" content="Find triangles that pass through each other with trimesh and a BVH, tell real intersections from coincident faces, and repair without collapsing the model.">
+  <meta name="keywords" content="3D geospatial, digital twin, point cloud, mesh pipeline, LOD, 3D Tiles, Cesium, PDAL, Open3D, Python, CI/CD">
+  <meta name="author" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta name="theme-color" content="#1f6b8a" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f171d" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+
+  
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem("theme");
+        var theme = (stored === "dark" || stored === "light") ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    })();
+  </script>
+  <meta name="generator" content="Eleventy">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="googlebot" content="index,follow,max-image-preview:large">
+
+  
+  <link rel="canonical" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/detecting-and-repairing-self-intersecting-geometry/">
+  <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">
+
+  
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/icon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+
+  
+  <link rel="apple-touch-icon" href="/assets/img/icon-180.png">
+  <link rel="mask-icon" href="/assets/img/logo.svg" color="#1f6b8a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="3D Geospatial">
+  <meta name="application-name" content="3D Geospatial">
+
+  
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Detecting and Repairing Self-Intersecting Geometry — 3D Geospatial">
+  <meta property="og:description" content="Find triangles that pass through each other with trimesh and a BVH, tell real intersections from coincident faces, and repair without collapsing the model.">
+  <meta property="og:url" content="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/detecting-and-repairing-self-intersecting-geometry/">
+  <meta property="og:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+  <meta property="og:site_name" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta property="og:locale" content="en_US">
+  
+  <meta property="article:published_time" content="2026-08-07T09:42:48.404Z">
+  <meta property="article:modified_time" content="2026-08-07T09:42:48.404Z">
+  <meta property="article:publisher" content="https://www.3d-geospatial.com/">
+  
+
+  
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Detecting and Repairing Self-Intersecting Geometry — 3D Geospatial">
+  <meta name="twitter:description" content="Find triangles that pass through each other with trimesh and a BVH, tell real intersections from coincident faces, and repair without collapsing the model.">
+  <meta name="twitter:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta name="twitter:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+
+  
+  <link rel="preload" href="/assets/css/styles.css?v=546adeb511" as="style">
+  
+
+  <link rel="stylesheet" href="/assets/css/styles.css?v=546adeb511">
+
+  
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.3d-geospatial.com/#organization",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "url": "https://www.3d-geospatial.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/icon-512.png",
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://www.3d-geospatial.com/#website",
+      "url": "https://www.3d-geospatial.com/",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "description": "Build reliable 3D spatial data pipelines for digital twins — point clouds, meshes, LOD strategies, Python processing, and CI/CD automation.",
+      "inLanguage": "en",
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      }
+    },
+    {
+      "@type": "TechArticle",
+      "@id": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/detecting-and-repairing-self-intersecting-geometry/#article",
+      "isPartOf": {
+        "@id": "https://www.3d-geospatial.com/#website"
+      },
+      "headline": "Detecting and Repairing Self-Intersecting Geometry",
+      "name": "Detecting and Repairing Self-Intersecting Geometry",
+      "description": "Find triangles that pass through each other with trimesh and a BVH, tell real intersections from coincident faces, and repair without collapsing the model.",
+      "url": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/detecting-and-repairing-self-intersecting-geometry/",
+      "mainEntityOfPage": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/detecting-and-repairing-self-intersecting-geometry/",
+      "inLanguage": "en",
+      "datePublished": "2026-08-07T09:42:48.404Z",
+      "dateModified": "2026-08-07T09:42:48.404Z",
+      "author": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "image": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/og-cover.png",
+        "width": 1200,
+        "height": 630
+      },
+      "breadcrumb": {
+        "@id": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/detecting-and-repairing-self-intersecting-geometry/#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/detecting-and-repairing-self-intersecting-geometry/#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://www.3d-geospatial.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "3D Geospatial Fundamentals For Digital Twins",
+          "item": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Mesh Topology Basics",
+          "item": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "name": "Detecting And Repairing Self Intersecting Geometry",
+          "item": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/detecting-and-repairing-self-intersecting-geometry/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  
+<header class="site-header" role="banner">
+  <div class="container site-header__inner">
+    <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+      <img src="/assets/img/logo.svg" alt="" class="brand__mark" width="36" height="36">
+      <span class="brand__name">
+        3D Geospatial
+        <small>Digital Twin Automation</small>
+      </span>
+    </a>
+
+    <button class="theme-toggle" type="button" data-theme-toggle
+            aria-label="Switch to dark theme" title="Switch to dark theme">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4.2"/>
+        <path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/>
+      </svg>
+    </button>
+
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>
+      <span class="nav-toggle__icon" aria-hidden="true"><span></span></span>
+      Menu
+    </button>
+
+    <nav class="primary-nav" id="primary-nav" aria-label="Primary">
+      
+      <a href="https://www.3d-geospatial.com/" >
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/>
+        </svg>
+        Home
+      </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/" aria-current="page">
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2 3 7l9 5 9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 17l9 5 9-5"/>
+            </svg>
+          
+          3D Geospatial Fundamentals
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+          
+          LOD Management &amp; Optimization
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="6" cy="6" r="1.5"/><circle cx="12" cy="6" r="1.5"/><circle cx="18" cy="6" r="1.5"/>
+              <circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/>
+              <circle cx="6" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="18" cy="18" r="1.5"/>
+            </svg>
+          
+          Point Cloud &amp; Mesh Pipelines
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <path d="M12 9v4"/><path d="M12 17h.01"/>
+            </svg>
+          
+          Troubleshooting &amp; Reliability
+        </a>
+      
+    </nav>
+  </div>
+</header>
+
+
+  <main id="main">
+    
+
+
+<div class="container">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    
+      
+        <a href="https://www.3d-geospatial.com/">Home</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals For Digital Twins</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <span class="current">Detecting And Repairing Self Intersecting Geometry</span>
+      
+    
+  </nav>
+
+  <div class="content-page">
+    <article class="article">
+      <h1 id="detecting-and-repairing-self-intersecting-geometry" tabindex="-1"><a class="heading-link" href="#detecting-and-repairing-self-intersecting-geometry"><span>Detecting and Repairing Self-Intersecting Geometry</span></a></h1>
+<p>This page finds the triangles in a mesh that pass through each other, distinguishes a genuine self-intersection from the coincident faces a boolean or a merge routinely produces, and repairs them without collapsing the surrounding geometry. Self-intersections are the topological defect that survives every other check: a mesh can be watertight, manifold, consistently wound and still have a wall passing through a floor, and every volumetric calculation on it will be wrong.</p>
+<h2 id="why-you-hit-this" tabindex="-1"><a class="heading-link" href="#why-you-hit-this"><span>Why you hit this</span></a></h2>
+<p>The checks most pipelines run — <code>is_watertight</code>, <code>is_winding_consistent</code>, non-manifold edge counts — all examine connectivity, and a self-intersection is a geometric relationship between faces that are not connected at all. Two triangles on opposite sides of a building can pass through one another while every vertex, edge and face in the mesh is locally perfect. The consequence appears downstream: a volume computed by the divergence theorem double-counts the intersecting region, a ray cast enters and exits an odd number of times, and a physics engine reports a body in permanent collision with itself.</p>
+<p>The connectivity checks this complements are in <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">mesh topology basics</a>.</p>
+<h2 id="prerequisites" tabindex="-1"><a class="heading-link" href="#prerequisites"><span>Prerequisites</span></a></h2>
+<ul>
+<li>Python 3.10+ with <code>trimesh&gt;=4.0</code>, <code>numpy&gt;=1.24</code>, <code>rtree&gt;=1.1</code> and <code>scipy&gt;=1.11</code>. Install <code>trimesh[easy]</code> to pull the optional accelerators.</li>
+<li>A mesh already merged and repaired for connectivity — self-intersection testing on an unmerged soup reports every shared edge as an intersection.</li>
+<li>Geometry on a local origin. Intersection tests are tolerance-based, and a tolerance meaningful at 15 m is meaningless at 585,000 m.</li>
+</ul>
+<h2 id="step-by-step" tabindex="-1"><a class="heading-link" href="#step-by-step"><span>Step-by-Step</span></a></h2>
+<h3 id="1-find-candidate-pairs-cheaply-with-a-bounding-volume-query" tabindex="-1"><a class="heading-link" href="#1-find-candidate-pairs-cheaply-with-a-bounding-volume-query"><span>1. Find candidate pairs cheaply with a bounding-volume query</span></a></h3>
+<p>Testing every triangle against every other is quadratic and unnecessary. An R-tree over face bounding boxes reduces it to the pairs that could possibly touch.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> numpy <span class="token keyword">as</span> np
+<span class="token keyword">import</span> trimesh
+<span class="token keyword">from</span> rtree <span class="token keyword">import</span> index
+
+mesh <span class="token operator">=</span> trimesh<span class="token punctuation">.</span>load<span class="token punctuation">(</span><span class="token string">"building_block.ply"</span><span class="token punctuation">,</span> process<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> force<span class="token operator">=</span><span class="token string">"mesh"</span><span class="token punctuation">)</span>
+tri <span class="token operator">=</span> mesh<span class="token punctuation">.</span>triangles                      <span class="token comment"># (n, 3, 3)</span>
+
+lo <span class="token operator">=</span> tri<span class="token punctuation">.</span><span class="token builtin">min</span><span class="token punctuation">(</span>axis<span class="token operator">=</span><span class="token number">1</span><span class="token punctuation">)</span>
+hi <span class="token operator">=</span> tri<span class="token punctuation">.</span><span class="token builtin">max</span><span class="token punctuation">(</span>axis<span class="token operator">=</span><span class="token number">1</span><span class="token punctuation">)</span>
+
+p <span class="token operator">=</span> index<span class="token punctuation">.</span>Property<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span> p<span class="token punctuation">.</span>dimension <span class="token operator">=</span> <span class="token number">3</span><span class="token punctuation">;</span> p<span class="token punctuation">.</span>leaf_capacity <span class="token operator">=</span> <span class="token number">64</span>
+idx <span class="token operator">=</span> index<span class="token punctuation">.</span>Index<span class="token punctuation">(</span>
+    <span class="token punctuation">(</span><span class="token punctuation">(</span>i<span class="token punctuation">,</span> <span class="token punctuation">(</span><span class="token operator">*</span>lo<span class="token punctuation">[</span>i<span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token operator">*</span>hi<span class="token punctuation">[</span>i<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token boolean">None</span><span class="token punctuation">)</span> <span class="token keyword">for</span> i <span class="token keyword">in</span> <span class="token builtin">range</span><span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>tri<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> properties<span class="token operator">=</span>p<span class="token punctuation">)</span>
+
+pairs <span class="token operator">=</span> <span class="token builtin">set</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+<span class="token keyword">for</span> i <span class="token keyword">in</span> <span class="token builtin">range</span><span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>tri<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">for</span> j <span class="token keyword">in</span> idx<span class="token punctuation">.</span>intersection<span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token operator">*</span>lo<span class="token punctuation">[</span>i<span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token operator">*</span>hi<span class="token punctuation">[</span>i<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">if</span> j <span class="token operator">></span> i <span class="token keyword">and</span> <span class="token keyword">not</span> np<span class="token punctuation">.</span>intersect1d<span class="token punctuation">(</span>mesh<span class="token punctuation">.</span>faces<span class="token punctuation">[</span>i<span class="token punctuation">]</span><span class="token punctuation">,</span> mesh<span class="token punctuation">.</span>faces<span class="token punctuation">[</span>j<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">.</span>size<span class="token punctuation">:</span>
+            pairs<span class="token punctuation">.</span>add<span class="token punctuation">(</span><span class="token punctuation">(</span>i<span class="token punctuation">,</span> j<span class="token punctuation">)</span><span class="token punctuation">)</span>              <span class="token comment"># skip faces sharing a vertex</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span><span class="token builtin">len</span><span class="token punctuation">(</span>tri<span class="token punctuation">)</span><span class="token punctuation">:</span><span class="token format-spec">,</span><span class="token punctuation">}</span></span><span class="token string"> faces → </span><span class="token interpolation"><span class="token punctuation">{</span><span class="token builtin">len</span><span class="token punctuation">(</span>pairs<span class="token punctuation">)</span><span class="token punctuation">:</span><span class="token format-spec">,</span><span class="token punctuation">}</span></span><span class="token string"> candidate pairs"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Excluding faces that share a vertex is what makes the result meaningful. Adjacent triangles touch by construction, and a test that counts them reports every mesh as catastrophically self-intersecting.</p>
+<h3 id="2-test-the-candidates-exactly" tabindex="-1"><a class="heading-link" href="#2-test-the-candidates-exactly"><span>2. Test the candidates exactly</span></a></h3>
+<p>The Möller triangle-triangle test is the standard, and it separates the two cases that matter.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> numpy <span class="token keyword">as</span> np
+
+<span class="token keyword">def</span> <span class="token function">tri_tri_intersect</span><span class="token punctuation">(</span>a<span class="token punctuation">,</span> b<span class="token punctuation">,</span> eps<span class="token operator">=</span><span class="token number">1e-9</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Möller's test. Returns 'none', 'coplanar' or 'crossing'."""</span>
+    n1 <span class="token operator">=</span> np<span class="token punctuation">.</span>cross<span class="token punctuation">(</span>a<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span> <span class="token operator">-</span> a<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">,</span> a<span class="token punctuation">[</span><span class="token number">2</span><span class="token punctuation">]</span> <span class="token operator">-</span> a<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    d1 <span class="token operator">=</span> <span class="token operator">-</span>np<span class="token punctuation">.</span>dot<span class="token punctuation">(</span>n1<span class="token punctuation">,</span> a<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    db <span class="token operator">=</span> np<span class="token punctuation">.</span>dot<span class="token punctuation">(</span>n1<span class="token punctuation">,</span> b<span class="token punctuation">.</span>T<span class="token punctuation">)</span> <span class="token operator">+</span> d1
+    <span class="token keyword">if</span> np<span class="token punctuation">.</span><span class="token builtin">all</span><span class="token punctuation">(</span>db <span class="token operator">></span> eps<span class="token punctuation">)</span> <span class="token keyword">or</span> np<span class="token punctuation">.</span><span class="token builtin">all</span><span class="token punctuation">(</span>db <span class="token operator">&lt;</span> <span class="token operator">-</span>eps<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token string">"none"</span>                       <span class="token comment"># b entirely on one side of a's plane</span>
+
+    n2 <span class="token operator">=</span> np<span class="token punctuation">.</span>cross<span class="token punctuation">(</span>b<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span> <span class="token operator">-</span> b<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">,</span> b<span class="token punctuation">[</span><span class="token number">2</span><span class="token punctuation">]</span> <span class="token operator">-</span> b<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    d2 <span class="token operator">=</span> <span class="token operator">-</span>np<span class="token punctuation">.</span>dot<span class="token punctuation">(</span>n2<span class="token punctuation">,</span> b<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    da <span class="token operator">=</span> np<span class="token punctuation">.</span>dot<span class="token punctuation">(</span>n2<span class="token punctuation">,</span> a<span class="token punctuation">.</span>T<span class="token punctuation">)</span> <span class="token operator">+</span> d2
+    <span class="token keyword">if</span> np<span class="token punctuation">.</span><span class="token builtin">all</span><span class="token punctuation">(</span>da <span class="token operator">></span> eps<span class="token punctuation">)</span> <span class="token keyword">or</span> np<span class="token punctuation">.</span><span class="token builtin">all</span><span class="token punctuation">(</span>da <span class="token operator">&lt;</span> <span class="token operator">-</span>eps<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token string">"none"</span>
+
+    <span class="token keyword">if</span> np<span class="token punctuation">.</span><span class="token builtin">all</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span><span class="token builtin">abs</span><span class="token punctuation">(</span>db<span class="token punctuation">)</span> <span class="token operator">&lt;=</span> eps<span class="token punctuation">)</span> <span class="token keyword">and</span> np<span class="token punctuation">.</span><span class="token builtin">all</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span><span class="token builtin">abs</span><span class="token punctuation">(</span>da<span class="token punctuation">)</span> <span class="token operator">&lt;=</span> eps<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token string">"coplanar"</span>                   <span class="token comment"># same plane: overlap or merely touching</span>
+    <span class="token keyword">return</span> <span class="token string">"crossing"</span>
+
+results <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token string">"none"</span><span class="token punctuation">:</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token string">"coplanar"</span><span class="token punctuation">:</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token string">"crossing"</span><span class="token punctuation">:</span> <span class="token number">0</span><span class="token punctuation">}</span>
+crossings <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+<span class="token keyword">for</span> i<span class="token punctuation">,</span> j <span class="token keyword">in</span> pairs<span class="token punctuation">:</span>
+    kind <span class="token operator">=</span> tri_tri_intersect<span class="token punctuation">(</span>tri<span class="token punctuation">[</span>i<span class="token punctuation">]</span><span class="token punctuation">,</span> tri<span class="token punctuation">[</span>j<span class="token punctuation">]</span><span class="token punctuation">)</span>
+    results<span class="token punctuation">[</span>kind<span class="token punctuation">]</span> <span class="token operator">+=</span> <span class="token number">1</span>
+    <span class="token keyword">if</span> kind <span class="token operator">==</span> <span class="token string">"crossing"</span><span class="token punctuation">:</span>
+        crossings<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">(</span>i<span class="token punctuation">,</span> j<span class="token punctuation">)</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span>results<span class="token punctuation">)</span>
+</code></pre></div>
+<p>The <code>coplanar</code> case is the one people misdiagnose. Two triangles in the same plane that overlap are almost always duplicated geometry — the same wall exported twice, or a boolean that left both operands’ faces — and the fix is deduplication rather than geometric repair. A <code>crossing</code> is a genuine self-intersection.</p>
+<figure class="diagram">
+<svg viewBox="-6 48 753 198" role="img" aria-labelledby="si-kinds-t si-kinds-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="si-kinds-t">Three relationships between two triangles, three different fixes</title>
+  <desc id="si-kinds-d">Triangles that share an edge are adjacent by construction and are not a defect. Coplanar overlapping triangles are duplicated geometry and are fixed by deduplication. Triangles that cross through each other are a genuine self-intersection and need geometric repair.</desc>
+  <rect class="svg-bg" x="-6" y="48" width="753" height="198" fill="#ffffff"/>
+  <path d="M50 80 L140 80 L95 165 Z" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <path d="M140 80 L230 80 L185 165 Z" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <path d="M300 80 L400 80 L350 165 Z" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <path d="M320 92 L420 92 L370 177 Z" fill="none" stroke="#c46a3d" stroke-width="2" stroke-dasharray="5 4"/>
+  <path d="M540 78 L650 78 L595 168 Z" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <path d="M560 160 L690 96 L640 62 Z" fill="none" stroke="#b0413e" stroke-width="2.5"/>
+  <text x="140" y="196" fill="#4f7a4d" font-size="12.5" text-anchor="middle">adjacent — not a defect</text>
+  <text x="360" y="196" fill="#c46a3d" font-size="12.5" text-anchor="middle">coplanar overlap — deduplicate</text>
+  <text x="615" y="196" fill="#b0413e" font-size="12.5" text-anchor="middle">crossing — repair geometrically</text>
+  <text x="370" y="228" fill="#15384a" font-size="12.5" text-anchor="middle">A detector that does not separate these reports thousands of defects on a healthy mesh and buries the handful that matter</text>
+</svg>
+<figcaption>Only the third is a self-intersection. Conflating the three is why teams conclude the check is too noisy to use.</figcaption>
+</figure>
+<h3 id="3-localise-the-damage-before-repairing" tabindex="-1"><a class="heading-link" href="#3-localise-the-damage-before-repairing"><span>3. Localise the damage before repairing</span></a></h3>
+<p>A repair that operates on the whole mesh is far riskier than one confined to the neighbourhood of the defect.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> numpy <span class="token keyword">as</span> np
+
+<span class="token keyword">def</span> <span class="token function">affected_region</span><span class="token punctuation">(</span>mesh<span class="token punctuation">,</span> crossings<span class="token punctuation">,</span> rings<span class="token operator">=</span><span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Faces within `rings` of any crossing face, via the face adjacency graph."""</span>
+    seed <span class="token operator">=</span> <span class="token punctuation">{</span>f <span class="token keyword">for</span> pair <span class="token keyword">in</span> crossings <span class="token keyword">for</span> f <span class="token keyword">in</span> pair<span class="token punctuation">}</span>
+    adj <span class="token operator">=</span> mesh<span class="token punctuation">.</span>face_adjacency
+    <span class="token keyword">for</span> _ <span class="token keyword">in</span> <span class="token builtin">range</span><span class="token punctuation">(</span>rings<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        grow <span class="token operator">=</span> <span class="token builtin">set</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+        <span class="token keyword">for</span> a<span class="token punctuation">,</span> b <span class="token keyword">in</span> adj<span class="token punctuation">:</span>
+            <span class="token keyword">if</span> a <span class="token keyword">in</span> seed<span class="token punctuation">:</span>
+                grow<span class="token punctuation">.</span>add<span class="token punctuation">(</span>b<span class="token punctuation">)</span>
+            <span class="token keyword">if</span> b <span class="token keyword">in</span> seed<span class="token punctuation">:</span>
+                grow<span class="token punctuation">.</span>add<span class="token punctuation">(</span>a<span class="token punctuation">)</span>
+        seed <span class="token operator">|</span><span class="token operator">=</span> grow
+    <span class="token keyword">return</span> np<span class="token punctuation">.</span>array<span class="token punctuation">(</span><span class="token builtin">sorted</span><span class="token punctuation">(</span>seed<span class="token punctuation">)</span><span class="token punctuation">)</span>
+
+region <span class="token operator">=</span> affected_region<span class="token punctuation">(</span>mesh<span class="token punctuation">,</span> crossings<span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span><span class="token builtin">len</span><span class="token punctuation">(</span>crossings<span class="token punctuation">)</span><span class="token punctuation">}</span></span><span class="token string"> crossings touch </span><span class="token interpolation"><span class="token punctuation">{</span><span class="token builtin">len</span><span class="token punctuation">(</span>region<span class="token punctuation">)</span><span class="token punctuation">}</span></span><span class="token string"> faces "</span></span>
+      <span class="token string-interpolation"><span class="token string">f"(</span><span class="token interpolation"><span class="token punctuation">{</span><span class="token number">100</span> <span class="token operator">*</span> <span class="token builtin">len</span><span class="token punctuation">(</span>region<span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token builtin">len</span><span class="token punctuation">(</span>mesh<span class="token punctuation">.</span>faces<span class="token punctuation">)</span><span class="token punctuation">:</span><span class="token format-spec">.2f</span><span class="token punctuation">}</span></span><span class="token string">% of the mesh)"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>If that percentage is small — well under one per cent is typical for a real defect — a local repair is safe. If it is large, the mesh is not self-intersecting so much as fundamentally wrong, and re-deriving it from the source is cheaper than repairing it.</p>
+<h3 id="4-repair-in-increasing-order-of-destructiveness" tabindex="-1"><a class="heading-link" href="#4-repair-in-increasing-order-of-destructiveness"><span>4. Repair, in increasing order of destructiveness</span></a></h3>
+<p>Try the cheap fixes first, and re-test after each.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> trimesh
+<span class="token keyword">import</span> numpy <span class="token keyword">as</span> np
+
+<span class="token keyword">def</span> <span class="token function">repair</span><span class="token punctuation">(</span>mesh<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    steps <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+
+    <span class="token comment"># 1. Duplicate and degenerate faces produce most coplanar reports.</span>
+    before <span class="token operator">=</span> <span class="token builtin">len</span><span class="token punctuation">(</span>mesh<span class="token punctuation">.</span>faces<span class="token punctuation">)</span>
+    mesh<span class="token punctuation">.</span>update_faces<span class="token punctuation">(</span>mesh<span class="token punctuation">.</span>unique_faces<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    mesh<span class="token punctuation">.</span>update_faces<span class="token punctuation">(</span>mesh<span class="token punctuation">.</span>nondegenerate_faces<span class="token punctuation">(</span>height<span class="token operator">=</span><span class="token number">1e-8</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    steps<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token string">"dedupe + degenerate"</span><span class="token punctuation">,</span> before <span class="token operator">-</span> <span class="token builtin">len</span><span class="token punctuation">(</span>mesh<span class="token punctuation">.</span>faces<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+
+    <span class="token comment"># 2. Merging near-coincident vertices resolves crossings caused by tiny gaps.</span>
+    before <span class="token operator">=</span> <span class="token builtin">len</span><span class="token punctuation">(</span>mesh<span class="token punctuation">.</span>vertices<span class="token punctuation">)</span>
+    mesh<span class="token punctuation">.</span>merge_vertices<span class="token punctuation">(</span>merge_tex<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> merge_norm<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+    steps<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token string">"merge vertices"</span><span class="token punctuation">,</span> before <span class="token operator">-</span> <span class="token builtin">len</span><span class="token punctuation">(</span>mesh<span class="token punctuation">.</span>vertices<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+
+    <span class="token comment"># 3. Only then, a voxel remesh of the affected region — lossy, so last.</span>
+    <span class="token keyword">return</span> mesh<span class="token punctuation">,</span> steps
+
+mesh<span class="token punctuation">,</span> steps <span class="token operator">=</span> repair<span class="token punctuation">(</span>mesh<span class="token punctuation">)</span>
+<span class="token keyword">for</span> name<span class="token punctuation">,</span> n <span class="token keyword">in</span> steps<span class="token punctuation">:</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>name<span class="token punctuation">:</span><span class="token format-spec">&lt;24</span><span class="token punctuation">}</span></span><span class="token string"> removed </span><span class="token interpolation"><span class="token punctuation">{</span>n<span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>The third option — voxelising and re-extracting the surface — always resolves self-intersections and always loses sharp edges, so it belongs behind a measurement: run it on the affected region only, then compare the result against the original with a Hausdorff distance and reject the repair if it exceeds your tolerance.</p>
+<figure class="diagram">
+<svg viewBox="-12 42 764 180" role="img" aria-labelledby="si-ladder-t si-ladder-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="si-ladder-t">Repair options ordered by what they destroy</title>
+  <desc id="si-ladder-d">Removing duplicate and degenerate faces changes nothing that was correct. Merging near-coincident vertices moves geometry only within the tolerance. Cutting and re-triangulating the intersecting faces preserves the surface but changes topology. Voxel remeshing always works and always rounds sharp edges, so it belongs last and only on the affected region.</desc>
+  <rect class="svg-bg" x="-12" y="42" width="764" height="180" fill="#ffffff"/>
+  <g stroke-width="2">
+    <rect x="30" y="56" width="160" height="52" rx="8" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="210" y="56" width="160" height="52" rx="8" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="390" y="56" width="160" height="52" rx="8" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="570" y="56" width="150" height="52" rx="8" fill="#f7dfdc" stroke="#b0413e"/>
+  </g>
+  <g fill="#1f2937" font-size="12" text-anchor="middle">
+    <text x="110" y="78"><tspan x="110" dy="0">dedupe faces</tspan><tspan x="110" dy="16">destroys nothing</tspan></text>
+    <text x="290" y="78"><tspan x="290" dy="0">merge vertices</tspan><tspan x="290" dy="16">moves within tolerance</tspan></text>
+    <text x="470" y="78"><tspan x="470" dy="0">cut and retriangulate</tspan><tspan x="470" dy="16">changes topology</tspan></text>
+    <text x="645" y="78"><tspan x="645" dy="0">voxel remesh</tspan><tspan x="645" dy="16">rounds sharp edges</tspan></text>
+  </g>
+  <path d="M30 140 H720" fill="none" stroke="#5b6471" stroke-width="2"/>
+  <text x="40" y="164" fill="#4f7a4d" font-size="12" text-anchor="start">safe</text>
+  <text x="710" y="164" fill="#b0413e" font-size="12" text-anchor="end">lossy</text>
+  <text x="370" y="204" fill="#15384a" font-size="12.5" text-anchor="middle">Re-test after every step — the first two frequently resolve everything, and each one you skip makes the next more destructive</text>
+</svg>
+<figcaption>Most self-intersections in survey-derived meshes are duplicates or sub-millimetre gaps, and are fixed by the two leftmost boxes.</figcaption>
+</figure>
+<h3 id="5-gate-on-the-crossing-count-not-on-watertightness" tabindex="-1"><a class="heading-link" href="#5-gate-on-the-crossing-count-not-on-watertightness"><span>5. Gate on the crossing count, not on watertightness</span></a></h3>
+<p>Add the check to the pipeline where connectivity is already asserted.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">assert_no_self_intersection</span><span class="token punctuation">(</span>mesh<span class="token punctuation">,</span> max_crossings<span class="token operator">=</span><span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    pairs <span class="token operator">=</span> candidate_pairs<span class="token punctuation">(</span>mesh<span class="token punctuation">)</span>
+    crossings <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">(</span>i<span class="token punctuation">,</span> j<span class="token punctuation">)</span> <span class="token keyword">for</span> i<span class="token punctuation">,</span> j <span class="token keyword">in</span> pairs
+                 <span class="token keyword">if</span> tri_tri_intersect<span class="token punctuation">(</span>mesh<span class="token punctuation">.</span>triangles<span class="token punctuation">[</span>i<span class="token punctuation">]</span><span class="token punctuation">,</span> mesh<span class="token punctuation">.</span>triangles<span class="token punctuation">[</span>j<span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token string">"crossing"</span><span class="token punctuation">]</span>
+    <span class="token keyword">if</span> <span class="token builtin">len</span><span class="token punctuation">(</span>crossings<span class="token punctuation">)</span> <span class="token operator">></span> max_crossings<span class="token punctuation">:</span>
+        <span class="token keyword">raise</span> AssertionError<span class="token punctuation">(</span>
+            <span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span><span class="token builtin">len</span><span class="token punctuation">(</span>crossings<span class="token punctuation">)</span><span class="token punctuation">}</span></span><span class="token string"> self-intersecting face pairs, e.g. </span><span class="token interpolation"><span class="token punctuation">{</span>crossings<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token format-spec">3]</span><span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token boolean">True</span>
+</code></pre></div>
+<figure class="diagram">
+<svg viewBox="46 21 648 209" role="img" aria-labelledby="si-cost-t si-cost-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="si-cost-t">Why the candidate pass is what makes the check affordable</title>
+  <desc id="si-cost-d">Testing every pair of faces in a half-million-face mesh is about one hundred and twenty billion tests. An R-tree over face bounding boxes reduces the candidates to tens of thousands, so the exact triangle-triangle test runs on a set five million times smaller and the whole check takes seconds instead of hours.</desc>
+  <rect class="svg-bg" x="46" y="21" width="648" height="209" fill="#ffffff"/>
+  <g stroke-width="2">
+    <rect x="60" y="60" width="620" height="34" rx="4" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="60" y="112" width="9" height="34" rx="3" fill="#eef5e9" stroke="#4f7a4d"/>
+  </g>
+  <g fill="#1f2937" font-size="12" text-anchor="start">
+    <text x="60" y="48">every pair — 1.2 × 10¹¹ tests, hours</text>
+    <text x="82" y="134">R-tree candidates — 1.9 × 10⁴ tests, seconds</text>
+  </g>
+  <text x="370" y="186" fill="#15384a" font-size="12.5" text-anchor="middle">The exact test is the expensive part, so the whole design is about how few pairs reach it</text>
+  <text x="370" y="212" fill="#5b6471" font-size="12" text-anchor="middle">Bars are to scale — the green one is nine pixels wide because the reduction really is that large</text>
+</svg>
+<figcaption>The bounding-box pass discards almost everything before the exact test runs, which is the difference between a check that lives in CI and one that never gets adopted.</figcaption>
+</figure>
+<h2 id="expected-output-verification" tabindex="-1"><a class="heading-link" href="#expected-output-verification"><span>Expected Output &amp; Verification</span></a></h2>
+<p>A representative run on a photogrammetric building block:</p>
+<div class="codeblock" data-lang="text"><div class="codeblock__bar"><span class="codeblock__lang">text</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-text" tabindex="0" role="group" aria-label="text code sample"><code class="language-text">482,110 faces → 18,904 candidate pairs
+{'none': 18726, 'coplanar': 162, 'crossing': 16}
+16 crossings touch 214 faces (0.04% of the mesh)
+dedupe + degenerate      removed 168
+merge vertices           removed 91
+</code></pre></div>
+<p>Three readings. The candidate reduction from a quarter of a trillion possible pairs to nineteen thousand is what makes the check affordable. The 162 coplanar pairs against 16 crossings is the usual ratio, and treating them as one number is why the check gets a reputation for noise. And 0.04% of faces affected says a local repair is safe here.</p>
+<p>Re-run the detector after repairing and require zero crossings, then confirm the volume is now plausible — a self-intersecting closed mesh frequently reports a negative or wildly inflated volume, and a sensible figure afterwards is good evidence the repair worked.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"volume:"</span><span class="token punctuation">,</span> <span class="token builtin">round</span><span class="token punctuation">(</span>mesh<span class="token punctuation">.</span>volume<span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"m³ | watertight:"</span><span class="token punctuation">,</span> mesh<span class="token punctuation">.</span>is_watertight<span class="token punctuation">)</span>
+<span class="token keyword">assert</span> mesh<span class="token punctuation">.</span>volume <span class="token operator">></span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token string">"negative volume — orientation or intersection still present"</span>
+</code></pre></div>
+<h2 id="common-errors" tabindex="-1"><a class="heading-link" href="#common-errors"><span>Common Errors</span></a></h2>
+<p><strong>Thousands of intersections on a healthy mesh.</strong> Faces sharing a vertex were not excluded, so every adjacency counts. Filter on shared vertices before testing.</p>
+<p><strong>The check takes hours.</strong> The candidate pass is missing and the test is quadratic. On a half-million-face mesh that is 120 billion pairs; with the R-tree it is tens of thousands.</p>
+<p><strong>Repair collapses a facade.</strong> Voxel remeshing was applied to the whole mesh rather than the affected region. Localise first, and always measure the Hausdorff distance against the original before accepting.</p>
+<p><strong>Volume is negative after repair.</strong> Face winding is inconsistent, which is a separate defect. Run <code>trimesh.repair.fix_normals</code> and re-check.</p>
+<h2 id="frequently-asked-questions" tabindex="-1"><a class="heading-link" href="#frequently-asked-questions"><span>Frequently Asked Questions</span></a></h2>
+<h3 id="does-a-self-intersecting-mesh-render-incorrectly" tabindex="-1"><a class="heading-link" href="#does-a-self-intersecting-mesh-render-incorrectly"><span>Does a self-intersecting mesh render incorrectly?</span></a></h3>
+<p>Usually not — the rasteriser draws both faces and the result looks fine. That is precisely why the defect survives visual review and only surfaces in a volumetric or ray-based calculation.</p>
+<h3 id="should-this-run-on-every-mesh" tabindex="-1"><a class="heading-link" href="#should-this-run-on-every-mesh"><span>Should this run on every mesh?</span></a></h3>
+<p>On every mesh that feeds a volumetric, hydrological or physics calculation, yes. On meshes that are only ever rendered, it is optional — though a crossing usually indicates something upstream went wrong that is worth knowing about anyway.</p>
+<h3 id="where-do-self-intersections-come-from" tabindex="-1"><a class="heading-link" href="#where-do-self-intersections-come-from"><span>Where do self-intersections come from?</span></a></h3>
+<p>Three sources dominate: booleans that left both operands’ faces, decimation that collapsed a thin feature through its neighbour, and photogrammetric reconstruction over a reflective surface where the depth estimate flipped. The last is the one that recurs.</p>
+<p>A word on where this belongs in a pipeline. Self-intersection is a property of a finished surface, so the natural place is immediately after reconstruction and again after decimation — the two stages that create them. Running it after texturing is wasted work, because texturing changes no geometry, and running it before merging reports adjacency as intersection.</p>
+<p>It is also worth recording the crossing count in the artifact rather than only failing on it. A mesh that goes from zero crossings to three after a decimation parameter change tells you something specific about that change, and the number is only available if somebody stored it. A boolean pass or fail discards exactly the signal that would have made the regression attributable.</p>
+<h2 id="related-guides" tabindex="-1"><a class="heading-link" href="#related-guides"><span>Related Guides</span></a></h2>
+<ul>
+<li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics for Digital Twins</a> — the connectivity checks this complements</li>
+<li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/fixing-non-manifold-edges-in-3d-meshes/">Fixing Non-Manifold Edges in 3D Meshes</a> — the defect that is about connectivity rather than geometry</li>
+<li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/">Automated Mesh Decimation for Digital Twins</a> — a common source of new crossings</li>
+</ul>
+<p>Back to <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics for Digital Twins</a>.</p>
+
+
+      
+      
+
+      <div class="related-nav">
+        
+
+        
+          <div>
+            <h3>Related</h3>
+            <div class="related-grid">
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/fixing-non-manifold-edges-in-3d-meshes/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Fixing Non-Manifold Edges in 3D Meshes</span>
+                </a>
+              
+            </div>
+          </div>
+        
+      </div>
+    </article>
+
+    
+    <aside class="toc" aria-label="On this page" data-toc hidden>
+      <h4>On this page</h4>
+      <ul></ul>
+    </aside>
+  </div>
+</div>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+  <div class="container site-footer__inner">
+    <div class="site-footer__brand">
+      <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+        <img src="/assets/img/logo-mark.svg" alt="" class="brand__mark" width="36" height="36">
+        <span class="brand__name">
+          3D Geospatial
+          <small>Digital Twin Automation</small>
+        </span>
+      </a>
+      <p>Engineering-grade guides on point cloud processing, mesh pipelines, LOD strategies, and CI/CD automation for digital twin platforms.</p>
+      <a class="footer-social" href="https://github.com/3d-geospatial" aria-label="3D Geospatial on GitHub" rel="noopener" target="_blank">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+          <path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.53-1.34-1.3-1.7-1.3-1.7-1.06-.72.08-.71.08-.71 1.17.08 1.79 1.2 1.79 1.2 1.04 1.79 2.73 1.27 3.4.97.1-.75.4-1.27.73-1.56-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.19-3.08-.12-.3-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.75.11 3.05.74.8 1.19 1.83 1.19 3.08 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.07.78 2.15v3.18c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5Z"/>
+        </svg>
+        <span>GitHub</span>
+      </a>
+    </div>
+
+    <div class="site-footer__col">
+      <h4>Sections</h4>
+      <ul>
+        <li><a href="https://www.3d-geospatial.com/">Home</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management &amp; Optimization</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/">Point Cloud &amp; Mesh Pipelines</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/">Troubleshooting &amp; Reliability</a></li>
+        
+      </ul>
+    </div>
+
+    
+      <div class="site-footer__col">
+        <h4>3D Geospatial Fundamentals</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/">3D Format Standards Comparison</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems for 3D Assets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/">Digital Elevation Model Workflows</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/">Spatial Indexing and Tiling Schemes for 3D Data</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>LOD Management &amp; Optimization</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/">Automated Tile Generation for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/">Cesium ion Upload Automation for 3D Tilesets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/">glTF LOD Generation With Draco Compression</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/">Streaming Sync Patterns for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/">Tileset Metadata and 3D Tiles Next</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Point Cloud &amp; Mesh Pipelines</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/">Automated Mesh Decimation for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/">CI/CD Automation for Spatial Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">LiDAR Classification and Ground Extraction</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/">Point Cloud Filtering Techniques</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/">Surface Reconstruction for Geospatial Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/">Texture Mapping Workflows for Digital Twins</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Troubleshooting &amp; Reliability</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/">Cross-Section Failure Modes in Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/">Data Validation &amp; QA Gates for 3D Tiles</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/">Performance Profiling and Benchmarking</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/">Streaming &amp; Runtime Diagnostics for 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+  </div>
+  <div class="container site-footer__bottom">
+    <span>© 2026 3D Geospatial &amp; Digital Twin Automation</span>
+    <span>Built with Eleventy · PWA-enabled</span>
+  </div>
+</footer>
+
+
+  <script src="/assets/js/site.js?v=b99aa9f971" defer></script>
+  
+</body>
+</html>

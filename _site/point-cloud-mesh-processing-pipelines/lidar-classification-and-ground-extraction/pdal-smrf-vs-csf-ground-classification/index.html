@@ -1,0 +1,679 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <title>PDAL SMRF vs CSF Ground Classification — 3D Geospatial</title>
+  <meta name="description" content="Run filters.smrf and filters.csf on the same tile, map each parameter to what it physically controls, and score both against labelled points before choosing.">
+  <meta name="keywords" content="3D geospatial, digital twin, point cloud, mesh pipeline, LOD, 3D Tiles, Cesium, PDAL, Open3D, Python, CI/CD">
+  <meta name="author" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta name="theme-color" content="#1f6b8a" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f171d" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+
+  
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem("theme");
+        var theme = (stored === "dark" || stored === "light") ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    })();
+  </script>
+  <meta name="generator" content="Eleventy">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="googlebot" content="index,follow,max-image-preview:large">
+
+  
+  <link rel="canonical" href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/pdal-smrf-vs-csf-ground-classification/">
+  <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">
+
+  
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/icon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+
+  
+  <link rel="apple-touch-icon" href="/assets/img/icon-180.png">
+  <link rel="mask-icon" href="/assets/img/logo.svg" color="#1f6b8a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="3D Geospatial">
+  <meta name="application-name" content="3D Geospatial">
+
+  
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="PDAL SMRF vs CSF Ground Classification — 3D Geospatial">
+  <meta property="og:description" content="Run filters.smrf and filters.csf on the same tile, map each parameter to what it physically controls, and score both against labelled points before choosing.">
+  <meta property="og:url" content="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/pdal-smrf-vs-csf-ground-classification/">
+  <meta property="og:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+  <meta property="og:site_name" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta property="og:locale" content="en_US">
+  
+  <meta property="article:published_time" content="2026-08-07T08:44:07.054Z">
+  <meta property="article:modified_time" content="2026-08-07T08:44:07.054Z">
+  <meta property="article:publisher" content="https://www.3d-geospatial.com/">
+  
+
+  
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="PDAL SMRF vs CSF Ground Classification — 3D Geospatial">
+  <meta name="twitter:description" content="Run filters.smrf and filters.csf on the same tile, map each parameter to what it physically controls, and score both against labelled points before choosing.">
+  <meta name="twitter:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta name="twitter:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+
+  
+  <link rel="preload" href="/assets/css/styles.css?v=546adeb511" as="style">
+  
+
+  <link rel="stylesheet" href="/assets/css/styles.css?v=546adeb511">
+
+  
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.3d-geospatial.com/#organization",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "url": "https://www.3d-geospatial.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/icon-512.png",
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://www.3d-geospatial.com/#website",
+      "url": "https://www.3d-geospatial.com/",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "description": "Build reliable 3D spatial data pipelines for digital twins — point clouds, meshes, LOD strategies, Python processing, and CI/CD automation.",
+      "inLanguage": "en",
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      }
+    },
+    {
+      "@type": "TechArticle",
+      "@id": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/pdal-smrf-vs-csf-ground-classification/#article",
+      "isPartOf": {
+        "@id": "https://www.3d-geospatial.com/#website"
+      },
+      "headline": "PDAL SMRF vs CSF Ground Classification",
+      "name": "PDAL SMRF vs CSF Ground Classification",
+      "description": "Run filters.smrf and filters.csf on the same tile, map each parameter to what it physically controls, and score both against labelled points before choosing.",
+      "url": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/pdal-smrf-vs-csf-ground-classification/",
+      "mainEntityOfPage": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/pdal-smrf-vs-csf-ground-classification/",
+      "inLanguage": "en",
+      "datePublished": "2026-08-07T08:44:07.054Z",
+      "dateModified": "2026-08-07T08:44:07.054Z",
+      "author": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "image": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/og-cover.png",
+        "width": 1200,
+        "height": 630
+      },
+      "breadcrumb": {
+        "@id": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/pdal-smrf-vs-csf-ground-classification/#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/pdal-smrf-vs-csf-ground-classification/#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://www.3d-geospatial.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Point Cloud Mesh Processing Pipelines",
+          "item": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Lidar Classification And Ground Extraction",
+          "item": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "name": "Pdal Smrf Vs Csf Ground Classification",
+          "item": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/pdal-smrf-vs-csf-ground-classification/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  
+<header class="site-header" role="banner">
+  <div class="container site-header__inner">
+    <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+      <img src="/assets/img/logo.svg" alt="" class="brand__mark" width="36" height="36">
+      <span class="brand__name">
+        3D Geospatial
+        <small>Digital Twin Automation</small>
+      </span>
+    </a>
+
+    <button class="theme-toggle" type="button" data-theme-toggle
+            aria-label="Switch to dark theme" title="Switch to dark theme">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4.2"/>
+        <path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/>
+      </svg>
+    </button>
+
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>
+      <span class="nav-toggle__icon" aria-hidden="true"><span></span></span>
+      Menu
+    </button>
+
+    <nav class="primary-nav" id="primary-nav" aria-label="Primary">
+      
+      <a href="https://www.3d-geospatial.com/" >
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/>
+        </svg>
+        Home
+      </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2 3 7l9 5 9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 17l9 5 9-5"/>
+            </svg>
+          
+          3D Geospatial Fundamentals
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+          
+          LOD Management &amp; Optimization
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/" aria-current="page">
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="6" cy="6" r="1.5"/><circle cx="12" cy="6" r="1.5"/><circle cx="18" cy="6" r="1.5"/>
+              <circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/>
+              <circle cx="6" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="18" cy="18" r="1.5"/>
+            </svg>
+          
+          Point Cloud &amp; Mesh Pipelines
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <path d="M12 9v4"/><path d="M12 17h.01"/>
+            </svg>
+          
+          Troubleshooting &amp; Reliability
+        </a>
+      
+    </nav>
+  </div>
+</header>
+
+
+  <main id="main">
+    
+
+
+<div class="container">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    
+      
+        <a href="https://www.3d-geospatial.com/">Home</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/">Point Cloud Mesh Processing Pipelines</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">Lidar Classification And Ground Extraction</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <span class="current">Pdal Smrf Vs Csf Ground Classification</span>
+      
+    
+  </nav>
+
+  <div class="content-page">
+    <article class="article">
+      <h1 id="pdal-smrf-vs-csf-ground-classification" tabindex="-1"><a class="heading-link" href="#pdal-smrf-vs-csf-ground-classification"><span>PDAL SMRF vs CSF Ground Classification</span></a></h1>
+<p>This page runs <code>filters.smrf</code> and <code>filters.csf</code> over the same LiDAR tile, maps every parameter to the physical thing it controls, and scores both against a labelled sample so the choice is made on numbers rather than on which output looks tidier. Both filters estimate the same surface — the lower envelope of the cloud — and they disagree in predictable places, which is what makes a per-site comparison worth the twenty minutes it takes.</p>
+<h2 id="why-you-hit-this" tabindex="-1"><a class="heading-link" href="#why-you-hit-this"><span>Why you hit this</span></a></h2>
+<p>Ground classification is the first irreversible decision in a terrain pipeline. Everything downstream — the <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/">DEM</a>, the flood extent, the clearance envelope, the volumetrics — is computed from the points this filter kept, and a point wrongly removed cannot be recovered by any later stage. The two filters PDAL ships are both good and neither is universally better, so teams tend to adopt whichever they saw first and carry it to sites it does not suit.</p>
+<h2 id="prerequisites" tabindex="-1"><a class="heading-link" href="#prerequisites"><span>Prerequisites</span></a></h2>
+<ul>
+<li>PDAL 2.6+ with the CSF plugin built in (<code>conda install -c conda-forge pdal</code> includes it; check with <code>pdal --drivers | grep csf</code>).</li>
+<li>A tile in a projected metric CRS with outliers already removed, per <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/">point cloud filtering techniques</a>.</li>
+<li>A few thousand manually labelled points across the tile’s terrain types, for scoring.</li>
+<li><code>laspy&gt;=2.5</code>, <code>numpy&gt;=1.24</code>, <code>scikit-learn&gt;=1.3</code>.</li>
+</ul>
+<h2 id="step-by-step" tabindex="-1"><a class="heading-link" href="#step-by-step"><span>Step-by-Step</span></a></h2>
+<h3 id="1-map-each-smrf-parameter-to-what-it-controls" tabindex="-1"><a class="heading-link" href="#1-map-each-smrf-parameter-to-what-it-controls"><span>1. Map each SMRF parameter to what it controls</span></a></h3>
+<p>SMRF has four parameters and every one of them is a physical quantity, which makes it tunable by reasoning about the site rather than by search.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python">SMRF <span class="token operator">=</span> <span class="token punctuation">{</span>
+    <span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"filters.smrf"</span><span class="token punctuation">,</span>
+    <span class="token string">"cell"</span><span class="token punctuation">:</span> <span class="token number">1.0</span><span class="token punctuation">,</span>        <span class="token comment"># raster cell for the minimum surface, metres.</span>
+                        <span class="token comment">#   ~= the point spacing; finer wastes work, coarser loses detail</span>
+    <span class="token string">"window"</span><span class="token punctuation">:</span> <span class="token number">18.0</span><span class="token punctuation">,</span>     <span class="token comment"># the LARGEST structure to remove, metres.</span>
+                        <span class="token comment">#   must exceed the widest building footprint on the tile</span>
+    <span class="token string">"slope"</span><span class="token punctuation">:</span> <span class="token number">0.20</span><span class="token punctuation">,</span>      <span class="token comment"># expected terrain slope as rise/run.</span>
+                        <span class="token comment">#   0.05 for a floodplain, 0.2 general, 0.5+ for mountainous</span>
+    <span class="token string">"threshold"</span><span class="token punctuation">:</span> <span class="token number">0.45</span><span class="token punctuation">,</span>  <span class="token comment"># elevation tolerance at the smallest window, metres.</span>
+                        <span class="token comment">#   ~= 2-3x the vertical accuracy of the survey</span>
+    <span class="token string">"scalar"</span><span class="token punctuation">:</span> <span class="token number">1.20</span><span class="token punctuation">,</span>     <span class="token comment"># how fast the tolerance grows with window size.</span>
+                        <span class="token comment">#   raise it where terrain is rough, lower it where it is smooth</span>
+<span class="token punctuation">}</span>
+</code></pre></div>
+<p><code>window</code> is the one that decides success. It is not a smoothing radius; it is a statement about the largest thing in the scene that is not terrain. Set it to 12 m on a tile containing a 40 m warehouse and the warehouse roof survives every opening and becomes a plateau.</p>
+<h3 id="2-map-each-csf-parameter-the-same-way" tabindex="-1"><a class="heading-link" href="#2-map-each-csf-parameter-the-same-way"><span>2. Map each CSF parameter the same way</span></a></h3>
+<p>CSF’s parameters describe a physical simulation, and two of them are commonly misread.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python">CSF <span class="token operator">=</span> <span class="token punctuation">{</span>
+    <span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"filters.csf"</span><span class="token punctuation">,</span>
+    <span class="token string">"resolution"</span><span class="token punctuation">:</span> <span class="token number">1.0</span><span class="token punctuation">,</span>   <span class="token comment"># cloth grid spacing, metres. Finer follows more detail and</span>
+                         <span class="token comment">#   costs quadratically; ~= point spacing is the usual choice</span>
+    <span class="token string">"rigidness"</span><span class="token punctuation">:</span> <span class="token number">2</span><span class="token punctuation">,</span>      <span class="token comment"># TERRAIN TYPE, not quality: 1 steep, 2 relief, 3 flat</span>
+    <span class="token string">"threshold"</span><span class="token punctuation">:</span> <span class="token number">0.35</span><span class="token punctuation">,</span>   <span class="token comment"># cloth-to-point distance counted as ground, metres</span>
+    <span class="token string">"step"</span><span class="token punctuation">:</span> <span class="token number">0.65</span><span class="token punctuation">,</span>        <span class="token comment"># simulation time step; smaller is stabler and slower</span>
+    <span class="token string">"iterations"</span><span class="token punctuation">:</span> <span class="token number">500</span><span class="token punctuation">,</span>   <span class="token comment"># simulation steps; raise until the cloth stops moving</span>
+    <span class="token string">"smooth"</span><span class="token punctuation">:</span> <span class="token boolean">True</span><span class="token punctuation">,</span>      <span class="token comment"># post-settle smoothing of the cloth</span>
+<span class="token punctuation">}</span>
+</code></pre></div>
+<p><code>rigidness</code> is an enumeration of terrain character with three valid values, not a dial. A stiff cloth spans buildings well and also spans ravines; a slack one follows a ravine and also sags into a courtyard. <code>iterations</code> is the other one worth checking — if the cloth has not settled when the simulation stops, the result depends on the iteration count, which is a silent source of run-to-run variation.</p>
+<figure class="diagram">
+<svg viewBox="10 18 767 272" role="img" aria-labelledby="sc-param-t sc-param-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="sc-param-t">What each parameter is actually a statement about</title>
+  <desc id="sc-param-d">SMRF's window is a statement about the largest non-terrain structure, its slope about the landscape, its threshold about the survey's vertical accuracy. CSF's resolution is a statement about point spacing and its rigidness about terrain type. Reading them as tuning dials rather than as descriptions of the site is what makes them hard to set.</desc>
+  <rect class="svg-bg" x="10" y="18" width="767" height="272" fill="#ffffff"/>
+  <g fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2">
+    <rect x="24" y="66" width="150" height="34" rx="6"/>
+    <rect x="24" y="110" width="150" height="34" rx="6"/>
+    <rect x="24" y="154" width="150" height="34" rx="6"/>
+    <rect x="24" y="198" width="150" height="34" rx="6"/>
+  </g>
+  <g fill="#eef5e9" stroke="#4f7a4d" stroke-width="2">
+    <rect x="410" y="66" width="150" height="34" rx="6"/>
+    <rect x="410" y="110" width="150" height="34" rx="6"/>
+    <rect x="410" y="154" width="150" height="34" rx="6"/>
+    <rect x="410" y="198" width="150" height="34" rx="6"/>
+  </g>
+  <g fill="#1f2937" font-size="12" text-anchor="middle">
+    <text x="99" y="88">window</text>
+    <text x="99" y="132">slope</text>
+    <text x="99" y="176">threshold</text>
+    <text x="99" y="220">cell</text>
+    <text x="485" y="88">rigidness</text>
+    <text x="485" y="132">resolution</text>
+    <text x="485" y="176">threshold</text>
+    <text x="485" y="220">iterations</text>
+  </g>
+  <g fill="#1f2937" font-size="12" text-anchor="start">
+    <text x="184" y="88">the widest building on the tile</text>
+    <text x="184" y="132">the landscape&#39;s rise over run</text>
+    <text x="184" y="176">the survey&#39;s vertical accuracy</text>
+    <text x="184" y="220">the point spacing</text>
+    <text x="570" y="88">terrain type: 1 steep, 2 relief, 3 flat</text>
+    <text x="570" y="132">the point spacing</text>
+    <text x="570" y="176">the survey&#39;s vertical accuracy</text>
+    <text x="570" y="220">enough for the cloth to settle</text>
+  </g>
+  <text x="99" y="46" fill="#1f6b8a" font-size="12.5" text-anchor="middle" font-weight="600">SMRF</text>
+  <text x="485" y="46" fill="#4f7a4d" font-size="12.5" text-anchor="middle" font-weight="600">CSF</text>
+  <text x="380" y="272" fill="#15384a" font-size="12.5" text-anchor="middle">Every one of these is measurable from the site or the survey report — none of them needs a parameter sweep to find</text>
+</svg>
+<figcaption>Both filters are fully determined by things you already know about the survey. The search only starts when a parameter is treated as a quality setting.</figcaption>
+</figure>
+<h3 id="3-run-both-on-the-same-input-in-one-pipeline-pass" tabindex="-1"><a class="heading-link" href="#3-run-both-on-the-same-input-in-one-pipeline-pass"><span>3. Run both on the same input in one pipeline pass</span></a></h3>
+<p>Reading the tile once and branching keeps the comparison honest and halves the I/O.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> json
+<span class="token keyword">import</span> pdal
+
+both <span class="token operator">=</span> <span class="token punctuation">{</span>
+    <span class="token string">"pipeline"</span><span class="token punctuation">:</span> <span class="token punctuation">[</span>
+        <span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"readers.las"</span><span class="token punctuation">,</span> <span class="token string">"filename"</span><span class="token punctuation">:</span> <span class="token string">"tile_utm33n.laz"</span><span class="token punctuation">,</span> <span class="token string">"tag"</span><span class="token punctuation">:</span> <span class="token string">"src"</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+        <span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"filters.assign"</span><span class="token punctuation">,</span> <span class="token string">"assignment"</span><span class="token punctuation">:</span> <span class="token string">"Classification[:]=0"</span><span class="token punctuation">,</span> <span class="token string">"tag"</span><span class="token punctuation">:</span> <span class="token string">"reset"</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+
+        <span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"filters.smrf"</span><span class="token punctuation">,</span> <span class="token string">"inputs"</span><span class="token punctuation">:</span> <span class="token punctuation">[</span><span class="token string">"reset"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token string">"tag"</span><span class="token punctuation">:</span> <span class="token string">"smrf"</span><span class="token punctuation">,</span>
+         <span class="token string">"cell"</span><span class="token punctuation">:</span> <span class="token number">1.0</span><span class="token punctuation">,</span> <span class="token string">"window"</span><span class="token punctuation">:</span> <span class="token number">18.0</span><span class="token punctuation">,</span> <span class="token string">"slope"</span><span class="token punctuation">:</span> <span class="token number">0.20</span><span class="token punctuation">,</span> <span class="token string">"threshold"</span><span class="token punctuation">:</span> <span class="token number">0.45</span><span class="token punctuation">,</span> <span class="token string">"scalar"</span><span class="token punctuation">:</span> <span class="token number">1.20</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+        <span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"writers.las"</span><span class="token punctuation">,</span> <span class="token string">"inputs"</span><span class="token punctuation">:</span> <span class="token punctuation">[</span><span class="token string">"smrf"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token string">"filename"</span><span class="token punctuation">:</span> <span class="token string">"out_smrf.laz"</span><span class="token punctuation">,</span>
+         <span class="token string">"forward"</span><span class="token punctuation">:</span> <span class="token string">"all"</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+
+        <span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"filters.csf"</span><span class="token punctuation">,</span> <span class="token string">"inputs"</span><span class="token punctuation">:</span> <span class="token punctuation">[</span><span class="token string">"reset"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token string">"tag"</span><span class="token punctuation">:</span> <span class="token string">"csf"</span><span class="token punctuation">,</span>
+         <span class="token string">"resolution"</span><span class="token punctuation">:</span> <span class="token number">1.0</span><span class="token punctuation">,</span> <span class="token string">"rigidness"</span><span class="token punctuation">:</span> <span class="token number">2</span><span class="token punctuation">,</span> <span class="token string">"threshold"</span><span class="token punctuation">:</span> <span class="token number">0.35</span><span class="token punctuation">,</span>
+         <span class="token string">"step"</span><span class="token punctuation">:</span> <span class="token number">0.65</span><span class="token punctuation">,</span> <span class="token string">"iterations"</span><span class="token punctuation">:</span> <span class="token number">500</span><span class="token punctuation">,</span> <span class="token string">"smooth"</span><span class="token punctuation">:</span> <span class="token boolean">True</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+        <span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"writers.las"</span><span class="token punctuation">,</span> <span class="token string">"inputs"</span><span class="token punctuation">:</span> <span class="token punctuation">[</span><span class="token string">"csf"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token string">"filename"</span><span class="token punctuation">:</span> <span class="token string">"out_csf.laz"</span><span class="token punctuation">,</span>
+         <span class="token string">"forward"</span><span class="token punctuation">:</span> <span class="token string">"all"</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+    <span class="token punctuation">]</span>
+<span class="token punctuation">}</span>
+p <span class="token operator">=</span> pdal<span class="token punctuation">.</span>Pipeline<span class="token punctuation">(</span>json<span class="token punctuation">.</span>dumps<span class="token punctuation">(</span>both<span class="token punctuation">)</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span>p<span class="token punctuation">.</span>execute<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"points through both filters"</span><span class="token punctuation">)</span>
+</code></pre></div>
+<h3 id="4-score-both-against-the-labelled-sample" tabindex="-1"><a class="heading-link" href="#4-score-both-against-the-labelled-sample"><span>4. Score both against the labelled sample</span></a></h3>
+<p>The comparison that decides it is per-class recall on ground, plus the vegetation-into-ground leak that puts spikes in the surface.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> numpy <span class="token keyword">as</span> np
+<span class="token keyword">import</span> laspy
+<span class="token keyword">from</span> sklearn<span class="token punctuation">.</span>metrics <span class="token keyword">import</span> confusion_matrix
+
+truth <span class="token operator">=</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>laspy<span class="token punctuation">.</span>read<span class="token punctuation">(</span><span class="token string">"validation_labelled.laz"</span><span class="token punctuation">)</span><span class="token punctuation">.</span>classification<span class="token punctuation">)</span>
+
+<span class="token keyword">def</span> <span class="token function">score</span><span class="token punctuation">(</span>path<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    pred <span class="token operator">=</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>laspy<span class="token punctuation">.</span>read<span class="token punctuation">(</span>path<span class="token punctuation">)</span><span class="token punctuation">.</span>classification<span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>truth<span class="token punctuation">)</span><span class="token punctuation">]</span>
+    cm <span class="token operator">=</span> confusion_matrix<span class="token punctuation">(</span>truth<span class="token punctuation">,</span> pred<span class="token punctuation">,</span> labels<span class="token operator">=</span><span class="token punctuation">[</span><span class="token number">2</span><span class="token punctuation">,</span> <span class="token number">5</span><span class="token punctuation">,</span> <span class="token number">6</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    ground_recall <span class="token operator">=</span> cm<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">]</span> <span class="token operator">/</span> cm<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+    veg_as_ground <span class="token operator">=</span> cm<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">]</span> <span class="token operator">/</span> cm<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+    bld_as_ground <span class="token operator">=</span> cm<span class="token punctuation">[</span><span class="token number">2</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">]</span> <span class="token operator">/</span> cm<span class="token punctuation">[</span><span class="token number">2</span><span class="token punctuation">]</span><span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> ground_recall<span class="token punctuation">,</span> veg_as_ground<span class="token punctuation">,</span> bld_as_ground
+
+<span class="token keyword">for</span> name<span class="token punctuation">,</span> path <span class="token keyword">in</span> <span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token string">"SMRF"</span><span class="token punctuation">,</span> <span class="token string">"out_smrf.laz"</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token punctuation">(</span><span class="token string">"CSF"</span><span class="token punctuation">,</span> <span class="token string">"out_csf.laz"</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    gr<span class="token punctuation">,</span> vg<span class="token punctuation">,</span> bg <span class="token operator">=</span> score<span class="token punctuation">(</span>path<span class="token punctuation">)</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>name<span class="token punctuation">}</span></span><span class="token string">: ground recall </span><span class="token interpolation"><span class="token punctuation">{</span>gr<span class="token punctuation">:</span><span class="token format-spec">.3f</span><span class="token punctuation">}</span></span><span class="token string"> | veg→ground </span><span class="token interpolation"><span class="token punctuation">{</span>vg<span class="token punctuation">:</span><span class="token format-spec">.4f</span><span class="token punctuation">}</span></span><span class="token string"> | bld→ground </span><span class="token interpolation"><span class="token punctuation">{</span>bg<span class="token punctuation">:</span><span class="token format-spec">.4f</span><span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Three numbers, and they trade against each other. A filter can always raise ground recall by being more permissive, at the cost of letting vegetation and buildings through. What you are choosing is the point on that trade-off that suits the downstream product: a drainage model tolerates missing ground far better than it tolerates a spike, a volumetric calculation is the reverse.</p>
+<h3 id="5-score-per-stratum-not-per-tile" tabindex="-1"><a class="heading-link" href="#5-score-per-stratum-not-per-tile"><span>5. Score per stratum, not per tile</span></a></h3>
+<p>A single figure for the tile hides exactly the terrain where the filter struggles.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> numpy <span class="token keyword">as</span> np
+<span class="token keyword">import</span> laspy
+
+las <span class="token operator">=</span> laspy<span class="token punctuation">.</span>read<span class="token punctuation">(</span><span class="token string">"validation_labelled.laz"</span><span class="token punctuation">)</span>
+stratum <span class="token operator">=</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>las<span class="token punctuation">.</span>point_source_id<span class="token punctuation">)</span>   <span class="token comment"># or a slope band, or a land-cover code</span>
+
+pred <span class="token operator">=</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>laspy<span class="token punctuation">.</span>read<span class="token punctuation">(</span><span class="token string">"out_smrf.laz"</span><span class="token punctuation">)</span><span class="token punctuation">.</span>classification<span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>stratum<span class="token punctuation">)</span><span class="token punctuation">]</span>
+truth <span class="token operator">=</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>las<span class="token punctuation">.</span>classification<span class="token punctuation">)</span>
+
+<span class="token keyword">for</span> s <span class="token keyword">in</span> np<span class="token punctuation">.</span>unique<span class="token punctuation">(</span>stratum<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    m <span class="token operator">=</span> <span class="token punctuation">(</span>stratum <span class="token operator">==</span> s<span class="token punctuation">)</span> <span class="token operator">&amp;</span> <span class="token punctuation">(</span>truth <span class="token operator">==</span> <span class="token number">2</span><span class="token punctuation">)</span>
+    <span class="token keyword">if</span> m<span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">&lt;</span> <span class="token number">50</span><span class="token punctuation">:</span>
+        <span class="token keyword">continue</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"stratum </span><span class="token interpolation"><span class="token punctuation">{</span>s<span class="token punctuation">}</span></span><span class="token string">: ground recall </span><span class="token interpolation"><span class="token punctuation">{</span><span class="token punctuation">(</span>pred<span class="token punctuation">[</span>m<span class="token punctuation">]</span> <span class="token operator">==</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">.</span>mean<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span><span class="token format-spec">.3f</span><span class="token punctuation">}</span></span><span class="token string">  (n=</span><span class="token interpolation"><span class="token punctuation">{</span>m<span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">}</span></span><span class="token string">)"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<figure class="diagram">
+<svg viewBox="95 6 602 291" role="img" aria-labelledby="sc-strat-t sc-strat-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="sc-strat-t">One tile figure against four stratum figures</title>
+  <desc id="sc-strat-d">A single tile-wide ground recall of 0.96 is composed of 0.99 on flat open ground, 0.98 under sparse canopy, 0.94 in the urban core and 0.71 on the steep vegetated cutting. Only the last of those matters to the drainage model, and the tile figure conceals it entirely.</desc>
+  <rect class="svg-bg" x="95" y="6" width="602" height="291" fill="#ffffff"/>
+  <text x="380" y="34" fill="#1f2937" font-size="13" text-anchor="middle" font-weight="600">Ground recall, same filter, same tile</text>
+  <rect x="120" y="60" width="404" height="30" rx="4" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <g stroke-width="2">
+    <rect x="120" y="112" width="416" height="26" rx="4" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="120" y="148" width="412" height="26" rx="4" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="120" y="184" width="395" height="26" rx="4" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="120" y="220" width="298" height="26" rx="4" fill="#f7dfdc" stroke="#b0413e"/>
+  </g>
+  <g fill="#1f2937" font-size="12" text-anchor="start">
+    <text x="534" y="80">0.96 — whole tile</text>
+    <text x="546" y="130">0.99 — flat open ground</text>
+    <text x="542" y="166">0.98 — sparse canopy</text>
+    <text x="525" y="202">0.94 — urban core</text>
+    <text x="428" y="238">0.71 — steep vegetated cutting</text>
+  </g>
+  <text x="380" y="278" fill="#15384a" font-size="12.5" text-anchor="middle">The cutting is 4% of the points and the whole reason the drainage model was commissioned</text>
+</svg>
+<figcaption>A tile-wide number is an average weighted by how much easy terrain the tile happens to contain. It says nothing about the hard part.</figcaption>
+</figure>
+<h2 id="expected-output-verification" tabindex="-1"><a class="heading-link" href="#expected-output-verification"><span>Expected Output &amp; Verification</span></a></h2>
+<p>A representative comparison on a mixed urban tile:</p>
+<div class="codeblock" data-lang="text"><div class="codeblock__bar"><span class="codeblock__lang">text</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-text" tabindex="0" role="group" aria-label="text code sample"><code class="language-text">SMRF: ground recall 0.962 | veg→ground 0.0071 | bld→ground 0.0034
+CSF : ground recall 0.981 | veg→ground 0.0189 | bld→ground 0.0102
+stratum 1: ground recall 0.994  (n=8120)
+stratum 2: ground recall 0.981  (n=3044)
+stratum 3: ground recall 0.943  (n=5210)
+stratum 4: ground recall 0.712  (n=486)
+</code></pre></div>
+<p>Read it as a trade rather than a winner. CSF found two per cent more ground and let roughly three times as much vegetation through, so for a terrain surface feeding a hydrological model SMRF is the safer choice here, and for a volumetric calculation over open ground CSF is. The stratum breakdown says something neither headline does: whichever filter ships, the steep vegetated cutting needs its own parameters or its own pass.</p>
+<figure class="diagram">
+<svg viewBox="-1 6 695 290" role="img" aria-labelledby="sc-trade-t sc-trade-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="sc-trade-t">The trade every ground filter makes</title>
+  <desc id="sc-trade-d">Loosening a filter raises the share of true ground it keeps and simultaneously raises the share of vegetation it mistakes for ground. SMRF and CSF sit at different points on that curve with the parameters given, and moving either one along the curve moves both numbers together.</desc>
+  <rect class="svg-bg" x="-1" y="6" width="695" height="290" fill="#ffffff"/>
+  <path d="M70 56 V216 H680" fill="none" stroke="#5b6471" stroke-width="1.5"/>
+  <path d="M100 200 C 220 170 360 120 620 74" fill="none" stroke="#5b6471" stroke-width="2" stroke-dasharray="6 4"/>
+  <circle cx="300" cy="140" r="7" fill="#1f6b8a"/>
+  <circle cx="470" cy="100" r="7" fill="#4f7a4d"/>
+  <text x="300" y="126" fill="#1f6b8a" font-size="12" text-anchor="middle">SMRF</text>
+  <text x="470" y="86" fill="#4f7a4d" font-size="12" text-anchor="middle">CSF</text>
+  <text x="380" y="248" fill="#5b6471" font-size="12" text-anchor="middle">vegetation mistaken for ground →</text>
+  <text x="34" y="120" fill="#5b6471" font-size="12" text-anchor="middle">ground</text>
+  <text x="34" y="136" fill="#5b6471" font-size="12" text-anchor="middle">kept ↑</text>
+  <text x="370" y="34" fill="#1f2937" font-size="13" text-anchor="middle" font-weight="600">You are choosing a point on a curve, not a better algorithm</text>
+  <text x="370" y="278" fill="#15384a" font-size="12" text-anchor="middle">A drainage model wants the lower left; a volumetric calculation over open ground can afford the upper right</text>
+</svg>
+<figcaption>Both filters ride the same trade-off. Which one is "better" is a statement about what the terrain is for, not about the algorithms.</figcaption>
+</figure>
+<h2 id="common-errors" tabindex="-1"><a class="heading-link" href="#common-errors"><span>Common Errors</span></a></h2>
+<p><strong>Both filters return almost no ground.</strong> The tile is in a geographic CRS, so <code>window: 18.0</code> means eighteen degrees and <code>cell: 1.0</code> means a one-degree raster. Reproject to a metric CRS before classifying; the assertion in the parent guide catches it.</p>
+<p><strong>CSF output changes between runs.</strong> The cloth had not settled when <code>iterations</code> ran out, so the result depends on where the simulation stopped. Raise <code>iterations</code> until two consecutive runs with different values agree, then keep the higher one.</p>
+<p><strong>SMRF leaves a plateau where a large building was.</strong> <code>window</code> is smaller than that building’s footprint. Measure the widest structure on the tile and set <code>window</code> above it; if the tile contains both a warehouse and a steep slope, split the tile rather than compromising the parameter.</p>
+<h2 id="frequently-asked-questions" tabindex="-1"><a class="heading-link" href="#frequently-asked-questions"><span>Frequently Asked Questions</span></a></h2>
+<h3 id="can-i-run-both-and-combine-them" tabindex="-1"><a class="heading-link" href="#can-i-run-both-and-combine-them"><span>Can I run both and combine them?</span></a></h3>
+<p>Yes, and the useful combination is conservative rather than permissive: classify as ground only where both agree, and route the disagreements to manual review or to a second pass with per-stratum parameters. That trades a little recall for a large drop in the spike rate, which is usually the right direction for a terrain product.</p>
+<h3 id="how-long-does-each-take" tabindex="-1"><a class="heading-link" href="#how-long-does-each-take"><span>How long does each take?</span></a></h3>
+<p>On a 40-million-point tile, SMRF runs in a few minutes and streams; CSF takes longer and needs the tile resident. At city scale that difference decides the architecture more often than the accuracy does.</p>
+<h3 id="do-the-parameters-transfer-between-surveys" tabindex="-1"><a class="heading-link" href="#do-the-parameters-transfer-between-surveys"><span>Do the parameters transfer between surveys?</span></a></h3>
+<p>The ones tied to the survey do — <code>threshold</code> follows vertical accuracy, <code>cell</code> and <code>resolution</code> follow point spacing. The ones tied to the site do not: <code>window</code>, <code>slope</code> and <code>rigidness</code> are statements about the landscape and have to be revisited per area.</p>
+<p>One last operational point. Whichever filter you adopt, record the exact parameter set in the tile’s metadata alongside the output, not only in the pipeline file. A year later the question is never “what does our pipeline do” but “what was this tile classified with”, and those two answers diverge the first time somebody reruns a single tile with an override. A dozen bytes of JSON in the LAS VLR, or a sidecar next to the LAZ, makes the classification reproducible from the artifact rather than from the repository’s history.</p>
+<h2 id="related-guides" tabindex="-1"><a class="heading-link" href="#related-guides"><span>Related Guides</span></a></h2>
+<ul>
+<li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">LiDAR Classification and Ground Extraction</a> — the full classification workflow and its gates</li>
+<li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/extracting-building-footprints-from-classified-lidar/">Extracting Building Footprints from Classified LiDAR</a> — what the building class becomes</li>
+<li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/">Digital Elevation Model Workflows</a> — where the ground class is consumed</li>
+</ul>
+<p>Back to <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">LiDAR Classification and Ground Extraction</a>.</p>
+
+
+      
+      
+
+      <div class="related-nav">
+        
+
+        
+          <div>
+            <h3>Related</h3>
+            <div class="related-grid">
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/extracting-building-footprints-from-classified-lidar/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Extracting Building Footprints from Classified LiDAR</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/reclassifying-noise-and-overlap-points-with-pdal/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Reclassifying Noise and Overlap Points with PDAL</span>
+                </a>
+              
+            </div>
+          </div>
+        
+      </div>
+    </article>
+
+    
+    <aside class="toc" aria-label="On this page" data-toc hidden>
+      <h4>On this page</h4>
+      <ul></ul>
+    </aside>
+  </div>
+</div>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+  <div class="container site-footer__inner">
+    <div class="site-footer__brand">
+      <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+        <img src="/assets/img/logo-mark.svg" alt="" class="brand__mark" width="36" height="36">
+        <span class="brand__name">
+          3D Geospatial
+          <small>Digital Twin Automation</small>
+        </span>
+      </a>
+      <p>Engineering-grade guides on point cloud processing, mesh pipelines, LOD strategies, and CI/CD automation for digital twin platforms.</p>
+      <a class="footer-social" href="https://github.com/3d-geospatial" aria-label="3D Geospatial on GitHub" rel="noopener" target="_blank">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+          <path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.53-1.34-1.3-1.7-1.3-1.7-1.06-.72.08-.71.08-.71 1.17.08 1.79 1.2 1.79 1.2 1.04 1.79 2.73 1.27 3.4.97.1-.75.4-1.27.73-1.56-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.19-3.08-.12-.3-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.75.11 3.05.74.8 1.19 1.83 1.19 3.08 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.07.78 2.15v3.18c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5Z"/>
+        </svg>
+        <span>GitHub</span>
+      </a>
+    </div>
+
+    <div class="site-footer__col">
+      <h4>Sections</h4>
+      <ul>
+        <li><a href="https://www.3d-geospatial.com/">Home</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management &amp; Optimization</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/">Point Cloud &amp; Mesh Pipelines</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/">Troubleshooting &amp; Reliability</a></li>
+        
+      </ul>
+    </div>
+
+    
+      <div class="site-footer__col">
+        <h4>3D Geospatial Fundamentals</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/">3D Format Standards Comparison</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems for 3D Assets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/">Digital Elevation Model Workflows</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/">Spatial Indexing and Tiling Schemes for 3D Data</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>LOD Management &amp; Optimization</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/">Automated Tile Generation for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/">Cesium ion Upload Automation for 3D Tilesets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/">glTF LOD Generation With Draco Compression</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/">Streaming Sync Patterns for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/">Tileset Metadata and 3D Tiles Next</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Point Cloud &amp; Mesh Pipelines</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/">Automated Mesh Decimation for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/">CI/CD Automation for Spatial Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">LiDAR Classification and Ground Extraction</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/">Point Cloud Filtering Techniques</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/">Surface Reconstruction for Geospatial Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/">Texture Mapping Workflows for Digital Twins</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Troubleshooting &amp; Reliability</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/">Cross-Section Failure Modes in Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/">Data Validation &amp; QA Gates for 3D Tiles</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/">Performance Profiling and Benchmarking</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/">Streaming &amp; Runtime Diagnostics for 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+  </div>
+  <div class="container site-footer__bottom">
+    <span>© 2026 3D Geospatial &amp; Digital Twin Automation</span>
+    <span>Built with Eleventy · PWA-enabled</span>
+  </div>
+</footer>
+
+
+  <script src="/assets/js/site.js?v=b99aa9f971" defer></script>
+  
+</body>
+</html>

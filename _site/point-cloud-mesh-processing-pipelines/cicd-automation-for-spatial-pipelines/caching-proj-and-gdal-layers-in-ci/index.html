@@ -1,0 +1,685 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <title>Caching PROJ and GDAL Layers in CI — 3D Geospatial</title>
+  <meta name="description" content="Cut a spatial CI job from ten minutes to four: pin the container by digest, cache PROJ data by release, cache conda and pip layers, and key each cache correctly.">
+  <meta name="keywords" content="3D geospatial, digital twin, point cloud, mesh pipeline, LOD, 3D Tiles, Cesium, PDAL, Open3D, Python, CI/CD">
+  <meta name="author" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta name="theme-color" content="#1f6b8a" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f171d" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+
+  
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem("theme");
+        var theme = (stored === "dark" || stored === "light") ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    })();
+  </script>
+  <meta name="generator" content="Eleventy">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="googlebot" content="index,follow,max-image-preview:large">
+
+  
+  <link rel="canonical" href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/caching-proj-and-gdal-layers-in-ci/">
+  <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">
+
+  
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/icon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+
+  
+  <link rel="apple-touch-icon" href="/assets/img/icon-180.png">
+  <link rel="mask-icon" href="/assets/img/logo.svg" color="#1f6b8a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="3D Geospatial">
+  <meta name="application-name" content="3D Geospatial">
+
+  
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Caching PROJ and GDAL Layers in CI — 3D Geospatial">
+  <meta property="og:description" content="Cut a spatial CI job from ten minutes to four: pin the container by digest, cache PROJ data by release, cache conda and pip layers, and key each cache correctly.">
+  <meta property="og:url" content="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/caching-proj-and-gdal-layers-in-ci/">
+  <meta property="og:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+  <meta property="og:site_name" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta property="og:locale" content="en_US">
+  
+  <meta property="article:published_time" content="2026-08-07T10:29:15.470Z">
+  <meta property="article:modified_time" content="2026-08-07T10:29:15.470Z">
+  <meta property="article:publisher" content="https://www.3d-geospatial.com/">
+  
+
+  
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Caching PROJ and GDAL Layers in CI — 3D Geospatial">
+  <meta name="twitter:description" content="Cut a spatial CI job from ten minutes to four: pin the container by digest, cache PROJ data by release, cache conda and pip layers, and key each cache correctly.">
+  <meta name="twitter:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta name="twitter:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+
+  
+  <link rel="preload" href="/assets/css/styles.css?v=546adeb511" as="style">
+  
+
+  <link rel="stylesheet" href="/assets/css/styles.css?v=546adeb511">
+
+  
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.3d-geospatial.com/#organization",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "url": "https://www.3d-geospatial.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/icon-512.png",
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://www.3d-geospatial.com/#website",
+      "url": "https://www.3d-geospatial.com/",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "description": "Build reliable 3D spatial data pipelines for digital twins — point clouds, meshes, LOD strategies, Python processing, and CI/CD automation.",
+      "inLanguage": "en",
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      }
+    },
+    {
+      "@type": "TechArticle",
+      "@id": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/caching-proj-and-gdal-layers-in-ci/#article",
+      "isPartOf": {
+        "@id": "https://www.3d-geospatial.com/#website"
+      },
+      "headline": "Caching PROJ and GDAL Layers in CI",
+      "name": "Caching PROJ and GDAL Layers in CI",
+      "description": "Cut a spatial CI job from ten minutes to four: pin the container by digest, cache PROJ data by release, cache conda and pip layers, and key each cache correctly.",
+      "url": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/caching-proj-and-gdal-layers-in-ci/",
+      "mainEntityOfPage": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/caching-proj-and-gdal-layers-in-ci/",
+      "inLanguage": "en",
+      "datePublished": "2026-08-07T10:29:15.470Z",
+      "dateModified": "2026-08-07T10:29:15.470Z",
+      "author": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "image": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/og-cover.png",
+        "width": 1200,
+        "height": 630
+      },
+      "breadcrumb": {
+        "@id": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/caching-proj-and-gdal-layers-in-ci/#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/caching-proj-and-gdal-layers-in-ci/#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://www.3d-geospatial.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Point Cloud Mesh Processing Pipelines",
+          "item": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Cicd Automation For Spatial Pipelines",
+          "item": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "name": "Caching Proj And Gdal Layers In CI",
+          "item": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/caching-proj-and-gdal-layers-in-ci/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  
+<header class="site-header" role="banner">
+  <div class="container site-header__inner">
+    <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+      <img src="/assets/img/logo.svg" alt="" class="brand__mark" width="36" height="36">
+      <span class="brand__name">
+        3D Geospatial
+        <small>Digital Twin Automation</small>
+      </span>
+    </a>
+
+    <button class="theme-toggle" type="button" data-theme-toggle
+            aria-label="Switch to dark theme" title="Switch to dark theme">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4.2"/>
+        <path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/>
+      </svg>
+    </button>
+
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>
+      <span class="nav-toggle__icon" aria-hidden="true"><span></span></span>
+      Menu
+    </button>
+
+    <nav class="primary-nav" id="primary-nav" aria-label="Primary">
+      
+      <a href="https://www.3d-geospatial.com/" >
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/>
+        </svg>
+        Home
+      </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2 3 7l9 5 9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 17l9 5 9-5"/>
+            </svg>
+          
+          3D Geospatial Fundamentals
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+          
+          LOD Management &amp; Optimization
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/" aria-current="page">
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="6" cy="6" r="1.5"/><circle cx="12" cy="6" r="1.5"/><circle cx="18" cy="6" r="1.5"/>
+              <circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/>
+              <circle cx="6" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="18" cy="18" r="1.5"/>
+            </svg>
+          
+          Point Cloud &amp; Mesh Pipelines
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <path d="M12 9v4"/><path d="M12 17h.01"/>
+            </svg>
+          
+          Troubleshooting &amp; Reliability
+        </a>
+      
+    </nav>
+  </div>
+</header>
+
+
+  <main id="main">
+    
+
+
+<div class="container">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    
+      
+        <a href="https://www.3d-geospatial.com/">Home</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/">Point Cloud Mesh Processing Pipelines</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/">Cicd Automation For Spatial Pipelines</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <span class="current">Caching Proj And Gdal Layers In CI</span>
+      
+    
+  </nav>
+
+  <div class="content-page">
+    <article class="article">
+      <h1 id="caching-proj-and-gdal-layers-in-ci" tabindex="-1"><a class="heading-link" href="#caching-proj-and-gdal-layers-in-ci"><span>Caching PROJ and GDAL Layers in CI</span></a></h1>
+<p>This page removes the setup cost from a spatial CI job — the conda solve, the GDAL and PROJ install, and the transformation-grid download — by pinning and caching each of them with a key that changes only when the thing itself changes. On a typical PDAL and GDAL job that is six minutes of every run, and removing it also removes a source of non-reproducibility, because a cached PROJ release is a pinned PROJ release.</p>
+<h2 id="why-you-hit-this" tabindex="-1"><a class="heading-link" href="#why-you-hit-this"><span>Why you hit this</span></a></h2>
+<p>A spatial CI job spends most of its wall clock before it touches any data. Resolving a conda environment containing GDAL, PROJ and PDAL takes minutes on its own, and <code>projsync</code> pulling transformation grids adds more. Teams notice the time and reach for a faster runner, which does not help because the cost is I/O and network rather than CPU. What does help is not doing the work twice, and the same change happens to pin the geodetic behaviour — which is the more valuable half.</p>
+<p>The wider job structure is in <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/github-actions-gdal-pdal-pipeline-jobs/">GitHub Actions GDAL/PDAL pipeline jobs</a>.</p>
+<h2 id="prerequisites" tabindex="-1"><a class="heading-link" href="#prerequisites"><span>Prerequisites</span></a></h2>
+<ul>
+<li>A CI system with a cache action — the examples use GitHub Actions, and the same keying logic applies to GitLab, Buildkite and CircleCI.</li>
+<li>A lockfile for the environment: <code>conda-lock</code>, <code>environment.yml</code> with pinned versions, or a container image.</li>
+<li>Somewhere to put a container image if you take that path — GHCR, ECR or Docker Hub.</li>
+</ul>
+<h2 id="step-by-step" tabindex="-1"><a class="heading-link" href="#step-by-step"><span>Step-by-Step</span></a></h2>
+<h3 id="1-prefer-a-pinned-container-over-installing-at-job-time" tabindex="-1"><a class="heading-link" href="#1-prefer-a-pinned-container-over-installing-at-job-time"><span>1. Prefer a pinned container over installing at job time</span></a></h3>
+<p>The largest single win is not installing GDAL at all.</p>
+<div class="codeblock" data-lang="yaml"><div class="codeblock__bar"><span class="codeblock__lang">yaml</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-yaml" tabindex="0" role="group" aria-label="yaml code sample"><code class="language-yaml"><span class="token key atrule">jobs</span><span class="token punctuation">:</span>
+  <span class="token key atrule">process</span><span class="token punctuation">:</span>
+    <span class="token key atrule">runs-on</span><span class="token punctuation">:</span> ubuntu<span class="token punctuation">-</span>latest
+    <span class="token key atrule">container</span><span class="token punctuation">:</span>
+      <span class="token comment"># Pin by DIGEST, never by tag — a tag is mutable and silently changes the toolchain.</span>
+      <span class="token key atrule">image</span><span class="token punctuation">:</span> ghcr.io/example/spatial<span class="token punctuation">-</span>base@sha256<span class="token punctuation">:</span>9f2c1ab4e6d0c73a1b8e5f2d4a6c8e0b2d4f6a8c0e2f4a6c8e0b2d4f6a8c0e2f
+    <span class="token key atrule">steps</span><span class="token punctuation">:</span>
+      <span class="token punctuation">-</span> <span class="token key atrule">uses</span><span class="token punctuation">:</span> actions/checkout@v4
+      <span class="token punctuation">-</span> <span class="token key atrule">run</span><span class="token punctuation">:</span> pdal <span class="token punctuation">-</span><span class="token punctuation">-</span>version <span class="token important">&amp;&amp;</span> gdalinfo <span class="token punctuation">-</span><span class="token punctuation">-</span>version <span class="token important">&amp;&amp;</span> projinfo <span class="token punctuation">-</span><span class="token punctuation">-</span>searchpaths
+</code></pre></div>
+<p>A digest is the only reference that guarantees the same bytes. A tag such as <code>:3.8</code> moves whenever the publisher rebuilds, which means a job that passed last week can fail today with no change in your repository — and, worse, can silently produce different coordinates because PROJ moved.</p>
+<h3 id="2-cache-the-proj-data-directory-keyed-on-the-release" tabindex="-1"><a class="heading-link" href="#2-cache-the-proj-data-directory-keyed-on-the-release"><span>2. Cache the PROJ data directory, keyed on the release</span></a></h3>
+<p>Transformation grids are large, static, and versioned. That combination is exactly what a cache is for.</p>
+<div class="codeblock" data-lang="yaml"><div class="codeblock__bar"><span class="codeblock__lang">yaml</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-yaml" tabindex="0" role="group" aria-label="yaml code sample"><code class="language-yaml">      <span class="token punctuation">-</span> <span class="token key atrule">name</span><span class="token punctuation">:</span> Resolve the PROJ data release
+        <span class="token key atrule">id</span><span class="token punctuation">:</span> proj
+        <span class="token key atrule">run</span><span class="token punctuation">:</span> echo "release=$(projinfo <span class="token punctuation">-</span><span class="token punctuation">-</span>searchpaths <span class="token punctuation">></span>/dev/null 2<span class="token punctuation">></span><span class="token important">&amp;1;</span> \
+                    python <span class="token punctuation">-</span>c 'import pyproj; print(pyproj.__proj_version__)')" <span class="token punctuation">></span><span class="token punctuation">></span> "$GITHUB_OUTPUT"
+
+      <span class="token punctuation">-</span> <span class="token key atrule">name</span><span class="token punctuation">:</span> Cache PROJ grids
+        <span class="token key atrule">uses</span><span class="token punctuation">:</span> actions/cache@v4
+        <span class="token key atrule">with</span><span class="token punctuation">:</span>
+          <span class="token key atrule">path</span><span class="token punctuation">:</span> ~/.local/share/proj
+          <span class="token key atrule">key</span><span class="token punctuation">:</span> proj<span class="token punctuation">-</span>data<span class="token punctuation">-</span>$<span class="token punctuation">{</span><span class="token punctuation">{</span> steps.proj.outputs.release <span class="token punctuation">}</span><span class="token punctuation">}</span><span class="token punctuation">-</span>v2
+          <span class="token key atrule">restore-keys</span><span class="token punctuation">:</span> proj<span class="token punctuation">-</span>data<span class="token punctuation">-</span>$<span class="token punctuation">{</span><span class="token punctuation">{</span> steps.proj.outputs.release <span class="token punctuation">}</span><span class="token punctuation">}</span><span class="token punctuation">-</span>
+
+      <span class="token punctuation">-</span> <span class="token key atrule">name</span><span class="token punctuation">:</span> Fetch any missing grids
+        <span class="token key atrule">run</span><span class="token punctuation">:</span> projsync <span class="token punctuation">-</span><span class="token punctuation">-</span>system<span class="token punctuation">-</span>directory <span class="token punctuation">-</span><span class="token punctuation">-</span>list<span class="token punctuation">-</span>files <span class="token punctuation">></span>/dev/null <span class="token important">&amp;&amp;</span> projsync <span class="token punctuation">-</span><span class="token punctuation">-</span>all <span class="token punctuation">-</span><span class="token punctuation">-</span>quiet
+</code></pre></div>
+<p>Keying on the PROJ release rather than on the workflow file is the important detail. The grids belong to PROJ, not to your pipeline, so a cache keyed on the workflow invalidates whenever anyone edits an unrelated step, and one keyed on <code>latest</code> never invalidates when it should.</p>
+<figure class="diagram">
+<svg viewBox="6 42 728 198" role="img" aria-labelledby="cc-key-t cc-key-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="cc-key-t">A cache key should name what the cache contains</title>
+  <desc id="cc-key-d">Keying the PROJ grid cache on a hash of the workflow file invalidates it whenever any unrelated step is edited. Keying it on a constant never invalidates it, so a PROJ upgrade quietly reuses the old grids. Keying it on the PROJ release invalidates exactly when the grids change.</desc>
+  <rect class="svg-bg" x="6" y="42" width="728" height="198" fill="#ffffff"/>
+  <g stroke-width="2">
+    <rect x="60" y="56" width="250" height="34" rx="6" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="60" y="102" width="250" height="34" rx="6" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="60" y="148" width="250" height="34" rx="6" fill="#eef5e9" stroke="#4f7a4d"/>
+  </g>
+  <g fill="#1f2937" font-size="12" text-anchor="middle">
+    <text x="185" y="78">hash(workflow.yml)</text>
+    <text x="185" y="124">proj-data-latest</text>
+    <text x="185" y="170">proj-data-9.3.1</text>
+  </g>
+  <g fill="#1f2937" font-size="12" text-anchor="start">
+    <text x="330" y="78">invalidates on every unrelated edit</text>
+    <text x="330" y="124">never invalidates — a PROJ upgrade reuses old grids</text>
+    <text x="330" y="170">invalidates exactly when the grids change</text>
+  </g>
+  <text x="370" y="222" fill="#15384a" font-size="12.5" text-anchor="middle">The middle row is the dangerous one: it is fast, it looks correct, and it silently pins geodesy to whatever was cached first</text>
+</svg>
+<figcaption>Two of the three keys produce a working cache. Only one of them invalidates when the thing it caches has actually changed.</figcaption>
+</figure>
+<h3 id="3-cache-the-environment-itself-when-a-container-is-not-an-option" tabindex="-1"><a class="heading-link" href="#3-cache-the-environment-itself-when-a-container-is-not-an-option"><span>3. Cache the environment itself when a container is not an option</span></a></h3>
+<p>Where the job must install at run time, cache the package layer and key it on the lockfile.</p>
+<div class="codeblock" data-lang="yaml"><div class="codeblock__bar"><span class="codeblock__lang">yaml</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-yaml" tabindex="0" role="group" aria-label="yaml code sample"><code class="language-yaml">      <span class="token punctuation">-</span> <span class="token key atrule">uses</span><span class="token punctuation">:</span> conda<span class="token punctuation">-</span>incubator/setup<span class="token punctuation">-</span>miniconda@v3
+        <span class="token key atrule">with</span><span class="token punctuation">:</span>
+          <span class="token key atrule">miniforge-version</span><span class="token punctuation">:</span> latest
+          <span class="token key atrule">use-mamba</span><span class="token punctuation">:</span> <span class="token boolean important">true</span>
+          <span class="token key atrule">environment-file</span><span class="token punctuation">:</span> environment.lock.yml
+          <span class="token key atrule">activate-environment</span><span class="token punctuation">:</span> spatial
+
+      <span class="token punctuation">-</span> <span class="token key atrule">name</span><span class="token punctuation">:</span> Cache conda packages
+        <span class="token key atrule">uses</span><span class="token punctuation">:</span> actions/cache@v4
+        <span class="token key atrule">with</span><span class="token punctuation">:</span>
+          <span class="token key atrule">path</span><span class="token punctuation">:</span> ~/conda_pkgs_dir
+          <span class="token key atrule">key</span><span class="token punctuation">:</span> conda<span class="token punctuation">-</span>$<span class="token punctuation">{</span><span class="token punctuation">{</span> runner.os <span class="token punctuation">}</span><span class="token punctuation">}</span><span class="token punctuation">-</span>$<span class="token punctuation">{</span><span class="token punctuation">{</span> hashFiles('environment.lock.yml') <span class="token punctuation">}</span><span class="token punctuation">}</span>
+          <span class="token key atrule">restore-keys</span><span class="token punctuation">:</span> conda<span class="token punctuation">-</span>$<span class="token punctuation">{</span><span class="token punctuation">{</span> runner.os <span class="token punctuation">}</span><span class="token punctuation">}</span><span class="token punctuation">-</span>
+</code></pre></div>
+<p><code>hashFiles</code> on the <em>lockfile</em> is what makes this correct. Hashing <code>environment.yml</code> with loose version specifiers produces a stable key across a solve that resolved differently, so the cache returns packages that do not match the environment the job then builds.</p>
+<h3 id="4-cache-the-source-data-too-when-it-is-stable" tabindex="-1"><a class="heading-link" href="#4-cache-the-source-data-too-when-it-is-stable"><span>4. Cache the source data too, when it is stable</span></a></h3>
+<p>Test fixtures and reference tiles change far less often than code.</p>
+<div class="codeblock" data-lang="yaml"><div class="codeblock__bar"><span class="codeblock__lang">yaml</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-yaml" tabindex="0" role="group" aria-label="yaml code sample"><code class="language-yaml">      <span class="token punctuation">-</span> <span class="token key atrule">name</span><span class="token punctuation">:</span> Cache test fixtures
+        <span class="token key atrule">uses</span><span class="token punctuation">:</span> actions/cache@v4
+        <span class="token key atrule">with</span><span class="token punctuation">:</span>
+          <span class="token key atrule">path</span><span class="token punctuation">:</span> fixtures/
+          <span class="token key atrule">key</span><span class="token punctuation">:</span> fixtures<span class="token punctuation">-</span>$<span class="token punctuation">{</span><span class="token punctuation">{</span> hashFiles('fixtures/manifest.sha256') <span class="token punctuation">}</span><span class="token punctuation">}</span>
+
+      <span class="token punctuation">-</span> <span class="token key atrule">name</span><span class="token punctuation">:</span> Fetch anything missing
+        <span class="token key atrule">run</span><span class="token punctuation">:</span> <span class="token punctuation">|</span><span class="token scalar string">
+          test -f fixtures/tile_utm33n.laz || \
+            aws s3 cp s3://twin-fixtures/tile_utm33n.laz fixtures/
+          sha256sum -c fixtures/manifest.sha256</span>
+</code></pre></div>
+<p>The checksum verification after restore is not optional. A partially restored cache is indistinguishable from a complete one to the job, and a truncated LAZ produces a confusing failure several steps later rather than at the point it was restored.</p>
+<h3 id="5-measure-what-each-cache-actually-saved" tabindex="-1"><a class="heading-link" href="#5-measure-what-each-cache-actually-saved"><span>5. Measure what each cache actually saved</span></a></h3>
+<p>Otherwise a cache that stopped working goes unnoticed, because a slow job looks like a busy runner.</p>
+<div class="codeblock" data-lang="yaml"><div class="codeblock__bar"><span class="codeblock__lang">yaml</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-yaml" tabindex="0" role="group" aria-label="yaml code sample"><code class="language-yaml">      <span class="token punctuation">-</span> <span class="token key atrule">name</span><span class="token punctuation">:</span> Record step timings
+        <span class="token key atrule">if</span><span class="token punctuation">:</span> always()
+        <span class="token key atrule">run</span><span class="token punctuation">:</span> <span class="token punctuation">|</span><span class="token scalar string">
+          echo "::notice title=timings::proj=${PROJ_S}s conda=${CONDA_S}s process=${PROC_S}s"</span>
+</code></pre></div>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> json
+<span class="token keyword">import</span> subprocess
+
+runs <span class="token operator">=</span> json<span class="token punctuation">.</span>loads<span class="token punctuation">(</span>subprocess<span class="token punctuation">.</span>run<span class="token punctuation">(</span>
+    <span class="token punctuation">[</span><span class="token string">"gh"</span><span class="token punctuation">,</span> <span class="token string">"run"</span><span class="token punctuation">,</span> <span class="token string">"list"</span><span class="token punctuation">,</span> <span class="token string">"--workflow"</span><span class="token punctuation">,</span> <span class="token string">"process.yml"</span><span class="token punctuation">,</span> <span class="token string">"--limit"</span><span class="token punctuation">,</span> <span class="token string">"30"</span><span class="token punctuation">,</span>
+     <span class="token string">"--json"</span><span class="token punctuation">,</span> <span class="token string">"conclusion,createdAt,updatedAt"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+    capture_output<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> text<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span><span class="token punctuation">.</span>stdout<span class="token punctuation">)</span>
+
+<span class="token keyword">import</span> datetime <span class="token keyword">as</span> dt
+durations <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+<span class="token keyword">for</span> r <span class="token keyword">in</span> runs<span class="token punctuation">:</span>
+    <span class="token keyword">if</span> r<span class="token punctuation">[</span><span class="token string">"conclusion"</span><span class="token punctuation">]</span> <span class="token operator">!=</span> <span class="token string">"success"</span><span class="token punctuation">:</span>
+        <span class="token keyword">continue</span>
+    a <span class="token operator">=</span> dt<span class="token punctuation">.</span>datetime<span class="token punctuation">.</span>fromisoformat<span class="token punctuation">(</span>r<span class="token punctuation">[</span><span class="token string">"createdAt"</span><span class="token punctuation">]</span><span class="token punctuation">.</span>replace<span class="token punctuation">(</span><span class="token string">"Z"</span><span class="token punctuation">,</span> <span class="token string">"+00:00"</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    b <span class="token operator">=</span> dt<span class="token punctuation">.</span>datetime<span class="token punctuation">.</span>fromisoformat<span class="token punctuation">(</span>r<span class="token punctuation">[</span><span class="token string">"updatedAt"</span><span class="token punctuation">]</span><span class="token punctuation">.</span>replace<span class="token punctuation">(</span><span class="token string">"Z"</span><span class="token punctuation">,</span> <span class="token string">"+00:00"</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    durations<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">(</span>b <span class="token operator">-</span> a<span class="token punctuation">)</span><span class="token punctuation">.</span>total_seconds<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+
+durations<span class="token punctuation">.</span>sort<span class="token punctuation">(</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"median </span><span class="token interpolation"><span class="token punctuation">{</span>durations<span class="token punctuation">[</span><span class="token builtin">len</span><span class="token punctuation">(</span>durations<span class="token punctuation">)</span><span class="token operator">//</span><span class="token number">2</span><span class="token punctuation">]</span><span class="token punctuation">:</span><span class="token format-spec">.0f</span><span class="token punctuation">}</span></span><span class="token string">s | "</span></span>
+      <span class="token string-interpolation"><span class="token string">f"p90 </span><span class="token interpolation"><span class="token punctuation">{</span>durations<span class="token punctuation">[</span><span class="token builtin">int</span><span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>durations<span class="token punctuation">)</span><span class="token operator">*</span><span class="token number">0.9</span><span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">:</span><span class="token format-spec">.0f</span><span class="token punctuation">}</span></span><span class="token string">s | n=</span><span class="token interpolation"><span class="token punctuation">{</span><span class="token builtin">len</span><span class="token punctuation">(</span>durations<span class="token punctuation">)</span><span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>A median that creeps upward over weeks is a cache that stopped hitting — most often because a key started including something volatile, or because the cache exceeded the size limit and is being evicted between runs.</p>
+<figure class="diagram">
+<svg viewBox="35 20 670 224" role="img" aria-labelledby="cc-time-t cc-time-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="cc-time-t">Where the nine minutes went, and what each change removed</title>
+  <desc id="cc-time-d">A cold run spends four minutes ten on the conda solve and install, two minutes on grid download and three and a half on processing. Pinning a container removes the first, caching PROJ data removes the second, and the run becomes almost entirely the work it exists to do.</desc>
+  <rect class="svg-bg" x="35" y="20" width="670" height="224" fill="#ffffff"/>
+  <g stroke-width="2">
+    <rect x="60" y="56" width="230" height="28" rx="4" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="290" y="56" width="110" height="28" rx="4" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="400" y="56" width="192" height="28" rx="4" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="60" y="110" width="22" height="28" rx="4" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="82" y="110" width="110" height="28" rx="4" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="192" y="110" width="192" height="28" rx="4" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="60" y="164" width="22" height="28" rx="4" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="82" y="164" width="14" height="28" rx="4" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="96" y="164" width="192" height="28" rx="4" fill="#e3f0f4" stroke="#1f6b8a"/>
+  </g>
+  <g fill="#1f2937" font-size="12" text-anchor="start">
+    <text x="602" y="75">cold — 9m 40s</text>
+    <text x="394" y="129">pinned container — 5m 30s</text>
+    <text x="298" y="183">plus cached PROJ data — 4m 10s</text>
+  </g>
+  <g fill="#5b6471" font-size="11" text-anchor="middle">
+    <text x="175" y="46">install</text>
+    <text x="345" y="46">grids</text>
+    <text x="496" y="46">processing</text>
+  </g>
+  <text x="370" y="226" fill="#15384a" font-size="12.5" text-anchor="middle">The processing bar never moves — everything removed was setup, and removing it also pinned the toolchain</text>
+</svg>
+<figcaption>Two changes take the job from mostly setup to almost entirely work, and the same two changes make the run reproducible.</figcaption>
+</figure>
+<figure class="diagram">
+<svg viewBox="10 42 668 214" role="img" aria-labelledby="cc-layer-t cc-layer-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="cc-layer-t">Four things to cache, and what each should be keyed on</title>
+  <desc id="cc-layer-d">The container image is pinned by digest rather than cached. PROJ grids are keyed on the PROJ release. Conda packages are keyed on a hash of the lockfile. Test fixtures are keyed on a checksum manifest. Each key names the thing the cache contains rather than the workflow that uses it.</desc>
+  <rect class="svg-bg" x="10" y="42" width="668" height="214" fill="#ffffff"/>
+  <g stroke-width="2">
+    <rect x="24" y="56" width="200" height="34" rx="6" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="24" y="98" width="200" height="34" rx="6" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="24" y="140" width="200" height="34" rx="6" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="24" y="182" width="200" height="34" rx="6" fill="#e3f0f4" stroke="#1f6b8a"/>
+  </g>
+  <g fill="#1f2937" font-size="12" text-anchor="middle">
+    <text x="124" y="78">container image</text>
+    <text x="124" y="120">PROJ grids</text>
+    <text x="124" y="162">conda packages</text>
+    <text x="124" y="204">test fixtures</text>
+  </g>
+  <g fill="#1f2937" font-size="12" text-anchor="start">
+    <text x="246" y="78">pinned by sha256 digest — not cached, fixed</text>
+    <text x="246" y="120">keyed on the PROJ release, e.g. 9.3.1</text>
+    <text x="246" y="162">keyed on hashFiles(environment.lock.yml)</text>
+    <text x="246" y="204">keyed on hashFiles(manifest.sha256)</text>
+  </g>
+  <text x="370" y="238" fill="#15384a" font-size="12.5" text-anchor="middle">Every key names its own contents, so each cache invalidates exactly when what it holds has changed</text>
+</svg>
+<figcaption>Four caches, four different keys. The common mistake is one key for all of them, which makes every cache as volatile as the most volatile input.</figcaption>
+</figure>
+<h2 id="expected-output-verification" tabindex="-1"><a class="heading-link" href="#expected-output-verification"><span>Expected Output &amp; Verification</span></a></h2>
+<p>A representative before and after on a matrix of twenty shards:</p>
+<div class="codeblock" data-lang="text"><div class="codeblock__bar"><span class="codeblock__lang">text</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-text" tabindex="0" role="group" aria-label="text code sample"><code class="language-text">median 578s | p90 641s | n=30       # before
+median 249s | p90 288s | n=30       # after
+proj=3s conda=0s process=211s
+</code></pre></div>
+<p>Two checks confirm the caches are real rather than apparently real. The PROJ step should report seconds rather than minutes on a hit, and <code>projinfo --searchpaths</code> should list the cached directory first. And the pipeline’s own numeric output — a transformed control point, a point count — must be identical to the pre-caching run, because a cache that changed the geodetic behaviour has broken something far more important than the runtime.</p>
+<div class="codeblock" data-lang="bash"><div class="codeblock__bar"><span class="codeblock__lang">bash</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-bash" tabindex="0" role="group" aria-label="bash code sample"><code class="language-bash">projinfo <span class="token parameter variable">--searchpaths</span>
+python - <span class="token operator">&lt;&lt;</span><span class="token string">'PY'
+from pyproj import Transformer
+t = Transformer.from_crs("EPSG:4326+5773", "EPSG:32618+5703", always_xy=True)
+print(t.description)
+print([round(v, 6) for v in t.transform(-73.985428, 40.748817, 12.30)])
+PY</span>
+</code></pre></div>
+<h2 id="common-errors" tabindex="-1"><a class="heading-link" href="#common-errors"><span>Common Errors</span></a></h2>
+<p><strong>The cache never hits.</strong> The key includes something that changes every run — a timestamp, a run number, or <code>hashFiles</code> over a directory the job writes into. Print the resolved key and compare it across two runs.</p>
+<p><strong>Cache hits and the job still installs everything.</strong> The cached path is not the one the tool actually uses. <code>conda</code> respects <code>CONDA_PKGS_DIRS</code>, and PROJ looks at <code>PROJ_DATA</code> and its compiled-in search path — check with <code>projinfo --searchpaths</code> rather than assuming.</p>
+<p><strong>Results changed after adding caching.</strong> A different PROJ data release was restored than the one the previous runs used. This is the failure worth taking seriously: pin the release explicitly and re-verify a control point.</p>
+<p><strong>Cache uploads fail on large directories.</strong> Most CI caches have a size ceiling in the low gigabytes. Cache only the grids you use — <code>projsync --area-of-use</code> fetches a bounding box rather than the world.</p>
+<h2 id="frequently-asked-questions" tabindex="-1"><a class="heading-link" href="#frequently-asked-questions"><span>Frequently Asked Questions</span></a></h2>
+<h3 id="container-or-cached-environment" tabindex="-1"><a class="heading-link" href="#container-or-cached-environment"><span>Container or cached environment?</span></a></h3>
+<p>Container, where you can. It pins the whole toolchain in one digest, it starts in seconds, and it is the same artifact developers can run locally. Cached environments are the fallback when the CI system cannot run containers.</p>
+<h3 id="should-the-proj-data-cache-be-shared-between-repositories" tabindex="-1"><a class="heading-link" href="#should-the-proj-data-cache-be-shared-between-repositories"><span>Should the PROJ data cache be shared between repositories?</span></a></h3>
+<p>If the CI system allows it, yes — the grids are identical and large. Where caches are per-repository, publishing a container that already contains them is the equivalent.</p>
+<h3 id="does-this-affect-reproducibility" tabindex="-1"><a class="heading-link" href="#does-this-affect-reproducibility"><span>Does this affect reproducibility?</span></a></h3>
+<p>It improves it, provided the keys are right. A pinned container digest plus a PROJ release in the cache key means the geodetic behaviour is fixed, which is one of the inputs an <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/incremental-retiling-of-changed-city-blocks/">incremental rebuild’s content hash</a> depends on.</p>
+<p>One caveat about restore-keys. A prefix fallback is useful for the conda cache, where a partially matching package set still saves most of the download. It is actively harmful for the PROJ cache, because a fallback restores grids from a <em>different</em> PROJ release, which is precisely the silent change of geodetic behaviour the exact key was there to prevent. Use <code>restore-keys</code> where a partial hit is a saving and omit it where a partial hit is a correctness risk.</p>
+<p>The second caveat is about verifying a restore rather than trusting it. Cache actions report a hit when they found and extracted an archive, not when the contents are complete — a truncated upload from a previous run restores cleanly and is missing files. A checksum pass over the restored directory costs a second and converts a confusing mid-job failure into an explicit one at the point of restore.</p>
+<p>Finally, treat the cache as an optimisation and never as a dependency. A job that cannot run with every cache cold is not cached, it is broken in a way that happens not to show — and it will show on the first run in a new fork, a new runner pool, or after a cache eviction.</p>
+<h2 id="related-guides" tabindex="-1"><a class="heading-link" href="#related-guides"><span>Related Guides</span></a></h2>
+<ul>
+<li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/">CI/CD Automation for Spatial Pipelines</a> — the pipeline this speeds up</li>
+<li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/github-actions-gdal-pdal-pipeline-jobs/">GitHub Actions GDAL/PDAL Pipeline Jobs</a> — the job structure being cached</li>
+<li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/asserting-crs-and-units-with-pyproj/">Asserting CRS and Units with pyproj</a> — the check that catches a changed PROJ release</li>
+</ul>
+<p>Back to <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/">CI/CD Automation for Spatial Pipelines</a>.</p>
+
+
+      
+      
+
+      <div class="related-nav">
+        
+
+        
+          <div>
+            <h3>Related</h3>
+            <div class="related-grid">
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/automated-3d-tiles-deployment-to-cdn/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Automated 3D Tiles Deployment to a CDN</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/github-actions-gdal-pdal-pipeline-jobs/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">GitHub Actions GDAL and PDAL Pipeline Jobs</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/schema-validation-gates-for-spatial-data/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Schema Validation Gates for Spatial Data</span>
+                </a>
+              
+            </div>
+          </div>
+        
+      </div>
+    </article>
+
+    
+    <aside class="toc" aria-label="On this page" data-toc hidden>
+      <h4>On this page</h4>
+      <ul></ul>
+    </aside>
+  </div>
+</div>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+  <div class="container site-footer__inner">
+    <div class="site-footer__brand">
+      <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+        <img src="/assets/img/logo-mark.svg" alt="" class="brand__mark" width="36" height="36">
+        <span class="brand__name">
+          3D Geospatial
+          <small>Digital Twin Automation</small>
+        </span>
+      </a>
+      <p>Engineering-grade guides on point cloud processing, mesh pipelines, LOD strategies, and CI/CD automation for digital twin platforms.</p>
+      <a class="footer-social" href="https://github.com/3d-geospatial" aria-label="3D Geospatial on GitHub" rel="noopener" target="_blank">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+          <path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.53-1.34-1.3-1.7-1.3-1.7-1.06-.72.08-.71.08-.71 1.17.08 1.79 1.2 1.79 1.2 1.04 1.79 2.73 1.27 3.4.97.1-.75.4-1.27.73-1.56-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.19-3.08-.12-.3-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.75.11 3.05.74.8 1.19 1.83 1.19 3.08 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.07.78 2.15v3.18c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5Z"/>
+        </svg>
+        <span>GitHub</span>
+      </a>
+    </div>
+
+    <div class="site-footer__col">
+      <h4>Sections</h4>
+      <ul>
+        <li><a href="https://www.3d-geospatial.com/">Home</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management &amp; Optimization</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/">Point Cloud &amp; Mesh Pipelines</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/">Troubleshooting &amp; Reliability</a></li>
+        
+      </ul>
+    </div>
+
+    
+      <div class="site-footer__col">
+        <h4>3D Geospatial Fundamentals</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/">3D Format Standards Comparison</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems for 3D Assets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/">Digital Elevation Model Workflows</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/">Spatial Indexing and Tiling Schemes for 3D Data</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>LOD Management &amp; Optimization</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/">Automated Tile Generation for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/">Cesium ion Upload Automation for 3D Tilesets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/">glTF LOD Generation With Draco Compression</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/">Streaming Sync Patterns for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/">Tileset Metadata and 3D Tiles Next</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Point Cloud &amp; Mesh Pipelines</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/">Automated Mesh Decimation for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/">CI/CD Automation for Spatial Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">LiDAR Classification and Ground Extraction</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/">Point Cloud Filtering Techniques</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/">Surface Reconstruction for Geospatial Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/">Texture Mapping Workflows for Digital Twins</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Troubleshooting &amp; Reliability</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/">Cross-Section Failure Modes in Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/">Data Validation &amp; QA Gates for 3D Tiles</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/">Performance Profiling and Benchmarking</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/">Streaming &amp; Runtime Diagnostics for 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+  </div>
+  <div class="container site-footer__bottom">
+    <span>© 2026 3D Geospatial &amp; Digital Twin Automation</span>
+    <span>Built with Eleventy · PWA-enabled</span>
+  </div>
+</footer>
+
+
+  <script src="/assets/js/site.js?v=b99aa9f971" defer></script>
+  
+</body>
+</html>

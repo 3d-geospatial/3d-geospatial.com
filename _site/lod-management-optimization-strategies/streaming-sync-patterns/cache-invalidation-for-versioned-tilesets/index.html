@@ -1,0 +1,637 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <title>Cache Invalidation for Versioned Tilesets — 3D Geospatial</title>
+  <meta name="description" content="Publish a tileset update without invalidating the CDN: immutable content paths, one mutable entry point, ETags, and why a wildcard purge is almost never right.">
+  <meta name="keywords" content="3D geospatial, digital twin, point cloud, mesh pipeline, LOD, 3D Tiles, Cesium, PDAL, Open3D, Python, CI/CD">
+  <meta name="author" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta name="theme-color" content="#1f6b8a" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f171d" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+
+  
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem("theme");
+        var theme = (stored === "dark" || stored === "light") ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    })();
+  </script>
+  <meta name="generator" content="Eleventy">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="googlebot" content="index,follow,max-image-preview:large">
+
+  
+  <link rel="canonical" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/cache-invalidation-for-versioned-tilesets/">
+  <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">
+
+  
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/icon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+
+  
+  <link rel="apple-touch-icon" href="/assets/img/icon-180.png">
+  <link rel="mask-icon" href="/assets/img/logo.svg" color="#1f6b8a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="3D Geospatial">
+  <meta name="application-name" content="3D Geospatial">
+
+  
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Cache Invalidation for Versioned Tilesets — 3D Geospatial">
+  <meta property="og:description" content="Publish a tileset update without invalidating the CDN: immutable content paths, one mutable entry point, ETags, and why a wildcard purge is almost never right.">
+  <meta property="og:url" content="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/cache-invalidation-for-versioned-tilesets/">
+  <meta property="og:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+  <meta property="og:site_name" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta property="og:locale" content="en_US">
+  
+  <meta property="article:published_time" content="2026-08-07T10:06:47.332Z">
+  <meta property="article:modified_time" content="2026-08-07T10:06:47.332Z">
+  <meta property="article:publisher" content="https://www.3d-geospatial.com/">
+  
+
+  
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Cache Invalidation for Versioned Tilesets — 3D Geospatial">
+  <meta name="twitter:description" content="Publish a tileset update without invalidating the CDN: immutable content paths, one mutable entry point, ETags, and why a wildcard purge is almost never right.">
+  <meta name="twitter:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta name="twitter:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+
+  
+  <link rel="preload" href="/assets/css/styles.css?v=546adeb511" as="style">
+  
+
+  <link rel="stylesheet" href="/assets/css/styles.css?v=546adeb511">
+
+  
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.3d-geospatial.com/#organization",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "url": "https://www.3d-geospatial.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/icon-512.png",
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://www.3d-geospatial.com/#website",
+      "url": "https://www.3d-geospatial.com/",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "description": "Build reliable 3D spatial data pipelines for digital twins — point clouds, meshes, LOD strategies, Python processing, and CI/CD automation.",
+      "inLanguage": "en",
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      }
+    },
+    {
+      "@type": "TechArticle",
+      "@id": "https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/cache-invalidation-for-versioned-tilesets/#article",
+      "isPartOf": {
+        "@id": "https://www.3d-geospatial.com/#website"
+      },
+      "headline": "Cache Invalidation for Versioned Tilesets",
+      "name": "Cache Invalidation for Versioned Tilesets",
+      "description": "Publish a tileset update without invalidating the CDN: immutable content paths, one mutable entry point, ETags, and why a wildcard purge is almost never right.",
+      "url": "https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/cache-invalidation-for-versioned-tilesets/",
+      "mainEntityOfPage": "https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/cache-invalidation-for-versioned-tilesets/",
+      "inLanguage": "en",
+      "datePublished": "2026-08-07T10:06:47.332Z",
+      "dateModified": "2026-08-07T10:06:47.332Z",
+      "author": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "image": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/og-cover.png",
+        "width": 1200,
+        "height": 630
+      },
+      "breadcrumb": {
+        "@id": "https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/cache-invalidation-for-versioned-tilesets/#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/cache-invalidation-for-versioned-tilesets/#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://www.3d-geospatial.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "LOD Management Optimization Strategies",
+          "item": "https://www.3d-geospatial.com/lod-management-optimization-strategies/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Streaming Sync Patterns",
+          "item": "https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "name": "Cache Invalidation For Versioned Tilesets",
+          "item": "https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/cache-invalidation-for-versioned-tilesets/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  
+<header class="site-header" role="banner">
+  <div class="container site-header__inner">
+    <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+      <img src="/assets/img/logo.svg" alt="" class="brand__mark" width="36" height="36">
+      <span class="brand__name">
+        3D Geospatial
+        <small>Digital Twin Automation</small>
+      </span>
+    </a>
+
+    <button class="theme-toggle" type="button" data-theme-toggle
+            aria-label="Switch to dark theme" title="Switch to dark theme">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4.2"/>
+        <path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/>
+      </svg>
+    </button>
+
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>
+      <span class="nav-toggle__icon" aria-hidden="true"><span></span></span>
+      Menu
+    </button>
+
+    <nav class="primary-nav" id="primary-nav" aria-label="Primary">
+      
+      <a href="https://www.3d-geospatial.com/" >
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/>
+        </svg>
+        Home
+      </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2 3 7l9 5 9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 17l9 5 9-5"/>
+            </svg>
+          
+          3D Geospatial Fundamentals
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/" aria-current="page">
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+          
+          LOD Management &amp; Optimization
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="6" cy="6" r="1.5"/><circle cx="12" cy="6" r="1.5"/><circle cx="18" cy="6" r="1.5"/>
+              <circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/>
+              <circle cx="6" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="18" cy="18" r="1.5"/>
+            </svg>
+          
+          Point Cloud &amp; Mesh Pipelines
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <path d="M12 9v4"/><path d="M12 17h.01"/>
+            </svg>
+          
+          Troubleshooting &amp; Reliability
+        </a>
+      
+    </nav>
+  </div>
+</header>
+
+
+  <main id="main">
+    
+
+
+<div class="container">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    
+      
+        <a href="https://www.3d-geospatial.com/">Home</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management Optimization Strategies</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/">Streaming Sync Patterns</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <span class="current">Cache Invalidation For Versioned Tilesets</span>
+      
+    
+  </nav>
+
+  <div class="content-page">
+    <article class="article">
+      <h1 id="cache-invalidation-for-versioned-tilesets" tabindex="-1"><a class="heading-link" href="#cache-invalidation-for-versioned-tilesets"><span>Cache Invalidation for Versioned Tilesets</span></a></h1>
+<p>This page publishes a tileset update so that caches keep working — every payload path immutable and cached for a year, exactly one mutable entry point, and an invalidation that touches a single object rather than a wildcard over a hundred thousand. The alternative, purging the tree on every publish, costs minutes of propagation, empties every edge and every browser cache, and makes the first viewer after a deploy pay for the whole city again.</p>
+<h2 id="why-you-hit-this" tabindex="-1"><a class="heading-link" href="#why-you-hit-this"><span>Why you hit this</span></a></h2>
+<p>Tilesets are large, mostly static, and republished often. Those three facts together make caching the dominant factor in perceived performance, and they make the naive publish — overwrite in place, purge everything — the worst possible combination: viewers see partially updated trees during the write, and afterwards nobody has a warm cache. The fix is structural rather than a setting, and it is the same pattern that works for any large versioned artifact.</p>
+<p>The deploy mechanics are in <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/automated-3d-tiles-deployment-to-cdn/">automated 3D Tiles deployment to CDN</a>; this page is about what the caches do with it.</p>
+<h2 id="prerequisites" tabindex="-1"><a class="heading-link" href="#prerequisites"><span>Prerequisites</span></a></h2>
+<ul>
+<li>Object storage plus a CDN that honours <code>Cache-Control</code> and conditional requests — CloudFront, Fastly, Cloudflare and most others.</li>
+<li>A build that writes to an immutable, version-keyed prefix, as produced by an <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/incremental-retiling-of-changed-city-blocks/">incremental retile</a>.</li>
+<li>The ability to set headers per path pattern, either at upload or at the edge.</li>
+</ul>
+<h2 id="step-by-step" tabindex="-1"><a class="heading-link" href="#step-by-step"><span>Step-by-Step</span></a></h2>
+<h3 id="1-make-every-payload-path-immutable" tabindex="-1"><a class="heading-link" href="#1-make-every-payload-path-immutable"><span>1. Make every payload path immutable</span></a></h3>
+<p>The rule is simple: if the bytes at a URL can ever change, that URL cannot be cached long. So arrange for them never to change.</p>
+<div class="codeblock" data-lang="bash"><div class="codeblock__bar"><span class="codeblock__lang">bash</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-bash" tabindex="0" role="group" aria-label="bash code sample"><code class="language-bash"><span class="token assign-left variable">BUILD</span><span class="token operator">=</span><span class="token variable"><span class="token variable">$(</span><span class="token function">git</span> rev-parse <span class="token parameter variable">--short</span> HEAD<span class="token variable">)</span></span>
+
+<span class="token comment"># Payloads: content-addressed by build, cached for a year.</span>
+aws s3 <span class="token function">sync</span> build/next/ <span class="token string">"s3://twin/builds/<span class="token variable">${BUILD}</span>/"</span> <span class="token punctuation">\</span>
+  --cache-control <span class="token string">"public, max-age=31536000, immutable"</span> <span class="token punctuation">\</span>
+  <span class="token parameter variable">--exclude</span> <span class="token string">"tileset.json"</span>
+
+<span class="token comment"># The one mutable object: never cached.</span>
+aws s3 <span class="token function">cp</span> build/next/tileset.json <span class="token string">"s3://twin/builds/<span class="token variable">${BUILD}</span>/tileset.json"</span> <span class="token punctuation">\</span>
+  --cache-control <span class="token string">"no-cache"</span>
+</code></pre></div>
+<p><code>immutable</code> is the directive that matters and the one most often omitted. Without it, a browser with a year-old entry still sends a conditional request on every navigation to confirm the object has not changed; with it, the request is not made at all. Across a tileset that is thousands of avoided round trips per session.</p>
+<h3 id="2-keep-exactly-one-mutable-entry-point" tabindex="-1"><a class="heading-link" href="#2-keep-exactly-one-mutable-entry-point"><span>2. Keep exactly one mutable entry point</span></a></h3>
+<p>Everything the viewer reads is reachable from one object, and only that object changes.</p>
+<div class="codeblock" data-lang="bash"><div class="codeblock__bar"><span class="codeblock__lang">bash</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-bash" tabindex="0" role="group" aria-label="bash code sample"><code class="language-bash"><span class="token comment"># The alias the viewer is pointed at. This is the only thing a publish rewrites.</span>
+aws s3 <span class="token function">cp</span> <span class="token string">"s3://twin/builds/<span class="token variable">${BUILD}</span>/tileset.json"</span> s3://twin/live/tileset.json <span class="token punctuation">\</span>
+  --cache-control <span class="token string">"no-cache, must-revalidate"</span> <span class="token punctuation">\</span>
+  --metadata-directive REPLACE
+
+<span class="token comment"># Its content URIs are absolute into the immutable prefix.</span>
+python - <span class="token operator">&lt;&lt;</span><span class="token string">'PY'
+import json
+ts = json.load(open("build/next/tileset.json"))
+def rewrite(node, prefix):
+    if "content" in node and not node["content"]["uri"].startswith("http"):
+        node["content"]["uri"] = f"{prefix}/{node['content']['uri']}"
+    for c in node.get("children", []):
+        rewrite(c, prefix)
+rewrite(ts["root"], f"/builds/{__import__('os').environ['BUILD']}")
+json.dump(ts, open("build/next/tileset.json", "w"))
+PY</span>
+</code></pre></div>
+<figure class="diagram">
+<svg viewBox="16 36 708 214" role="img" aria-labelledby="ci-shape-t ci-shape-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="ci-shape-t">One mutable object in front of an immutable tree</title>
+  <desc id="ci-shape-d">The viewer resolves a single no-cache alias, which points into a build prefix whose every object is immutable and cached for a year. Publishing rewrites the alias only, so one object is invalidated and every payload the viewer already holds stays valid.</desc>
+  <rect class="svg-bg" x="16" y="36" width="708" height="214" fill="#ffffff"/>
+  <g stroke-width="2">
+    <rect x="30" y="96" width="150" height="52" rx="8" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="260" y="50" width="200" height="44" rx="8" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="260" y="106" width="200" height="44" rx="8" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="260" y="162" width="200" height="44" rx="8" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="530" y="106" width="180" height="44" rx="8" fill="#e3f0f4" stroke="#1f6b8a"/>
+  </g>
+  <g stroke="#5b6471" stroke-width="2" fill="none">
+    <path d="M180 122 L258 128"/>
+    <path d="M460 128 L528 128"/>
+  </g>
+  <g fill="#1f2937" font-size="12" text-anchor="middle">
+    <text x="105" y="118"><tspan x="105" dy="0">/live/tileset.json</tspan><tspan x="105" dy="16">no-cache</tspan></text>
+    <text x="360" y="70">/builds/8f2c1a/ — previous</text>
+    <text x="360" y="126">/builds/c41e97/ — live</text>
+    <text x="360" y="182">/builds/19b0d4/ — next</text>
+    <text x="620" y="126"><tspan x="620" dy="0">*.b3dm, *.glb</tspan><tspan x="620" dy="16">immutable, 1 year</tspan></text>
+  </g>
+  <text x="370" y="232" fill="#15384a" font-size="12.5" text-anchor="middle">Publishing rewrites one object and invalidates one path — every payload a viewer already holds stays valid</text>
+</svg>
+<figcaption>The whole scheme is one indirection. Everything expensive is immutable, and the only thing that changes is a few kilobytes of JSON.</figcaption>
+</figure>
+<h3 id="3-invalidate-one-path-not-a-wildcard" tabindex="-1"><a class="heading-link" href="#3-invalidate-one-path-not-a-wildcard"><span>3. Invalidate one path, not a wildcard</span></a></h3>
+<div class="codeblock" data-lang="bash"><div class="codeblock__bar"><span class="codeblock__lang">bash</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-bash" tabindex="0" role="group" aria-label="bash code sample"><code class="language-bash"><span class="token comment"># Right: one path, propagates in seconds, free on most CDNs.</span>
+aws cloudfront create-invalidation --distribution-id <span class="token string">"<span class="token variable">$DIST</span>"</span> <span class="token parameter variable">--paths</span> <span class="token string">"/live/tileset.json"</span>
+
+<span class="token comment"># Wrong: a wildcard over the whole tree.</span>
+<span class="token comment"># aws cloudfront create-invalidation --distribution-id "$DIST" --paths "/*"</span>
+</code></pre></div>
+<p>The wildcard is wrong on three counts. It takes minutes rather than seconds to propagate, so there is a window in which some edges serve the old tree and some the new. It is billed per path on several CDNs, and a city tileset has a lot of paths. And it discards every warm cache entry, so the first viewer after each deploy re-downloads the entire visible extent — which is precisely the cost the caching was there to avoid.</p>
+<h3 id="4-use-etags-for-the-one-object-that-does-change" tabindex="-1"><a class="heading-link" href="#4-use-etags-for-the-one-object-that-does-change"><span>4. Use ETags for the one object that does change</span></a></h3>
+<p>The alias is fetched on every session, so making it conditional is worth the two headers.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> hashlib
+<span class="token keyword">import</span> json
+<span class="token keyword">from</span> pathlib <span class="token keyword">import</span> Path
+
+<span class="token keyword">def</span> <span class="token function">publish_alias</span><span class="token punctuation">(</span>local_path<span class="token punctuation">,</span> s3<span class="token punctuation">,</span> bucket<span class="token punctuation">,</span> key<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    body <span class="token operator">=</span> Path<span class="token punctuation">(</span>local_path<span class="token punctuation">)</span><span class="token punctuation">.</span>read_bytes<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    etag <span class="token operator">=</span> hashlib<span class="token punctuation">.</span>md5<span class="token punctuation">(</span>body<span class="token punctuation">)</span><span class="token punctuation">.</span>hexdigest<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    s3<span class="token punctuation">.</span>put_object<span class="token punctuation">(</span>
+        Bucket<span class="token operator">=</span>bucket<span class="token punctuation">,</span> Key<span class="token operator">=</span>key<span class="token punctuation">,</span> Body<span class="token operator">=</span>body<span class="token punctuation">,</span>
+        ContentType<span class="token operator">=</span><span class="token string">"application/json"</span><span class="token punctuation">,</span>
+        CacheControl<span class="token operator">=</span><span class="token string">"no-cache, must-revalidate"</span><span class="token punctuation">,</span>
+        Metadata<span class="token operator">=</span><span class="token punctuation">{</span><span class="token string">"build-etag"</span><span class="token punctuation">:</span> etag<span class="token punctuation">}</span><span class="token punctuation">,</span>
+    <span class="token punctuation">)</span>
+    <span class="token keyword">return</span> etag
+</code></pre></div>
+<p>With <code>no-cache</code> the client still revalidates, but a matching ETag returns <code>304 Not Modified</code> with an empty body. For a tileset root that is a few kilobytes that is a modest saving; for an implicit tileset whose root is under two kilobytes it is nearly all of the request.</p>
+<h3 id="5-retire-old-builds-on-a-schedule-not-on-publish" tabindex="-1"><a class="heading-link" href="#5-retire-old-builds-on-a-schedule-not-on-publish"><span>5. Retire old builds on a schedule, not on publish</span></a></h3>
+<p>Deleting the previous build at publish time removes the rollback and breaks any viewer mid-session.</p>
+<div class="codeblock" data-lang="bash"><div class="codeblock__bar"><span class="codeblock__lang">bash</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-bash" tabindex="0" role="group" aria-label="bash code sample"><code class="language-bash"><span class="token comment"># Keep the last four builds; expire anything older.</span>
+aws s3api put-bucket-lifecycle-configuration <span class="token parameter variable">--bucket</span> twin --lifecycle-configuration <span class="token string">'{
+  "Rules": [{
+    "ID": "expire-old-builds",
+    "Filter": {"Prefix": "builds/"},
+    "Status": "Enabled",
+    "Expiration": {"Days": 30}
+  }]
+}'</span>
+</code></pre></div>
+<p>Expiring by age rather than by count is the safer rule: a quiet month should not silently expire the only version you would want to return to, and thirty days of a city tileset is a predictable storage cost rather than an unbounded one.</p>
+<figure class="diagram">
+<svg viewBox="60 23 624 211" role="img" aria-labelledby="ci-cost-t ci-cost-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="ci-cost-t">What the first viewer after a deploy pays</title>
+  <desc id="ci-cost-d">After a wildcard purge every edge and browser cache is empty, so the first viewer downloads the whole visible extent again — about ninety megabytes. After a single-path invalidation only the changed tiles are cold, so the same viewer downloads a few megabytes and the rest comes from cache.</desc>
+  <rect class="svg-bg" x="60" y="23" width="624" height="211" fill="#ffffff"/>
+  <g stroke-width="2">
+    <rect x="200" y="60" width="470" height="32" rx="4" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="200" y="112" width="34" height="32" rx="4" fill="#eef5e9" stroke="#4f7a4d"/>
+  </g>
+  <g fill="#1f2937" font-size="12" text-anchor="start">
+    <text x="200" y="50">wildcard purge — 91 MB re-downloaded, 4 min propagation</text>
+    <text x="246" y="134">single path — 6.4 MB, seconds to propagate</text>
+  </g>
+  <text x="190" y="82" fill="#5b6471" font-size="12" text-anchor="end">/*</text>
+  <text x="190" y="134" fill="#5b6471" font-size="12" text-anchor="end">/live/tileset.json</text>
+  <text x="370" y="188" fill="#15384a" font-size="12.5" text-anchor="middle">Same deploy, same tiles changed — the difference is entirely in what the invalidation discarded</text>
+  <text x="370" y="216" fill="#5b6471" font-size="12" text-anchor="middle">And the wildcard's four-minute propagation is a window in which edges disagree about which build is live</text>
+</svg>
+<figcaption>The purge is not merely slower. It throws away the caches that were the point of the exercise, and it does so on every publish.</figcaption>
+</figure>
+<figure class="diagram">
+<svg viewBox="10 42 607 214" role="img" aria-labelledby="ci-hdr-t ci-hdr-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="ci-hdr-t">The header each kind of object needs</title>
+  <desc id="ci-hdr-d">Tile payloads and subtree files never change at their path and take a one-year immutable cache. The tileset root at the alias changes on every publish and takes no-cache with must-revalidate. Getting these two the wrong way round produces either a viewer that never updates or a city that is re-downloaded on every visit.</desc>
+  <rect class="svg-bg" x="10" y="42" width="607" height="214" fill="#ffffff"/>
+  <g stroke-width="2">
+    <rect x="24" y="56" width="230" height="34" rx="6" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="24" y="98" width="230" height="34" rx="6" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="24" y="140" width="230" height="34" rx="6" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="24" y="182" width="230" height="34" rx="6" fill="#fdf3e0" stroke="#c46a3d"/>
+  </g>
+  <g fill="#1f2937" font-size="12" text-anchor="middle">
+    <text x="139" y="78">*.b3dm, *.glb, *.pnts</text>
+    <text x="139" y="120">*.subtree</text>
+    <text x="139" y="162">*.ktx2 textures</text>
+    <text x="139" y="204">/live/tileset.json</text>
+  </g>
+  <g fill="#1f2937" font-size="12" text-anchor="start">
+    <text x="278" y="78">public, max-age=31536000, immutable</text>
+    <text x="278" y="120">public, max-age=31536000, immutable</text>
+    <text x="278" y="162">public, max-age=31536000, immutable</text>
+    <text x="278" y="204">no-cache, must-revalidate</text>
+  </g>
+  <text x="370" y="238" fill="#15384a" font-size="12.5" text-anchor="middle">One row differs from the other three, and it is the only object a publish rewrites</text>
+</svg>
+<figcaption>Four patterns and one exception. The exception is small, revalidates cheaply with an ETag, and is the entire mutable surface of the deployment.</figcaption>
+</figure>
+<h2 id="expected-output-verification" tabindex="-1"><a class="heading-link" href="#expected-output-verification"><span>Expected Output &amp; Verification</span></a></h2>
+<p>Confirm the headers from outside your network, because a local check sees neither the CDN nor its cache state.</p>
+<div class="codeblock" data-lang="bash"><div class="codeblock__bar"><span class="codeblock__lang">bash</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-bash" tabindex="0" role="group" aria-label="bash code sample"><code class="language-bash"><span class="token function">curl</span> <span class="token parameter variable">-sI</span> https://cdn.example.com/live/tileset.json <span class="token operator">|</span> <span class="token function">grep</span> <span class="token parameter variable">-Ei</span> <span class="token string">"cache-control|etag|x-cache"</span>
+<span class="token function">curl</span> <span class="token parameter variable">-sI</span> https://cdn.example.com/builds/c41e97/12/8801/9702.b3dm <span class="token operator">|</span> <span class="token function">grep</span> <span class="token parameter variable">-Ei</span> <span class="token string">"cache-control|x-cache"</span>
+</code></pre></div>
+<div class="codeblock" data-lang="text"><div class="codeblock__bar"><span class="codeblock__lang">text</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-text" tabindex="0" role="group" aria-label="text code sample"><code class="language-text">cache-control: no-cache, must-revalidate
+etag: "9f2c1ab4e6d0..."
+x-cache: Miss from cloudfront
+
+cache-control: public, max-age=31536000, immutable
+x-cache: Hit from cloudfront
+</code></pre></div>
+<p>Four things to check: the alias is <code>no-cache</code> and the payloads are <code>immutable</code>; the payload path contains the build id; a second request for the same payload reports a cache hit; and the tileset the alias resolves to carries the commit you just published. That last one catches a stale edge, which is the failure this whole scheme exists to prevent and the only one a header check alone will miss.</p>
+<h2 id="common-errors" tabindex="-1"><a class="heading-link" href="#common-errors"><span>Common Errors</span></a></h2>
+<p><strong>Viewers see the old tileset for hours after a deploy.</strong> The alias was cached. Set <code>no-cache</code> on it explicitly — inheriting a bucket-wide long <code>max-age</code> is the usual cause.</p>
+<p><strong>Every deploy re-downloads the whole city.</strong> Payload paths are not version-keyed, so the invalidation had to be a wildcard. Move payloads under a build prefix and the wildcard becomes unnecessary.</p>
+<p><strong>Some viewers see a half-updated tree.</strong> The tileset was overwritten in place while a viewer was resolving it. Write the new build to its own prefix first, then move the alias.</p>
+<p><strong>The CDN reports a hit but serves stale bytes.</strong> A proxy between you and the CDN is caching without honouring the headers. Check for an intermediate cache and confirm <code>Vary</code> and <code>Cache-Control</code> survive it.</p>
+<h2 id="frequently-asked-questions" tabindex="-1"><a class="heading-link" href="#frequently-asked-questions"><span>Frequently Asked Questions</span></a></h2>
+<h3 id="why-not-use-query-strings-for-versioning" tabindex="-1"><a class="heading-link" href="#why-not-use-query-strings-for-versioning"><span>Why not use query strings for versioning?</span></a></h3>
+<p>Some CDNs strip or ignore query strings when forming the cache key, so <code>tile.b3dm?v=2</code> can be served from the entry for <code>?v=1</code>. Path-based versioning has no such ambiguity anywhere.</p>
+<h3 id="how-long-should-max-age-be-for-payloads" tabindex="-1"><a class="heading-link" href="#how-long-should-max-age-be-for-payloads"><span>How long should <code>max-age</code> be for payloads?</span></a></h3>
+<p>A year, with <code>immutable</code>. The path already encodes the build, so the bytes at it can never change and there is no reason to revalidate.</p>
+<h3 id="does-this-interact-with-the-incremental-rebuild" tabindex="-1"><a class="heading-link" href="#does-this-interact-with-the-incremental-rebuild"><span>Does this interact with the incremental rebuild?</span></a></h3>
+<p>Directly, and favourably: tiles that were copied forward byte-identical land at a <em>new</em> path under the new build prefix, so they are cold at the edge even though the bytes are the same. If that matters, address payloads by content hash rather than by build id and unchanged tiles keep their URL — at the cost of a less readable layout.</p>
+<p>It is worth being explicit about what this scheme buys and what it does not. It makes a publish atomic and cheap, and it keeps warm caches warm — so the median viewer after a deploy pays for the handful of tiles that changed rather than for the city. It does not make the first ever visit faster: a cold viewer downloads the visible extent regardless, and that cost belongs to tile size and compression rather than to caching.</p>
+<p>The second limitation is that immutability is a property of the path, not of the bytes. Two builds that produce identical tiles still place them at different paths, so every tile is cold after a publish even where nothing changed. Where that matters — a city republished several times a day — addressing payloads by a hash of their contents rather than by build id keeps unchanged tiles at the same URL and preserves their cache entries, at the cost of a directory layout no human can navigate.</p>
+<p>Finally, verify from outside. A <code>curl</code> from the build machine frequently bypasses the CDN entirely and reports the origin’s headers, which are not what a viewer sees. Check from a network you do not control, and check the resolved commit rather than only the headers.</p>
+<h3 id="should-the-alias-be-an-object-or-a-redirect" tabindex="-1"><a class="heading-link" href="#should-the-alias-be-an-object-or-a-redirect"><span>Should the alias be an object or a redirect?</span></a></h3>
+<p>An object. A redirect adds a round trip on every session and, on several CDNs, is cached under rules that differ from the target’s — which reintroduces exactly the staleness the scheme removes.</p>
+<h2 id="related-guides" tabindex="-1"><a class="heading-link" href="#related-guides"><span>Related Guides</span></a></h2>
+<ul>
+<li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/">Streaming &amp; Synchronization Patterns</a> — how the client consumes what is published</li>
+<li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/automated-3d-tiles-deployment-to-cdn/">Automated 3D Tiles Deployment to CDN</a> — the upload and alias mechanics</li>
+<li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/incremental-retiling-of-changed-city-blocks/">Incremental Retiling of Changed City Blocks</a> — producing a build where most tiles did not change</li>
+</ul>
+<p>Back to <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/">Streaming &amp; Synchronization Patterns</a>.</p>
+
+
+      
+      
+
+      <div class="related-nav">
+        
+
+        
+      </div>
+    </article>
+
+    
+    <aside class="toc" aria-label="On this page" data-toc hidden>
+      <h4>On this page</h4>
+      <ul></ul>
+    </aside>
+  </div>
+</div>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+  <div class="container site-footer__inner">
+    <div class="site-footer__brand">
+      <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+        <img src="/assets/img/logo-mark.svg" alt="" class="brand__mark" width="36" height="36">
+        <span class="brand__name">
+          3D Geospatial
+          <small>Digital Twin Automation</small>
+        </span>
+      </a>
+      <p>Engineering-grade guides on point cloud processing, mesh pipelines, LOD strategies, and CI/CD automation for digital twin platforms.</p>
+      <a class="footer-social" href="https://github.com/3d-geospatial" aria-label="3D Geospatial on GitHub" rel="noopener" target="_blank">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+          <path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.53-1.34-1.3-1.7-1.3-1.7-1.06-.72.08-.71.08-.71 1.17.08 1.79 1.2 1.79 1.2 1.04 1.79 2.73 1.27 3.4.97.1-.75.4-1.27.73-1.56-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.19-3.08-.12-.3-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.75.11 3.05.74.8 1.19 1.83 1.19 3.08 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.07.78 2.15v3.18c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5Z"/>
+        </svg>
+        <span>GitHub</span>
+      </a>
+    </div>
+
+    <div class="site-footer__col">
+      <h4>Sections</h4>
+      <ul>
+        <li><a href="https://www.3d-geospatial.com/">Home</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management &amp; Optimization</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/">Point Cloud &amp; Mesh Pipelines</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/">Troubleshooting &amp; Reliability</a></li>
+        
+      </ul>
+    </div>
+
+    
+      <div class="site-footer__col">
+        <h4>3D Geospatial Fundamentals</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/">3D Format Standards Comparison</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems for 3D Assets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/">Digital Elevation Model Workflows</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/">Spatial Indexing and Tiling Schemes for 3D Data</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>LOD Management &amp; Optimization</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/">Automated Tile Generation for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/">Cesium ion Upload Automation for 3D Tilesets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/">glTF LOD Generation With Draco Compression</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/">Streaming Sync Patterns for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/">Tileset Metadata and 3D Tiles Next</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Point Cloud &amp; Mesh Pipelines</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/">Automated Mesh Decimation for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/">CI/CD Automation for Spatial Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">LiDAR Classification and Ground Extraction</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/">Point Cloud Filtering Techniques</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/">Surface Reconstruction for Geospatial Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/">Texture Mapping Workflows for Digital Twins</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Troubleshooting &amp; Reliability</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/">Cross-Section Failure Modes in Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/">Data Validation &amp; QA Gates for 3D Tiles</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/">Performance Profiling and Benchmarking</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/">Streaming &amp; Runtime Diagnostics for 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+  </div>
+  <div class="container site-footer__bottom">
+    <span>© 2026 3D Geospatial &amp; Digital Twin Automation</span>
+    <span>Built with Eleventy · PWA-enabled</span>
+  </div>
+</footer>
+
+
+  <script src="/assets/js/site.js?v=b99aa9f971" defer></script>
+  
+</body>
+</html>

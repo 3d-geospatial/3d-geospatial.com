@@ -1,0 +1,673 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <title>ECEF and ENU Frames for Tileset Transforms — 3D Geospatial</title>
+  <meta name="description" content="Build the 4x4 root transform a 3D Tiles tileset needs: the ENU basis at a local origin, the ECEF translation, column-major order, and the checks that catch a wrong one.">
+  <meta name="keywords" content="3D geospatial, digital twin, point cloud, mesh pipeline, LOD, 3D Tiles, Cesium, PDAL, Open3D, Python, CI/CD">
+  <meta name="author" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta name="theme-color" content="#1f6b8a" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f171d" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+
+  
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem("theme");
+        var theme = (stored === "dark" || stored === "light") ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    })();
+  </script>
+  <meta name="generator" content="Eleventy">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="googlebot" content="index,follow,max-image-preview:large">
+
+  
+  <link rel="canonical" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/ecef-and-enu-frames-for-tileset-transforms/">
+  <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">
+
+  
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/icon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+
+  
+  <link rel="apple-touch-icon" href="/assets/img/icon-180.png">
+  <link rel="mask-icon" href="/assets/img/logo.svg" color="#1f6b8a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="3D Geospatial">
+  <meta name="application-name" content="3D Geospatial">
+
+  
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="ECEF and ENU Frames for Tileset Transforms — 3D Geospatial">
+  <meta property="og:description" content="Build the 4x4 root transform a 3D Tiles tileset needs: the ENU basis at a local origin, the ECEF translation, column-major order, and the checks that catch a wrong one.">
+  <meta property="og:url" content="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/ecef-and-enu-frames-for-tileset-transforms/">
+  <meta property="og:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+  <meta property="og:site_name" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta property="og:locale" content="en_US">
+  
+  <meta property="article:published_time" content="2026-08-07T09:32:31.636Z">
+  <meta property="article:modified_time" content="2026-08-07T09:32:31.636Z">
+  <meta property="article:publisher" content="https://www.3d-geospatial.com/">
+  
+
+  
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="ECEF and ENU Frames for Tileset Transforms — 3D Geospatial">
+  <meta name="twitter:description" content="Build the 4x4 root transform a 3D Tiles tileset needs: the ENU basis at a local origin, the ECEF translation, column-major order, and the checks that catch a wrong one.">
+  <meta name="twitter:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta name="twitter:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+
+  
+  <link rel="preload" href="/assets/css/styles.css?v=546adeb511" as="style">
+  
+
+  <link rel="stylesheet" href="/assets/css/styles.css?v=546adeb511">
+
+  
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.3d-geospatial.com/#organization",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "url": "https://www.3d-geospatial.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/icon-512.png",
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://www.3d-geospatial.com/#website",
+      "url": "https://www.3d-geospatial.com/",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "description": "Build reliable 3D spatial data pipelines for digital twins — point clouds, meshes, LOD strategies, Python processing, and CI/CD automation.",
+      "inLanguage": "en",
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      }
+    },
+    {
+      "@type": "TechArticle",
+      "@id": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/ecef-and-enu-frames-for-tileset-transforms/#article",
+      "isPartOf": {
+        "@id": "https://www.3d-geospatial.com/#website"
+      },
+      "headline": "ECEF and ENU Frames for Tileset Transforms",
+      "name": "ECEF and ENU Frames for Tileset Transforms",
+      "description": "Build the 4x4 root transform a 3D Tiles tileset needs: the ENU basis at a local origin, the ECEF translation, column-major order, and the checks that catch a wrong one.",
+      "url": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/ecef-and-enu-frames-for-tileset-transforms/",
+      "mainEntityOfPage": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/ecef-and-enu-frames-for-tileset-transforms/",
+      "inLanguage": "en",
+      "datePublished": "2026-08-07T09:32:31.636Z",
+      "dateModified": "2026-08-07T09:32:31.636Z",
+      "author": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "image": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/og-cover.png",
+        "width": 1200,
+        "height": 630
+      },
+      "breadcrumb": {
+        "@id": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/ecef-and-enu-frames-for-tileset-transforms/#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/ecef-and-enu-frames-for-tileset-transforms/#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://www.3d-geospatial.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "3D Geospatial Fundamentals For Digital Twins",
+          "item": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Coordinate Reference Systems For 3D Assets",
+          "item": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "name": "Ecef And Enu Frames For Tileset Transforms",
+          "item": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/ecef-and-enu-frames-for-tileset-transforms/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  
+<header class="site-header" role="banner">
+  <div class="container site-header__inner">
+    <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+      <img src="/assets/img/logo.svg" alt="" class="brand__mark" width="36" height="36">
+      <span class="brand__name">
+        3D Geospatial
+        <small>Digital Twin Automation</small>
+      </span>
+    </a>
+
+    <button class="theme-toggle" type="button" data-theme-toggle
+            aria-label="Switch to dark theme" title="Switch to dark theme">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4.2"/>
+        <path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/>
+      </svg>
+    </button>
+
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>
+      <span class="nav-toggle__icon" aria-hidden="true"><span></span></span>
+      Menu
+    </button>
+
+    <nav class="primary-nav" id="primary-nav" aria-label="Primary">
+      
+      <a href="https://www.3d-geospatial.com/" >
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/>
+        </svg>
+        Home
+      </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/" aria-current="page">
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2 3 7l9 5 9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 17l9 5 9-5"/>
+            </svg>
+          
+          3D Geospatial Fundamentals
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+          
+          LOD Management &amp; Optimization
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="6" cy="6" r="1.5"/><circle cx="12" cy="6" r="1.5"/><circle cx="18" cy="6" r="1.5"/>
+              <circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/>
+              <circle cx="6" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="18" cy="18" r="1.5"/>
+            </svg>
+          
+          Point Cloud &amp; Mesh Pipelines
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <path d="M12 9v4"/><path d="M12 17h.01"/>
+            </svg>
+          
+          Troubleshooting &amp; Reliability
+        </a>
+      
+    </nav>
+  </div>
+</header>
+
+
+  <main id="main">
+    
+
+
+<div class="container">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    
+      
+        <a href="https://www.3d-geospatial.com/">Home</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals For Digital Twins</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems For 3D Assets</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <span class="current">Ecef And Enu Frames For Tileset Transforms</span>
+      
+    
+  </nav>
+
+  <div class="content-page">
+    <article class="article">
+      <h1 id="ecef-and-enu-frames-for-tileset-transforms" tabindex="-1"><a class="heading-link" href="#ecef-and-enu-frames-for-tileset-transforms"><span>ECEF and ENU Frames for Tileset Transforms</span></a></h1>
+<p>This page builds the sixteen numbers that place a tileset on the globe — the root <code>transform</code> — from first principles: the east-north-up basis at a chosen origin, the geocentric translation to that origin, the column-major ordering 3D Tiles expects, and the assertions that catch each of the three ways it goes wrong. Get it right and a building sits on its footprint; get it subtly wrong and the building is level but rotated, or upright but half a kilometre away.</p>
+<h2 id="why-you-hit-this" tabindex="-1"><a class="heading-link" href="#why-you-hit-this"><span>Why you hit this</span></a></h2>
+<p>Tile content is authored in small local metres so that float32 vertices stay precise, and 3D Tiles positions that content in a geocentric Earth-centred Earth-fixed frame. The root transform is the bridge, and it has to encode two things at once: where the local origin sits on the globe, and which way is up there. The second is what people miss — “up” in a local frame is the ellipsoid normal at that specific point, and it differs from the geocentric radial direction by up to about 0.2°, which over a kilometre-wide tile is metres of tilt.</p>
+<p>The local-origin shift this depends on is covered in <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/gltf-vs-3dtiles-vs-obj-for-spatial-data/">glTF vs 3D Tiles vs OBJ</a>.</p>
+<h2 id="prerequisites" tabindex="-1"><a class="heading-link" href="#prerequisites"><span>Prerequisites</span></a></h2>
+<ul>
+<li>Python 3.10+ with <code>pyproj&gt;=3.6</code> and <code>numpy&gt;=1.24</code>.</li>
+<li>A local origin: the point your tile content’s coordinates are relative to, in a known CRS.</li>
+<li>Content in metres with a stated axis convention. glTF is Y-up; the ENU frame built here is Z-up, so one rotation sits between them.</li>
+</ul>
+<h2 id="step-by-step" tabindex="-1"><a class="heading-link" href="#step-by-step"><span>Step-by-Step</span></a></h2>
+<h3 id="1-convert-the-local-origin-to-ecef" tabindex="-1"><a class="heading-link" href="#1-convert-the-local-origin-to-ecef"><span>1. Convert the local origin to ECEF</span></a></h3>
+<p>The translation column of the transform is the origin’s geocentric position.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> numpy <span class="token keyword">as</span> np
+<span class="token keyword">from</span> pyproj <span class="token keyword">import</span> Transformer
+
+to_ecef <span class="token operator">=</span> Transformer<span class="token punctuation">.</span>from_crs<span class="token punctuation">(</span><span class="token string">"EPSG:32633+5941"</span><span class="token punctuation">,</span> <span class="token string">"EPSG:4978"</span><span class="token punctuation">,</span> always_xy<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+
+origin_e<span class="token punctuation">,</span> origin_n<span class="token punctuation">,</span> origin_h <span class="token operator">=</span> <span class="token number">598120.4</span><span class="token punctuation">,</span> <span class="token number">6643880.1</span><span class="token punctuation">,</span> <span class="token number">42.6</span>      <span class="token comment"># UTM 33N + orthometric</span>
+ox<span class="token punctuation">,</span> oy<span class="token punctuation">,</span> oz <span class="token operator">=</span> to_ecef<span class="token punctuation">.</span>transform<span class="token punctuation">(</span>origin_e<span class="token punctuation">,</span> origin_n<span class="token punctuation">,</span> origin_h<span class="token punctuation">)</span>
+
+r <span class="token operator">=</span> <span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>linalg<span class="token punctuation">.</span>norm<span class="token punctuation">(</span><span class="token punctuation">[</span>ox<span class="token punctuation">,</span> oy<span class="token punctuation">,</span> oz<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"ECEF origin: </span><span class="token interpolation"><span class="token punctuation">{</span>ox<span class="token punctuation">:</span><span class="token format-spec">.3f</span><span class="token punctuation">}</span></span><span class="token string"> </span><span class="token interpolation"><span class="token punctuation">{</span>oy<span class="token punctuation">:</span><span class="token format-spec">.3f</span><span class="token punctuation">}</span></span><span class="token string"> </span><span class="token interpolation"><span class="token punctuation">{</span>oz<span class="token punctuation">:</span><span class="token format-spec">.3f</span><span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+<span class="token keyword">assert</span> <span class="token number">6.3e6</span> <span class="token operator">&lt;</span> r <span class="token operator">&lt;</span> <span class="token number">6.6e6</span><span class="token punctuation">,</span> <span class="token string-interpolation"><span class="token string">f"radius </span><span class="token interpolation"><span class="token punctuation">{</span>r<span class="token punctuation">:</span><span class="token format-spec">.0f</span><span class="token punctuation">}</span></span><span class="token string"> m is not on the ellipsoid"</span></span>
+</code></pre></div>
+<p>The radius assertion is the cheapest and most valuable check in the whole procedure. Every forgotten reprojection lands the origin at or near the geocentre, and this catches it in one line.</p>
+<h3 id="2-build-the-enu-basis-at-that-origin" tabindex="-1"><a class="heading-link" href="#2-build-the-enu-basis-at-that-origin"><span>2. Build the ENU basis at that origin</span></a></h3>
+<p>East, north and up are the columns of the rotation. They come from the geodetic latitude and longitude, not from the projected coordinates.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> numpy <span class="token keyword">as</span> np
+<span class="token keyword">from</span> pyproj <span class="token keyword">import</span> Transformer
+
+to_geo <span class="token operator">=</span> Transformer<span class="token punctuation">.</span>from_crs<span class="token punctuation">(</span><span class="token string">"EPSG:4978"</span><span class="token punctuation">,</span> <span class="token string">"EPSG:4979"</span><span class="token punctuation">,</span> always_xy<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+lon<span class="token punctuation">,</span> lat<span class="token punctuation">,</span> _ <span class="token operator">=</span> to_geo<span class="token punctuation">.</span>transform<span class="token punctuation">(</span>ox<span class="token punctuation">,</span> oy<span class="token punctuation">,</span> oz<span class="token punctuation">)</span>
+la<span class="token punctuation">,</span> lo <span class="token operator">=</span> np<span class="token punctuation">.</span>radians<span class="token punctuation">(</span>lat<span class="token punctuation">)</span><span class="token punctuation">,</span> np<span class="token punctuation">.</span>radians<span class="token punctuation">(</span>lon<span class="token punctuation">)</span>
+
+east  <span class="token operator">=</span> np<span class="token punctuation">.</span>array<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token operator">-</span>np<span class="token punctuation">.</span>sin<span class="token punctuation">(</span>lo<span class="token punctuation">)</span><span class="token punctuation">,</span>               np<span class="token punctuation">.</span>cos<span class="token punctuation">(</span>lo<span class="token punctuation">)</span><span class="token punctuation">,</span>              <span class="token number">0.0</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+north <span class="token operator">=</span> np<span class="token punctuation">.</span>array<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token operator">-</span>np<span class="token punctuation">.</span>sin<span class="token punctuation">(</span>la<span class="token punctuation">)</span> <span class="token operator">*</span> np<span class="token punctuation">.</span>cos<span class="token punctuation">(</span>lo<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token operator">-</span>np<span class="token punctuation">.</span>sin<span class="token punctuation">(</span>la<span class="token punctuation">)</span> <span class="token operator">*</span> np<span class="token punctuation">.</span>sin<span class="token punctuation">(</span>lo<span class="token punctuation">)</span><span class="token punctuation">,</span> np<span class="token punctuation">.</span>cos<span class="token punctuation">(</span>la<span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+up    <span class="token operator">=</span> np<span class="token punctuation">.</span>array<span class="token punctuation">(</span><span class="token punctuation">[</span> np<span class="token punctuation">.</span>cos<span class="token punctuation">(</span>la<span class="token punctuation">)</span> <span class="token operator">*</span> np<span class="token punctuation">.</span>cos<span class="token punctuation">(</span>lo<span class="token punctuation">)</span><span class="token punctuation">,</span>  np<span class="token punctuation">.</span>cos<span class="token punctuation">(</span>la<span class="token punctuation">)</span> <span class="token operator">*</span> np<span class="token punctuation">.</span>sin<span class="token punctuation">(</span>lo<span class="token punctuation">)</span><span class="token punctuation">,</span> np<span class="token punctuation">.</span>sin<span class="token punctuation">(</span>la<span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+
+<span class="token keyword">for</span> name<span class="token punctuation">,</span> v <span class="token keyword">in</span> <span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token string">"east"</span><span class="token punctuation">,</span> east<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token punctuation">(</span><span class="token string">"north"</span><span class="token punctuation">,</span> north<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token punctuation">(</span><span class="token string">"up"</span><span class="token punctuation">,</span> up<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>name<span class="token punctuation">:</span><span class="token format-spec">&lt;6</span><span class="token punctuation">}</span></span><span class="token string"> </span><span class="token interpolation"><span class="token punctuation">{</span>np<span class="token punctuation">.</span><span class="token builtin">round</span><span class="token punctuation">(</span>v<span class="token punctuation">,</span> <span class="token number">6</span><span class="token punctuation">)</span><span class="token punctuation">}</span></span><span class="token string">  |v| = </span><span class="token interpolation"><span class="token punctuation">{</span>np<span class="token punctuation">.</span>linalg<span class="token punctuation">.</span>norm<span class="token punctuation">(</span>v<span class="token punctuation">)</span><span class="token punctuation">:</span><span class="token format-spec">.9f</span><span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+
+<span class="token keyword">assert</span> <span class="token builtin">abs</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>dot<span class="token punctuation">(</span>east<span class="token punctuation">,</span> north<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">&lt;</span> <span class="token number">1e-12</span> <span class="token keyword">and</span> <span class="token builtin">abs</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>dot<span class="token punctuation">(</span>east<span class="token punctuation">,</span> up<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">&lt;</span> <span class="token number">1e-12</span>
+<span class="token keyword">assert</span> np<span class="token punctuation">.</span>allclose<span class="token punctuation">(</span>np<span class="token punctuation">.</span>cross<span class="token punctuation">(</span>east<span class="token punctuation">,</span> north<span class="token punctuation">)</span><span class="token punctuation">,</span> up<span class="token punctuation">,</span> atol<span class="token operator">=</span><span class="token number">1e-12</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"basis is left-handed"</span>
+</code></pre></div>
+<p>The cross-product assertion is what catches a sign error. East cross north must equal up in a right-handed frame; if it equals minus up, the tileset renders mirrored and everything reads correctly except that text on facades is backwards.</p>
+<figure class="diagram">
+<svg viewBox="92 9 556 305" role="img" aria-labelledby="ee-enu-t ee-enu-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="ee-enu-t">Why local up is not the geocentric radial direction</title>
+  <desc id="ee-enu-d">The ellipsoid normal at a point is perpendicular to the ellipsoid surface, while the geocentric radial direction points at the Earth's centre. Because the Earth is flattened, the two differ by up to about 0.2 degrees at mid-latitudes, which tilts a kilometre-wide tile by several metres across its width.</desc>
+  <rect class="svg-bg" x="92" y="9" width="556" height="305" fill="#ffffff"/>
+  <path d="M120 210 A 190 150 0 0 1 470 100" fill="none" stroke="#4f7a4d" stroke-width="2.5"/>
+  <circle cx="330" cy="235" r="5" fill="#5b6471"/>
+  <circle cx="330" cy="118" r="5" fill="#1f6b8a"/>
+  <path d="M330 118 L330 235" fill="none" stroke="#5b6471" stroke-width="2" stroke-dasharray="5 4"/>
+  <path d="M330 118 L352 40" fill="none" stroke="#1f6b8a" stroke-width="2.5"/>
+  <path d="M330 118 L330 40" fill="none" stroke="#c46a3d" stroke-width="2.5" stroke-dasharray="5 4"/>
+  <text x="362" y="36" fill="#1f6b8a" font-size="12" text-anchor="start">ellipsoid normal — local up</text>
+  <text x="318" y="36" fill="#c46a3d" font-size="12" text-anchor="end">geocentric radial</text>
+  <text x="344" y="240" fill="#5b6471" font-size="12" text-anchor="start">toward the geocentre</text>
+  <text x="140" y="188" fill="#4f7a4d" font-size="12" text-anchor="start">ellipsoid surface</text>
+  <text x="370" y="272" fill="#15384a" font-size="12.5" text-anchor="middle">Up to about 0.2° apart at mid-latitudes — several metres of tilt across a kilometre-wide tile</text>
+  <text x="370" y="296" fill="#5b6471" font-size="12" text-anchor="middle">So the basis must come from geodetic latitude, not from normalising the ECEF position vector</text>
+</svg>
+<figcaption>Normalising the position vector gives the radial direction, which is a plausible and slightly wrong &quot;up&quot;. The tilt it introduces grows with tile size.</figcaption>
+</figure>
+<h3 id="3-assemble-the-matrix-in-column-major-order" tabindex="-1"><a class="heading-link" href="#3-assemble-the-matrix-in-column-major-order"><span>3. Assemble the matrix in column-major order</span></a></h3>
+<p>3D Tiles stores the transform as sixteen numbers in column-major order, which is the transpose of how most people write a matrix out.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> numpy <span class="token keyword">as</span> np
+
+<span class="token keyword">def</span> <span class="token function">root_transform</span><span class="token punctuation">(</span>east<span class="token punctuation">,</span> north<span class="token punctuation">,</span> up<span class="token punctuation">,</span> origin_ecef<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Column-major 4x4 as 3D Tiles expects: [c0(4), c1(4), c2(4), c3(4)]."""</span>
+    ox<span class="token punctuation">,</span> oy<span class="token punctuation">,</span> oz <span class="token operator">=</span> origin_ecef
+    <span class="token keyword">return</span> <span class="token punctuation">[</span>
+        east<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">,</span>  east<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">,</span>  east<span class="token punctuation">[</span><span class="token number">2</span><span class="token punctuation">]</span><span class="token punctuation">,</span>  <span class="token number">0.0</span><span class="token punctuation">,</span>     <span class="token comment"># column 0 — X axis of the local frame</span>
+        north<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">,</span> north<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">,</span> north<span class="token punctuation">[</span><span class="token number">2</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token number">0.0</span><span class="token punctuation">,</span>     <span class="token comment"># column 1 — Y axis</span>
+        up<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">,</span>    up<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">,</span>    up<span class="token punctuation">[</span><span class="token number">2</span><span class="token punctuation">]</span><span class="token punctuation">,</span>    <span class="token number">0.0</span><span class="token punctuation">,</span>     <span class="token comment"># column 2 — Z axis</span>
+        ox<span class="token punctuation">,</span>       oy<span class="token punctuation">,</span>       oz<span class="token punctuation">,</span>       <span class="token number">1.0</span><span class="token punctuation">,</span>     <span class="token comment"># column 3 — translation</span>
+    <span class="token punctuation">]</span>
+
+transform <span class="token operator">=</span> root_transform<span class="token punctuation">(</span>east<span class="token punctuation">,</span> north<span class="token punctuation">,</span> up<span class="token punctuation">,</span> <span class="token punctuation">(</span>ox<span class="token punctuation">,</span> oy<span class="token punctuation">,</span> oz<span class="token punctuation">)</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"translation:"</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token builtin">round</span><span class="token punctuation">(</span>v<span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span> <span class="token keyword">for</span> v <span class="token keyword">in</span> transform<span class="token punctuation">[</span><span class="token number">12</span><span class="token punctuation">:</span><span class="token number">15</span><span class="token punctuation">]</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"bottom row:"</span><span class="token punctuation">,</span> transform<span class="token punctuation">[</span><span class="token number">3</span><span class="token punctuation">]</span><span class="token punctuation">,</span> transform<span class="token punctuation">[</span><span class="token number">7</span><span class="token punctuation">]</span><span class="token punctuation">,</span> transform<span class="token punctuation">[</span><span class="token number">11</span><span class="token punctuation">]</span><span class="token punctuation">,</span> transform<span class="token punctuation">[</span><span class="token number">15</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+<span class="token keyword">assert</span> transform<span class="token punctuation">[</span><span class="token number">15</span><span class="token punctuation">]</span> <span class="token operator">==</span> <span class="token number">1.0</span><span class="token punctuation">,</span> <span class="token string">"the 16th element must be 1"</span>
+</code></pre></div>
+<p>Two elements identify the ordering immediately. In column-major the translation occupies indices 12–14 and index 15 is 1. In row-major the translation would be at 3, 7 and 11. If your translation looks like <code>[x, 0, 0, 0]</code> you have written it the other way round.</p>
+<figure class="diagram">
+<svg viewBox="16 16 699 236" role="img" aria-labelledby="ee-col-t ee-col-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="ee-col-t">Column-major against row-major, element by element</title>
+  <desc id="ee-col-d">In the column-major order 3D Tiles requires, the local frame's east, north and up axes occupy elements zero to two, four to six and eight to ten, and the translation occupies twelve to fourteen with a one at fifteen. Written row-major, the translation lands at three, seven and eleven instead, which places the tileset near the geocentre with a scrambled basis.</desc>
+  <rect class="svg-bg" x="16" y="16" width="699" height="236" fill="#ffffff"/>
+  <g stroke-width="2">
+    <rect x="30" y="56" width="150" height="30" rx="4" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="184" y="56" width="150" height="30" rx="4" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="338" y="56" width="150" height="30" rx="4" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="492" y="56" width="150" height="30" rx="4" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="30" y="140" width="150" height="30" rx="4" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="184" y="140" width="150" height="30" rx="4" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="338" y="140" width="150" height="30" rx="4" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="492" y="140" width="150" height="30" rx="4" fill="#f7dfdc" stroke="#b0413e"/>
+  </g>
+  <g fill="#1f2937" font-size="11.5" text-anchor="middle">
+    <text x="105" y="76">0–2 east, 3 = 0</text>
+    <text x="259" y="76">4–6 north, 7 = 0</text>
+    <text x="413" y="76">8–10 up, 11 = 0</text>
+    <text x="567" y="76">12–14 origin, 15 = 1</text>
+    <text x="105" y="160">0–2 east, 3 = ox</text>
+    <text x="259" y="160">4–6 north, 7 = oy</text>
+    <text x="413" y="160">8–10 up, 11 = oz</text>
+    <text x="567" y="160">12–14 zeros, 15 = 1</text>
+  </g>
+  <text x="30" y="44" fill="#4f7a4d" font-size="12.5" text-anchor="start" font-weight="600">column-major — what 3D Tiles reads</text>
+  <text x="30" y="128" fill="#b0413e" font-size="12.5" text-anchor="start" font-weight="600">row-major — the same sixteen numbers, transposed</text>
+  <text x="370" y="208" fill="#15384a" font-size="12.5" text-anchor="middle">Both arrays are sixteen valid floats and the validator accepts either — only the rendered position tells them apart</text>
+  <text x="370" y="234" fill="#5b6471" font-size="12" text-anchor="middle">Assert that elements 3, 7 and 11 are zero and element 15 is one before writing the tileset</text>
+</svg>
+<figcaption>The two orderings are indistinguishable as data and completely different as a placement. One assertion on four elements separates them.</figcaption>
+</figure>
+<h3 id="4-handle-the-gltf-y-up-convention" tabindex="-1"><a class="heading-link" href="#4-handle-the-gltf-y-up-convention"><span>4. Handle the glTF Y-up convention</span></a></h3>
+<p>The ENU basis is Z-up and glTF is Y-up, so exactly one rotation reconciles them — and it belongs in one place, not two.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> numpy <span class="token keyword">as</span> np
+
+Z_UP_TO_Y_UP <span class="token operator">=</span> np<span class="token punctuation">.</span>array<span class="token punctuation">(</span><span class="token punctuation">[</span>
+    <span class="token punctuation">[</span><span class="token number">1.0</span><span class="token punctuation">,</span> <span class="token number">0.0</span><span class="token punctuation">,</span>  <span class="token number">0.0</span><span class="token punctuation">,</span> <span class="token number">0.0</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+    <span class="token punctuation">[</span><span class="token number">0.0</span><span class="token punctuation">,</span> <span class="token number">0.0</span><span class="token punctuation">,</span>  <span class="token number">1.0</span><span class="token punctuation">,</span> <span class="token number">0.0</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+    <span class="token punctuation">[</span><span class="token number">0.0</span><span class="token punctuation">,</span> <span class="token operator">-</span><span class="token number">1.0</span><span class="token punctuation">,</span> <span class="token number">0.0</span><span class="token punctuation">,</span> <span class="token number">0.0</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+    <span class="token punctuation">[</span><span class="token number">0.0</span><span class="token punctuation">,</span> <span class="token number">0.0</span><span class="token punctuation">,</span>  <span class="token number">0.0</span><span class="token punctuation">,</span> <span class="token number">1.0</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+<span class="token punctuation">]</span><span class="token punctuation">)</span>
+
+<span class="token keyword">def</span> <span class="token function">compose</span><span class="token punctuation">(</span>enu_matrix_4x4<span class="token punctuation">,</span> content_is_y_up<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">return</span> enu_matrix_4x4 @ Z_UP_TO_Y_UP <span class="token keyword">if</span> content_is_y_up <span class="token keyword">else</span> enu_matrix_4x4
+</code></pre></div>
+<p>Apply it either in the tileset transform or when exporting the glTF, never both. Applying it twice rotates the content 180° about X, which renders as a building standing on its roof and is unmistakable; applying it zero times renders a building lying on its side, which people sometimes ship.</p>
+<h3 id="5-verify-by-round-tripping-a-known-point" tabindex="-1"><a class="heading-link" href="#5-verify-by-round-tripping-a-known-point"><span>5. Verify by round-tripping a known point</span></a></h3>
+<p>The end-to-end check takes a vertex in local coordinates, applies the transform, and confirms it lands where the source data says it should.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> numpy <span class="token keyword">as</span> np
+<span class="token keyword">from</span> pyproj <span class="token keyword">import</span> Transformer
+
+M <span class="token operator">=</span> np<span class="token punctuation">.</span>array<span class="token punctuation">(</span>transform<span class="token punctuation">)</span><span class="token punctuation">.</span>reshape<span class="token punctuation">(</span><span class="token number">4</span><span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">.</span>T          <span class="token comment"># column-major → row-major for numpy</span>
+
+local <span class="token operator">=</span> np<span class="token punctuation">.</span>array<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token number">12.5</span><span class="token punctuation">,</span> <span class="token operator">-</span><span class="token number">8.25</span><span class="token punctuation">,</span> <span class="token number">3.0</span><span class="token punctuation">,</span> <span class="token number">1.0</span><span class="token punctuation">]</span><span class="token punctuation">)</span>        <span class="token comment"># a vertex in tile-local metres</span>
+world <span class="token operator">=</span> M @ local
+
+back <span class="token operator">=</span> Transformer<span class="token punctuation">.</span>from_crs<span class="token punctuation">(</span><span class="token string">"EPSG:4978"</span><span class="token punctuation">,</span> <span class="token string">"EPSG:32633+5941"</span><span class="token punctuation">,</span> always_xy<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+e<span class="token punctuation">,</span> n<span class="token punctuation">,</span> h <span class="token operator">=</span> back<span class="token punctuation">.</span>transform<span class="token punctuation">(</span>world<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">,</span> world<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">,</span> world<span class="token punctuation">[</span><span class="token number">2</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+
+expected <span class="token operator">=</span> <span class="token punctuation">(</span>origin_e <span class="token operator">+</span> <span class="token number">12.5</span><span class="token punctuation">,</span> origin_n <span class="token operator">-</span> <span class="token number">8.25</span><span class="token punctuation">,</span> origin_h <span class="token operator">+</span> <span class="token number">3.0</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"expected:"</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token builtin">round</span><span class="token punctuation">(</span>v<span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span> <span class="token keyword">for</span> v <span class="token keyword">in</span> expected<span class="token punctuation">]</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"actual  :"</span><span class="token punctuation">,</span> <span class="token builtin">round</span><span class="token punctuation">(</span>e<span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token builtin">round</span><span class="token punctuation">(</span>n<span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token builtin">round</span><span class="token punctuation">(</span>h<span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+<span class="token keyword">assert</span> <span class="token builtin">abs</span><span class="token punctuation">(</span>e <span class="token operator">-</span> expected<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token operator">&lt;</span> <span class="token number">0.02</span> <span class="token keyword">and</span> <span class="token builtin">abs</span><span class="token punctuation">(</span>n <span class="token operator">-</span> expected<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token operator">&lt;</span> <span class="token number">0.02</span><span class="token punctuation">,</span> <span class="token string">"transform misplaces the vertex"</span>
+</code></pre></div>
+<figure class="diagram">
+<svg viewBox="10 46 736 172" role="img" aria-labelledby="ee-fail-t ee-fail-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="ee-fail-t">Three ways the transform goes wrong, and what each looks like</title>
+  <desc id="ee-fail-d">A translation of zero puts the tileset at the centre of the Earth. A row-major matrix puts the translation in the wrong elements and the tileset ends up near the origin with a scrambled basis. A basis built from the normalised position vector renders the tileset level but tilted by a fraction of a degree, which is visible only as a slope across a large tile.</desc>
+  <rect class="svg-bg" x="10" y="46" width="736" height="172" fill="#ffffff"/>
+  <g stroke-width="2">
+    <rect x="24" y="60" width="220" height="66" rx="8" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="268" y="60" width="220" height="66" rx="8" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="512" y="60" width="220" height="66" rx="8" fill="#fdf3e0" stroke="#c46a3d"/>
+  </g>
+  <g fill="#1f2937" font-size="12" text-anchor="middle">
+    <text x="134" y="84"><tspan x="134" dy="0" font-weight="600">translation is zero</tspan><tspan x="134" dy="17">tileset at the geocentre</tspan><tspan x="134" dy="16">caught by the radius check</tspan></text>
+    <text x="378" y="84"><tspan x="378" dy="0" font-weight="600">row-major matrix</tspan><tspan x="378" dy="17">translation in 3, 7, 11</tspan><tspan x="378" dy="16">caught by element 15 ≠ 1</tspan></text>
+    <text x="622" y="84"><tspan x="622" dy="0" font-weight="600">basis from |position|</tspan><tspan x="622" dy="17">tilted by up to 0.2°</tspan><tspan x="622" dy="16">caught by the vertex round-trip</tspan></text>
+  </g>
+  <text x="380" y="170" fill="#15384a" font-size="12.5" text-anchor="middle">The first two are obvious in a viewer; the third renders convincingly and is only visible as a slope across a large tile</text>
+  <text x="380" y="200" fill="#5b6471" font-size="12" text-anchor="middle">Three assertions, each a line long, cover all three — and the third is the one worth keeping in CI</text>
+</svg>
+<figcaption>Two of these announce themselves immediately. The tilt does not, which is why the round-trip check earns its place in the gate.</figcaption>
+</figure>
+<h2 id="expected-output-verification" tabindex="-1"><a class="heading-link" href="#expected-output-verification"><span>Expected Output &amp; Verification</span></a></h2>
+<p>A correct run over an Oslo-area origin prints:</p>
+<div class="codeblock" data-lang="text"><div class="codeblock__bar"><span class="codeblock__lang">text</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-text" tabindex="0" role="group" aria-label="text code sample"><code class="language-text">ECEF origin: 3172416.883 601058.221 5481955.107
+east   [-0.186524  0.982448  0.      ]  |v| = 1.000000000
+north  [-0.850196 -0.161436  0.501112]  |v| = 1.000000000
+up     [ 0.492313  0.093484  0.865383]  |v| = 1.000000000
+translation: [3172416.88, 601058.22, 5481955.11]
+bottom row: 0.0 0.0 0.0 1.0
+expected: [598132.9, 6643871.85, 45.6]
+actual  : 598132.901 6643871.849 45.601
+</code></pre></div>
+<p>Four things to confirm: the ECEF radius is on the ellipsoid, all three basis vectors are unit length, element 15 is 1 with the rest of the bottom row zero, and the round-tripped vertex matches to a couple of centimetres. Together those exclude every failure mode in the diagram above.</p>
+<h2 id="common-errors" tabindex="-1"><a class="heading-link" href="#common-errors"><span>Common Errors</span></a></h2>
+<p><strong>The tileset renders at the centre of the Earth.</strong> The translation is <code>[0, 0, 0]</code>, usually because the origin was never reprojected to ECEF. The radius assertion catches it before publishing.</p>
+<p><strong>The tileset is in the right place but rotated oddly.</strong> The matrix was written row-major. Check that indices 12–14 hold the translation and index 15 is 1.</p>
+<p><strong>Buildings lean slightly across a large tile.</strong> The basis came from normalising the ECEF position vector rather than from geodetic latitude, so “up” is the radial direction. Rebuild the basis from <code>lat</code>/<code>lon</code>.</p>
+<p><strong>Content is on its side or upside down.</strong> The Z-up to Y-up rotation was applied zero times or twice. Apply it exactly once, and record in the manifest where it is applied.</p>
+<h2 id="frequently-asked-questions" tabindex="-1"><a class="heading-link" href="#frequently-asked-questions"><span>Frequently Asked Questions</span></a></h2>
+<h3 id="where-should-the-local-origin-be" tabindex="-1"><a class="heading-link" href="#where-should-the-local-origin-be"><span>Where should the local origin be?</span></a></h3>
+<p>At the centre of the tile’s extent, so vertex magnitudes stay small in every direction. A corner origin doubles the largest coordinate for no benefit.</p>
+<h3 id="can-one-transform-serve-a-whole-city" tabindex="-1"><a class="heading-link" href="#can-one-transform-serve-a-whole-city"><span>Can one transform serve a whole city?</span></a></h3>
+<p>Only if the city is small enough that one ENU basis is accurate across it. The basis is exact at the origin and drifts with distance, so beyond roughly ten kilometres each district wants its own origin and transform.</p>
+<h3 id="does-the-vertical-datum-matter-here" tabindex="-1"><a class="heading-link" href="#does-the-vertical-datum-matter-here"><span>Does the vertical datum matter here?</span></a></h3>
+<p>Yes. <code>EPSG:4978</code> expects ellipsoidal height, so an orthometric origin height has to pass through a compound CRS as in step 1. Feeding an orthometric height straight in puts the tileset the geoid separation off vertically — tens of metres in many regions.</p>
+<p>One practice makes all of this reproducible: store the origin, the basis and the composed matrix in the tileset’s <code>extras</code> alongside the transform itself, together with the CRS the origin came from. The sixteen numbers are opaque, so a tileset that carries only them cannot be re-derived, checked against a moved origin, or compared with the next build. Four extra fields turn the transform from a magic constant into something a later reader can verify.</p>
+<p>The related habit is to compute the transform once per tileset and pass it down, rather than recomputing it per tile. Two tiles whose transforms were computed from slightly different origins will not line up at their shared edge, and the discrepancy is proportional to how far apart the origins are — which makes it a seam that grows across the city rather than a constant offset.</p>
+<h2 id="related-guides" tabindex="-1"><a class="heading-link" href="#related-guides"><span>Related Guides</span></a></h2>
+<ul>
+<li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems for 3D Assets</a> — the compound CRS the origin passes through</li>
+<li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/gltf-vs-3dtiles-vs-obj-for-spatial-data/">glTF vs 3D Tiles vs OBJ for Spatial Data</a> — the local-origin shift and the Y-up rotation</li>
+<li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/writing-3d-tiles-validator-checks-in-ci/">Writing 3D Tiles Validator Checks in CI</a> — where the radius assertion belongs</li>
+</ul>
+<p>Back to <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems for 3D Assets</a>.</p>
+
+
+      
+      
+
+      <div class="related-nav">
+        
+
+        
+          <div>
+            <h3>Related</h3>
+            <div class="related-grid">
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/converting-wgs84-to-local-projected-coordinates/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Converting WGS84 to Local Projected Coordinates</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/handling-vertical-datums-and-geoid-separation/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Handling Vertical Datums and Geoid Separation</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/how-to-choose-crs-for-urban-digital-twins/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">How to Choose CRS for Urban Digital Twins</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/transforming-between-epoch-based-datums/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Transforming Between Epoch-Based Datums</span>
+                </a>
+              
+            </div>
+          </div>
+        
+      </div>
+    </article>
+
+    
+    <aside class="toc" aria-label="On this page" data-toc hidden>
+      <h4>On this page</h4>
+      <ul></ul>
+    </aside>
+  </div>
+</div>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+  <div class="container site-footer__inner">
+    <div class="site-footer__brand">
+      <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+        <img src="/assets/img/logo-mark.svg" alt="" class="brand__mark" width="36" height="36">
+        <span class="brand__name">
+          3D Geospatial
+          <small>Digital Twin Automation</small>
+        </span>
+      </a>
+      <p>Engineering-grade guides on point cloud processing, mesh pipelines, LOD strategies, and CI/CD automation for digital twin platforms.</p>
+      <a class="footer-social" href="https://github.com/3d-geospatial" aria-label="3D Geospatial on GitHub" rel="noopener" target="_blank">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+          <path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.53-1.34-1.3-1.7-1.3-1.7-1.06-.72.08-.71.08-.71 1.17.08 1.79 1.2 1.79 1.2 1.04 1.79 2.73 1.27 3.4.97.1-.75.4-1.27.73-1.56-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.19-3.08-.12-.3-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.75.11 3.05.74.8 1.19 1.83 1.19 3.08 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.07.78 2.15v3.18c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5Z"/>
+        </svg>
+        <span>GitHub</span>
+      </a>
+    </div>
+
+    <div class="site-footer__col">
+      <h4>Sections</h4>
+      <ul>
+        <li><a href="https://www.3d-geospatial.com/">Home</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management &amp; Optimization</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/">Point Cloud &amp; Mesh Pipelines</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/">Troubleshooting &amp; Reliability</a></li>
+        
+      </ul>
+    </div>
+
+    
+      <div class="site-footer__col">
+        <h4>3D Geospatial Fundamentals</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/">3D Format Standards Comparison</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems for 3D Assets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/">Digital Elevation Model Workflows</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/">Spatial Indexing and Tiling Schemes for 3D Data</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>LOD Management &amp; Optimization</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/">Automated Tile Generation for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/">Cesium ion Upload Automation for 3D Tilesets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/">glTF LOD Generation With Draco Compression</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/">Streaming Sync Patterns for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/">Tileset Metadata and 3D Tiles Next</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Point Cloud &amp; Mesh Pipelines</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/">Automated Mesh Decimation for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/">CI/CD Automation for Spatial Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">LiDAR Classification and Ground Extraction</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/">Point Cloud Filtering Techniques</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/">Surface Reconstruction for Geospatial Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/">Texture Mapping Workflows for Digital Twins</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Troubleshooting &amp; Reliability</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/">Cross-Section Failure Modes in Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/">Data Validation &amp; QA Gates for 3D Tiles</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/">Performance Profiling and Benchmarking</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/">Streaming &amp; Runtime Diagnostics for 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+  </div>
+  <div class="container site-footer__bottom">
+    <span>© 2026 3D Geospatial &amp; Digital Twin Automation</span>
+    <span>Built with Eleventy · PWA-enabled</span>
+  </div>
+</footer>
+
+
+  <script src="/assets/js/site.js?v=b99aa9f971" defer></script>
+  
+</body>
+</html>

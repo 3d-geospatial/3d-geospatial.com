@@ -1,0 +1,669 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <title>Estimating Point Spacing for Mobile Mapping Scans — 3D Geospatial</title>
+  <meta name="description" content="Why ppsm misreports a mobile scan: range-dependent spacing, incidence angle, trajectory speed, and measuring nearest-neighbour spacing per surface instead.">
+  <meta name="keywords" content="3D geospatial, digital twin, point cloud, mesh pipeline, LOD, 3D Tiles, Cesium, PDAL, Open3D, Python, CI/CD">
+  <meta name="author" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta name="theme-color" content="#1f6b8a" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f171d" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+
+  
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem("theme");
+        var theme = (stored === "dark" || stored === "light") ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    })();
+  </script>
+  <meta name="generator" content="Eleventy">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="googlebot" content="index,follow,max-image-preview:large">
+
+  
+  <link rel="canonical" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/estimating-point-spacing-for-mobile-mapping-scans/">
+  <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">
+
+  
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/icon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+
+  
+  <link rel="apple-touch-icon" href="/assets/img/icon-180.png">
+  <link rel="mask-icon" href="/assets/img/logo.svg" color="#1f6b8a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="3D Geospatial">
+  <meta name="application-name" content="3D Geospatial">
+
+  
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Estimating Point Spacing for Mobile Mapping Scans — 3D Geospatial">
+  <meta property="og:description" content="Why ppsm misreports a mobile scan: range-dependent spacing, incidence angle, trajectory speed, and measuring nearest-neighbour spacing per surface instead.">
+  <meta property="og:url" content="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/estimating-point-spacing-for-mobile-mapping-scans/">
+  <meta property="og:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+  <meta property="og:site_name" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta property="og:locale" content="en_US">
+  
+  <meta property="article:published_time" content="2026-08-07T09:56:07.502Z">
+  <meta property="article:modified_time" content="2026-08-07T09:56:07.502Z">
+  <meta property="article:publisher" content="https://www.3d-geospatial.com/">
+  
+
+  
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Estimating Point Spacing for Mobile Mapping Scans — 3D Geospatial">
+  <meta name="twitter:description" content="Why ppsm misreports a mobile scan: range-dependent spacing, incidence angle, trajectory speed, and measuring nearest-neighbour spacing per surface instead.">
+  <meta name="twitter:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta name="twitter:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+
+  
+  <link rel="preload" href="/assets/css/styles.css?v=546adeb511" as="style">
+  
+
+  <link rel="stylesheet" href="/assets/css/styles.css?v=546adeb511">
+
+  
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.3d-geospatial.com/#organization",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "url": "https://www.3d-geospatial.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/icon-512.png",
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://www.3d-geospatial.com/#website",
+      "url": "https://www.3d-geospatial.com/",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "description": "Build reliable 3D spatial data pipelines for digital twins — point clouds, meshes, LOD strategies, Python processing, and CI/CD automation.",
+      "inLanguage": "en",
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      }
+    },
+    {
+      "@type": "TechArticle",
+      "@id": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/estimating-point-spacing-for-mobile-mapping-scans/#article",
+      "isPartOf": {
+        "@id": "https://www.3d-geospatial.com/#website"
+      },
+      "headline": "Estimating Point Spacing for Mobile Mapping Scans",
+      "name": "Estimating Point Spacing for Mobile Mapping Scans",
+      "description": "Why ppsm misreports a mobile scan: range-dependent spacing, incidence angle, trajectory speed, and measuring nearest-neighbour spacing per surface instead.",
+      "url": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/estimating-point-spacing-for-mobile-mapping-scans/",
+      "mainEntityOfPage": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/estimating-point-spacing-for-mobile-mapping-scans/",
+      "inLanguage": "en",
+      "datePublished": "2026-08-07T09:56:07.502Z",
+      "dateModified": "2026-08-07T09:56:07.502Z",
+      "author": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "image": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/og-cover.png",
+        "width": 1200,
+        "height": 630
+      },
+      "breadcrumb": {
+        "@id": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/estimating-point-spacing-for-mobile-mapping-scans/#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/estimating-point-spacing-for-mobile-mapping-scans/#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://www.3d-geospatial.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "3D Geospatial Fundamentals For Digital Twins",
+          "item": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Point Cloud Density Standards",
+          "item": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "name": "Estimating Point Spacing For Mobile Mapping Scans",
+          "item": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/estimating-point-spacing-for-mobile-mapping-scans/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  
+<header class="site-header" role="banner">
+  <div class="container site-header__inner">
+    <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+      <img src="/assets/img/logo.svg" alt="" class="brand__mark" width="36" height="36">
+      <span class="brand__name">
+        3D Geospatial
+        <small>Digital Twin Automation</small>
+      </span>
+    </a>
+
+    <button class="theme-toggle" type="button" data-theme-toggle
+            aria-label="Switch to dark theme" title="Switch to dark theme">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4.2"/>
+        <path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/>
+      </svg>
+    </button>
+
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>
+      <span class="nav-toggle__icon" aria-hidden="true"><span></span></span>
+      Menu
+    </button>
+
+    <nav class="primary-nav" id="primary-nav" aria-label="Primary">
+      
+      <a href="https://www.3d-geospatial.com/" >
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/>
+        </svg>
+        Home
+      </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/" aria-current="page">
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2 3 7l9 5 9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 17l9 5 9-5"/>
+            </svg>
+          
+          3D Geospatial Fundamentals
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+          
+          LOD Management &amp; Optimization
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="6" cy="6" r="1.5"/><circle cx="12" cy="6" r="1.5"/><circle cx="18" cy="6" r="1.5"/>
+              <circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/>
+              <circle cx="6" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="18" cy="18" r="1.5"/>
+            </svg>
+          
+          Point Cloud &amp; Mesh Pipelines
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <path d="M12 9v4"/><path d="M12 17h.01"/>
+            </svg>
+          
+          Troubleshooting &amp; Reliability
+        </a>
+      
+    </nav>
+  </div>
+</header>
+
+
+  <main id="main">
+    
+
+
+<div class="container">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    
+      
+        <a href="https://www.3d-geospatial.com/">Home</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals For Digital Twins</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <span class="current">Estimating Point Spacing For Mobile Mapping Scans</span>
+      
+    
+  </nav>
+
+  <div class="content-page">
+    <article class="article">
+      <h1 id="estimating-point-spacing-for-mobile-mapping-scans" tabindex="-1"><a class="heading-link" href="#estimating-point-spacing-for-mobile-mapping-scans"><span>Estimating Point Spacing for Mobile Mapping Scans</span></a></h1>
+<p>This page measures point spacing on a mobile mapping scan properly — per surface and per range, using nearest-neighbour distances rather than a planimetric density — and explains why the points-per-square-metre figure that works for airborne LiDAR is actively misleading here. A mobile scan’s density varies by an order of magnitude between a kerb two metres from the vehicle and a facade thirty metres away, and a single ppsm figure averages that away.</p>
+<h2 id="why-you-hit-this" tabindex="-1"><a class="heading-link" href="#why-you-hit-this"><span>Why you hit this</span></a></h2>
+<p>Mobile mapping specifications are frequently written in the units airborne surveys use, because that is what procurement knows. The result is a contract that is either trivially satisfied or impossible, depending on where you measure: a scanner producing 3,000 points per square metre on the road surface beside the vehicle might produce 40 on a building facade at the far end of the street, and the “average” that gets reported describes neither. Every clearance, gauge and asset-extraction requirement lives on one of those surfaces.</p>
+<p>The planimetric approach this replaces is covered in <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">point cloud density standards</a>; what follows is what changes when the sensor moves along a trajectory rather than flying over.</p>
+<h2 id="prerequisites" tabindex="-1"><a class="heading-link" href="#prerequisites"><span>Prerequisites</span></a></h2>
+<ul>
+<li>Python 3.10+ with <code>laspy&gt;=2.5</code>, <code>numpy&gt;=1.24</code>, <code>scipy&gt;=1.11</code> and <code>open3d&gt;=0.18</code>.</li>
+<li>A scan retaining <code>GpsTime</code> and, ideally, the trajectory as a separate file. Range is recoverable from the trajectory and cannot be reconstructed without it.</li>
+<li>A metric projected CRS, and outliers already removed — a single stray point ruins a nearest-neighbour statistic.</li>
+</ul>
+<h2 id="step-by-step" tabindex="-1"><a class="heading-link" href="#step-by-step"><span>Step-by-Step</span></a></h2>
+<h3 id="1-understand-why-planimetric-density-fails-here" tabindex="-1"><a class="heading-link" href="#1-understand-why-planimetric-density-fails-here"><span>1. Understand why planimetric density fails here</span></a></h3>
+<p>Airborne density works because the sensor looks roughly straight down from a roughly constant height, so a square metre of ground receives a roughly constant number of returns. A mobile scanner rotates about a moving axis, so spacing along the scan line is range times the angular step, and spacing across it is vehicle speed divided by rotation rate.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> numpy <span class="token keyword">as</span> np
+
+<span class="token keyword">def</span> <span class="token function">mobile_spacing</span><span class="token punctuation">(</span>range_m<span class="token punctuation">,</span> angular_step_deg<span class="token punctuation">,</span> speed_mps<span class="token punctuation">,</span> rotations_per_s<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    along <span class="token operator">=</span> range_m <span class="token operator">*</span> np<span class="token punctuation">.</span>radians<span class="token punctuation">(</span>angular_step_deg<span class="token punctuation">)</span>      <span class="token comment"># within one rotation</span>
+    across <span class="token operator">=</span> speed_mps <span class="token operator">/</span> rotations_per_s                <span class="token comment"># between rotations</span>
+    <span class="token keyword">return</span> along<span class="token punctuation">,</span> across
+
+<span class="token keyword">for</span> r <span class="token keyword">in</span> <span class="token punctuation">(</span><span class="token number">2.0</span><span class="token punctuation">,</span> <span class="token number">8.0</span><span class="token punctuation">,</span> <span class="token number">20.0</span><span class="token punctuation">,</span> <span class="token number">40.0</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    a<span class="token punctuation">,</span> c <span class="token operator">=</span> mobile_spacing<span class="token punctuation">(</span>r<span class="token punctuation">,</span> <span class="token number">0.03</span><span class="token punctuation">,</span> <span class="token number">8.3</span><span class="token punctuation">,</span> <span class="token number">200.0</span><span class="token punctuation">)</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"range </span><span class="token interpolation"><span class="token punctuation">{</span>r<span class="token punctuation">:</span><span class="token format-spec">>5.1f</span><span class="token punctuation">}</span></span><span class="token string"> m → along </span><span class="token interpolation"><span class="token punctuation">{</span>a<span class="token operator">*</span><span class="token number">1000</span><span class="token punctuation">:</span><span class="token format-spec">6.1f</span><span class="token punctuation">}</span></span><span class="token string"> mm, across </span><span class="token interpolation"><span class="token punctuation">{</span>c<span class="token operator">*</span><span class="token number">1000</span><span class="token punctuation">:</span><span class="token format-spec">6.1f</span><span class="token punctuation">}</span></span><span class="token string"> mm, "</span></span>
+          <span class="token string-interpolation"><span class="token string">f"anisotropy </span><span class="token interpolation"><span class="token punctuation">{</span><span class="token builtin">max</span><span class="token punctuation">(</span>a<span class="token punctuation">,</span> c<span class="token punctuation">)</span><span class="token operator">/</span><span class="token builtin">min</span><span class="token punctuation">(</span>a<span class="token punctuation">,</span> c<span class="token punctuation">)</span><span class="token punctuation">:</span><span class="token format-spec">.1f</span><span class="token punctuation">}</span></span><span class="token string">:1"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Two facts fall out of that. Spacing along the scan line grows linearly with range, so density falls with the square of it. And the two spacings are independent, so the point pattern is anisotropic — dense in one direction and sparse in the other — which is exactly what a planimetric density cannot express.</p>
+<figure class="diagram">
+<svg viewBox="14 42 712 202" role="img" aria-labelledby="ms-range-t ms-range-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="ms-range-t">Spacing grows with range, so density falls with its square</title>
+  <desc id="ms-range-d">At two metres from the vehicle the along-scan spacing is about one millimetre and the pattern is nearly isotropic. At forty metres it is twenty-one millimetres, while the across-scan spacing set by vehicle speed is unchanged at forty-two, so the pattern is both sparse and strongly anisotropic.</desc>
+  <rect class="svg-bg" x="14" y="42" width="712" height="202" fill="#ffffff"/>
+  <g stroke-width="2">
+    <rect x="150" y="56" width="16" height="26" rx="3" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="150" y="94" width="64" height="26" rx="3" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="150" y="132" width="160" height="26" rx="3" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="150" y="170" width="320" height="26" rx="3" fill="#f7dfdc" stroke="#b0413e"/>
+  </g>
+  <g fill="#1f2937" font-size="12" text-anchor="start">
+    <text x="176" y="74">1.0 mm — 2 m range</text>
+    <text x="224" y="112">4.2 mm — 8 m</text>
+    <text x="320" y="150">10.5 mm — 20 m</text>
+    <text x="480" y="188">21.0 mm — 40 m</text>
+  </g>
+  <text x="140" y="130" fill="#5b6471" font-size="12" text-anchor="end">along-scan</text>
+  <text x="140" y="146" fill="#5b6471" font-size="12" text-anchor="end">spacing</text>
+  <text x="370" y="226" fill="#15384a" font-size="12.5" text-anchor="middle">Across-scan spacing is 42 mm at every range, set by vehicle speed — so the pattern goes from 42:1 anisotropic to 2:1</text>
+</svg>
+<figcaption>One of the two spacings depends on range and the other does not, which is why the pattern&#39;s shape changes across the scene as well as its density.</figcaption>
+</figure>
+<figure class="diagram">
+<svg viewBox="-27 20 795 226" role="img" aria-labelledby="ms-aniso-t ms-aniso-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="ms-aniso-t">The point pattern is anisotropic, and its shape changes with range</title>
+  <desc id="ms-aniso-d">Close to the vehicle, points are dense along each scan line and far apart between rotations, so the pattern is a set of widely separated dense stripes. Far away the along-scan spacing has grown to match the across-scan spacing and the pattern becomes an even grid, sparse in both directions.</desc>
+  <rect class="svg-bg" x="-27" y="20" width="795" height="226" fill="#ffffff"/>
+  <g fill="#1f6b8a">
+    <circle cx="60" cy="70" r="2"/><circle cx="66" cy="70" r="2"/><circle cx="72" cy="70" r="2"/><circle cx="78" cy="70" r="2"/><circle cx="84" cy="70" r="2"/><circle cx="90" cy="70" r="2"/><circle cx="96" cy="70" r="2"/><circle cx="102" cy="70" r="2"/><circle cx="108" cy="70" r="2"/><circle cx="114" cy="70" r="2"/><circle cx="120" cy="70" r="2"/><circle cx="126" cy="70" r="2"/><circle cx="132" cy="70" r="2"/><circle cx="138" cy="70" r="2"/><circle cx="144" cy="70" r="2"/>
+    <circle cx="60" cy="112" r="2"/><circle cx="66" cy="112" r="2"/><circle cx="72" cy="112" r="2"/><circle cx="78" cy="112" r="2"/><circle cx="84" cy="112" r="2"/><circle cx="90" cy="112" r="2"/><circle cx="96" cy="112" r="2"/><circle cx="102" cy="112" r="2"/><circle cx="108" cy="112" r="2"/><circle cx="114" cy="112" r="2"/><circle cx="120" cy="112" r="2"/><circle cx="126" cy="112" r="2"/><circle cx="132" cy="112" r="2"/><circle cx="138" cy="112" r="2"/><circle cx="144" cy="112" r="2"/>
+    <circle cx="60" cy="154" r="2"/><circle cx="66" cy="154" r="2"/><circle cx="72" cy="154" r="2"/><circle cx="78" cy="154" r="2"/><circle cx="84" cy="154" r="2"/><circle cx="90" cy="154" r="2"/><circle cx="96" cy="154" r="2"/><circle cx="102" cy="154" r="2"/><circle cx="108" cy="154" r="2"/><circle cx="114" cy="154" r="2"/><circle cx="120" cy="154" r="2"/><circle cx="126" cy="154" r="2"/><circle cx="132" cy="154" r="2"/><circle cx="138" cy="154" r="2"/><circle cx="144" cy="154" r="2"/>
+  </g>
+  <g fill="#c46a3d">
+    <circle cx="460" cy="70" r="2"/><circle cx="502" cy="70" r="2"/><circle cx="544" cy="70" r="2"/><circle cx="586" cy="70" r="2"/><circle cx="628" cy="70" r="2"/><circle cx="670" cy="70" r="2"/>
+    <circle cx="460" cy="112" r="2"/><circle cx="502" cy="112" r="2"/><circle cx="544" cy="112" r="2"/><circle cx="586" cy="112" r="2"/><circle cx="628" cy="112" r="2"/><circle cx="670" cy="112" r="2"/>
+    <circle cx="460" cy="154" r="2"/><circle cx="502" cy="154" r="2"/><circle cx="544" cy="154" r="2"/><circle cx="586" cy="154" r="2"/><circle cx="628" cy="154" r="2"/><circle cx="670" cy="154" r="2"/>
+  </g>
+  <text x="102" y="48" fill="#1f6b8a" font-size="12.5" text-anchor="middle" font-weight="600">2 m — 40:1 anisotropic</text>
+  <text x="565" y="48" fill="#c46a3d" font-size="12.5" text-anchor="middle" font-weight="600">40 m — 2:1, sparse both ways</text>
+  <text x="102" y="192" fill="#1f2937" font-size="12" text-anchor="middle">dense stripes, wide gaps between them</text>
+  <text x="565" y="192" fill="#1f2937" font-size="12" text-anchor="middle">an even grid, and nothing small survives it</text>
+  <text x="370" y="228" fill="#15384a" font-size="12.5" text-anchor="middle">A planimetric density reports the same number for both patterns, and the left one reconstructs a kerb while the right one does not</text>
+</svg>
+<figcaption>The two patterns have similar point counts per square metre and completely different reconstruction behaviour, which is the case against reporting density alone.</figcaption>
+</figure>
+<h3 id="2-measure-nearest-neighbour-spacing-instead" tabindex="-1"><a class="heading-link" href="#2-measure-nearest-neighbour-spacing-instead"><span>2. Measure nearest-neighbour spacing instead</span></a></h3>
+<p>The robust statistic is the distance from each point to its nearest neighbour, which describes the pattern wherever it is measured.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> laspy
+<span class="token keyword">import</span> numpy <span class="token keyword">as</span> np
+<span class="token keyword">from</span> scipy<span class="token punctuation">.</span>spatial <span class="token keyword">import</span> cKDTree
+
+las <span class="token operator">=</span> laspy<span class="token punctuation">.</span>read<span class="token punctuation">(</span><span class="token string">"mobile_scan_utm33n.laz"</span><span class="token punctuation">)</span>
+xyz <span class="token operator">=</span> np<span class="token punctuation">.</span>column_stack<span class="token punctuation">(</span><span class="token punctuation">[</span>np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>las<span class="token punctuation">.</span>x<span class="token punctuation">)</span><span class="token punctuation">,</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>las<span class="token punctuation">.</span>y<span class="token punctuation">)</span><span class="token punctuation">,</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>las<span class="token punctuation">.</span>z<span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+
+rng <span class="token operator">=</span> np<span class="token punctuation">.</span>random<span class="token punctuation">.</span>default_rng<span class="token punctuation">(</span><span class="token number">0</span><span class="token punctuation">)</span>
+sample <span class="token operator">=</span> xyz<span class="token punctuation">[</span>rng<span class="token punctuation">.</span>choice<span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>xyz<span class="token punctuation">)</span><span class="token punctuation">,</span> size<span class="token operator">=</span><span class="token builtin">min</span><span class="token punctuation">(</span><span class="token number">500_000</span><span class="token punctuation">,</span> <span class="token builtin">len</span><span class="token punctuation">(</span>xyz<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> replace<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">)</span><span class="token punctuation">]</span>
+
+tree <span class="token operator">=</span> cKDTree<span class="token punctuation">(</span>xyz<span class="token punctuation">)</span>
+d<span class="token punctuation">,</span> _ <span class="token operator">=</span> tree<span class="token punctuation">.</span>query<span class="token punctuation">(</span>sample<span class="token punctuation">,</span> k<span class="token operator">=</span><span class="token number">2</span><span class="token punctuation">)</span>                <span class="token comment"># k=2: self plus nearest neighbour</span>
+nn <span class="token operator">=</span> d<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">]</span>
+
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"nearest-neighbour spacing: median </span><span class="token interpolation"><span class="token punctuation">{</span>np<span class="token punctuation">.</span>median<span class="token punctuation">(</span>nn<span class="token punctuation">)</span><span class="token operator">*</span><span class="token number">1000</span><span class="token punctuation">:</span><span class="token format-spec">.1f</span><span class="token punctuation">}</span></span><span class="token string"> mm, "</span></span>
+      <span class="token string-interpolation"><span class="token string">f"p10 </span><span class="token interpolation"><span class="token punctuation">{</span>np<span class="token punctuation">.</span>percentile<span class="token punctuation">(</span>nn<span class="token punctuation">,</span> <span class="token number">10</span><span class="token punctuation">)</span><span class="token operator">*</span><span class="token number">1000</span><span class="token punctuation">:</span><span class="token format-spec">.1f</span><span class="token punctuation">}</span></span><span class="token string">, p90 </span><span class="token interpolation"><span class="token punctuation">{</span>np<span class="token punctuation">.</span>percentile<span class="token punctuation">(</span>nn<span class="token punctuation">,</span> <span class="token number">90</span><span class="token punctuation">)</span><span class="token operator">*</span><span class="token number">1000</span><span class="token punctuation">:</span><span class="token format-spec">.1f</span><span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>The p10-to-p90 span is the number worth quoting alongside the median. On an airborne scan it is typically within a factor of two; on a mobile scan a factor of fifteen is normal, and that ratio is the honest description of what the survey delivered.</p>
+<h3 id="3-stratify-by-surface-because-that-is-what-the-requirement-is-about" tabindex="-1"><a class="heading-link" href="#3-stratify-by-surface-because-that-is-what-the-requirement-is-about"><span>3. Stratify by surface, because that is what the requirement is about</span></a></h3>
+<p>A specification says “resolve a 25 mm conductor” or “measure kerb height to 10 mm”, and those live on specific surfaces.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> numpy <span class="token keyword">as</span> np
+
+<span class="token keyword">def</span> <span class="token function">spacing_by_class</span><span class="token punctuation">(</span>las<span class="token punctuation">,</span> xyz<span class="token punctuation">,</span> tree<span class="token punctuation">,</span> codes<span class="token operator">=</span><span class="token punctuation">(</span><span class="token number">2</span><span class="token punctuation">,</span> <span class="token number">6</span><span class="token punctuation">,</span> <span class="token number">11</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    cls <span class="token operator">=</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>las<span class="token punctuation">.</span>classification<span class="token punctuation">)</span>
+    out <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token punctuation">}</span>
+    <span class="token keyword">for</span> c <span class="token keyword">in</span> codes<span class="token punctuation">:</span>
+        m <span class="token operator">=</span> cls <span class="token operator">==</span> c
+        <span class="token keyword">if</span> m<span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">&lt;</span> <span class="token number">1000</span><span class="token punctuation">:</span>
+            <span class="token keyword">continue</span>
+        sub <span class="token operator">=</span> xyz<span class="token punctuation">[</span>m<span class="token punctuation">]</span>
+        d<span class="token punctuation">,</span> _ <span class="token operator">=</span> tree<span class="token punctuation">.</span>query<span class="token punctuation">(</span>sub<span class="token punctuation">[</span>np<span class="token punctuation">.</span>random<span class="token punctuation">.</span>default_rng<span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">.</span>choice<span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>sub<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">50_000</span><span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">,</span> k<span class="token operator">=</span><span class="token number">2</span><span class="token punctuation">)</span>
+        out<span class="token punctuation">[</span>c<span class="token punctuation">]</span> <span class="token operator">=</span> np<span class="token punctuation">.</span>median<span class="token punctuation">(</span>d<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> out
+
+names <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token number">2</span><span class="token punctuation">:</span> <span class="token string">"ground"</span><span class="token punctuation">,</span> <span class="token number">6</span><span class="token punctuation">:</span> <span class="token string">"building facade"</span><span class="token punctuation">,</span> <span class="token number">11</span><span class="token punctuation">:</span> <span class="token string">"road surface"</span><span class="token punctuation">}</span>
+<span class="token keyword">for</span> c<span class="token punctuation">,</span> s <span class="token keyword">in</span> spacing_by_class<span class="token punctuation">(</span>las<span class="token punctuation">,</span> xyz<span class="token punctuation">,</span> tree<span class="token punctuation">)</span><span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>names<span class="token punctuation">.</span>get<span class="token punctuation">(</span>c<span class="token punctuation">,</span> c<span class="token punctuation">)</span><span class="token punctuation">:</span><span class="token format-spec">&lt;18</span><span class="token punctuation">}</span></span><span class="token string"> median spacing </span><span class="token interpolation"><span class="token punctuation">{</span>s<span class="token operator">*</span><span class="token number">1000</span><span class="token punctuation">:</span><span class="token format-spec">6.1f</span><span class="token punctuation">}</span></span><span class="token string"> mm"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<h3 id="4-recover-range-from-the-trajectory" tabindex="-1"><a class="heading-link" href="#4-recover-range-from-the-trajectory"><span>4. Recover range from the trajectory</span></a></h3>
+<p>Range is what explains the variation, and it is recoverable if the trajectory was delivered.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> numpy <span class="token keyword">as</span> np
+<span class="token keyword">from</span> scipy<span class="token punctuation">.</span>interpolate <span class="token keyword">import</span> interp1d
+
+traj <span class="token operator">=</span> np<span class="token punctuation">.</span>loadtxt<span class="token punctuation">(</span><span class="token string">"trajectory.txt"</span><span class="token punctuation">)</span>            <span class="token comment"># gps_time, x, y, z</span>
+fx <span class="token operator">=</span> interp1d<span class="token punctuation">(</span>traj<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">,</span> traj<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">,</span> bounds_error<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">,</span> fill_value<span class="token operator">=</span><span class="token string">"extrapolate"</span><span class="token punctuation">)</span>
+fy <span class="token operator">=</span> interp1d<span class="token punctuation">(</span>traj<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">,</span> traj<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">]</span><span class="token punctuation">,</span> bounds_error<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">,</span> fill_value<span class="token operator">=</span><span class="token string">"extrapolate"</span><span class="token punctuation">)</span>
+fz <span class="token operator">=</span> interp1d<span class="token punctuation">(</span>traj<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">,</span> traj<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">]</span><span class="token punctuation">,</span> bounds_error<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">,</span> fill_value<span class="token operator">=</span><span class="token string">"extrapolate"</span><span class="token punctuation">)</span>
+
+t <span class="token operator">=</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>las<span class="token punctuation">.</span>gps_time<span class="token punctuation">)</span>
+sensor <span class="token operator">=</span> np<span class="token punctuation">.</span>column_stack<span class="token punctuation">(</span><span class="token punctuation">[</span>fx<span class="token punctuation">(</span>t<span class="token punctuation">)</span><span class="token punctuation">,</span> fy<span class="token punctuation">(</span>t<span class="token punctuation">)</span><span class="token punctuation">,</span> fz<span class="token punctuation">(</span>t<span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+rng_m <span class="token operator">=</span> np<span class="token punctuation">.</span>linalg<span class="token punctuation">.</span>norm<span class="token punctuation">(</span>xyz <span class="token operator">-</span> sensor<span class="token punctuation">,</span> axis<span class="token operator">=</span><span class="token number">1</span><span class="token punctuation">)</span>
+
+<span class="token keyword">for</span> lo<span class="token punctuation">,</span> hi <span class="token keyword">in</span> <span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">5</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token punctuation">(</span><span class="token number">5</span><span class="token punctuation">,</span> <span class="token number">15</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token punctuation">(</span><span class="token number">15</span><span class="token punctuation">,</span> <span class="token number">30</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token punctuation">(</span><span class="token number">30</span><span class="token punctuation">,</span> <span class="token number">60</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    m <span class="token operator">=</span> <span class="token punctuation">(</span>rng_m <span class="token operator">>=</span> lo<span class="token punctuation">)</span> <span class="token operator">&amp;</span> <span class="token punctuation">(</span>rng_m <span class="token operator">&lt;</span> hi<span class="token punctuation">)</span>
+    <span class="token keyword">if</span> m<span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">&lt;</span> <span class="token number">1000</span><span class="token punctuation">:</span>
+        <span class="token keyword">continue</span>
+    d<span class="token punctuation">,</span> _ <span class="token operator">=</span> tree<span class="token punctuation">.</span>query<span class="token punctuation">(</span>xyz<span class="token punctuation">[</span>m<span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token number">20_000</span><span class="token punctuation">]</span><span class="token punctuation">,</span> k<span class="token operator">=</span><span class="token number">2</span><span class="token punctuation">)</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"range </span><span class="token interpolation"><span class="token punctuation">{</span>lo<span class="token punctuation">:</span><span class="token format-spec">>2</span><span class="token punctuation">}</span></span><span class="token string">–</span><span class="token interpolation"><span class="token punctuation">{</span>hi<span class="token punctuation">:</span><span class="token format-spec">&lt;2</span><span class="token punctuation">}</span></span><span class="token string"> m: </span><span class="token interpolation"><span class="token punctuation">{</span>m<span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span><span class="token format-spec">>10,</span><span class="token punctuation">}</span></span><span class="token string"> points, "</span></span>
+          <span class="token string-interpolation"><span class="token string">f"median spacing </span><span class="token interpolation"><span class="token punctuation">{</span>np<span class="token punctuation">.</span>median<span class="token punctuation">(</span>d<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token operator">*</span><span class="token number">1000</span><span class="token punctuation">:</span><span class="token format-spec">6.1f</span><span class="token punctuation">}</span></span><span class="token string"> mm"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<figure class="diagram">
+<svg viewBox="39 42 662 207" role="img" aria-labelledby="ms-strat-t ms-strat-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="ms-strat-t">One scan, one ppsm figure, four very different surfaces</title>
+  <desc id="ms-strat-d">A mobile scan reported as two thousand points per square metre resolves to a four millimetre spacing on the road surface beside the vehicle, eleven on the near kerb, thirty-one on a facade across the street and eighty-four on an overhead conductor. Only the last two decide whether the survey meets a clearance requirement.</desc>
+  <rect class="svg-bg" x="39" y="42" width="662" height="207" fill="#ffffff"/>
+  <g stroke-width="2">
+    <rect x="60" y="56" width="34" height="28" rx="3" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="60" y="94" width="92" height="28" rx="3" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="60" y="132" width="260" height="28" rx="3" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="60" y="170" width="420" height="28" rx="3" fill="#f7dfdc" stroke="#b0413e"/>
+  </g>
+  <g fill="#1f2937" font-size="12" text-anchor="start">
+    <text x="104" y="75">4 mm — road, 2 m away</text>
+    <text x="162" y="113">11 mm — near kerb, 6 m</text>
+    <text x="330" y="151">31 mm — facade, 18 m</text>
+    <text x="490" y="189">84 mm — conductor, 34 m</text>
+  </g>
+  <text x="370" y="230" fill="#15384a" font-size="12.5" text-anchor="middle">A 25 mm conductor needs roughly 8 mm spacing to be reconstructed — this scan misses it by a factor of ten</text>
+</svg>
+<figcaption>The scan-wide figure passes every specification. The surface the specification was written about fails by an order of magnitude.</figcaption>
+</figure>
+<h3 id="5-write-the-acceptance-criterion-in-the-units-the-work-needs" tabindex="-1"><a class="heading-link" href="#5-write-the-acceptance-criterion-in-the-units-the-work-needs"><span>5. Write the acceptance criterion in the units the work needs</span></a></h3>
+<p>The useful specification names a surface, a distance and a spacing.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python">REQUIREMENTS <span class="token operator">=</span> <span class="token punctuation">[</span>
+    <span class="token punctuation">{</span><span class="token string">"surface"</span><span class="token punctuation">:</span> <span class="token string">"road"</span><span class="token punctuation">,</span> <span class="token string">"class"</span><span class="token punctuation">:</span> <span class="token number">11</span><span class="token punctuation">,</span> <span class="token string">"max_range_m"</span><span class="token punctuation">:</span> <span class="token number">8.0</span><span class="token punctuation">,</span>  <span class="token string">"max_spacing_mm"</span><span class="token punctuation">:</span> <span class="token number">10.0</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+    <span class="token punctuation">{</span><span class="token string">"surface"</span><span class="token punctuation">:</span> <span class="token string">"kerb"</span><span class="token punctuation">,</span> <span class="token string">"class"</span><span class="token punctuation">:</span> <span class="token number">2</span><span class="token punctuation">,</span>  <span class="token string">"max_range_m"</span><span class="token punctuation">:</span> <span class="token number">12.0</span><span class="token punctuation">,</span> <span class="token string">"max_spacing_mm"</span><span class="token punctuation">:</span> <span class="token number">15.0</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+    <span class="token punctuation">{</span><span class="token string">"surface"</span><span class="token punctuation">:</span> <span class="token string">"conductor"</span><span class="token punctuation">,</span> <span class="token string">"class"</span><span class="token punctuation">:</span> <span class="token number">14</span><span class="token punctuation">,</span> <span class="token string">"max_range_m"</span><span class="token punctuation">:</span> <span class="token number">40.0</span><span class="token punctuation">,</span> <span class="token string">"max_spacing_mm"</span><span class="token punctuation">:</span> <span class="token number">8.0</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+<span class="token punctuation">]</span>
+
+<span class="token keyword">def</span> <span class="token function">check</span><span class="token punctuation">(</span>las<span class="token punctuation">,</span> xyz<span class="token punctuation">,</span> tree<span class="token punctuation">,</span> rng_m<span class="token punctuation">,</span> reqs<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    cls <span class="token operator">=</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>las<span class="token punctuation">.</span>classification<span class="token punctuation">)</span>
+    failures <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    <span class="token keyword">for</span> r <span class="token keyword">in</span> reqs<span class="token punctuation">:</span>
+        m <span class="token operator">=</span> <span class="token punctuation">(</span>cls <span class="token operator">==</span> r<span class="token punctuation">[</span><span class="token string">"class"</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token operator">&amp;</span> <span class="token punctuation">(</span>rng_m <span class="token operator">&lt;=</span> r<span class="token punctuation">[</span><span class="token string">"max_range_m"</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+        <span class="token keyword">if</span> m<span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">&lt;</span> <span class="token number">500</span><span class="token punctuation">:</span>
+            failures<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>r<span class="token punctuation">[</span><span class="token string">'surface'</span><span class="token punctuation">]</span><span class="token punctuation">}</span></span><span class="token string">: only </span><span class="token interpolation"><span class="token punctuation">{</span>m<span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">}</span></span><span class="token string"> points in range"</span></span><span class="token punctuation">)</span>
+            <span class="token keyword">continue</span>
+        d<span class="token punctuation">,</span> _ <span class="token operator">=</span> tree<span class="token punctuation">.</span>query<span class="token punctuation">(</span>xyz<span class="token punctuation">[</span>m<span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token number">50_000</span><span class="token punctuation">]</span><span class="token punctuation">,</span> k<span class="token operator">=</span><span class="token number">2</span><span class="token punctuation">)</span>
+        got <span class="token operator">=</span> <span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>median<span class="token punctuation">(</span>d<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">*</span> <span class="token number">1000</span>
+        <span class="token keyword">if</span> got <span class="token operator">></span> r<span class="token punctuation">[</span><span class="token string">"max_spacing_mm"</span><span class="token punctuation">]</span><span class="token punctuation">:</span>
+            failures<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>r<span class="token punctuation">[</span><span class="token string">'surface'</span><span class="token punctuation">]</span><span class="token punctuation">}</span></span><span class="token string">: </span><span class="token interpolation"><span class="token punctuation">{</span>got<span class="token punctuation">:</span><span class="token format-spec">.1f</span><span class="token punctuation">}</span></span><span class="token string"> mm > </span><span class="token interpolation"><span class="token punctuation">{</span>r<span class="token punctuation">[</span><span class="token string">'max_spacing_mm'</span><span class="token punctuation">]</span><span class="token punctuation">}</span></span><span class="token string"> mm"</span></span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> failures
+</code></pre></div>
+<h2 id="expected-output-verification" tabindex="-1"><a class="heading-link" href="#expected-output-verification"><span>Expected Output &amp; Verification</span></a></h2>
+<p>A representative mobile scan of an urban street:</p>
+<div class="codeblock" data-lang="text"><div class="codeblock__bar"><span class="codeblock__lang">text</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-text" tabindex="0" role="group" aria-label="text code sample"><code class="language-text">range  2.0 m → along    1.0 mm, across   41.5 mm, anisotropy 39.6:1
+range 40.0 m → along   20.9 mm, across   41.5 mm, anisotropy  2.0:1
+nearest-neighbour spacing: median 12.4 mm, p10 2.1, p90 68.9
+road surface       median spacing    4.1 mm
+building facade    median spacing   31.4 mm
+range  0–5  m:  84,220,118 points, median spacing    3.8 mm
+range 30–60 m:   4,102,884 points, median spacing   79.2 mm
+</code></pre></div>
+<p>The p10-to-p90 ratio of 33 is the headline finding, and it is what makes a single figure meaningless. Verify by checking that the measured spacing at a given range agrees with the geometric prediction from step 1 to within about 20% — a large disagreement means the trajectory interpolation is wrong, usually a GPS time offset between the scan and the trajectory file.</p>
+<h2 id="common-errors" tabindex="-1"><a class="heading-link" href="#common-errors"><span>Common Errors</span></a></h2>
+<p><strong>Range comes out implausibly large for every point.</strong> The trajectory and the scan use different GPS time conventions — adjusted standard GPS time versus week seconds. Check that the two time ranges overlap before interpolating.</p>
+<p><strong>Nearest-neighbour spacing is near zero everywhere.</strong> Duplicate points, usually from merging overlapping passes without deduplication. Deduplicate on exact coordinates first, or the statistic measures the duplication rather than the scan.</p>
+<p><strong>Spacing on facades looks better than the geometry predicts.</strong> Multiple passes covered the same facade from different positions, so the effective spacing is better than any single pass achieved. That is legitimate coverage, and it is worth reporting per pass as well as combined.</p>
+<h2 id="frequently-asked-questions" tabindex="-1"><a class="heading-link" href="#frequently-asked-questions"><span>Frequently Asked Questions</span></a></h2>
+<h3 id="should-i-ever-quote-points-per-square-metre-for-a-mobile-scan" tabindex="-1"><a class="heading-link" href="#should-i-ever-quote-points-per-square-metre-for-a-mobile-scan"><span>Should I ever quote points per square metre for a mobile scan?</span></a></h3>
+<p>Only alongside the surface and the range it was measured on. Quoted alone it is a number that no downstream requirement can use.</p>
+<h3 id="how-many-points-do-i-need-to-sample" tabindex="-1"><a class="heading-link" href="#how-many-points-do-i-need-to-sample"><span>How many points do I need to sample?</span></a></h3>
+<p>Fifty thousand per stratum is ample for a median and a robust p10/p90. The <code>cKDTree</code> query is the cost, and it scales with the sample rather than with the cloud.</p>
+<h3 id="does-this-apply-to-terrestrial-static-scans-too" tabindex="-1"><a class="heading-link" href="#does-this-apply-to-terrestrial-static-scans-too"><span>Does this apply to terrestrial static scans too?</span></a></h3>
+<p>Partly. A static scan has the same range-dependent along-scan spacing, but no vehicle motion, so the across-scan spacing is also range-dependent and the pattern stays isotropic. The nearest-neighbour approach is still the right measurement.</p>
+<p>A last note on procurement. The most useful thing this measurement produces is not a pass or a fail but a specification that can be met: naming the surface, the maximum range at which it must be met, and the spacing in millimetres turns an argument about averages into a check either party can run. A contract written in points per square metre over a mobile scan is, in practice, unenforceable in both directions — the surveyor cannot demonstrate compliance and the client cannot demonstrate breach, because neither can say where the number was measured.</p>
+<p>The second use is planning. Because spacing along the scan line is range times the angular step, and across it is speed over rotation rate, the specification determines the survey: a conductor at 34 m needing 8 mm spacing implies either a finer angular step or a second pass from closer. That calculation is worth doing before the vehicle is booked rather than after the data is rejected.</p>
+<h3 id="what-about-multiple-passes-over-the-same-street" tabindex="-1"><a class="heading-link" href="#what-about-multiple-passes-over-the-same-street"><span>What about multiple passes over the same street?</span></a></h3>
+<p>Report both. The combined cloud is what downstream work consumes, so its spacing is the operative number, but the per-pass figure is what tells you whether a single pass would have sufficed — which is the question that decides the next survey’s cost.</p>
+<h2 id="related-guides" tabindex="-1"><a class="heading-link" href="#related-guides"><span>Related Guides</span></a></h2>
+<ul>
+<li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a> — the planimetric approach and where it does apply</li>
+<li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/best-practices-for-lidar-point-density-in-infrastructure/">Best Practices for LiDAR Point Density in Infrastructure</a> — per-asset density targets</li>
+<li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/removing-noise-from-terrestrial-lidar-scans/">Removing Noise from Terrestrial LiDAR Scans</a> — the cleanup that must precede any spacing statistic</li>
+</ul>
+<p>Back to <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a>.</p>
+
+
+      
+      
+
+      <div class="related-nav">
+        
+
+        
+          <div>
+            <h3>Related</h3>
+            <div class="related-grid">
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/computing-point-density-from-laz-with-pdal/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Computing Point Density from LAZ with PDAL</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/best-practices-for-lidar-point-density-in-infrastructure/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">LiDAR Point Density Best Practices</span>
+                </a>
+              
+            </div>
+          </div>
+        
+      </div>
+    </article>
+
+    
+    <aside class="toc" aria-label="On this page" data-toc hidden>
+      <h4>On this page</h4>
+      <ul></ul>
+    </aside>
+  </div>
+</div>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+  <div class="container site-footer__inner">
+    <div class="site-footer__brand">
+      <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+        <img src="/assets/img/logo-mark.svg" alt="" class="brand__mark" width="36" height="36">
+        <span class="brand__name">
+          3D Geospatial
+          <small>Digital Twin Automation</small>
+        </span>
+      </a>
+      <p>Engineering-grade guides on point cloud processing, mesh pipelines, LOD strategies, and CI/CD automation for digital twin platforms.</p>
+      <a class="footer-social" href="https://github.com/3d-geospatial" aria-label="3D Geospatial on GitHub" rel="noopener" target="_blank">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+          <path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.53-1.34-1.3-1.7-1.3-1.7-1.06-.72.08-.71.08-.71 1.17.08 1.79 1.2 1.79 1.2 1.04 1.79 2.73 1.27 3.4.97.1-.75.4-1.27.73-1.56-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.19-3.08-.12-.3-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.75.11 3.05.74.8 1.19 1.83 1.19 3.08 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.07.78 2.15v3.18c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5Z"/>
+        </svg>
+        <span>GitHub</span>
+      </a>
+    </div>
+
+    <div class="site-footer__col">
+      <h4>Sections</h4>
+      <ul>
+        <li><a href="https://www.3d-geospatial.com/">Home</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management &amp; Optimization</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/">Point Cloud &amp; Mesh Pipelines</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/">Troubleshooting &amp; Reliability</a></li>
+        
+      </ul>
+    </div>
+
+    
+      <div class="site-footer__col">
+        <h4>3D Geospatial Fundamentals</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/">3D Format Standards Comparison</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems for 3D Assets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/">Digital Elevation Model Workflows</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/">Spatial Indexing and Tiling Schemes for 3D Data</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>LOD Management &amp; Optimization</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/">Automated Tile Generation for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/">Cesium ion Upload Automation for 3D Tilesets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/">glTF LOD Generation With Draco Compression</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/">Streaming Sync Patterns for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/">Tileset Metadata and 3D Tiles Next</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Point Cloud &amp; Mesh Pipelines</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/">Automated Mesh Decimation for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/">CI/CD Automation for Spatial Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">LiDAR Classification and Ground Extraction</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/">Point Cloud Filtering Techniques</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/">Surface Reconstruction for Geospatial Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/">Texture Mapping Workflows for Digital Twins</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Troubleshooting &amp; Reliability</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/">Cross-Section Failure Modes in Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/">Data Validation &amp; QA Gates for 3D Tiles</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/">Performance Profiling and Benchmarking</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/">Streaming &amp; Runtime Diagnostics for 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+  </div>
+  <div class="container site-footer__bottom">
+    <span>© 2026 3D Geospatial &amp; Digital Twin Automation</span>
+    <span>Built with Eleventy · PWA-enabled</span>
+  </div>
+</footer>
+
+
+  <script src="/assets/js/site.js?v=b99aa9f971" defer></script>
+  
+</body>
+</html>

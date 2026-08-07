@@ -1,0 +1,730 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <title>Implicit Tiling with Subtree Files — 3D Geospatial</title>
+  <meta name="description" content="Write .subtree binaries by hand: the 24-byte header, the three availability bitstreams, Morton ordering, and the checks that catch a bitstream off by one node.">
+  <meta name="keywords" content="3D geospatial, digital twin, point cloud, mesh pipeline, LOD, 3D Tiles, Cesium, PDAL, Open3D, Python, CI/CD">
+  <meta name="author" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta name="theme-color" content="#1f6b8a" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f171d" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+
+  
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem("theme");
+        var theme = (stored === "dark" || stored === "light") ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    })();
+  </script>
+  <meta name="generator" content="Eleventy">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="googlebot" content="index,follow,max-image-preview:large">
+
+  
+  <link rel="canonical" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/implicit-tiling-with-subtree-files/">
+  <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">
+
+  
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/icon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+
+  
+  <link rel="apple-touch-icon" href="/assets/img/icon-180.png">
+  <link rel="mask-icon" href="/assets/img/logo.svg" color="#1f6b8a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="3D Geospatial">
+  <meta name="application-name" content="3D Geospatial">
+
+  
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Implicit Tiling with Subtree Files — 3D Geospatial">
+  <meta property="og:description" content="Write .subtree binaries by hand: the 24-byte header, the three availability bitstreams, Morton ordering, and the checks that catch a bitstream off by one node.">
+  <meta property="og:url" content="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/implicit-tiling-with-subtree-files/">
+  <meta property="og:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+  <meta property="og:site_name" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta property="og:locale" content="en_US">
+  
+  <meta property="article:published_time" content="2026-08-07T09:08:22.619Z">
+  <meta property="article:modified_time" content="2026-08-07T09:08:22.619Z">
+  <meta property="article:publisher" content="https://www.3d-geospatial.com/">
+  
+
+  
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Implicit Tiling with Subtree Files — 3D Geospatial">
+  <meta name="twitter:description" content="Write .subtree binaries by hand: the 24-byte header, the three availability bitstreams, Morton ordering, and the checks that catch a bitstream off by one node.">
+  <meta name="twitter:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta name="twitter:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+
+  
+  <link rel="preload" href="/assets/css/styles.css?v=546adeb511" as="style">
+  
+
+  <link rel="stylesheet" href="/assets/css/styles.css?v=546adeb511">
+
+  
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.3d-geospatial.com/#organization",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "url": "https://www.3d-geospatial.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/icon-512.png",
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://www.3d-geospatial.com/#website",
+      "url": "https://www.3d-geospatial.com/",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "description": "Build reliable 3D spatial data pipelines for digital twins — point clouds, meshes, LOD strategies, Python processing, and CI/CD automation.",
+      "inLanguage": "en",
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      }
+    },
+    {
+      "@type": "TechArticle",
+      "@id": "https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/implicit-tiling-with-subtree-files/#article",
+      "isPartOf": {
+        "@id": "https://www.3d-geospatial.com/#website"
+      },
+      "headline": "Implicit Tiling with Subtree Files",
+      "name": "Implicit Tiling with Subtree Files",
+      "description": "Write .subtree binaries by hand: the 24-byte header, the three availability bitstreams, Morton ordering, and the checks that catch a bitstream off by one node.",
+      "url": "https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/implicit-tiling-with-subtree-files/",
+      "mainEntityOfPage": "https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/implicit-tiling-with-subtree-files/",
+      "inLanguage": "en",
+      "datePublished": "2026-08-07T09:08:22.619Z",
+      "dateModified": "2026-08-07T09:08:22.619Z",
+      "author": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "image": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/og-cover.png",
+        "width": 1200,
+        "height": 630
+      },
+      "breadcrumb": {
+        "@id": "https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/implicit-tiling-with-subtree-files/#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/implicit-tiling-with-subtree-files/#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://www.3d-geospatial.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "LOD Management Optimization Strategies",
+          "item": "https://www.3d-geospatial.com/lod-management-optimization-strategies/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Tileset Metadata And 3D Tiles Next",
+          "item": "https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "name": "Implicit Tiling With Subtree Files",
+          "item": "https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/implicit-tiling-with-subtree-files/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  
+<header class="site-header" role="banner">
+  <div class="container site-header__inner">
+    <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+      <img src="/assets/img/logo.svg" alt="" class="brand__mark" width="36" height="36">
+      <span class="brand__name">
+        3D Geospatial
+        <small>Digital Twin Automation</small>
+      </span>
+    </a>
+
+    <button class="theme-toggle" type="button" data-theme-toggle
+            aria-label="Switch to dark theme" title="Switch to dark theme">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4.2"/>
+        <path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/>
+      </svg>
+    </button>
+
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>
+      <span class="nav-toggle__icon" aria-hidden="true"><span></span></span>
+      Menu
+    </button>
+
+    <nav class="primary-nav" id="primary-nav" aria-label="Primary">
+      
+      <a href="https://www.3d-geospatial.com/" >
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/>
+        </svg>
+        Home
+      </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2 3 7l9 5 9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 17l9 5 9-5"/>
+            </svg>
+          
+          3D Geospatial Fundamentals
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/" aria-current="page">
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+          
+          LOD Management &amp; Optimization
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="6" cy="6" r="1.5"/><circle cx="12" cy="6" r="1.5"/><circle cx="18" cy="6" r="1.5"/>
+              <circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/>
+              <circle cx="6" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="18" cy="18" r="1.5"/>
+            </svg>
+          
+          Point Cloud &amp; Mesh Pipelines
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <path d="M12 9v4"/><path d="M12 17h.01"/>
+            </svg>
+          
+          Troubleshooting &amp; Reliability
+        </a>
+      
+    </nav>
+  </div>
+</header>
+
+
+  <main id="main">
+    
+
+
+<div class="container">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    
+      
+        <a href="https://www.3d-geospatial.com/">Home</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management Optimization Strategies</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/">Tileset Metadata And 3D Tiles Next</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <span class="current">Implicit Tiling With Subtree Files</span>
+      
+    
+  </nav>
+
+  <div class="content-page">
+    <article class="article">
+      <h1 id="implicit-tiling-with-subtree-files" tabindex="-1"><a class="heading-link" href="#implicit-tiling-with-subtree-files"><span>Implicit Tiling with Subtree Files</span></a></h1>
+<p>This page writes a <code>.subtree</code> file from scratch — the 24-byte header, the JSON chunk, and the three availability bitstreams — and covers the two details that cause nearly every implicit-tiling bug: the Morton ordering the bits are laid out in, and the difference between a node existing and a node having content. Once these files are correct, a client can address any tile arithmetically and the <code>tileset.json</code> stops describing the tree at all.</p>
+<h2 id="why-you-hit-this" tabindex="-1"><a class="heading-link" href="#why-you-hit-this"><span>Why you hit this</span></a></h2>
+<p>Every tool that writes implicit tilesets writes subtrees for you, right up until you need something they do not support — a sparse city where most of the quadtree is empty, availability derived from a manifest rather than from files on disk, or subtrees regenerated incrementally when one block changes. At that point you are writing the binary yourself, and the format is small enough to do so in an afternoon and unforgiving enough to fail silently if you get the bit order wrong.</p>
+<p>The surrounding decisions — whether your tree can be implicit at all, and what <code>subtreeLevels</code> to pick — are covered in <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/">tileset metadata and 3D Tiles Next</a>.</p>
+<h2 id="prerequisites" tabindex="-1"><a class="heading-link" href="#prerequisites"><span>Prerequisites</span></a></h2>
+<ul>
+<li>Python 3.10+ with <code>numpy&gt;=1.24</code>. No other dependency is needed to write the format.</li>
+<li>A uniform quadtree or octree, and a way to say for each node whether it exists and whether it has a payload.</li>
+<li><code>3d-tiles-validator</code> (<code>npm i -g 3d-tiles-validator</code>) for structural verification.</li>
+</ul>
+<h2 id="step-by-step" tabindex="-1"><a class="heading-link" href="#step-by-step"><span>Step-by-Step</span></a></h2>
+<h3 id="1-understand-the-node-ordering" tabindex="-1"><a class="heading-link" href="#1-understand-the-node-ordering"><span>1. Understand the node ordering</span></a></h3>
+<p>Availability bits are laid out level by level, and within a level in Morton order — the interleaved-bit ordering that keeps spatially adjacent tiles adjacent in the bitstream. Index 0 is the subtree root; indices 1–4 are its children; 5–20 are the grandchildren, and so on.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">morton_2d</span><span class="token punctuation">(</span>x<span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">,</span> y<span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">)</span> <span class="token operator">-</span><span class="token operator">></span> <span class="token builtin">int</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Interleave the bits of x and y, x in the even positions."""</span>
+    <span class="token keyword">def</span> <span class="token function">spread</span><span class="token punctuation">(</span>v<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        v <span class="token operator">&amp;</span><span class="token operator">=</span> <span class="token number">0xFFFFFFFF</span>
+        v <span class="token operator">=</span> <span class="token punctuation">(</span>v <span class="token operator">|</span> <span class="token punctuation">(</span>v <span class="token operator">&lt;&lt;</span> <span class="token number">16</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">&amp;</span> <span class="token number">0x0000FFFF0000FFFF</span>
+        v <span class="token operator">=</span> <span class="token punctuation">(</span>v <span class="token operator">|</span> <span class="token punctuation">(</span>v <span class="token operator">&lt;&lt;</span> <span class="token number">8</span><span class="token punctuation">)</span><span class="token punctuation">)</span>  <span class="token operator">&amp;</span> <span class="token number">0x00FF00FF00FF00FF</span>
+        v <span class="token operator">=</span> <span class="token punctuation">(</span>v <span class="token operator">|</span> <span class="token punctuation">(</span>v <span class="token operator">&lt;&lt;</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">)</span>  <span class="token operator">&amp;</span> <span class="token number">0x0F0F0F0F0F0F0F0F</span>
+        v <span class="token operator">=</span> <span class="token punctuation">(</span>v <span class="token operator">|</span> <span class="token punctuation">(</span>v <span class="token operator">&lt;&lt;</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">)</span>  <span class="token operator">&amp;</span> <span class="token number">0x3333333333333333</span>
+        v <span class="token operator">=</span> <span class="token punctuation">(</span>v <span class="token operator">|</span> <span class="token punctuation">(</span>v <span class="token operator">&lt;&lt;</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">)</span>  <span class="token operator">&amp;</span> <span class="token number">0x5555555555555555</span>
+        <span class="token keyword">return</span> v
+    <span class="token keyword">return</span> spread<span class="token punctuation">(</span>x<span class="token punctuation">)</span> <span class="token operator">|</span> <span class="token punctuation">(</span>spread<span class="token punctuation">(</span>y<span class="token punctuation">)</span> <span class="token operator">&lt;&lt;</span> <span class="token number">1</span><span class="token punctuation">)</span>
+
+<span class="token keyword">def</span> <span class="token function">node_index</span><span class="token punctuation">(</span>level<span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">,</span> x<span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">,</span> y<span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">)</span> <span class="token operator">-</span><span class="token operator">></span> <span class="token builtin">int</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Index into the subtree bitstream for a tile at (level, x, y), level relative to the subtree root."""</span>
+    level_offset <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token number">4</span> <span class="token operator">**</span> level <span class="token operator">-</span> <span class="token number">1</span><span class="token punctuation">)</span> <span class="token operator">//</span> <span class="token number">3</span>      <span class="token comment"># nodes in all levels above this one</span>
+    <span class="token keyword">return</span> level_offset <span class="token operator">+</span> morton_2d<span class="token punctuation">(</span>x<span class="token punctuation">,</span> y<span class="token punctuation">)</span>
+
+<span class="token keyword">for</span> lvl<span class="token punctuation">,</span> x<span class="token punctuation">,</span> y <span class="token keyword">in</span> <span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token punctuation">(</span><span class="token number">2</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"level </span><span class="token interpolation"><span class="token punctuation">{</span>lvl<span class="token punctuation">}</span></span><span class="token string"> (</span><span class="token interpolation"><span class="token punctuation">{</span>x<span class="token punctuation">}</span></span><span class="token string">,</span><span class="token interpolation"><span class="token punctuation">{</span>y<span class="token punctuation">}</span></span><span class="token string">) → index </span><span class="token interpolation"><span class="token punctuation">{</span>node_index<span class="token punctuation">(</span>lvl<span class="token punctuation">,</span> x<span class="token punctuation">,</span> y<span class="token punctuation">)</span><span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>The level offset <code>(4**level - 1) // 3</code> is the sum of the geometric series 1 + 4 + 16 + …, and getting it wrong by one level is the classic bug: every bit is then read from the wrong place and availability appears random.</p>
+<figure class="diagram">
+<svg viewBox="9 46 722 250" role="img" aria-labelledby="st-morton-t st-morton-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="st-morton-t">Morton order over a quadtree level</title>
+  <desc id="st-morton-d">Within each level, availability bits are laid out in Morton order, which interleaves the bits of the x and y tile indices. The resulting traversal is a repeating Z shape, so tiles that are neighbours on the ground are close together in the bitstream and a subtree covering one region reads as one contiguous run.</desc>
+  <rect class="svg-bg" x="9" y="46" width="722" height="250" fill="#ffffff"/>
+  <g fill="#ffffff" stroke="#5b6471" stroke-width="1.5">
+    <rect x="60" y="60" width="60" height="50"/><rect x="120" y="60" width="60" height="50"/>
+    <rect x="180" y="60" width="60" height="50"/><rect x="240" y="60" width="60" height="50"/>
+    <rect x="60" y="110" width="60" height="50"/><rect x="120" y="110" width="60" height="50"/>
+    <rect x="180" y="110" width="60" height="50"/><rect x="240" y="110" width="60" height="50"/>
+    <rect x="60" y="160" width="60" height="50"/><rect x="120" y="160" width="60" height="50"/>
+    <rect x="180" y="160" width="60" height="50"/><rect x="240" y="160" width="60" height="50"/>
+    <rect x="60" y="210" width="60" height="50"/><rect x="120" y="210" width="60" height="50"/>
+    <rect x="180" y="210" width="60" height="50"/><rect x="240" y="210" width="60" height="50"/>
+  </g>
+  <g fill="#1f2937" font-size="12" text-anchor="middle">
+    <text x="90" y="90">0</text><text x="150" y="90">1</text><text x="210" y="90">4</text><text x="270" y="90">5</text>
+    <text x="90" y="140">2</text><text x="150" y="140">3</text><text x="210" y="140">6</text><text x="270" y="140">7</text>
+    <text x="90" y="190">8</text><text x="150" y="190">9</text><text x="210" y="190">12</text><text x="270" y="190">13</text>
+    <text x="90" y="240">10</text><text x="150" y="240">11</text><text x="210" y="240">14</text><text x="270" y="240">15</text>
+  </g>
+  <path d="M90 85 L150 85 L90 135 L150 135 L210 85 L270 85 L210 135 L270 135 L90 185 L150 185 L90 235 L150 235 L210 185 L270 185 L210 235 L270 235"
+        fill="none" stroke="#c46a3d" stroke-width="1.5" opacity="0.9"/>
+  <g fill="#eef5e9" stroke="#4f7a4d" stroke-width="2">
+    <rect x="380" y="72" width="330" height="34" rx="6"/>
+    <rect x="380" y="116" width="330" height="34" rx="6"/>
+    <rect x="380" y="160" width="330" height="34" rx="6"/>
+  </g>
+  <g fill="#1f2937" font-size="12" text-anchor="middle">
+    <text x="545" y="94">level 0 → 1 bit at offset 0</text>
+    <text x="545" y="138">level 1 → 4 bits at offset 1</text>
+    <text x="545" y="182">level 2 → 16 bits at offset 5</text>
+  </g>
+  <text x="545" y="216" fill="#5b6471" font-size="12" text-anchor="middle">offset = (4^level − 1) / 3</text>
+  <text x="370" y="278" fill="#15384a" font-size="12" text-anchor="middle">The Z traversal is what makes a spatially contiguous region a contiguous run of bits, which is why the files compress so well</text>
+</svg>
+<figcaption>The numbers are bitstream indices within one level. Getting the level offset wrong shifts every index and the availability pattern becomes noise.</figcaption>
+</figure>
+<h3 id="2-pack-the-availability-bits" tabindex="-1"><a class="heading-link" href="#2-pack-the-availability-bits"><span>2. Pack the availability bits</span></a></h3>
+<p>Three bitstreams, LSB first within each byte, each padded to a byte boundary.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> numpy <span class="token keyword">as</span> np
+
+<span class="token keyword">def</span> <span class="token function">pack_bits</span><span class="token punctuation">(</span>flags<span class="token punctuation">)</span> <span class="token operator">-</span><span class="token operator">></span> <span class="token builtin">bytes</span><span class="token punctuation">:</span>
+    flags <span class="token operator">=</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>flags<span class="token punctuation">,</span> dtype<span class="token operator">=</span>np<span class="token punctuation">.</span>uint8<span class="token punctuation">)</span>
+    padded <span class="token operator">=</span> np<span class="token punctuation">.</span>zeros<span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>flags<span class="token punctuation">)</span> <span class="token operator">+</span> <span class="token number">7</span><span class="token punctuation">)</span> <span class="token operator">//</span> <span class="token number">8</span><span class="token punctuation">)</span> <span class="token operator">*</span> <span class="token number">8</span><span class="token punctuation">,</span> dtype<span class="token operator">=</span>np<span class="token punctuation">.</span>uint8<span class="token punctuation">)</span>
+    padded<span class="token punctuation">[</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>flags<span class="token punctuation">)</span><span class="token punctuation">]</span> <span class="token operator">=</span> flags
+    <span class="token keyword">return</span> np<span class="token punctuation">.</span>packbits<span class="token punctuation">(</span>padded<span class="token punctuation">,</span> bitorder<span class="token operator">=</span><span class="token string">"little"</span><span class="token punctuation">)</span><span class="token punctuation">.</span>tobytes<span class="token punctuation">(</span><span class="token punctuation">)</span>
+
+LEVELS <span class="token operator">=</span> <span class="token number">6</span>
+N_NODES <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token number">4</span> <span class="token operator">**</span> LEVELS <span class="token operator">-</span> <span class="token number">1</span><span class="token punctuation">)</span> <span class="token operator">//</span> <span class="token number">3</span>            <span class="token comment"># 1365</span>
+N_LEAF_CHILDREN <span class="token operator">=</span> <span class="token number">4</span> <span class="token operator">**</span> LEVELS               <span class="token comment"># 4096 possible child subtrees</span>
+
+tile_avail <span class="token operator">=</span> np<span class="token punctuation">.</span>zeros<span class="token punctuation">(</span>N_NODES<span class="token punctuation">,</span> dtype<span class="token operator">=</span>np<span class="token punctuation">.</span>uint8<span class="token punctuation">)</span>
+content_avail <span class="token operator">=</span> np<span class="token punctuation">.</span>zeros<span class="token punctuation">(</span>N_NODES<span class="token punctuation">,</span> dtype<span class="token operator">=</span>np<span class="token punctuation">.</span>uint8<span class="token punctuation">)</span>
+
+<span class="token comment"># Mark what genuinely exists. Interior nodes over open water exist with no content.</span>
+<span class="token keyword">for</span> i <span class="token keyword">in</span> <span class="token builtin">range</span><span class="token punctuation">(</span>N_NODES<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    tile_avail<span class="token punctuation">[</span>i<span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token number">1</span>
+content_avail<span class="token punctuation">[</span>node_index<span class="token punctuation">(</span><span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token number">0</span>       <span class="token comment"># root is a container, no payload</span>
+<span class="token keyword">for</span> lvl <span class="token keyword">in</span> <span class="token builtin">range</span><span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">,</span> LEVELS<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">for</span> x <span class="token keyword">in</span> <span class="token builtin">range</span><span class="token punctuation">(</span><span class="token number">2</span> <span class="token operator">**</span> lvl<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">for</span> y <span class="token keyword">in</span> <span class="token builtin">range</span><span class="token punctuation">(</span><span class="token number">2</span> <span class="token operator">**</span> lvl<span class="token punctuation">)</span><span class="token punctuation">:</span>
+            content_avail<span class="token punctuation">[</span>node_index<span class="token punctuation">(</span>lvl<span class="token punctuation">,</span> x<span class="token punctuation">,</span> y<span class="token punctuation">)</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token number">1</span>
+
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>tile_avail<span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">}</span></span><span class="token string"> tiles available, </span><span class="token interpolation"><span class="token punctuation">{</span>content_avail<span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">}</span></span><span class="token string"> with content"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p><code>bitorder=&quot;little&quot;</code> is not optional. The specification says bit <em>i</em> of the stream is bit <code>i % 8</code> of byte <code>i // 8</code>, counting from the least significant — which is <code>numpy</code>’s “little” and the opposite of its default.</p>
+<h3 id="3-use-the-constant-forms-when-everything-is-available" tabindex="-1"><a class="heading-link" href="#3-use-the-constant-forms-when-everything-is-available"><span>3. Use the constant forms when everything is available</span></a></h3>
+<p>A subtree whose bits are all 1 or all 0 does not need a bitstream at all, and using the constant form makes the file dramatically smaller for the dense interior of a city.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">availability_object</span><span class="token punctuation">(</span>flags<span class="token punctuation">:</span> np<span class="token punctuation">.</span>ndarray<span class="token punctuation">,</span> bitstream_index<span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Return the JSON form: a constant when uniform, otherwise a bitstream reference."""</span>
+    total <span class="token operator">=</span> <span class="token builtin">int</span><span class="token punctuation">(</span>flags<span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token keyword">if</span> total <span class="token operator">==</span> <span class="token builtin">len</span><span class="token punctuation">(</span>flags<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"constant"</span><span class="token punctuation">:</span> <span class="token number">1</span><span class="token punctuation">}</span><span class="token punctuation">,</span> <span class="token boolean">None</span>
+    <span class="token keyword">if</span> total <span class="token operator">==</span> <span class="token number">0</span><span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"constant"</span><span class="token punctuation">:</span> <span class="token number">0</span><span class="token punctuation">}</span><span class="token punctuation">,</span> <span class="token boolean">None</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"bitstream"</span><span class="token punctuation">:</span> bitstream_index<span class="token punctuation">,</span> <span class="token string">"availableCount"</span><span class="token punctuation">:</span> total<span class="token punctuation">}</span><span class="token punctuation">,</span> pack_bits<span class="token punctuation">(</span>flags<span class="token punctuation">)</span>
+</code></pre></div>
+<p><code>availableCount</code> is optional but worth writing: it lets a reader size its structures before decoding the bits, and it gives you a self-check — if your count and the popcount of your bitstream disagree, one of them is wrong.</p>
+<h3 id="4-write-the-binary-file" tabindex="-1"><a class="heading-link" href="#4-write-the-binary-file"><span>4. Write the binary file</span></a></h3>
+<p>The header is 24 bytes: a magic, a version, and the two chunk lengths.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> json
+<span class="token keyword">import</span> struct
+
+<span class="token keyword">def</span> <span class="token function">write_subtree</span><span class="token punctuation">(</span>path<span class="token punctuation">,</span> tile_avail<span class="token punctuation">,</span> content_avail<span class="token punctuation">,</span> child_avail<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    buffers<span class="token punctuation">,</span> views<span class="token punctuation">,</span> binary <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token string">b""</span>
+
+    <span class="token keyword">def</span> <span class="token function">add</span><span class="token punctuation">(</span>flags<span class="token punctuation">,</span> idx<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">nonlocal</span> binary
+        obj<span class="token punctuation">,</span> bits <span class="token operator">=</span> availability_object<span class="token punctuation">(</span>flags<span class="token punctuation">,</span> <span class="token builtin">len</span><span class="token punctuation">(</span>views<span class="token punctuation">)</span><span class="token punctuation">)</span>
+        <span class="token keyword">if</span> bits <span class="token keyword">is</span> <span class="token keyword">not</span> <span class="token boolean">None</span><span class="token punctuation">:</span>
+            views<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"buffer"</span><span class="token punctuation">:</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token string">"byteOffset"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>binary<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"byteLength"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>bits<span class="token punctuation">)</span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+            binary <span class="token operator">+=</span> bits
+            binary <span class="token operator">+=</span> <span class="token string">b"\x00"</span> <span class="token operator">*</span> <span class="token punctuation">(</span><span class="token operator">-</span><span class="token builtin">len</span><span class="token punctuation">(</span>binary<span class="token punctuation">)</span> <span class="token operator">%</span> <span class="token number">8</span><span class="token punctuation">)</span>          <span class="token comment"># align each view</span>
+        <span class="token keyword">return</span> obj
+
+    tile_obj <span class="token operator">=</span> add<span class="token punctuation">(</span>tile_avail<span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span>
+    content_obj <span class="token operator">=</span> add<span class="token punctuation">(</span>content_avail<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span>
+    child_obj <span class="token operator">=</span> add<span class="token punctuation">(</span>child_avail<span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span>
+
+    subtree <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token string">"tileAvailability"</span><span class="token punctuation">:</span> tile_obj<span class="token punctuation">,</span>
+               <span class="token string">"contentAvailability"</span><span class="token punctuation">:</span> <span class="token punctuation">[</span>content_obj<span class="token punctuation">]</span><span class="token punctuation">,</span>
+               <span class="token string">"childSubtreeAvailability"</span><span class="token punctuation">:</span> child_obj<span class="token punctuation">}</span>
+    <span class="token keyword">if</span> views<span class="token punctuation">:</span>
+        subtree<span class="token punctuation">[</span><span class="token string">"buffers"</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">{</span><span class="token string">"byteLength"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>binary<span class="token punctuation">)</span><span class="token punctuation">}</span><span class="token punctuation">]</span>
+        subtree<span class="token punctuation">[</span><span class="token string">"bufferViews"</span><span class="token punctuation">]</span> <span class="token operator">=</span> views
+
+    js <span class="token operator">=</span> json<span class="token punctuation">.</span>dumps<span class="token punctuation">(</span>subtree<span class="token punctuation">,</span> separators<span class="token operator">=</span><span class="token punctuation">(</span><span class="token string">","</span><span class="token punctuation">,</span> <span class="token string">":"</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">.</span>encode<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    js <span class="token operator">+=</span> <span class="token string">b" "</span> <span class="token operator">*</span> <span class="token punctuation">(</span><span class="token operator">-</span><span class="token builtin">len</span><span class="token punctuation">(</span>js<span class="token punctuation">)</span> <span class="token operator">%</span> <span class="token number">8</span><span class="token punctuation">)</span>
+
+    <span class="token keyword">with</span> <span class="token builtin">open</span><span class="token punctuation">(</span>path<span class="token punctuation">,</span> <span class="token string">"wb"</span><span class="token punctuation">)</span> <span class="token keyword">as</span> f<span class="token punctuation">:</span>
+        f<span class="token punctuation">.</span>write<span class="token punctuation">(</span>struct<span class="token punctuation">.</span>pack<span class="token punctuation">(</span><span class="token string">"&lt;4sIQQ"</span><span class="token punctuation">,</span> <span class="token string">b"subt"</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">,</span> <span class="token builtin">len</span><span class="token punctuation">(</span>js<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token builtin">len</span><span class="token punctuation">(</span>binary<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+        f<span class="token punctuation">.</span>write<span class="token punctuation">(</span>js<span class="token punctuation">)</span>
+        f<span class="token punctuation">.</span>write<span class="token punctuation">(</span>binary<span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token number">24</span> <span class="token operator">+</span> <span class="token builtin">len</span><span class="token punctuation">(</span>js<span class="token punctuation">)</span> <span class="token operator">+</span> <span class="token builtin">len</span><span class="token punctuation">(</span>binary<span class="token punctuation">)</span>
+
+child_avail <span class="token operator">=</span> np<span class="token punctuation">.</span>zeros<span class="token punctuation">(</span>N_LEAF_CHILDREN<span class="token punctuation">,</span> dtype<span class="token operator">=</span>np<span class="token punctuation">.</span>uint8<span class="token punctuation">)</span>
+size <span class="token operator">=</span> write_subtree<span class="token punctuation">(</span><span class="token string">"subtrees/0/0/0.subtree"</span><span class="token punctuation">,</span> tile_avail<span class="token punctuation">,</span> content_avail<span class="token punctuation">,</span> child_avail<span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"wrote </span><span class="token interpolation"><span class="token punctuation">{</span>size<span class="token punctuation">}</span></span><span class="token string"> bytes"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>The JSON chunk is padded with spaces and the binary chunk with zeros — a detail the specification is explicit about and which readers do enforce, because the padding byte value distinguishes the two chunk types when scanning.</p>
+<figure class="diagram">
+<svg viewBox="-19 56 743 182" role="img" aria-labelledby="st-layout-t st-layout-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="st-layout-t">The subtree file layout</title>
+  <desc id="st-layout-d">A subtree file is a twenty-four byte header holding the magic, version and the two chunk lengths, then a JSON chunk padded with spaces to an eight-byte boundary, then a binary chunk of packed availability bits padded with zeros. Every offset in the JSON is relative to the start of the binary chunk.</desc>
+  <rect class="svg-bg" x="-19" y="56" width="743" height="182" fill="#ffffff"/>
+  <rect x="30" y="70" width="110" height="50" rx="4" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="140" y="70" width="240" height="50" rx="4" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <rect x="380" y="70" width="330" height="50" rx="4" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <g fill="#1f2937" font-size="12" text-anchor="middle">
+    <text x="85" y="92"><tspan x="85" dy="0">header</tspan><tspan x="85" dy="16">24 B</tspan></text>
+    <text x="260" y="92"><tspan x="260" dy="0">JSON chunk</tspan><tspan x="260" dy="16">space-padded to 8 B</tspan></text>
+    <text x="545" y="92"><tspan x="545" dy="0">binary chunk</tspan><tspan x="545" dy="16">zero-padded to 8 B</tspan></text>
+  </g>
+  <g fill="#5b6471" font-size="11.5" text-anchor="middle">
+    <text x="85" y="146">&quot;subt&quot; · version · jsonLen · binLen</text>
+    <text x="260" y="146">availability objects, bufferViews</text>
+    <text x="545" y="146">tile bits · content bits · child bits</text>
+  </g>
+  <text x="380" y="192" fill="#15384a" font-size="12.5" text-anchor="middle">Every byteOffset in the JSON is measured from the start of the binary chunk, not from the start of the file</text>
+  <text x="380" y="220" fill="#5b6471" font-size="12" text-anchor="middle">Which is the second most common bug, and it presents as availability that is plausible but shifted</text>
+</svg>
+<figcaption>Three sections and two padding rules. The offsets being binary-chunk-relative is the detail most hand-written writers get wrong on the first attempt.</figcaption>
+</figure>
+<h3 id="5-read-it-back-and-compare-against-the-filesystem" tabindex="-1"><a class="heading-link" href="#5-read-it-back-and-compare-against-the-filesystem"><span>5. Read it back and compare against the filesystem</span></a></h3>
+<p>The only check that matters is whether the bits agree with what you actually wrote to disk.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> glob
+<span class="token keyword">import</span> json
+<span class="token keyword">import</span> struct
+<span class="token keyword">import</span> numpy <span class="token keyword">as</span> np
+
+<span class="token keyword">def</span> <span class="token function">read_subtree</span><span class="token punctuation">(</span>path<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    raw <span class="token operator">=</span> <span class="token builtin">open</span><span class="token punctuation">(</span>path<span class="token punctuation">,</span> <span class="token string">"rb"</span><span class="token punctuation">)</span><span class="token punctuation">.</span>read<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    magic<span class="token punctuation">,</span> version<span class="token punctuation">,</span> js_len<span class="token punctuation">,</span> bin_len <span class="token operator">=</span> struct<span class="token punctuation">.</span>unpack_from<span class="token punctuation">(</span><span class="token string">"&lt;4sIQQ"</span><span class="token punctuation">,</span> raw<span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span>
+    <span class="token keyword">assert</span> magic <span class="token operator">==</span> <span class="token string">b"subt"</span><span class="token punctuation">,</span> <span class="token string-interpolation"><span class="token string">f"bad magic </span><span class="token interpolation"><span class="token punctuation">{</span>magic<span class="token conversion-option punctuation">!r</span><span class="token punctuation">}</span></span><span class="token string">"</span></span>
+    js <span class="token operator">=</span> json<span class="token punctuation">.</span>loads<span class="token punctuation">(</span>raw<span class="token punctuation">[</span><span class="token number">24</span> <span class="token punctuation">:</span> <span class="token number">24</span> <span class="token operator">+</span> js_len<span class="token punctuation">]</span><span class="token punctuation">)</span>
+    binary <span class="token operator">=</span> raw<span class="token punctuation">[</span><span class="token number">24</span> <span class="token operator">+</span> js_len <span class="token punctuation">:</span> <span class="token number">24</span> <span class="token operator">+</span> js_len <span class="token operator">+</span> bin_len<span class="token punctuation">]</span>
+    <span class="token keyword">return</span> js<span class="token punctuation">,</span> binary
+
+<span class="token keyword">def</span> <span class="token function">decode</span><span class="token punctuation">(</span>js<span class="token punctuation">,</span> binary<span class="token punctuation">,</span> key<span class="token punctuation">,</span> n_nodes<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    obj <span class="token operator">=</span> js<span class="token punctuation">[</span>key<span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span> <span class="token keyword">if</span> <span class="token builtin">isinstance</span><span class="token punctuation">(</span>js<span class="token punctuation">[</span>key<span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token builtin">list</span><span class="token punctuation">)</span> <span class="token keyword">else</span> js<span class="token punctuation">[</span>key<span class="token punctuation">]</span>
+    <span class="token keyword">if</span> <span class="token string">"constant"</span> <span class="token keyword">in</span> obj<span class="token punctuation">:</span>
+        <span class="token keyword">return</span> np<span class="token punctuation">.</span>full<span class="token punctuation">(</span>n_nodes<span class="token punctuation">,</span> obj<span class="token punctuation">[</span><span class="token string">"constant"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> dtype<span class="token operator">=</span>np<span class="token punctuation">.</span>uint8<span class="token punctuation">)</span>
+    view <span class="token operator">=</span> js<span class="token punctuation">[</span><span class="token string">"bufferViews"</span><span class="token punctuation">]</span><span class="token punctuation">[</span>obj<span class="token punctuation">[</span><span class="token string">"bitstream"</span><span class="token punctuation">]</span><span class="token punctuation">]</span>
+    chunk <span class="token operator">=</span> binary<span class="token punctuation">[</span>view<span class="token punctuation">[</span><span class="token string">"byteOffset"</span><span class="token punctuation">]</span> <span class="token punctuation">:</span> view<span class="token punctuation">[</span><span class="token string">"byteOffset"</span><span class="token punctuation">]</span> <span class="token operator">+</span> view<span class="token punctuation">[</span><span class="token string">"byteLength"</span><span class="token punctuation">]</span><span class="token punctuation">]</span>
+    bits <span class="token operator">=</span> np<span class="token punctuation">.</span>unpackbits<span class="token punctuation">(</span>np<span class="token punctuation">.</span>frombuffer<span class="token punctuation">(</span>chunk<span class="token punctuation">,</span> dtype<span class="token operator">=</span>np<span class="token punctuation">.</span>uint8<span class="token punctuation">)</span><span class="token punctuation">,</span> bitorder<span class="token operator">=</span><span class="token string">"little"</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> bits<span class="token punctuation">[</span><span class="token punctuation">:</span>n_nodes<span class="token punctuation">]</span>
+
+js<span class="token punctuation">,</span> binary <span class="token operator">=</span> read_subtree<span class="token punctuation">(</span><span class="token string">"subtrees/0/0/0.subtree"</span><span class="token punctuation">)</span>
+content <span class="token operator">=</span> decode<span class="token punctuation">(</span>js<span class="token punctuation">,</span> binary<span class="token punctuation">,</span> <span class="token string">"contentAvailability"</span><span class="token punctuation">,</span> N_NODES<span class="token punctuation">)</span>
+on_disk <span class="token operator">=</span> <span class="token builtin">len</span><span class="token punctuation">(</span>glob<span class="token punctuation">.</span>glob<span class="token punctuation">(</span><span class="token string">"content/**/*.glb"</span><span class="token punctuation">,</span> recursive<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"content bits set: </span><span class="token interpolation"><span class="token punctuation">{</span><span class="token builtin">int</span><span class="token punctuation">(</span>content<span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">}</span></span><span class="token string"> | files on disk: </span><span class="token interpolation"><span class="token punctuation">{</span>on_disk<span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+<span class="token keyword">assert</span> <span class="token builtin">int</span><span class="token punctuation">(</span>content<span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">&lt;=</span> on_disk<span class="token punctuation">,</span> <span class="token string">"the subtree promises payloads that do not exist"</span>
+</code></pre></div>
+<figure class="diagram">
+<svg viewBox="26 52 688 188" role="img" aria-labelledby="st-chain-t st-chain-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="st-chain-t">How subtrees chain to cover a deep tree</title>
+  <desc id="st-chain-d">With six levels per subtree, a thirteen-level tree is covered by three chained subtree files. The first describes levels zero to five, its child-subtree bits point at files describing levels six to eleven, and those in turn point at the last level. A camera descending to the deepest level fetches three small files rather than one large tree.</desc>
+  <rect class="svg-bg" x="26" y="52" width="688" height="188" fill="#ffffff"/>
+  <g stroke-width="2">
+    <rect x="40" y="66" width="180" height="56" rx="8" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="280" y="66" width="180" height="56" rx="8" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="520" y="66" width="180" height="56" rx="8" fill="#e3f0f4" stroke="#1f6b8a"/>
+  </g>
+  <g stroke="#5b6471" stroke-width="2" fill="none">
+    <path d="M220 94 H278"/>
+    <path d="M460 94 H518"/>
+  </g>
+  <g fill="#1f2937" font-size="12" text-anchor="middle">
+    <text x="130" y="88"><tspan x="130" dy="0">0/0/0.subtree</tspan><tspan x="130" dy="16">levels 0–5, 171 B</tspan></text>
+    <text x="370" y="88"><tspan x="370" dy="0">6/x/y.subtree</tspan><tspan x="370" dy="16">levels 6–11, 171 B</tspan></text>
+    <text x="610" y="88"><tspan x="610" dy="0">12/x/y.subtree</tspan><tspan x="610" dy="16">level 12, 1 B</tspan></text>
+  </g>
+  <g fill="#5b6471" font-size="11.5" text-anchor="middle">
+    <text x="370" y="140">each arrow is a set childSubtreeAvailability bit</text>
+  </g>
+  <text x="370" y="162" fill="#15384a" font-size="12.5" text-anchor="middle">A camera at the deepest level has fetched 343 bytes of tree description in total</text>
+  <text x="370" y="188" fill="#5b6471" font-size="12" text-anchor="middle">The equivalent explicit tree is about 22 million JSON objects, all of which have to be parsed first</text>
+  <text x="370" y="222" fill="#5b6471" font-size="12" text-anchor="middle">subtreeLevels trades the number of these hops against the size of each file</text>
+</svg>
+<figcaption>Three fetches of a few hundred bytes replace parsing the whole tree. That, rather than the disk saving, is what the client experiences.</figcaption>
+</figure>
+<h2 id="expected-output-verification" tabindex="-1"><a class="heading-link" href="#expected-output-verification"><span>Expected Output &amp; Verification</span></a></h2>
+<p>A correct six-level subtree over a dense block:</p>
+<div class="codeblock" data-lang="text"><div class="codeblock__bar"><span class="codeblock__lang">text</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-text" tabindex="0" role="group" aria-label="text code sample"><code class="language-text">level 0 (0,0) → index 0
+level 1 (0,0) → index 1
+level 1 (1,0) → index 2
+level 1 (0,1) → index 3
+level 1 (1,1) → index 4
+level 2 (3,2) → index 16
+1365 tiles available, 1364 with content
+wrote 424 bytes
+content bits set: 1364 | files on disk: 1364
+</code></pre></div>
+<p>Four hundred bytes for 1365 nodes is the point of the format. Then run the validator, which checks the header against the chunk lengths and the bitstream lengths against the node count implied by <code>subtreeLevels</code>:</p>
+<div class="codeblock" data-lang="bash"><div class="codeblock__bar"><span class="codeblock__lang">bash</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-bash" tabindex="0" role="group" aria-label="bash code sample"><code class="language-bash">npx 3d-tiles-validator <span class="token parameter variable">--tilesetFile</span> tileset.json
+</code></pre></div>
+<p>A clean validator run plus an exact match between content bits and files on disk is sufficient. If the validator passes and the client still 404s, the availability is internally consistent and disagrees with reality — which means the bits were generated from the intended output rather than from the actual one.</p>
+<h2 id="common-errors" tabindex="-1"><a class="heading-link" href="#common-errors"><span>Common Errors</span></a></h2>
+<p><strong>Availability looks random.</strong> The level offset is wrong — usually <code>4 ** level</code> instead of <code>(4 ** level - 1) // 3</code>. Print <code>node_index</code> for the first two levels and check it reads 0, 1, 2, 3, 4.</p>
+<p><strong>Every bit reads inverted or scrambled within each byte.</strong> <code>numpy.packbits</code> defaults to <code>bitorder=&quot;big&quot;</code>; the specification requires little. Pass it explicitly on both pack and unpack.</p>
+<p><strong><code>Invalid subtree magic</code> from the validator.</strong> The header was written with the wrong struct format — it is <code>&lt;4sIQQ</code>, little-endian, with 64-bit chunk lengths. A 32-bit length field shifts everything after the first twelve bytes.</p>
+<p><strong>Client requests tiles that 404 in a specific region.</strong> <code>contentAvailability</code> was copied from <code>tileAvailability</code>, so interior nodes without geometry advertise a payload. The two are independent; derive content availability from the files you wrote.</p>
+<h2 id="frequently-asked-questions" tabindex="-1"><a class="heading-link" href="#frequently-asked-questions"><span>Frequently Asked Questions</span></a></h2>
+<h3 id="should-i-always-use-the-constant-form-when-i-can" tabindex="-1"><a class="heading-link" href="#should-i-always-use-the-constant-form-when-i-can"><span>Should I always use the constant form when I can?</span></a></h3>
+<p>Yes. It removes the bitstream entirely, and for the dense interior of a city most subtrees are uniformly available. The saving is modest per file and large across a city’s worth of them.</p>
+<h3 id="how-do-subtrees-chain" tabindex="-1"><a class="heading-link" href="#how-do-subtrees-chain"><span>How do subtrees chain?</span></a></h3>
+<p><code>childSubtreeAvailability</code> has one bit per possible child subtree — <code>4 ** subtreeLevels</code> of them for a quadtree — and a set bit means a subtree file exists at that address one level below the current subtree’s deepest. That is how a 13-level tree is covered by three chained 6-level subtrees.</p>
+<h3 id="can-i-regenerate-one-subtree-without-the-others" tabindex="-1"><a class="heading-link" href="#can-i-regenerate-one-subtree-without-the-others"><span>Can I regenerate one subtree without the others?</span></a></h3>
+<p>Yes, and that is the main operational advantage. A subtree describes a bounded region and a bounded level range, so a change in one city block rewrites one small file rather than the whole tree — which is what makes implicit tiling fit an <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">incremental rebuild</a>.</p>
+<h2 id="related-guides" tabindex="-1"><a class="heading-link" href="#related-guides"><span>Related Guides</span></a></h2>
+<ul>
+<li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/">Tileset Metadata and 3D Tiles Next</a> — where implicit tiling fits, and when not to use it</li>
+<li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/attaching-ext-structural-metadata-to-building-tiles/">Attaching EXT_structural_metadata to Building Tiles</a> — the other half of 1.1</li>
+<li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a> — generating subtrees incrementally</li>
+</ul>
+<p>Back to <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/">Tileset Metadata and 3D Tiles Next</a>.</p>
+
+
+      
+      
+
+      <div class="related-nav">
+        
+
+        
+          <div>
+            <h3>Related</h3>
+            <div class="related-grid">
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/attaching-ext-structural-metadata-to-building-tiles/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Attaching EXT_structural_metadata to Building Tiles</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/migrating-a-1-0-tileset-to-3d-tiles-1-1/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Migrating a 1.0 Tileset to 3D Tiles 1.1</span>
+                </a>
+              
+            </div>
+          </div>
+        
+      </div>
+    </article>
+
+    
+    <aside class="toc" aria-label="On this page" data-toc hidden>
+      <h4>On this page</h4>
+      <ul></ul>
+    </aside>
+  </div>
+</div>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+  <div class="container site-footer__inner">
+    <div class="site-footer__brand">
+      <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+        <img src="/assets/img/logo-mark.svg" alt="" class="brand__mark" width="36" height="36">
+        <span class="brand__name">
+          3D Geospatial
+          <small>Digital Twin Automation</small>
+        </span>
+      </a>
+      <p>Engineering-grade guides on point cloud processing, mesh pipelines, LOD strategies, and CI/CD automation for digital twin platforms.</p>
+      <a class="footer-social" href="https://github.com/3d-geospatial" aria-label="3D Geospatial on GitHub" rel="noopener" target="_blank">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+          <path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.53-1.34-1.3-1.7-1.3-1.7-1.06-.72.08-.71.08-.71 1.17.08 1.79 1.2 1.79 1.2 1.04 1.79 2.73 1.27 3.4.97.1-.75.4-1.27.73-1.56-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.19-3.08-.12-.3-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.75.11 3.05.74.8 1.19 1.83 1.19 3.08 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.07.78 2.15v3.18c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5Z"/>
+        </svg>
+        <span>GitHub</span>
+      </a>
+    </div>
+
+    <div class="site-footer__col">
+      <h4>Sections</h4>
+      <ul>
+        <li><a href="https://www.3d-geospatial.com/">Home</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management &amp; Optimization</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/">Point Cloud &amp; Mesh Pipelines</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/">Troubleshooting &amp; Reliability</a></li>
+        
+      </ul>
+    </div>
+
+    
+      <div class="site-footer__col">
+        <h4>3D Geospatial Fundamentals</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/">3D Format Standards Comparison</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems for 3D Assets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/">Digital Elevation Model Workflows</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/">Spatial Indexing and Tiling Schemes for 3D Data</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>LOD Management &amp; Optimization</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/">Automated Tile Generation for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/">Cesium ion Upload Automation for 3D Tilesets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/">glTF LOD Generation With Draco Compression</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/">Streaming Sync Patterns for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/">Tileset Metadata and 3D Tiles Next</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Point Cloud &amp; Mesh Pipelines</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/">Automated Mesh Decimation for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/">CI/CD Automation for Spatial Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">LiDAR Classification and Ground Extraction</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/">Point Cloud Filtering Techniques</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/">Surface Reconstruction for Geospatial Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/">Texture Mapping Workflows for Digital Twins</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Troubleshooting &amp; Reliability</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/">Cross-Section Failure Modes in Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/">Data Validation &amp; QA Gates for 3D Tiles</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/">Performance Profiling and Benchmarking</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/">Streaming &amp; Runtime Diagnostics for 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+  </div>
+  <div class="container site-footer__bottom">
+    <span>© 2026 3D Geospatial &amp; Digital Twin Automation</span>
+    <span>Built with Eleventy · PWA-enabled</span>
+  </div>
+</footer>
+
+
+  <script src="/assets/js/site.js?v=b99aa9f971" defer></script>
+  
+</body>
+</html>
