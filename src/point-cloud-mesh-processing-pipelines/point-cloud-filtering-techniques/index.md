@@ -359,5 +359,8 @@ No — SOR, radius removal, and range clipping only delete points; surviving coo
 - [Automated Mesh Decimation for Digital Twins](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/) — polygon-budget reduction after reconstruction
 - [Point Cloud Density Standards](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/) — density targets that set your voxel size
 - [Coordinate Reference Systems for 3D Assets](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/) — choosing the metric EPSG filtering depends on
+- [Cropping Point Clouds to Polygons with PDAL](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/cropping-point-clouds-to-polygons-with-pdal/) — clip a point cloud to parcels, corridors or exclusion zones with filters.crop
+- [Radius Outlier Removal in Open3D](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/radius-outlier-removal-in-open3d/) — remove noise without eating real detail
+- [Voxel Downsampling Strategies Compared](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/voxel-downsampling-strategies-compared/) — centroid, nearest-to-centroid, random and Poisson-disk downsampling measured on the same cloud
 
 Back to [Point Cloud & Mesh Processing Pipelines](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/).

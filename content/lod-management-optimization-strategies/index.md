@@ -237,6 +237,16 @@ GPU-driven culling moves the per-frame frustum and SSE tests onto compute shader
 <figcaption>Budgeting only the geometry is why a tileset that looks well within limits still evicts constantly. Count everything the tile brings with it.</figcaption>
 </figure>
 
+## Vector Overlays on 3D Tiles
+
+A twin is rarely only geometry. Parcel boundaries, utility routes, zoning polygons, street names and sensor markers all have to appear over the tileset, and every one of them is a different rendering mechanism with different failure modes: a polygon draped on terrain, a polyline clamped to buildings, a classification volume that recolours the tiles beneath it, thousands of labels that must declutter rather than overlap. [Vector Overlays on 3D Tiles](https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/) covers the choice between them and the cost of each.
+
+The mechanisms divide by what the vector data has to follow. [Draping GeoJSON polygons on 3D Tiles](https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/draping-geojson-polygons-on-3d-tiles/) and [clamping polylines to terrain and buildings](https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/clamping-polylines-to-terrain-and-buildings/) handle the two-dimensional cases; [classifying 3D Tiles with polygon volumes](https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/classifying-3d-tiles-with-polygon-volumes/) recolours the tileset itself rather than drawing over it, and [extruding footprints into LOD1 tiles](https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/extruding-footprints-into-lod1-tiles/) turns vector data into geometry outright. [Rendering thousands of labels and billboards](https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/rendering-thousands-of-labels-and-billboards/) and [serving vector tiles as imagery over terrain](https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/serving-vector-tiles-as-imagery-over-terrain/) are the two scaling answers for dense annotation.
+
+**Key Practice:** Pick the mechanism from what the data must follow, not from what is easiest to implement. A boundary that must sit exactly on the ground wants a ground primitive; one that must follow a building facade wants classification; and ten thousand labels want a collection with declutter rather than ten thousand entities.
+
+---
+
 ## Cross-Section Integration
 
 LOD management sits in the middle of the twin pipeline: it consumes the [3D geospatial fundamentals](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/) and feeds — and is fed by — the [point cloud and mesh processing pipelines](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/). Most LOD failures are violations of a boundary contract with one of those neighbours.
@@ -305,5 +315,6 @@ Almost always georeferencing drift: a tile transform that does not resolve clean
 - [Streaming Sync Patterns for 3D Geospatial](https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/) — SSE queues, prefetch, cache eviction
 - [3D Geospatial Fundamentals for Digital Twins](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/) — the CRS and mesh inputs LOD consumes
 - [Point Cloud & Mesh Processing Pipelines](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/) — the decimation that produces per-LOD meshes
+- [Vector Overlays on 3D Tiles](https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/) — draping, clamping, classification and label rendering over tilesets
 
 Back to [3D Geospatial for Digital Twins home](https://www.3d-geospatial.com/).

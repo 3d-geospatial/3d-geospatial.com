@@ -368,5 +368,8 @@ The second point concerns what implicit tiling does to your debugging. An explic
 - [Migrating a 1.0 Tileset to 3D Tiles 1.1](https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/migrating-a-1-0-tileset-to-3d-tiles-1-1/) — the incremental path
 - [Hierarchical LOD Structuring](https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/) — the tree that has to be uniform for any of this to apply
 - [3D Tiles Batch Tiling Pipelines](https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/) — where the subtrees get written
+- [Defining Tileset and Group Metadata](https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/defining-tileset-and-group-metadata/) — author a 3D Tiles 1.1 metadata schema and attach values at tileset, group, tile and content level
+- [Encoding Property Textures for Per-Texel Data](https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/encoding-property-textures-for-per-texel-data/) — store analysis results per texel instead of per feature
+- [Styling Tiles by Metadata with Cesium3DTileStyle](https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/styling-tiles-by-metadata-with-cesium3dtilestyle/) — write Cesium3DTileStyle expressions that colour, filter and size 3D Tiles features by metadata
 
 Back to [LOD Management & Optimization Strategies](https://www.3d-geospatial.com/lod-management-optimization-strategies/).

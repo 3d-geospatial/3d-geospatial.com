@@ -1,0 +1,793 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <title>Thinning Point Clouds to a Target Density — 3D Geospatial</title>
+  <meta name="description" content="Reduce a dense cloud to a target density without losing structure: compare PDAL sample, voxel centre and decimation">
+  <meta name="keywords" content="3D geospatial, digital twin, point cloud, mesh pipeline, LOD, 3D Tiles, Cesium, PDAL, Open3D, Python, CI/CD">
+  <meta name="author" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta name="theme-color" content="#1f6b8a" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f171d" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+
+  
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem("theme");
+        var theme = (stored === "dark" || stored === "light") ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    })();
+  </script>
+  <meta name="generator" content="Eleventy">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="googlebot" content="index,follow,max-image-preview:large">
+
+  
+  <link rel="canonical" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/thinning-point-clouds-to-a-target-density/">
+  <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">
+
+  
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/icon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+
+  
+  <link rel="apple-touch-icon" href="/assets/img/icon-180.png">
+  <link rel="mask-icon" href="/assets/img/logo.svg" color="#1f6b8a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="3D Geospatial">
+  <meta name="application-name" content="3D Geospatial">
+
+  
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Thinning Point Clouds to a Target Density — 3D Geospatial">
+  <meta property="og:description" content="Reduce a dense cloud to a target density without losing structure: compare PDAL sample, voxel centre and decimation">
+  <meta property="og:url" content="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/thinning-point-clouds-to-a-target-density/">
+  <meta property="og:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+  <meta property="og:site_name" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta property="og:locale" content="en_US">
+  
+  <meta property="article:published_time" content="2026-09-17T23:36:56.450Z">
+  <meta property="article:modified_time" content="2026-09-17T23:36:56.450Z">
+  <meta property="article:publisher" content="https://www.3d-geospatial.com/">
+  
+
+  
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Thinning Point Clouds to a Target Density — 3D Geospatial">
+  <meta name="twitter:description" content="Reduce a dense cloud to a target density without losing structure: compare PDAL sample, voxel centre and decimation">
+  <meta name="twitter:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta name="twitter:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+
+  
+  <link rel="preload" href="/assets/css/styles.css?v=8c46394d6c" as="style">
+  
+
+  <link rel="stylesheet" href="/assets/css/styles.css?v=8c46394d6c">
+
+  
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.3d-geospatial.com/#organization",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "url": "https://www.3d-geospatial.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/icon-512.png",
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://www.3d-geospatial.com/#website",
+      "url": "https://www.3d-geospatial.com/",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "description": "Build reliable 3D spatial data pipelines for digital twins — point clouds, meshes, LOD strategies, Python processing, and CI/CD automation.",
+      "inLanguage": "en",
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      }
+    },
+    {
+      "@type": "TechArticle",
+      "@id": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/thinning-point-clouds-to-a-target-density/#article",
+      "isPartOf": {
+        "@id": "https://www.3d-geospatial.com/#website"
+      },
+      "headline": "Thinning Point Clouds to a Target Density",
+      "name": "Thinning Point Clouds to a Target Density",
+      "description": "Reduce a dense cloud to a target density without losing structure: compare PDAL sample, voxel centre and decimation",
+      "url": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/thinning-point-clouds-to-a-target-density/",
+      "mainEntityOfPage": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/thinning-point-clouds-to-a-target-density/",
+      "inLanguage": "en",
+      "datePublished": "2026-09-17T23:36:56.450Z",
+      "dateModified": "2026-09-17T23:36:56.450Z",
+      "author": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "image": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/og-cover.png",
+        "width": 1200,
+        "height": 630
+      },
+      "breadcrumb": {
+        "@id": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/thinning-point-clouds-to-a-target-density/#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/thinning-point-clouds-to-a-target-density/#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://www.3d-geospatial.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "3D Geospatial Fundamentals For Digital Twins",
+          "item": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Point Cloud Density Standards",
+          "item": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "name": "Thinning Point Clouds To A Target Density",
+          "item": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/thinning-point-clouds-to-a-target-density/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  
+<header class="site-header" role="banner">
+  <div class="container site-header__inner">
+    <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+      <img src="/assets/img/logo.svg" alt="" class="brand__mark" width="36" height="36">
+      <span class="brand__name">
+        3D Geospatial
+        <small>Digital Twin Automation</small>
+      </span>
+    </a>
+
+    <button class="theme-toggle" type="button" data-theme-toggle
+            aria-label="Switch to dark theme" title="Switch to dark theme">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4.2"/>
+        <path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/>
+      </svg>
+    </button>
+
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>
+      <span class="nav-toggle__icon" aria-hidden="true"><span></span></span>
+      Menu
+    </button>
+
+    <nav class="primary-nav" id="primary-nav" aria-label="Primary">
+      
+      <a href="https://www.3d-geospatial.com/" >
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/>
+        </svg>
+        Home
+      </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/" aria-current="page">
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2 3 7l9 5 9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 17l9 5 9-5"/>
+            </svg>
+          
+          3D Geospatial Fundamentals
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+          
+          LOD Management &amp; Optimization
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="6" cy="6" r="1.5"/><circle cx="12" cy="6" r="1.5"/><circle cx="18" cy="6" r="1.5"/>
+              <circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/>
+              <circle cx="6" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="18" cy="18" r="1.5"/>
+            </svg>
+          
+          Point Cloud &amp; Mesh Pipelines
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <path d="M12 9v4"/><path d="M12 17h.01"/>
+            </svg>
+          
+          Troubleshooting &amp; Reliability
+        </a>
+      
+    </nav>
+  </div>
+</header>
+
+
+  <main id="main">
+    
+
+
+<div class="container">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    
+      
+        <a href="https://www.3d-geospatial.com/">Home</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals For Digital Twins</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <span class="current">Thinning Point Clouds To A Target Density</span>
+      
+    
+  </nav>
+
+  <div class="content-page">
+    <article class="article">
+      <h1 id="thinning-point-clouds-to-a-target-density" tabindex="-1"><a class="heading-link" href="#thinning-point-clouds-to-a-target-density"><span>Thinning Point Clouds to a Target Density</span></a></h1>
+<p>This page reduces an over-dense point cloud to a target density — comparing PDAL’s Poisson-disk <code>filters.sample</code>, voxel-centre selection and naive decimation, preserving the class balance and the points that carry structure, and verifying that the thinned cloud still supports the products built from it, in EPSG:25832+7837.</p>
+<h2 id="why-you-hit-this" tabindex="-1"><a class="heading-link" href="#why-you-hit-this"><span>Why you hit this</span></a></h2>
+<p>Modern sensors over-deliver. A mobile-mapping pass produces 2,000 points per square metre on a facade, an airborne survey flown with 70% side overlap gives 40 pts/m² where the specification asked for 8, and a photogrammetric reconstruction hands over 200 million points for a city block. None of that extra density improves a terrain model at 1 m resolution or a mesh decimated to 50,000 triangles; all of it costs memory, processing time and storage at every later stage. Thinning is therefore a normal pipeline step — and doing it with the wrong method destroys exactly the structure the downstream stages need. The targets and their meaning are in <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">point cloud density standards</a>.</p>
+<h2 id="prerequisites" tabindex="-1"><a class="heading-link" href="#prerequisites"><span>Prerequisites</span></a></h2>
+<ul>
+<li>PDAL 2.6+ with Python bindings (<code>pdal&gt;=3.4</code>), <code>laspy[lazrs]&gt;=2.5</code>, <code>numpy&gt;=1.24</code>, <code>scipy&gt;=1.11</code>.</li>
+<li>A classified cloud whose density you have already measured per cell, as in <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/mapping-density-coverage-gaps-with-pdal/">mapping density coverage gaps with PDAL</a>.</li>
+<li>A stated target: a density in points per square metre, or a minimum spacing in metres. They are equivalent — spacing ≈ 1/√density — and the spacing form is the one the thinning methods take.</li>
+</ul>
+<h2 id="the-three-methods-are-not-interchangeable" tabindex="-1"><a class="heading-link" href="#the-three-methods-are-not-interchangeable"><span>The Three Methods Are Not Interchangeable</span></a></h2>
+<p><strong>Decimation</strong> (<code>filters.decimation</code>) keeps every n-th point in file order. It is the fastest and the only one that preserves nothing: file order follows the sensor’s acquisition order, so a decimated cloud is thinned along the flight line and untouched across it, and returns from one scanner in a dual-head system can be removed preferentially.</p>
+<p><strong>Voxel selection</strong> (<code>filters.voxelcentroidnearest</code> or <code>filters.voxeldownsize</code>) divides space into a grid and keeps one point per occupied cell. It gives a bounded, predictable spacing and aligns every surviving point to a grid, which introduces a subtle regularity that reconstruction algorithms can key on.</p>
+<p><strong>Poisson-disk sampling</strong> (<code>filters.sample</code>) keeps points greedily subject to a minimum distance, so no two survivors are closer than the radius and the result is irregular but uniformly dense. It is the best-behaved for reconstruction and the slowest, because it is a neighbourhood search rather than a hash.</p>
+<figure class="diagram">
+<svg viewBox="33 33 700 223" role="img" aria-labelledby="thin-methods-t thin-methods-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="thin-methods-t">What each thinning method keeps</title>
+  <desc id="thin-methods-d">The same dense patch thinned three ways. Decimation keeps every fourth point in acquisition order, leaving stripes along the scan direction. Voxel selection keeps one point per grid cell, producing a regular lattice. Poisson-disk sampling keeps points no closer than a radius, producing an irregular but evenly spaced set that follows the surface.</desc>
+  <rect class="svg-bg" x="33" y="33" width="700" height="223" fill="#ffffff"/>
+  <g fill="#b0413e">
+    <circle cx="50" cy="60" r="3"/><circle cx="70" cy="60" r="3"/><circle cx="90" cy="60" r="3"/><circle cx="110" cy="60" r="3"/><circle cx="130" cy="60" r="3"/><circle cx="150" cy="60" r="3"/><circle cx="170" cy="60" r="3"/><circle cx="190" cy="60" r="3"/><circle cx="210" cy="60" r="3"/>
+    <circle cx="50" cy="120" r="3"/><circle cx="70" cy="120" r="3"/><circle cx="90" cy="120" r="3"/><circle cx="110" cy="120" r="3"/><circle cx="130" cy="120" r="3"/><circle cx="150" cy="120" r="3"/><circle cx="170" cy="120" r="3"/><circle cx="190" cy="120" r="3"/><circle cx="210" cy="120" r="3"/>
+  </g>
+  <g fill="#1f6b8a">
+    <circle cx="300" cy="55" r="3"/><circle cx="340" cy="55" r="3"/><circle cx="380" cy="55" r="3"/><circle cx="420" cy="55" r="3"/><circle cx="460" cy="55" r="3"/>
+    <circle cx="300" cy="95" r="3"/><circle cx="340" cy="95" r="3"/><circle cx="380" cy="95" r="3"/><circle cx="420" cy="95" r="3"/><circle cx="460" cy="95" r="3"/>
+    <circle cx="300" cy="135" r="3"/><circle cx="340" cy="135" r="3"/><circle cx="380" cy="135" r="3"/><circle cx="420" cy="135" r="3"/><circle cx="460" cy="135" r="3"/>
+  </g>
+  <g fill="#4f7a4d">
+    <circle cx="560" cy="52" r="3"/><circle cx="604" cy="68" r="3"/><circle cx="648" cy="50" r="3"/><circle cx="700" cy="66" r="3"/>
+    <circle cx="576" cy="100" r="3"/><circle cx="628" cy="108" r="3"/><circle cx="676" cy="94" r="3"/><circle cx="716" cy="110" r="3"/>
+    <circle cx="558" cy="142" r="3"/><circle cx="606" cy="150" r="3"/><circle cx="660" cy="138" r="3"/><circle cx="706" cy="152" r="3"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="130" y="188">decimation</text>
+    <text x="380" y="188">voxel selection</text>
+    <text x="638" y="188">Poisson-disk</text>
+    <text x="130" y="210">stripes along the scan</text>
+    <text x="380" y="210">regular lattice</text>
+    <text x="638" y="210">irregular, evenly spaced</text>
+  </g>
+  <text x="380" y="238" fill="#15384a" font-size="12" text-anchor="middle">All three keep about the same number of points; only the third preserves an isotropic sample.</text>
+</svg>
+<figcaption>The point counts match and the spatial properties do not, which is why the method matters more than the ratio.</figcaption>
+</figure>
+<h2 id="step-by-step" tabindex="-1"><a class="heading-link" href="#step-by-step"><span>Step-by-Step</span></a></h2>
+<h3 id="1-convert-the-target-into-a-radius" tabindex="-1"><a class="heading-link" href="#1-convert-the-target-into-a-radius"><span>1. Convert the target into a radius</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> math
+
+<span class="token keyword">def</span> <span class="token function">target_to_radius</span><span class="token punctuation">(</span>target_per_m2<span class="token operator">=</span><span class="token boolean">None</span><span class="token punctuation">,</span> min_spacing_m<span class="token operator">=</span><span class="token boolean">None</span><span class="token punctuation">,</span> safety<span class="token operator">=</span><span class="token number">1.0</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Poisson-disk radius that yields approximately the requested density."""</span>
+    <span class="token keyword">if</span> min_spacing_m<span class="token punctuation">:</span>
+        <span class="token keyword">return</span> min_spacing_m <span class="token operator">*</span> safety
+    <span class="token keyword">if</span> <span class="token keyword">not</span> target_per_m2<span class="token punctuation">:</span>
+        <span class="token keyword">raise</span> ValueError<span class="token punctuation">(</span><span class="token string">"give a density or a spacing"</span><span class="token punctuation">)</span>
+    <span class="token comment"># a Poisson-disk set of radius r has about 0.7 / r² points per unit area</span>
+    <span class="token keyword">return</span> math<span class="token punctuation">.</span>sqrt<span class="token punctuation">(</span><span class="token number">0.7</span> <span class="token operator">/</span> target_per_m2<span class="token punctuation">)</span> <span class="token operator">*</span> safety
+
+<span class="token keyword">for</span> target <span class="token keyword">in</span> <span class="token punctuation">(</span><span class="token number">8</span><span class="token punctuation">,</span> <span class="token number">20</span><span class="token punctuation">,</span> <span class="token number">50</span><span class="token punctuation">,</span> <span class="token number">200</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    r <span class="token operator">=</span> target_to_radius<span class="token punctuation">(</span>target_per_m2<span class="token operator">=</span>target<span class="token punctuation">)</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"target </span><span class="token interpolation"><span class="token punctuation">{</span>target<span class="token punctuation">:</span><span class="token format-spec">>4</span><span class="token punctuation">}</span></span><span class="token string"> pts/m² → radius </span><span class="token interpolation"><span class="token punctuation">{</span>r<span class="token punctuation">:</span><span class="token format-spec">.3f</span><span class="token punctuation">}</span></span><span class="token string"> m (≈ </span><span class="token interpolation"><span class="token punctuation">{</span><span class="token number">0.7</span> <span class="token operator">/</span> r <span class="token operator">**</span> <span class="token number">2</span><span class="token punctuation">:</span><span class="token format-spec">.1f</span><span class="token punctuation">}</span></span><span class="token string"> pts/m² achieved)"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>The 0.7 factor is the packing density of a maximal Poisson-disk set, and it is the reason a radius equal to the nominal spacing under-delivers: at radius <code>r</code> the achievable density is about <code>0.7 / r²</code>, not <code>1 / r²</code>. Setting the radius from the density rather than the other way round is what makes the result land on the target instead of 30% below it.</p>
+<h3 id="2-thin-with-poisson-disk-sampling-per-class" tabindex="-1"><a class="heading-link" href="#2-thin-with-poisson-disk-sampling-per-class"><span>2. Thin with Poisson-disk sampling, per class</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> json
+
+<span class="token keyword">import</span> pdal
+
+SRC <span class="token operator">=</span> <span class="token string">"deliveries/2026-09/tile_691_5335.laz"</span>
+
+<span class="token keyword">def</span> <span class="token function">thin_poisson</span><span class="token punctuation">(</span>src<span class="token punctuation">,</span> out<span class="token punctuation">,</span> radius<span class="token punctuation">,</span> classes<span class="token operator">=</span><span class="token boolean">None</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    stages <span class="token operator">=</span> <span class="token punctuation">[</span>src<span class="token punctuation">]</span>
+    <span class="token keyword">if</span> classes<span class="token punctuation">:</span>
+        stages<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"filters.range"</span><span class="token punctuation">,</span>
+                       <span class="token string">"limits"</span><span class="token punctuation">:</span> <span class="token string">","</span><span class="token punctuation">.</span>join<span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"Classification[</span><span class="token interpolation"><span class="token punctuation">{</span>c<span class="token punctuation">}</span></span><span class="token string">:</span><span class="token interpolation"><span class="token punctuation">{</span>c<span class="token punctuation">}</span></span><span class="token string">]"</span></span> <span class="token keyword">for</span> c <span class="token keyword">in</span> classes<span class="token punctuation">)</span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+    stages <span class="token operator">+=</span> <span class="token punctuation">[</span>
+        <span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"filters.sample"</span><span class="token punctuation">,</span> <span class="token string">"radius"</span><span class="token punctuation">:</span> radius<span class="token punctuation">}</span><span class="token punctuation">,</span>
+        <span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"writers.las"</span><span class="token punctuation">,</span> <span class="token string">"filename"</span><span class="token punctuation">:</span> out<span class="token punctuation">,</span> <span class="token string">"compression"</span><span class="token punctuation">:</span> <span class="token string">"laszip"</span><span class="token punctuation">,</span>
+         <span class="token string">"forward"</span><span class="token punctuation">:</span> <span class="token string">"all"</span><span class="token punctuation">,</span> <span class="token string">"minor_version"</span><span class="token punctuation">:</span> <span class="token number">4</span><span class="token punctuation">,</span> <span class="token string">"dataformat_id"</span><span class="token punctuation">:</span> <span class="token number">6</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+    <span class="token punctuation">]</span>
+    <span class="token keyword">return</span> pdal<span class="token punctuation">.</span>Pipeline<span class="token punctuation">(</span>json<span class="token punctuation">.</span>dumps<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"pipeline"</span><span class="token punctuation">:</span> stages<span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">.</span>execute<span class="token punctuation">(</span><span class="token punctuation">)</span>
+
+radius <span class="token operator">=</span> target_to_radius<span class="token punctuation">(</span>target_per_m2<span class="token operator">=</span><span class="token number">8</span><span class="token punctuation">)</span>
+kept <span class="token operator">=</span> thin_poisson<span class="token punctuation">(</span>SRC<span class="token punctuation">,</span> <span class="token string">"build/thin_all_8.laz"</span><span class="token punctuation">,</span> radius<span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>kept<span class="token punctuation">:</span><span class="token format-spec">,</span><span class="token punctuation">}</span></span><span class="token string"> points kept at radius </span><span class="token interpolation"><span class="token punctuation">{</span>radius<span class="token punctuation">:</span><span class="token format-spec">.3f</span><span class="token punctuation">}</span></span><span class="token string"> m"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p><code>filters.sample</code> is PDAL’s Poisson-disk implementation and it operates in three dimensions, which matters on vertical surfaces: a 2D thinning that keeps one point per square metre of ground keeps one point per square metre of <em>plan</em> on a facade, which is almost nothing. The 3D radius keeps the facade sampled at the same spacing as the ground.</p>
+<h3 id="3-thin-classes-independently-when-they-have-different-requirements" tabindex="-1"><a class="heading-link" href="#3-thin-classes-independently-when-they-have-different-requirements"><span>3. Thin classes independently when they have different requirements</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python">CLASS_TARGETS <span class="token operator">=</span> <span class="token punctuation">{</span>
+    <span class="token number">2</span><span class="token punctuation">:</span> <span class="token number">8.0</span><span class="token punctuation">,</span>        <span class="token comment"># ground: the terrain model's requirement</span>
+    <span class="token number">6</span><span class="token punctuation">:</span> <span class="token number">20.0</span><span class="token punctuation">,</span>       <span class="token comment"># buildings: roof detail for reconstruction</span>
+    <span class="token number">5</span><span class="token punctuation">:</span> <span class="token number">4.0</span><span class="token punctuation">,</span>        <span class="token comment"># high vegetation: canopy structure, coarser is fine</span>
+    <span class="token punctuation">(</span><span class="token number">3</span><span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">:</span> <span class="token number">2.0</span><span class="token punctuation">,</span>   <span class="token comment"># low and medium vegetation: rarely needed at density</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">def</span> <span class="token function">thin_by_class</span><span class="token punctuation">(</span>src<span class="token punctuation">,</span> out_dir<span class="token punctuation">,</span> class_targets<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    outputs <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token punctuation">}</span>
+    <span class="token keyword">for</span> classes<span class="token punctuation">,</span> target <span class="token keyword">in</span> class_targets<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        cls <span class="token operator">=</span> <span class="token punctuation">(</span>classes<span class="token punctuation">,</span><span class="token punctuation">)</span> <span class="token keyword">if</span> <span class="token builtin">isinstance</span><span class="token punctuation">(</span>classes<span class="token punctuation">,</span> <span class="token builtin">int</span><span class="token punctuation">)</span> <span class="token keyword">else</span> classes
+        name <span class="token operator">=</span> <span class="token string">"_"</span><span class="token punctuation">.</span>join<span class="token punctuation">(</span><span class="token builtin">str</span><span class="token punctuation">(</span>c<span class="token punctuation">)</span> <span class="token keyword">for</span> c <span class="token keyword">in</span> cls<span class="token punctuation">)</span>
+        out <span class="token operator">=</span> <span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>out_dir<span class="token punctuation">}</span></span><span class="token string">/thin_class_</span><span class="token interpolation"><span class="token punctuation">{</span>name<span class="token punctuation">}</span></span><span class="token string">.laz"</span></span>
+        r <span class="token operator">=</span> target_to_radius<span class="token punctuation">(</span>target_per_m2<span class="token operator">=</span>target<span class="token punctuation">)</span>
+        n <span class="token operator">=</span> thin_poisson<span class="token punctuation">(</span>src<span class="token punctuation">,</span> out<span class="token punctuation">,</span> r<span class="token punctuation">,</span> classes<span class="token operator">=</span>cls<span class="token punctuation">)</span>
+        outputs<span class="token punctuation">[</span>name<span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token string">"target_per_m2"</span><span class="token punctuation">:</span> target<span class="token punctuation">,</span> <span class="token string">"radius_m"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>r<span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"points"</span><span class="token punctuation">:</span> n<span class="token punctuation">}</span>
+    <span class="token keyword">return</span> outputs
+
+outs <span class="token operator">=</span> thin_by_class<span class="token punctuation">(</span>SRC<span class="token punctuation">,</span> <span class="token string">"build"</span><span class="token punctuation">,</span> CLASS_TARGETS<span class="token punctuation">)</span>
+<span class="token keyword">for</span> name<span class="token punctuation">,</span> info <span class="token keyword">in</span> outs<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"class </span><span class="token interpolation"><span class="token punctuation">{</span>name<span class="token punctuation">:</span><span class="token format-spec">&lt;6</span><span class="token punctuation">}</span></span><span class="token string"> target </span><span class="token interpolation"><span class="token punctuation">{</span>info<span class="token punctuation">[</span><span class="token string">'target_per_m2'</span><span class="token punctuation">]</span><span class="token punctuation">:</span><span class="token format-spec">>5</span><span class="token punctuation">}</span></span><span class="token string"> pts/m²  "</span></span>
+          <span class="token string-interpolation"><span class="token string">f"radius </span><span class="token interpolation"><span class="token punctuation">{</span>info<span class="token punctuation">[</span><span class="token string">'radius_m'</span><span class="token punctuation">]</span><span class="token punctuation">:</span><span class="token format-spec">.3f</span><span class="token punctuation">}</span></span><span class="token string"> m  kept </span><span class="token interpolation"><span class="token punctuation">{</span>info<span class="token punctuation">[</span><span class="token string">'points'</span><span class="token punctuation">]</span><span class="token punctuation">:</span><span class="token format-spec">,</span><span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Thinning uniformly across classes is the mistake that makes a thinned delivery unusable. Ground needs the specification’s density because the terrain model depends on it; roofs often need more, because reconstruction quality scales with sample spacing relative to roof features; vegetation needs far less, and is usually most of the points. A per-class pass typically removes 70% of a cloud while leaving every product’s input unchanged.</p>
+<p>Merging the per-class outputs back into one file preserves the ability to serve them separately as well:</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">merge</span><span class="token punctuation">(</span>parts<span class="token punctuation">,</span> out<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    stages <span class="token operator">=</span> <span class="token builtin">list</span><span class="token punctuation">(</span>parts<span class="token punctuation">)</span> <span class="token operator">+</span> <span class="token punctuation">[</span>
+        <span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"filters.merge"</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+        <span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"writers.las"</span><span class="token punctuation">,</span> <span class="token string">"filename"</span><span class="token punctuation">:</span> out<span class="token punctuation">,</span> <span class="token string">"compression"</span><span class="token punctuation">:</span> <span class="token string">"laszip"</span><span class="token punctuation">,</span>
+         <span class="token string">"forward"</span><span class="token punctuation">:</span> <span class="token string">"all"</span><span class="token punctuation">,</span> <span class="token string">"minor_version"</span><span class="token punctuation">:</span> <span class="token number">4</span><span class="token punctuation">,</span> <span class="token string">"dataformat_id"</span><span class="token punctuation">:</span> <span class="token number">6</span><span class="token punctuation">,</span>
+         <span class="token string">"a_srs"</span><span class="token punctuation">:</span> <span class="token string">"EPSG:25832+7837"</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+    <span class="token punctuation">]</span>
+    <span class="token keyword">return</span> pdal<span class="token punctuation">.</span>Pipeline<span class="token punctuation">(</span>json<span class="token punctuation">.</span>dumps<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"pipeline"</span><span class="token punctuation">:</span> stages<span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">.</span>execute<span class="token punctuation">(</span><span class="token punctuation">)</span>
+
+total <span class="token operator">=</span> merge<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token string-interpolation"><span class="token string">f"build/thin_class_</span><span class="token interpolation"><span class="token punctuation">{</span>k<span class="token punctuation">}</span></span><span class="token string">.laz"</span></span> <span class="token keyword">for</span> k <span class="token keyword">in</span> outs<span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token string">"build/tile_thinned.laz"</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"merged </span><span class="token interpolation"><span class="token punctuation">{</span>total<span class="token punctuation">:</span><span class="token format-spec">,</span><span class="token punctuation">}</span></span><span class="token string"> points"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<figure class="diagram">
+<svg viewBox="46 4 668 236" role="img" aria-labelledby="thin-class-t thin-class-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="thin-class-t">Per-class thinning against uniform thinning</title>
+  <desc id="thin-class-d">Two stacked bars for the same tile. Before thinning, vegetation holds most of the points, with ground and buildings smaller shares. Uniform thinning to eight points per square metre keeps the same proportions and leaves buildings under-sampled for reconstruction. Per-class thinning keeps buildings denser, ground at the specification and vegetation much sparser, for a smaller total.</desc>
+  <rect class="svg-bg" x="46" y="4" width="668" height="236" fill="#ffffff"/>
+  <g stroke-width="1.5">
+    <rect x="60" y="40" width="200" height="30" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="260" y="40" width="120" height="30" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="380" y="40" width="320" height="30" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="60" y="100" width="80" height="30" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="140" y="100" width="48" height="30" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="188" y="100" width="128" height="30" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="60" y="160" width="80" height="30" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="140" y="160" width="96" height="30" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="236" y="160" width="40" height="30" fill="#fdf3e0" stroke="#c46a3d"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="start">
+    <text x="60" y="32">delivered: 18.4 M points</text>
+    <text x="60" y="92">uniform thinning: 5.1 M — buildings under-sampled</text>
+    <text x="60" y="152">per-class thinning: 4.2 M — every product's input intact</text>
+  </g>
+  <g fill="#1f2937" font-size="11.5" text-anchor="middle">
+    <text x="160" y="60">ground</text><text x="320" y="60">buildings</text><text x="540" y="60">vegetation</text>
+  </g>
+  <text x="380" y="222" fill="#15384a" font-size="12.5" text-anchor="middle">Fewer points in total, more where reconstruction needs them.</text>
+</svg>
+<figcaption>Uniform thinning preserves the delivered proportions, which are set by what the sensor saw rather than by what the products need.</figcaption>
+</figure>
+<h3 id="4-compare-the-methods-on-the-same-tile" tabindex="-1"><a class="heading-link" href="#4-compare-the-methods-on-the-same-tile"><span>4. Compare the methods on the same tile</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> time
+
+<span class="token keyword">def</span> <span class="token function">thin_voxel</span><span class="token punctuation">(</span>src<span class="token punctuation">,</span> out<span class="token punctuation">,</span> cell<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    stages <span class="token operator">=</span> <span class="token punctuation">[</span>src<span class="token punctuation">,</span>
+              <span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"filters.voxelcentroidnearest"</span><span class="token punctuation">,</span> <span class="token string">"cell"</span><span class="token punctuation">:</span> cell<span class="token punctuation">}</span><span class="token punctuation">,</span>
+              <span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"writers.las"</span><span class="token punctuation">,</span> <span class="token string">"filename"</span><span class="token punctuation">:</span> out<span class="token punctuation">,</span> <span class="token string">"compression"</span><span class="token punctuation">:</span> <span class="token string">"laszip"</span><span class="token punctuation">,</span> <span class="token string">"forward"</span><span class="token punctuation">:</span> <span class="token string">"all"</span><span class="token punctuation">}</span><span class="token punctuation">]</span>
+    <span class="token keyword">return</span> pdal<span class="token punctuation">.</span>Pipeline<span class="token punctuation">(</span>json<span class="token punctuation">.</span>dumps<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"pipeline"</span><span class="token punctuation">:</span> stages<span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">.</span>execute<span class="token punctuation">(</span><span class="token punctuation">)</span>
+
+<span class="token keyword">def</span> <span class="token function">thin_decimate</span><span class="token punctuation">(</span>src<span class="token punctuation">,</span> out<span class="token punctuation">,</span> step<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    stages <span class="token operator">=</span> <span class="token punctuation">[</span>src<span class="token punctuation">,</span>
+              <span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"filters.decimation"</span><span class="token punctuation">,</span> <span class="token string">"step"</span><span class="token punctuation">:</span> step<span class="token punctuation">}</span><span class="token punctuation">,</span>
+              <span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"writers.las"</span><span class="token punctuation">,</span> <span class="token string">"filename"</span><span class="token punctuation">:</span> out<span class="token punctuation">,</span> <span class="token string">"compression"</span><span class="token punctuation">:</span> <span class="token string">"laszip"</span><span class="token punctuation">,</span> <span class="token string">"forward"</span><span class="token punctuation">:</span> <span class="token string">"all"</span><span class="token punctuation">}</span><span class="token punctuation">]</span>
+    <span class="token keyword">return</span> pdal<span class="token punctuation">.</span>Pipeline<span class="token punctuation">(</span>json<span class="token punctuation">.</span>dumps<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"pipeline"</span><span class="token punctuation">:</span> stages<span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">.</span>execute<span class="token punctuation">(</span><span class="token punctuation">)</span>
+
+results <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+<span class="token keyword">for</span> label<span class="token punctuation">,</span> fn<span class="token punctuation">,</span> arg <span class="token keyword">in</span> <span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token string">"poisson r=0.30"</span><span class="token punctuation">,</span> thin_poisson<span class="token punctuation">,</span> <span class="token number">0.296</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                       <span class="token punctuation">(</span><span class="token string">"voxel c=0.30"</span><span class="token punctuation">,</span> thin_voxel<span class="token punctuation">,</span> <span class="token number">0.30</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                       <span class="token punctuation">(</span><span class="token string">"decimate n=5"</span><span class="token punctuation">,</span> thin_decimate<span class="token punctuation">,</span> <span class="token number">5</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    out <span class="token operator">=</span> <span class="token string-interpolation"><span class="token string">f"build/cmp_</span><span class="token interpolation"><span class="token punctuation">{</span>label<span class="token punctuation">.</span>split<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">}</span></span><span class="token string">.laz"</span></span>
+    t0 <span class="token operator">=</span> time<span class="token punctuation">.</span>perf_counter<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    n <span class="token operator">=</span> fn<span class="token punctuation">(</span>SRC<span class="token punctuation">,</span> out<span class="token punctuation">,</span> arg<span class="token punctuation">)</span>
+    results<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">(</span>label<span class="token punctuation">,</span> n<span class="token punctuation">,</span> <span class="token builtin">round</span><span class="token punctuation">(</span>time<span class="token punctuation">.</span>perf_counter<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">-</span> t0<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+<span class="token keyword">for</span> label<span class="token punctuation">,</span> n<span class="token punctuation">,</span> secs <span class="token keyword">in</span> results<span class="token punctuation">:</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>label<span class="token punctuation">:</span><span class="token format-spec">&lt;16</span><span class="token punctuation">}</span></span><span class="token interpolation"><span class="token punctuation">{</span>n<span class="token punctuation">:</span><span class="token format-spec">>10,</span><span class="token punctuation">}</span></span><span class="token string"> points  </span><span class="token interpolation"><span class="token punctuation">{</span>secs<span class="token punctuation">:</span><span class="token format-spec">>6.1f</span><span class="token punctuation">}</span></span><span class="token string"> s"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<h3 id="5-measure-what-the-thinning-did-to-the-spacing" tabindex="-1"><a class="heading-link" href="#5-measure-what-the-thinning-did-to-the-spacing"><span>5. Measure what the thinning did to the spacing</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> laspy
+<span class="token keyword">import</span> numpy <span class="token keyword">as</span> np
+<span class="token keyword">from</span> scipy<span class="token punctuation">.</span>spatial <span class="token keyword">import</span> cKDTree
+
+<span class="token keyword">def</span> <span class="token function">spacing_stats</span><span class="token punctuation">(</span>path<span class="token punctuation">,</span> sample<span class="token operator">=</span><span class="token number">300_000</span><span class="token punctuation">,</span> k<span class="token operator">=</span><span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    las <span class="token operator">=</span> laspy<span class="token punctuation">.</span>read<span class="token punctuation">(</span>path<span class="token punctuation">)</span>
+    xyz <span class="token operator">=</span> np<span class="token punctuation">.</span>column_stack<span class="token punctuation">(</span><span class="token punctuation">[</span>las<span class="token punctuation">.</span>x<span class="token punctuation">,</span> las<span class="token punctuation">.</span>y<span class="token punctuation">,</span> las<span class="token punctuation">.</span>z<span class="token punctuation">]</span><span class="token punctuation">)</span>
+    <span class="token keyword">if</span> <span class="token builtin">len</span><span class="token punctuation">(</span>xyz<span class="token punctuation">)</span> <span class="token operator">></span> sample<span class="token punctuation">:</span>
+        xyz <span class="token operator">=</span> xyz<span class="token punctuation">[</span>np<span class="token punctuation">.</span>random<span class="token punctuation">.</span>default_rng<span class="token punctuation">(</span><span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">.</span>choice<span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>xyz<span class="token punctuation">)</span><span class="token punctuation">,</span> sample<span class="token punctuation">,</span> replace<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">)</span><span class="token punctuation">]</span>
+    d<span class="token punctuation">,</span> _ <span class="token operator">=</span> cKDTree<span class="token punctuation">(</span>xyz<span class="token punctuation">)</span><span class="token punctuation">.</span>query<span class="token punctuation">(</span>xyz<span class="token punctuation">,</span> k<span class="token operator">=</span>k<span class="token punctuation">,</span> workers<span class="token operator">=</span><span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">)</span>
+    nn <span class="token operator">=</span> d<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">]</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token string">"points"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>las<span class="token punctuation">.</span>points<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"nn_median_m"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>median<span class="token punctuation">(</span>nn<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"nn_p05_m"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>percentile<span class="token punctuation">(</span>nn<span class="token punctuation">,</span> <span class="token number">5</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"nn_p95_m"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>percentile<span class="token punctuation">(</span>nn<span class="token punctuation">,</span> <span class="token number">95</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"anisotropy"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>percentile<span class="token punctuation">(</span>nn<span class="token punctuation">,</span> <span class="token number">95</span><span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token builtin">max</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>percentile<span class="token punctuation">(</span>nn<span class="token punctuation">,</span> <span class="token number">5</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">1e-6</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+
+<span class="token keyword">for</span> path <span class="token keyword">in</span> <span class="token punctuation">(</span><span class="token string">"build/cmp_poisson.laz"</span><span class="token punctuation">,</span> <span class="token string">"build/cmp_voxel.laz"</span><span class="token punctuation">,</span> <span class="token string">"build/cmp_decimate.laz"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>path<span class="token punctuation">.</span>split<span class="token punctuation">(</span><span class="token string">'_'</span><span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token operator">-</span><span class="token number">4</span><span class="token punctuation">]</span><span class="token punctuation">:</span><span class="token format-spec">&lt;10</span><span class="token punctuation">}</span></span><span class="token interpolation"><span class="token punctuation">{</span>spacing_stats<span class="token punctuation">(</span>path<span class="token punctuation">)</span><span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>The anisotropy figure — the ratio of the 95th to the 5th percentile nearest-neighbour distance — is the number that separates the methods. A Poisson-disk set has a hard lower bound at its radius and a narrow spread, so the ratio is close to 2. A decimated set keeps the original’s within-scanline spacing while stretching across lines, so the ratio is 5 or more. That anisotropy is what makes surface reconstruction produce striped artefacts from a decimated cloud.</p>
+<h3 id="6-verify-the-products-not-just-the-cloud" tabindex="-1"><a class="heading-link" href="#6-verify-the-products-not-just-the-cloud"><span>6. Verify the products, not just the cloud</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">dtm_difference</span><span class="token punctuation">(</span>dense_path<span class="token punctuation">,</span> thin_path<span class="token punctuation">,</span> cell<span class="token operator">=</span><span class="token number">1.0</span><span class="token punctuation">,</span> bounds<span class="token operator">=</span><span class="token boolean">None</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">for</span> src<span class="token punctuation">,</span> out <span class="token keyword">in</span> <span class="token punctuation">(</span><span class="token punctuation">(</span>dense_path<span class="token punctuation">,</span> <span class="token string">"build/dtm_dense.tif"</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token punctuation">(</span>thin_path<span class="token punctuation">,</span> <span class="token string">"build/dtm_thin.tif"</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        stages <span class="token operator">=</span> <span class="token punctuation">[</span>src<span class="token punctuation">,</span>
+                  <span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"filters.range"</span><span class="token punctuation">,</span> <span class="token string">"limits"</span><span class="token punctuation">:</span> <span class="token string">"Classification[2:2]"</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+                  <span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"writers.gdal"</span><span class="token punctuation">,</span> <span class="token string">"filename"</span><span class="token punctuation">:</span> out<span class="token punctuation">,</span> <span class="token string">"resolution"</span><span class="token punctuation">:</span> cell<span class="token punctuation">,</span>
+                   <span class="token string">"output_type"</span><span class="token punctuation">:</span> <span class="token string">"idw"</span><span class="token punctuation">,</span> <span class="token string">"nodata"</span><span class="token punctuation">:</span> <span class="token operator">-</span><span class="token number">9999</span><span class="token punctuation">,</span> <span class="token string">"data_type"</span><span class="token punctuation">:</span> <span class="token string">"float32"</span><span class="token punctuation">,</span>
+                   <span class="token operator">**</span><span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"bounds"</span><span class="token punctuation">:</span> bounds<span class="token punctuation">}</span> <span class="token keyword">if</span> bounds <span class="token keyword">else</span> <span class="token punctuation">{</span><span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">}</span><span class="token punctuation">]</span>
+        pdal<span class="token punctuation">.</span>Pipeline<span class="token punctuation">(</span>json<span class="token punctuation">.</span>dumps<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"pipeline"</span><span class="token punctuation">:</span> stages<span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">.</span>execute<span class="token punctuation">(</span><span class="token punctuation">)</span>
+
+    <span class="token keyword">import</span> rasterio
+    <span class="token keyword">with</span> rasterio<span class="token punctuation">.</span><span class="token builtin">open</span><span class="token punctuation">(</span><span class="token string">"build/dtm_dense.tif"</span><span class="token punctuation">)</span> <span class="token keyword">as</span> a<span class="token punctuation">,</span> rasterio<span class="token punctuation">.</span><span class="token builtin">open</span><span class="token punctuation">(</span><span class="token string">"build/dtm_thin.tif"</span><span class="token punctuation">)</span> <span class="token keyword">as</span> b<span class="token punctuation">:</span>
+        da<span class="token punctuation">,</span> db <span class="token operator">=</span> a<span class="token punctuation">.</span>read<span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">,</span> masked<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span><span class="token punctuation">,</span> b<span class="token punctuation">.</span>read<span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">,</span> masked<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+        diff <span class="token operator">=</span> <span class="token punctuation">(</span>db <span class="token operator">-</span> da<span class="token punctuation">)</span><span class="token punctuation">.</span>compressed<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"cells"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span>diff<span class="token punctuation">.</span>size<span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"rmse_m"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>sqrt<span class="token punctuation">(</span><span class="token punctuation">(</span>diff <span class="token operator">**</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">.</span>mean<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"p95_abs_m"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>percentile<span class="token punctuation">(</span>np<span class="token punctuation">.</span><span class="token builtin">abs</span><span class="token punctuation">(</span>diff<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">95</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"max_abs_m"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span><span class="token builtin">abs</span><span class="token punctuation">(</span>diff<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">max</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">}</span>
+
+<span class="token keyword">print</span><span class="token punctuation">(</span>dtm_difference<span class="token punctuation">(</span>SRC<span class="token punctuation">,</span> <span class="token string">"build/tile_thinned.laz"</span><span class="token punctuation">,</span> bounds<span class="token operator">=</span>BOUNDS<span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>This is the acceptance test that matters: not “how many points did we keep” but “did the product change”. A terrain model built from the thinned ground points should differ from the dense one by a few millimetres RMSE, which is the interpolation noise. A difference of centimetres means the ground class was thinned below what the interpolation needs, and the target should be revisited.</p>
+<figure class="diagram">
+<svg viewBox="56 9 667 237" role="img" aria-labelledby="thin-verify-t thin-verify-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="thin-verify-t">Terrain model difference against ground-class thinning target</title>
+  <desc id="thin-verify-d">A curve of terrain model root mean square difference against the ground thinning target. At twenty and twelve points per square metre the difference is under five millimetres. At eight it is about nine millimetres, still below the survey's own accuracy. At four it rises to four centimetres and at two to eleven, where the thinning is visibly degrading the product.</desc>
+  <rect class="svg-bg" x="56" y="9" width="667" height="237" fill="#ffffff"/>
+  <path d="M70 30 V180 H700" fill="none" stroke="#5b6471" stroke-width="1.5"/>
+  <path d="M70 120 H700" fill="none" stroke="#4f7a4d" stroke-width="2" stroke-dasharray="6 4"/>
+  <polyline points="660,172 540,170 420,166 300,150 180,86 110,44" fill="none" stroke="#1f6b8a" stroke-width="2.5"/>
+  <g fill="#1f2937" font-size="12" text-anchor="middle">
+    <text x="110" y="200">2</text><text x="180" y="200">4</text><text x="300" y="200">8</text>
+    <text x="420" y="200">12</text><text x="540" y="200">16</text><text x="660" y="200">20 pts/m²</text>
+  </g>
+  <text x="708" y="112" fill="#4f7a4d" font-size="12" text-anchor="end">survey accuracy</text>
+  <text x="130" y="36" fill="#b0413e" font-size="12" text-anchor="start">11 cm</text>
+  <text x="330" y="142" fill="#1f6b8a" font-size="12" text-anchor="start">9 mm at the specification</text>
+  <text x="385" y="228" fill="#15384a" font-size="12.5" text-anchor="middle">ground thinning target — the product stops caring above about 8 pts/m²</text>
+</svg>
+<figcaption>The curve shows where thinning becomes free: above the specification's density, extra ground points change the terrain model by less than its own accuracy.</figcaption>
+</figure>
+<h2 id="expected-output-verification" tabindex="-1"><a class="heading-link" href="#expected-output-verification"><span>Expected Output &amp; Verification</span></a></h2>
+<div class="codeblock" data-lang="text"><div class="codeblock__bar"><span class="codeblock__lang">text</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-text" tabindex="0" role="group" aria-label="text code sample"><code class="language-text">target    8 pts/m² → radius 0.296 m (≈ 8.0 pts/m² achieved)
+target   20 pts/m² → radius 0.187 m (≈ 20.0 pts/m² achieved)
+6,204,118 points kept at radius 0.296 m
+class 2      target   8.0 pts/m²  radius 0.296 m  kept 2,104,882
+class 6      target  20.0 pts/m²  radius 0.187 m  kept 1,402,118
+class 5      target   4.0 pts/m²  radius 0.418 m  kept   604,204
+class 3_4    target   2.0 pts/m²  radius 0.592 m  kept   102,884
+merged 4,214,088 points
+poisson r=0.30    6,204,118 points    94.2 s
+voxel c=0.30      6,880,204 points    31.8 s
+decimate n=5      3,680,424 points     8.4 s
+poisson   {'points': 6204118, 'nn_median_m': 0.318, 'nn_p05_m': 0.297, 'nn_p95_m': 0.512, 'anisotropy': 1.72}
+voxel     {'points': 6880204, 'nn_median_m': 0.301, 'nn_p05_m': 0.204, 'nn_p95_m': 0.424, 'anisotropy': 2.08}
+decimate  {'points': 3680424, 'nn_median_m': 0.208, 'nn_p05_m': 0.031, 'nn_p95_m': 0.884, 'anisotropy': 28.52}
+{'cells': 996012, 'rmse_m': 0.0091, 'p95_abs_m': 0.0162, 'max_abs_m': 0.184}
+</code></pre></div>
+<p>The decimation row is the argument for not using it: it kept fewer points and its nearest-neighbour distances span 3 cm to 88 cm, an anisotropy of 28. The Poisson result has an anisotropy of 1.7 and a 5th percentile exactly at its radius, which is the definition of the method working.</p>
+<p>Verify that the thinning preserved classes and metadata, which a thinning step frequently loses:</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">compare_headers</span><span class="token punctuation">(</span>a_path<span class="token punctuation">,</span> b_path<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    a<span class="token punctuation">,</span> b <span class="token operator">=</span> laspy<span class="token punctuation">.</span>read<span class="token punctuation">(</span>a_path<span class="token punctuation">)</span><span class="token punctuation">,</span> laspy<span class="token punctuation">.</span>read<span class="token punctuation">(</span>b_path<span class="token punctuation">)</span>
+    ca <span class="token operator">=</span> <span class="token builtin">dict</span><span class="token punctuation">(</span><span class="token builtin">zip</span><span class="token punctuation">(</span><span class="token operator">*</span>np<span class="token punctuation">.</span>unique<span class="token punctuation">(</span>a<span class="token punctuation">.</span>classification<span class="token punctuation">,</span> return_counts<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    cb <span class="token operator">=</span> <span class="token builtin">dict</span><span class="token punctuation">(</span><span class="token builtin">zip</span><span class="token punctuation">(</span><span class="token operator">*</span>np<span class="token punctuation">.</span>unique<span class="token punctuation">(</span>b<span class="token punctuation">.</span>classification<span class="token punctuation">,</span> return_counts<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token string">"crs_preserved"</span><span class="token punctuation">:</span> a<span class="token punctuation">.</span>header<span class="token punctuation">.</span>parse_crs<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">==</span> b<span class="token punctuation">.</span>header<span class="token punctuation">.</span>parse_crs<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"classes_before"</span><span class="token punctuation">:</span> <span class="token punctuation">{</span><span class="token builtin">int</span><span class="token punctuation">(</span>k<span class="token punctuation">)</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span>v<span class="token punctuation">)</span> <span class="token keyword">for</span> k<span class="token punctuation">,</span> v <span class="token keyword">in</span> ca<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+        <span class="token string">"classes_after"</span><span class="token punctuation">:</span> <span class="token punctuation">{</span><span class="token builtin">int</span><span class="token punctuation">(</span>k<span class="token punctuation">)</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span>v<span class="token punctuation">)</span> <span class="token keyword">for</span> k<span class="token punctuation">,</span> v <span class="token keyword">in</span> cb<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+        <span class="token string">"classes_lost"</span><span class="token punctuation">:</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span><span class="token builtin">set</span><span class="token punctuation">(</span>ca<span class="token punctuation">)</span> <span class="token operator">-</span> <span class="token builtin">set</span><span class="token punctuation">(</span>cb<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"extra_dims_preserved"</span><span class="token punctuation">:</span> <span class="token punctuation">(</span><span class="token punctuation">[</span>d<span class="token punctuation">.</span>name <span class="token keyword">for</span> d <span class="token keyword">in</span> a<span class="token punctuation">.</span>header<span class="token punctuation">.</span>extra_dimensions<span class="token punctuation">]</span>
+                                 <span class="token operator">==</span> <span class="token punctuation">[</span>d<span class="token punctuation">.</span>name <span class="token keyword">for</span> d <span class="token keyword">in</span> b<span class="token punctuation">.</span>header<span class="token punctuation">.</span>extra_dimensions<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+
+<span class="token keyword">print</span><span class="token punctuation">(</span>compare_headers<span class="token punctuation">(</span>SRC<span class="token punctuation">,</span> <span class="token string">"build/tile_thinned.laz"</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+<span class="token keyword">assert</span> compare_headers<span class="token punctuation">(</span>SRC<span class="token punctuation">,</span> <span class="token string">"build/tile_thinned.laz"</span><span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token string">"crs_preserved"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token string">"CRS lost in thinning"</span>
+</code></pre></div>
+<p>A class present before and absent afterwards means a rare class — water, bridge decks, noise — was thinned out of existence by a radius appropriate for ground. Classes with few points should be passed through untouched rather than thinned.</p>
+<h2 id="performance-notes" tabindex="-1"><a class="heading-link" href="#performance-notes"><span>Performance Notes</span></a></h2>
+<ul>
+<li><strong>Poisson-disk sampling is the slow one</strong>: it is a neighbourhood query per point, roughly 15–20 million points per minute per core. Tile the work and run tiles in parallel.</li>
+<li><strong>Voxel selection is three to five times faster</strong> and is a reasonable default when the output feeds rasterisation rather than reconstruction, where the lattice regularity does not matter.</li>
+<li><strong>Thin early, once.</strong> Thinning before classification biases the classifier; thinning immediately after is the right point, and thinning again later compounds the sampling artefacts.</li>
+<li><strong>Keep the dense original.</strong> Thinning is lossy and the target sometimes changes; re-thinning from the archive costs minutes, recovering lost points costs a reflight.</li>
+<li><strong>Do not thin what you will not process.</strong> Dropping vegetation entirely, where a product does not need it, is cheaper and more honest than thinning it to 2 pts/m².</li>
+</ul>
+<h2 id="common-errors" tabindex="-1"><a class="heading-link" href="#common-errors"><span>Common Errors</span></a></h2>
+<p><strong>The achieved density is 30% below the target.</strong> The radius was set equal to the nominal spacing rather than derived from the packing factor. Use the 0.7 relation in step 1.</p>
+<p><strong>Facades come out far sparser than the ground.</strong> A 2D thinning was used, or a voxel cell that is large relative to the facade’s sampling. <code>filters.sample</code> in 3D treats all surfaces alike.</p>
+<p><strong>A rare class disappears.</strong> It was thinned with the same radius as everything else. Exclude classes with fewer than a few thousand points from thinning.</p>
+<p><strong>The terrain model changes by centimetres.</strong> The ground class was thinned below the interpolation’s needs, or the thinning removed the breakline-defining points. Raise the ground target, and keep points flagged as key points or model key points unconditionally.</p>
+<p><strong>Output loses the CRS or the extra dimensions.</strong> <code>writers.las</code> without <code>forward: &quot;all&quot;</code> writes a header from defaults. Forward everything, and assert the CRS afterwards.</p>
+<h2 id="frequently-asked-questions" tabindex="-1"><a class="heading-link" href="#frequently-asked-questions"><span>Frequently Asked Questions</span></a></h2>
+<h3 id="should-thinning-happen-before-or-after-classification" tabindex="-1"><a class="heading-link" href="#should-thinning-happen-before-or-after-classification"><span>Should thinning happen before or after classification?</span></a></h3>
+<p>After. Classifiers use local density and neighbourhood geometry, and a thinned cloud gives them less to work with — ground filters in particular degrade noticeably. Classify at full density, then thin per class.</p>
+<h3 id="is-thinning-the-same-as-level-of-detail-generation" tabindex="-1"><a class="heading-link" href="#is-thinning-the-same-as-level-of-detail-generation"><span>Is thinning the same as level-of-detail generation?</span></a></h3>
+<p>No. Thinning produces one cloud at one density; a level-of-detail structure keeps all the points and organises them so a viewer can request progressively more, which is what <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/converting-point-clouds-to-3d-tiles-with-py3dtiles/">converting point clouds to 3D Tiles with py3dtiles</a> builds. A twin usually wants both: a thinned cloud for processing and an octree for viewing.</p>
+<h3 id="how-do-i-thin-a-photogrammetric-cloud" tabindex="-1"><a class="heading-link" href="#how-do-i-thin-a-photogrammetric-cloud"><span>How do I thin a photogrammetric cloud?</span></a></h3>
+<p>The same way, with two caveats: its noise is higher, so thinning removes some of it and a filtering pass first is better; and it has no classification, so per-class targets are unavailable until a classifier has run.</p>
+<h2 id="related-guides" tabindex="-1"><a class="heading-link" href="#related-guides"><span>Related Guides</span></a></h2>
+<ul>
+<li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/mapping-density-coverage-gaps-with-pdal/">Mapping Density Coverage Gaps with PDAL</a> — measuring before thinning</li>
+<li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/voxel-downsampling-strategies-compared/">Voxel Downsampling Strategies Compared</a> — the Open3D side of the same choice</li>
+<li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/validating-density-against-usgs-quality-levels/">Validating Density Against USGS Quality Levels</a> — what target to thin to</li>
+</ul>
+<p>Back to <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a>.</p>
+
+
+      
+      
+
+      <div class="related-nav">
+        
+
+        
+          <div>
+            <h3>Related</h3>
+            <div class="related-grid">
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/computing-point-density-from-laz-with-pdal/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Computing Point Density from LAZ with PDAL</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/estimating-point-spacing-for-mobile-mapping-scans/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Estimating Point Spacing for Mobile Mapping Scans</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/best-practices-for-lidar-point-density-in-infrastructure/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">LiDAR Point Density Best Practices</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/mapping-density-coverage-gaps-with-pdal/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Mapping Density Coverage Gaps with PDAL</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/validating-density-against-usgs-quality-levels/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Validating Density Against USGS Quality Levels</span>
+                </a>
+              
+            </div>
+          </div>
+        
+      </div>
+    </article>
+
+    
+    <aside class="toc" aria-label="On this page" data-toc hidden>
+      <h4>On this page</h4>
+      <ul></ul>
+    </aside>
+  </div>
+</div>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+  <div class="container site-footer__inner">
+    <div class="site-footer__brand">
+      <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+        <img src="/assets/img/logo-mark.svg" alt="" class="brand__mark" width="36" height="36">
+        <span class="brand__name">
+          3D Geospatial
+          <small>Digital Twin Automation</small>
+        </span>
+      </a>
+      <p>Engineering-grade guides on point cloud processing, mesh pipelines, LOD strategies, and CI/CD automation for digital twin platforms.</p>
+      <a class="footer-social" href="https://github.com/3d-geospatial" aria-label="3D Geospatial on GitHub" rel="noopener" target="_blank">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+          <path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.53-1.34-1.3-1.7-1.3-1.7-1.06-.72.08-.71.08-.71 1.17.08 1.79 1.2 1.79 1.2 1.04 1.79 2.73 1.27 3.4.97.1-.75.4-1.27.73-1.56-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.19-3.08-.12-.3-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.75.11 3.05.74.8 1.19 1.83 1.19 3.08 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.07.78 2.15v3.18c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5Z"/>
+        </svg>
+        <span>GitHub</span>
+      </a>
+    </div>
+
+    <div class="site-footer__col">
+      <h4>Sections</h4>
+      <ul>
+        <li><a href="https://www.3d-geospatial.com/">Home</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management &amp; Optimization</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/">Point Cloud &amp; Mesh Pipelines</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/">Troubleshooting &amp; Reliability</a></li>
+        
+      </ul>
+    </div>
+
+    
+      <div class="site-footer__col">
+        <h4>3D Geospatial Fundamentals</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/">3D Format Standards Comparison</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/">BIM and IFC Georeferencing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/">CityGML and CityJSON Processing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems for 3D Assets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/">Digital Elevation Model Workflows</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/">Spatial Indexing and Tiling Schemes for 3D Data</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>LOD Management &amp; Optimization</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/">Automated Tile Generation for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/">Cesium ion Upload Automation for 3D Tilesets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/">glTF LOD Generation With Draco Compression</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/">Streaming Sync Patterns for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/">Tileset Metadata and 3D Tiles Next</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/">Vector Overlays on 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Point Cloud &amp; Mesh Pipelines</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/">Automated Mesh Decimation for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/">Change Detection Between LiDAR Scan Epochs</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/">CI/CD Automation for Spatial Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">LiDAR Classification and Ground Extraction</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/photogrammetry-processing-pipelines/">Photogrammetry Processing Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/">Point Cloud Filtering Techniques</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/">Surface Reconstruction for Geospatial Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/">Texture Mapping Workflows for Digital Twins</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Troubleshooting &amp; Reliability</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/">Cross-Section Failure Modes in Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/">Data Validation &amp; QA Gates for 3D Tiles</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/">Performance Profiling and Benchmarking</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/">Pipeline Observability and Monitoring</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/">Streaming &amp; Runtime Diagnostics for 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+  </div>
+  <div class="container site-footer__bottom">
+    <span>© 2026 3D Geospatial &amp; Digital Twin Automation</span>
+    <span>Built with Eleventy · PWA-enabled</span>
+  </div>
+</footer>
+
+
+  <script src="/assets/js/site.js?v=b99aa9f971" defer></script>
+  
+</body>
+</html>

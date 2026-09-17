@@ -336,5 +336,7 @@ The tiles do not share identical elevations along their common edge, usually bec
 - [Point Cloud Filtering Techniques](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/) — ground-classify raw returns before rasterizing
 - [3D Format Standards Comparison](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/) — exporting terrain as COG, glTF, or 3D Tiles for delivery
 - [Automated Tile Generation for 3D Geospatial](https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/) — streaming the finished terrain at multiple resolutions
+- [Hydro-Flattening Water Bodies in DEMs](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/hydro-flattening-water-bodies-in-dems/) — flatten lakes and enforce monotonic river surfaces in a DEM
+- [Interpolating DTMs from Ground Points with PDAL](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/interpolating-dtms-from-ground-points-with-pdal/) — build a terrain raster from classified ground returns
 
 Back to [3D Geospatial Fundamentals for Digital Twins](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/).

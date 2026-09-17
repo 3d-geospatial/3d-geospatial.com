@@ -377,5 +377,9 @@ Not meaningfully if you quantize sensibly. `geometricError` is dominated by deci
 - [Tuning Draco Quantization for Building Meshes](https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/tuning-draco-quantization-for-building-meshes/) — choosing position/texcoord/normal bits from mesh extent
 - [Automated Mesh Decimation for Digital Twins](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/) — the QEM theory behind the LOD chain in step 2
 - [glTF vs 3D Tiles vs OBJ for Spatial Data](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/gltf-vs-3dtiles-vs-obj-for-spatial-data/) — why glTF is the payload Draco compresses inside b3dm
+- [Generating LOD Chains with meshoptimizer](https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/generating-lod-chains-with-meshoptimizer/) — build glTF level-of-detail chains with meshoptimizer
+- [gltfpack Settings for 3D Tiles Content](https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/gltfpack-settings-for-3d-tiles-content/) — which gltfpack flags to use for tile content and which to avoid
+- [Inspecting glTF with gltf-transform](https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/inspecting-gltf-with-gltf-transform/) — read what is actually inside a GLB with gltf-transform
+- [Merging Meshes to Cut Draw Calls](https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/merging-meshes-to-cut-draw-calls/) — cut a tile from 400 draw calls to 4 by merging primitives per material
 
 Back to [LOD Management & Optimization Strategies](https://www.3d-geospatial.com/lod-management-optimization-strategies/).

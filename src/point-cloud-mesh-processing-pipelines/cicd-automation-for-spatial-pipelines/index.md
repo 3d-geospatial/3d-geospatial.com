@@ -348,5 +348,7 @@ Finally, keep the pipeline definition and the workflow file separate. The PDAL a
 - [Automated Tile Generation for 3D Geospatial](https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/) — the tiling step this pipeline wraps in CI
 - [3D Tiles Batch Tiling Pipelines](https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/) — parallel encoding inside each matrix leg
 - [Cesium ion Upload Automation](https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/) — the managed-hosting alternative to a self-hosted CDN
+- [Running PDAL Pipelines in Docker](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/running-pdal-pipelines-in-docker/) — containerise a PDAL pipeline reproducibly
+- [Testing Spatial Pipelines with pytest Fixtures](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/testing-spatial-pipelines-with-pytest-fixtures/) — test geospatial code without giant files
 
 Back to [Point Cloud & Mesh Processing Pipelines](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/).

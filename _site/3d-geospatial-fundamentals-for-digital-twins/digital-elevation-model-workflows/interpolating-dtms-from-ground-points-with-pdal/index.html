@@ -1,0 +1,780 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <title>Interpolating DTMs from Ground Points with PDAL — 3D Geospatial</title>
+  <meta name="description" content="Build a terrain raster from classified ground returns: choose IDW or TIN, match cell size to density, handle voids and edges">
+  <meta name="keywords" content="3D geospatial, digital twin, point cloud, mesh pipeline, LOD, 3D Tiles, Cesium, PDAL, Open3D, Python, CI/CD">
+  <meta name="author" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta name="theme-color" content="#1f6b8a" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f171d" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+
+  
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem("theme");
+        var theme = (stored === "dark" || stored === "light") ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    })();
+  </script>
+  <meta name="generator" content="Eleventy">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="googlebot" content="index,follow,max-image-preview:large">
+
+  
+  <link rel="canonical" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/interpolating-dtms-from-ground-points-with-pdal/">
+  <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">
+
+  
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/icon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+
+  
+  <link rel="apple-touch-icon" href="/assets/img/icon-180.png">
+  <link rel="mask-icon" href="/assets/img/logo.svg" color="#1f6b8a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="3D Geospatial">
+  <meta name="application-name" content="3D Geospatial">
+
+  
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Interpolating DTMs from Ground Points with PDAL — 3D Geospatial">
+  <meta property="og:description" content="Build a terrain raster from classified ground returns: choose IDW or TIN, match cell size to density, handle voids and edges">
+  <meta property="og:url" content="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/interpolating-dtms-from-ground-points-with-pdal/">
+  <meta property="og:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+  <meta property="og:site_name" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta property="og:locale" content="en_US">
+  
+  <meta property="article:published_time" content="2026-09-17T23:36:56.449Z">
+  <meta property="article:modified_time" content="2026-09-17T23:36:56.449Z">
+  <meta property="article:publisher" content="https://www.3d-geospatial.com/">
+  
+
+  
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Interpolating DTMs from Ground Points with PDAL — 3D Geospatial">
+  <meta name="twitter:description" content="Build a terrain raster from classified ground returns: choose IDW or TIN, match cell size to density, handle voids and edges">
+  <meta name="twitter:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta name="twitter:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+
+  
+  <link rel="preload" href="/assets/css/styles.css?v=8c46394d6c" as="style">
+  
+
+  <link rel="stylesheet" href="/assets/css/styles.css?v=8c46394d6c">
+
+  
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.3d-geospatial.com/#organization",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "url": "https://www.3d-geospatial.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/icon-512.png",
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://www.3d-geospatial.com/#website",
+      "url": "https://www.3d-geospatial.com/",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "description": "Build reliable 3D spatial data pipelines for digital twins — point clouds, meshes, LOD strategies, Python processing, and CI/CD automation.",
+      "inLanguage": "en",
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      }
+    },
+    {
+      "@type": "TechArticle",
+      "@id": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/interpolating-dtms-from-ground-points-with-pdal/#article",
+      "isPartOf": {
+        "@id": "https://www.3d-geospatial.com/#website"
+      },
+      "headline": "Interpolating DTMs from Ground Points with PDAL",
+      "name": "Interpolating DTMs from Ground Points with PDAL",
+      "description": "Build a terrain raster from classified ground returns: choose IDW or TIN, match cell size to density, handle voids and edges",
+      "url": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/interpolating-dtms-from-ground-points-with-pdal/",
+      "mainEntityOfPage": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/interpolating-dtms-from-ground-points-with-pdal/",
+      "inLanguage": "en",
+      "datePublished": "2026-09-17T23:36:56.449Z",
+      "dateModified": "2026-09-17T23:36:56.449Z",
+      "author": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "image": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/og-cover.png",
+        "width": 1200,
+        "height": 630
+      },
+      "breadcrumb": {
+        "@id": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/interpolating-dtms-from-ground-points-with-pdal/#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/interpolating-dtms-from-ground-points-with-pdal/#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://www.3d-geospatial.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "3D Geospatial Fundamentals For Digital Twins",
+          "item": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Digital Elevation Model Workflows",
+          "item": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "name": "Interpolating Dtms From Ground Points With Pdal",
+          "item": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/interpolating-dtms-from-ground-points-with-pdal/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  
+<header class="site-header" role="banner">
+  <div class="container site-header__inner">
+    <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+      <img src="/assets/img/logo.svg" alt="" class="brand__mark" width="36" height="36">
+      <span class="brand__name">
+        3D Geospatial
+        <small>Digital Twin Automation</small>
+      </span>
+    </a>
+
+    <button class="theme-toggle" type="button" data-theme-toggle
+            aria-label="Switch to dark theme" title="Switch to dark theme">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4.2"/>
+        <path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/>
+      </svg>
+    </button>
+
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>
+      <span class="nav-toggle__icon" aria-hidden="true"><span></span></span>
+      Menu
+    </button>
+
+    <nav class="primary-nav" id="primary-nav" aria-label="Primary">
+      
+      <a href="https://www.3d-geospatial.com/" >
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/>
+        </svg>
+        Home
+      </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/" aria-current="page">
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2 3 7l9 5 9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 17l9 5 9-5"/>
+            </svg>
+          
+          3D Geospatial Fundamentals
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+          
+          LOD Management &amp; Optimization
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="6" cy="6" r="1.5"/><circle cx="12" cy="6" r="1.5"/><circle cx="18" cy="6" r="1.5"/>
+              <circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/>
+              <circle cx="6" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="18" cy="18" r="1.5"/>
+            </svg>
+          
+          Point Cloud &amp; Mesh Pipelines
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <path d="M12 9v4"/><path d="M12 17h.01"/>
+            </svg>
+          
+          Troubleshooting &amp; Reliability
+        </a>
+      
+    </nav>
+  </div>
+</header>
+
+
+  <main id="main">
+    
+
+
+<div class="container">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    
+      
+        <a href="https://www.3d-geospatial.com/">Home</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals For Digital Twins</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/">Digital Elevation Model Workflows</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <span class="current">Interpolating Dtms From Ground Points With Pdal</span>
+      
+    
+  </nav>
+
+  <div class="content-page">
+    <article class="article">
+      <h1 id="interpolating-dtms-from-ground-points-with-pdal" tabindex="-1"><a class="heading-link" href="#interpolating-dtms-from-ground-points-with-pdal"><span>Interpolating DTMs from Ground Points with PDAL</span></a></h1>
+<p>This page interpolates a digital terrain model from classified ground returns with PDAL — choosing between inverse-distance weighting and a Delaunay triangulation, matching the cell size to the point density instead of to a round number, handling voids under buildings and at tile edges, and verifying the surface against checkpoints and its own slope distribution, in EPSG:26910+5703.</p>
+<h2 id="why-you-hit-this" tabindex="-1"><a class="heading-link" href="#why-you-hit-this"><span>Why you hit this</span></a></h2>
+<p>The interpolation step looks trivial — one PDAL stage — and it decides more about the twin’s terrain than any other single choice. Too fine a cell relative to the point density and the raster is a field of interpolation artefacts; too coarse and real breaks disappear. IDW produces characteristic bullseyes around isolated points; a triangulation produces flat triangles across voids that look like real planes. Both are defensible and they are not interchangeable, and a specification that says “1 m DTM” says nothing about either. The wider workflow is in <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/">digital elevation model workflows</a>.</p>
+<h2 id="prerequisites" tabindex="-1"><a class="heading-link" href="#prerequisites"><span>Prerequisites</span></a></h2>
+<ul>
+<li>PDAL 2.6+ with Python bindings (<code>pdal&gt;=3.4</code>), <code>rasterio&gt;=1.3</code>, <code>numpy&gt;=1.24</code>, <code>scipy&gt;=1.11</code>.</li>
+<li>A classified cloud with ground as class 2, noise already removed, in EPSG:26910 with NAVD88 heights.</li>
+<li>The cloud’s ground-point density per cell, measured as in <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/mapping-density-coverage-gaps-with-pdal/">mapping density coverage gaps with PDAL</a>.</li>
+<li>Surveyed checkpoints for the verification step.</li>
+</ul>
+<h2 id="step-by-step" tabindex="-1"><a class="heading-link" href="#step-by-step"><span>Step-by-Step</span></a></h2>
+<h3 id="1-choose-the-cell-size-from-the-ground-density" tabindex="-1"><a class="heading-link" href="#1-choose-the-cell-size-from-the-ground-density"><span>1. Choose the cell size from the ground density</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> math
+
+<span class="token keyword">def</span> <span class="token function">cell_size_for</span><span class="token punctuation">(</span>ground_density_per_m2<span class="token punctuation">,</span> points_per_cell<span class="token operator">=</span><span class="token number">4.0</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Cell size that puts about `points_per_cell` ground points in each cell."""</span>
+    spacing <span class="token operator">=</span> <span class="token number">1.0</span> <span class="token operator">/</span> math<span class="token punctuation">.</span>sqrt<span class="token punctuation">(</span>ground_density_per_m2<span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token builtin">round</span><span class="token punctuation">(</span>spacing <span class="token operator">*</span> math<span class="token punctuation">.</span>sqrt<span class="token punctuation">(</span>points_per_cell<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token builtin">round</span><span class="token punctuation">(</span>spacing<span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span>
+
+<span class="token keyword">for</span> d <span class="token keyword">in</span> <span class="token punctuation">(</span><span class="token number">0.5</span><span class="token punctuation">,</span> <span class="token number">2.0</span><span class="token punctuation">,</span> <span class="token number">4.0</span><span class="token punctuation">,</span> <span class="token number">8.0</span><span class="token punctuation">,</span> <span class="token number">16.0</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    cell<span class="token punctuation">,</span> spacing <span class="token operator">=</span> cell_size_for<span class="token punctuation">(</span>d<span class="token punctuation">)</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"ground </span><span class="token interpolation"><span class="token punctuation">{</span>d<span class="token punctuation">:</span><span class="token format-spec">>5</span><span class="token punctuation">}</span></span><span class="token string"> pts/m² → spacing </span><span class="token interpolation"><span class="token punctuation">{</span>spacing<span class="token punctuation">:</span><span class="token format-spec">.3f</span><span class="token punctuation">}</span></span><span class="token string"> m → cell </span><span class="token interpolation"><span class="token punctuation">{</span>cell<span class="token punctuation">:</span><span class="token format-spec">.2f</span><span class="token punctuation">}</span></span><span class="token string"> m"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>The rule behind that table is that a cell needs several points to have an interpolated value rather than a guess. Four is a good target: at 4 pts/m² of <em>ground</em> — which a QL2 delivery gives over open terrain and much less under canopy — a 1 m cell holds about four points and a 0.5 m cell about one. Publishing a 0.5 m DTM from that data produces a raster whose every other cell is extrapolated, and whose apparent detail is interpolation noise.</p>
+<p>Ground density is the number that matters, not total density. A cloud with 14 pts/m² can have 1.5 pts/m² of ground under forest, and the cell size has to serve the worst area the product covers or be stated per land cover.</p>
+<h3 id="2-interpolate-with-idw" tabindex="-1"><a class="heading-link" href="#2-interpolate-with-idw"><span>2. Interpolate with IDW</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> json
+
+<span class="token keyword">import</span> pdal
+
+SRC <span class="token operator">=</span> <span class="token string">"deliveries/2026-09/tile_10TFK.laz"</span>
+BOUNDS <span class="token operator">=</span> <span class="token string">"([560000, 561000], [5240000, 5241000])"</span>
+CELL <span class="token operator">=</span> <span class="token number">1.0</span>
+
+<span class="token keyword">def</span> <span class="token function">idw_dtm</span><span class="token punctuation">(</span>src<span class="token punctuation">,</span> out<span class="token punctuation">,</span> cell<span class="token operator">=</span>CELL<span class="token punctuation">,</span> bounds<span class="token operator">=</span>BOUNDS<span class="token punctuation">,</span> radius<span class="token operator">=</span><span class="token boolean">None</span><span class="token punctuation">,</span> power<span class="token operator">=</span><span class="token number">2.0</span><span class="token punctuation">,</span> window<span class="token operator">=</span><span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    radius <span class="token operator">=</span> radius <span class="token keyword">if</span> radius <span class="token keyword">is</span> <span class="token keyword">not</span> <span class="token boolean">None</span> <span class="token keyword">else</span> cell <span class="token operator">*</span> <span class="token number">1.5</span>
+    stages <span class="token operator">=</span> <span class="token punctuation">[</span>
+        src<span class="token punctuation">,</span>
+        <span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"filters.range"</span><span class="token punctuation">,</span> <span class="token string">"limits"</span><span class="token punctuation">:</span> <span class="token string">"Classification[2:2]"</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+        <span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"writers.gdal"</span><span class="token punctuation">,</span> <span class="token string">"filename"</span><span class="token punctuation">:</span> out<span class="token punctuation">,</span> <span class="token string">"resolution"</span><span class="token punctuation">:</span> cell<span class="token punctuation">,</span> <span class="token string">"bounds"</span><span class="token punctuation">:</span> bounds<span class="token punctuation">,</span>
+         <span class="token string">"output_type"</span><span class="token punctuation">:</span> <span class="token string">"idw"</span><span class="token punctuation">,</span> <span class="token string">"radius"</span><span class="token punctuation">:</span> radius<span class="token punctuation">,</span> <span class="token string">"power"</span><span class="token punctuation">:</span> power<span class="token punctuation">,</span> <span class="token string">"window_size"</span><span class="token punctuation">:</span> window<span class="token punctuation">,</span>
+         <span class="token string">"data_type"</span><span class="token punctuation">:</span> <span class="token string">"float32"</span><span class="token punctuation">,</span> <span class="token string">"nodata"</span><span class="token punctuation">:</span> <span class="token operator">-</span><span class="token number">9999.0</span><span class="token punctuation">,</span> <span class="token string">"gdaldriver"</span><span class="token punctuation">:</span> <span class="token string">"GTiff"</span><span class="token punctuation">,</span>
+         <span class="token string">"override_srs"</span><span class="token punctuation">:</span> <span class="token string">"EPSG:26910"</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+    <span class="token punctuation">]</span>
+    n <span class="token operator">=</span> pdal<span class="token punctuation">.</span>Pipeline<span class="token punctuation">(</span>json<span class="token punctuation">.</span>dumps<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"pipeline"</span><span class="token punctuation">:</span> stages<span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">.</span>execute<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> n
+
+n <span class="token operator">=</span> idw_dtm<span class="token punctuation">(</span>SRC<span class="token punctuation">,</span> <span class="token string">"build/dtm_idw_1m.tif"</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>n<span class="token punctuation">:</span><span class="token format-spec">,</span><span class="token punctuation">}</span></span><span class="token string"> ground points interpolated"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Three parameters control the result. <code>radius</code> is how far a cell looks for points; at 1.5 cells it finds neighbours without smearing across a break. <code>power</code> sets how quickly influence falls with distance — 2 is the standard, and higher values approach nearest-neighbour behaviour with visible cell edges. <code>window_size</code> fills cells that found nothing by growing a window, which is convenient and produces the flat patches discussed below; leaving it at 0 keeps voids as nodata, which is more honest.</p>
+<h3 id="3-interpolate-with-a-triangulation" tabindex="-1"><a class="heading-link" href="#3-interpolate-with-a-triangulation"><span>3. Interpolate with a triangulation</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">tin_dtm</span><span class="token punctuation">(</span>src<span class="token punctuation">,</span> out<span class="token punctuation">,</span> cell<span class="token operator">=</span>CELL<span class="token punctuation">,</span> bounds<span class="token operator">=</span>BOUNDS<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    stages <span class="token operator">=</span> <span class="token punctuation">[</span>
+        src<span class="token punctuation">,</span>
+        <span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"filters.range"</span><span class="token punctuation">,</span> <span class="token string">"limits"</span><span class="token punctuation">:</span> <span class="token string">"Classification[2:2]"</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+        <span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"filters.delaunay"</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+        <span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"filters.faceraster"</span><span class="token punctuation">,</span> <span class="token string">"resolution"</span><span class="token punctuation">:</span> cell<span class="token punctuation">,</span>
+         <span class="token string">"origin_x"</span><span class="token punctuation">:</span> <span class="token number">560000</span><span class="token punctuation">,</span> <span class="token string">"origin_y"</span><span class="token punctuation">:</span> <span class="token number">5240000</span><span class="token punctuation">,</span> <span class="token string">"width"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span><span class="token number">1000</span> <span class="token operator">/</span> cell<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"height"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span><span class="token number">1000</span> <span class="token operator">/</span> cell<span class="token punctuation">)</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+        <span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"writers.raster"</span><span class="token punctuation">,</span> <span class="token string">"filename"</span><span class="token punctuation">:</span> out<span class="token punctuation">,</span> <span class="token string">"data_type"</span><span class="token punctuation">:</span> <span class="token string">"float32"</span><span class="token punctuation">,</span> <span class="token string">"nodata"</span><span class="token punctuation">:</span> <span class="token operator">-</span><span class="token number">9999.0</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+    <span class="token punctuation">]</span>
+    <span class="token keyword">return</span> pdal<span class="token punctuation">.</span>Pipeline<span class="token punctuation">(</span>json<span class="token punctuation">.</span>dumps<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"pipeline"</span><span class="token punctuation">:</span> stages<span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">.</span>execute<span class="token punctuation">(</span><span class="token punctuation">)</span>
+
+n_tin <span class="token operator">=</span> tin_dtm<span class="token punctuation">(</span>SRC<span class="token punctuation">,</span> <span class="token string">"build/dtm_tin_1m.tif"</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>n_tin<span class="token punctuation">:</span><span class="token format-spec">,</span><span class="token punctuation">}</span></span><span class="token string"> points triangulated and rasterised"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>A triangulation interpolates linearly inside each triangle, which has two consequences worth knowing. Within the data it is faithful: a plane through three ground points is a better estimate than a distance-weighted average, and ridges stay sharp. Across a void it produces one large flat triangle, so a building footprint with no ground returns becomes a tilted plane that looks entirely plausible and is invented.</p>
+<figure class="diagram">
+<svg viewBox="42 46 719 190" role="img" aria-labelledby="dtm-methods-t dtm-methods-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="dtm-methods-t">IDW and triangulation on the same ground points</title>
+  <desc id="dtm-methods-d">A profile with sparse ground points and a gap where a building stood. Inverse-distance weighting produces a smooth curve that sags in the gap and shows small bullseye bumps at isolated points. The triangulation produces straight segments between points, which is faithful within the data and spans the gap as one flat plane.</desc>
+  <rect class="svg-bg" x="42" y="46" width="719" height="190" fill="#ffffff"/>
+  <g fill="#1f2937">
+    <circle cx="60" cy="150" r="4"/><circle cx="110" cy="140" r="4"/><circle cx="160" cy="146" r="4"/>
+    <circle cx="210" cy="126" r="4"/><circle cx="330" cy="120" r="4"/><circle cx="380" cy="112" r="4"/>
+    <circle cx="430" cy="118" r="4"/><circle cx="480" cy="104" r="4"/>
+  </g>
+  <path d="M60 150 C90 138 100 136 110 140 C130 148 145 150 160 146 C185 138 195 130 210 126 C250 122 290 140 330 120 C355 108 368 108 380 112 C405 120 418 122 430 118 C455 110 468 104 480 104"
+        fill="none" stroke="#1f6b8a" stroke-width="2.5"/>
+  <path d="M60 150 L110 140 L160 146 L210 126 L330 120 L380 112 L430 118 L480 104"
+        fill="none" stroke="#4f7a4d" stroke-width="2.5" stroke-dasharray="7 4"/>
+  <rect x="215" y="60" width="110" height="66" fill="#f7dfdc" stroke="#b0413e" stroke-width="1.5"/>
+  <text x="270" y="96" fill="#1f2937" font-size="12" text-anchor="middle">building</text>
+  <text x="270" y="152" fill="#b0413e" font-size="12" text-anchor="middle">no ground returns</text>
+  <text x="560" y="120" fill="#1f6b8a" font-size="12.5" text-anchor="start">IDW: smooth, sags in the void</text>
+  <text x="560" y="144" fill="#4f7a4d" font-size="12.5" text-anchor="start">TIN: faithful, one plane across it</text>
+  <text x="380" y="218" fill="#15384a" font-size="12.5" text-anchor="middle">Both invent a surface under the building; they differ in how the invention looks.</text>
+</svg>
+<figcaption>Inside the data, the triangulation is the more faithful interpolator. Across a void, neither is right and both are confident.</figcaption>
+</figure>
+<h3 id="4-handle-voids-honestly" tabindex="-1"><a class="heading-link" href="#4-handle-voids-honestly"><span>4. Handle voids honestly</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> numpy <span class="token keyword">as</span> np
+<span class="token keyword">import</span> rasterio
+<span class="token keyword">from</span> rasterio<span class="token punctuation">.</span>features <span class="token keyword">import</span> rasterize
+<span class="token keyword">import</span> geopandas <span class="token keyword">as</span> gpd
+
+<span class="token keyword">def</span> <span class="token function">mark_voids</span><span class="token punctuation">(</span>dtm_path<span class="token punctuation">,</span> out_path<span class="token punctuation">,</span> footprints_path<span class="token operator">=</span><span class="token boolean">None</span><span class="token punctuation">,</span> max_fill_cells<span class="token operator">=</span><span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">with</span> rasterio<span class="token punctuation">.</span><span class="token builtin">open</span><span class="token punctuation">(</span>dtm_path<span class="token punctuation">)</span> <span class="token keyword">as</span> src<span class="token punctuation">:</span>
+        dem <span class="token operator">=</span> src<span class="token punctuation">.</span>read<span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">,</span> masked<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+        profile<span class="token punctuation">,</span> transform<span class="token punctuation">,</span> shape <span class="token operator">=</span> src<span class="token punctuation">.</span>profile<span class="token punctuation">.</span>copy<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> src<span class="token punctuation">.</span>transform<span class="token punctuation">,</span> src<span class="token punctuation">.</span>shape
+
+    void <span class="token operator">=</span> np<span class="token punctuation">.</span>ma<span class="token punctuation">.</span>getmaskarray<span class="token punctuation">(</span>dem<span class="token punctuation">)</span>
+    under_building <span class="token operator">=</span> np<span class="token punctuation">.</span>zeros<span class="token punctuation">(</span>shape<span class="token punctuation">,</span> dtype<span class="token operator">=</span><span class="token builtin">bool</span><span class="token punctuation">)</span>
+    <span class="token keyword">if</span> footprints_path<span class="token punctuation">:</span>
+        gdf <span class="token operator">=</span> gpd<span class="token punctuation">.</span>read_file<span class="token punctuation">(</span>footprints_path<span class="token punctuation">)</span><span class="token punctuation">.</span>to_crs<span class="token punctuation">(</span>profile<span class="token punctuation">[</span><span class="token string">"crs"</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+        under_building <span class="token operator">=</span> rasterize<span class="token punctuation">(</span><span class="token punctuation">[</span>g <span class="token keyword">for</span> g <span class="token keyword">in</span> gdf<span class="token punctuation">.</span>geometry<span class="token punctuation">]</span><span class="token punctuation">,</span> out_shape<span class="token operator">=</span>shape<span class="token punctuation">,</span>
+                                   transform<span class="token operator">=</span>transform<span class="token punctuation">,</span> fill<span class="token operator">=</span><span class="token number">0</span><span class="token punctuation">,</span> default_value<span class="token operator">=</span><span class="token number">1</span><span class="token punctuation">,</span>
+                                   dtype<span class="token operator">=</span><span class="token string">"uint8"</span><span class="token punctuation">)</span><span class="token punctuation">.</span>astype<span class="token punctuation">(</span><span class="token builtin">bool</span><span class="token punctuation">)</span>
+
+    <span class="token keyword">from</span> scipy <span class="token keyword">import</span> ndimage
+    labels<span class="token punctuation">,</span> n <span class="token operator">=</span> ndimage<span class="token punctuation">.</span>label<span class="token punctuation">(</span>void<span class="token punctuation">)</span>
+    sizes <span class="token operator">=</span> ndimage<span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span>void<span class="token punctuation">,</span> labels<span class="token punctuation">,</span> index<span class="token operator">=</span><span class="token builtin">range</span><span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">,</span> n <span class="token operator">+</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    small <span class="token operator">=</span> np<span class="token punctuation">.</span>isin<span class="token punctuation">(</span>labels<span class="token punctuation">,</span> <span class="token number">1</span> <span class="token operator">+</span> np<span class="token punctuation">.</span>flatnonzero<span class="token punctuation">(</span>sizes <span class="token operator">&lt;=</span> max_fill_cells<span class="token punctuation">)</span><span class="token punctuation">)</span>
+
+    filled <span class="token operator">=</span> np<span class="token punctuation">.</span>ma<span class="token punctuation">.</span>filled<span class="token punctuation">(</span>dem<span class="token punctuation">,</span> np<span class="token punctuation">.</span>nan<span class="token punctuation">)</span>
+    <span class="token keyword">if</span> small<span class="token punctuation">.</span><span class="token builtin">any</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>                                   <span class="token comment"># fill only speckle, by local mean</span>
+        mean <span class="token operator">=</span> ndimage<span class="token punctuation">.</span>generic_filter<span class="token punctuation">(</span>np<span class="token punctuation">.</span>nan_to_num<span class="token punctuation">(</span>filled<span class="token punctuation">,</span> nan<span class="token operator">=</span><span class="token number">0.0</span><span class="token punctuation">)</span><span class="token punctuation">,</span> np<span class="token punctuation">.</span>nanmean<span class="token punctuation">,</span> size<span class="token operator">=</span><span class="token number">5</span><span class="token punctuation">)</span>
+        filled<span class="token punctuation">[</span>small<span class="token punctuation">]</span> <span class="token operator">=</span> mean<span class="token punctuation">[</span>small<span class="token punctuation">]</span>
+
+    profile<span class="token punctuation">.</span>update<span class="token punctuation">(</span>dtype<span class="token operator">=</span><span class="token string">"float32"</span><span class="token punctuation">,</span> nodata<span class="token operator">=</span><span class="token operator">-</span><span class="token number">9999.0</span><span class="token punctuation">,</span> count<span class="token operator">=</span><span class="token number">2</span><span class="token punctuation">)</span>
+    <span class="token keyword">with</span> rasterio<span class="token punctuation">.</span><span class="token builtin">open</span><span class="token punctuation">(</span>out_path<span class="token punctuation">,</span> <span class="token string">"w"</span><span class="token punctuation">,</span> <span class="token operator">**</span>profile<span class="token punctuation">)</span> <span class="token keyword">as</span> dst<span class="token punctuation">:</span>
+        dst<span class="token punctuation">.</span>write<span class="token punctuation">(</span>np<span class="token punctuation">.</span>nan_to_num<span class="token punctuation">(</span>filled<span class="token punctuation">,</span> nan<span class="token operator">=</span><span class="token operator">-</span><span class="token number">9999.0</span><span class="token punctuation">)</span><span class="token punctuation">.</span>astype<span class="token punctuation">(</span><span class="token string">"float32"</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span>
+        dst<span class="token punctuation">.</span>write<span class="token punctuation">(</span><span class="token punctuation">(</span>void <span class="token operator">&amp;</span> <span class="token operator">~</span>small<span class="token punctuation">)</span><span class="token punctuation">.</span>astype<span class="token punctuation">(</span><span class="token string">"float32"</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span>      <span class="token comment"># a mask band: 1 = interpolated void</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"void_cells"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span>void<span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"speckle_filled"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span>small<span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"voids_under_buildings"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span><span class="token punctuation">(</span>void <span class="token operator">&amp;</span> under_building<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">}</span>
+
+<span class="token keyword">print</span><span class="token punctuation">(</span>mark_voids<span class="token punctuation">(</span><span class="token string">"build/dtm_tin_1m.tif"</span><span class="token punctuation">,</span> <span class="token string">"build/dtm_1m_masked.tif"</span><span class="token punctuation">,</span>
+                 footprints_path<span class="token operator">=</span><span class="token string">"reference/footprints.gpkg"</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Shipping a mask band alongside the elevation band is the honest answer to voids. Speckle — a cell or two where a wet patch absorbed the pulse — is filled from its neighbours and is genuinely interpolated terrain. A building footprint or a lake is not terrain at all, and a consumer needs to know which cells are measurement and which are invention. Both PDAL’s <code>window_size</code> and a triangulation will silently fill both kinds if allowed to.</p>
+<figure class="diagram">
+<svg viewBox="6 6 748 222" role="img" aria-labelledby="dtm-void-t dtm-void-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="dtm-void-t">Three kinds of empty cell and what to do with each</title>
+  <desc id="dtm-void-d">A table. Speckle of one to three cells from absorbed pulses is filled from neighbours and counts as interpolated terrain. A building footprint has no terrain at all and is left as nodata with a mask band. A water body is handled by hydro-flattening rather than interpolation. A tile edge is filled by interpolating with a buffer of neighbouring points.</desc>
+  <rect class="svg-bg" x="6" y="6" width="748" height="222" fill="#ffffff"/>
+  <g stroke-width="1.5">
+    <rect x="20" y="20" width="230" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="250" y="20" width="490" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="20" y="54" width="230" height="40" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="250" y="54" width="490" height="40" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="20" y="94" width="230" height="40" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="250" y="94" width="490" height="40" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="20" y="134" width="230" height="40" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="250" y="134" width="490" height="40" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="20" y="174" width="230" height="40" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="250" y="174" width="490" height="40" fill="#eef5e9" stroke="#4f7a4d"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="135" y="43">empty cells</text><text x="495" y="43">treatment</text>
+    <text x="135" y="79">speckle, 1–3 cells</text><text x="495" y="79">fill from neighbours; it is interpolated terrain</text>
+    <text x="135" y="119">building footprint</text><text x="495" y="119">leave nodata, record it in a mask band</text>
+    <text x="135" y="159">water body</text><text x="495" y="159">hydro-flatten, not interpolate</text>
+    <text x="135" y="199">tile edge</text><text x="495" y="199">interpolate with a buffer, then clip</text>
+  </g>
+</svg>
+<figcaption>Only the first and last are interpolation problems; the middle two are decisions about what the product claims to contain.</figcaption>
+</figure>
+<h3 id="5-compare-the-two-surfaces" tabindex="-1"><a class="heading-link" href="#5-compare-the-two-surfaces"><span>5. Compare the two surfaces</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">compare_surfaces</span><span class="token punctuation">(</span>a_path<span class="token punctuation">,</span> b_path<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">with</span> rasterio<span class="token punctuation">.</span><span class="token builtin">open</span><span class="token punctuation">(</span>a_path<span class="token punctuation">)</span> <span class="token keyword">as</span> a<span class="token punctuation">,</span> rasterio<span class="token punctuation">.</span><span class="token builtin">open</span><span class="token punctuation">(</span>b_path<span class="token punctuation">)</span> <span class="token keyword">as</span> b<span class="token punctuation">:</span>
+        <span class="token keyword">assert</span> a<span class="token punctuation">.</span>transform <span class="token operator">==</span> b<span class="token punctuation">.</span>transform <span class="token keyword">and</span> a<span class="token punctuation">.</span>shape <span class="token operator">==</span> b<span class="token punctuation">.</span>shape<span class="token punctuation">,</span> <span class="token string">"grids differ"</span>
+        za<span class="token punctuation">,</span> zb <span class="token operator">=</span> a<span class="token punctuation">.</span>read<span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">,</span> masked<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span><span class="token punctuation">,</span> b<span class="token punctuation">.</span>read<span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">,</span> masked<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+    diff <span class="token operator">=</span> <span class="token punctuation">(</span>zb <span class="token operator">-</span> za<span class="token punctuation">)</span><span class="token punctuation">.</span>compressed<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    <span class="token keyword">def</span> <span class="token function">slope_stats</span><span class="token punctuation">(</span>z<span class="token punctuation">,</span> cell<span class="token operator">=</span>CELL<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        gy<span class="token punctuation">,</span> gx <span class="token operator">=</span> np<span class="token punctuation">.</span>gradient<span class="token punctuation">(</span>np<span class="token punctuation">.</span>ma<span class="token punctuation">.</span>filled<span class="token punctuation">(</span>z<span class="token punctuation">,</span> np<span class="token punctuation">.</span>nan<span class="token punctuation">)</span><span class="token punctuation">,</span> cell<span class="token punctuation">)</span>
+        s <span class="token operator">=</span> np<span class="token punctuation">.</span>degrees<span class="token punctuation">(</span>np<span class="token punctuation">.</span>arctan<span class="token punctuation">(</span>np<span class="token punctuation">.</span>hypot<span class="token punctuation">(</span>gx<span class="token punctuation">,</span> gy<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+        s <span class="token operator">=</span> s<span class="token punctuation">[</span>np<span class="token punctuation">.</span>isfinite<span class="token punctuation">(</span>s<span class="token punctuation">)</span><span class="token punctuation">]</span>
+        <span class="token keyword">return</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>median<span class="token punctuation">(</span>s<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>percentile<span class="token punctuation">(</span>s<span class="token punctuation">,</span> <span class="token number">99</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token string">"cells_compared"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span>diff<span class="token punctuation">.</span>size<span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"rmse_between_m"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>sqrt<span class="token punctuation">(</span><span class="token punctuation">(</span>diff <span class="token operator">**</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">.</span>mean<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"p95_abs_m"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>percentile<span class="token punctuation">(</span>np<span class="token punctuation">.</span><span class="token builtin">abs</span><span class="token punctuation">(</span>diff<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">95</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"idw_slope_median_p99"</span><span class="token punctuation">:</span> slope_stats<span class="token punctuation">(</span>za<span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"tin_slope_median_p99"</span><span class="token punctuation">:</span> slope_stats<span class="token punctuation">(</span>zb<span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+
+<span class="token keyword">print</span><span class="token punctuation">(</span>compare_surfaces<span class="token punctuation">(</span><span class="token string">"build/dtm_idw_1m.tif"</span><span class="token punctuation">,</span> <span class="token string">"build/dtm_tin_1m.tif"</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>The 99th percentile of slope is the artefact detector. Real terrain in a given landscape has a slope distribution with a known upper end; a surface whose p99 slope is 70° in gently rolling country has spikes, and those come from interpolation across voids or from un-removed noise rather than from the ground. Comparing the two methods’ slope distributions is more informative than comparing their elevations, because they agree on elevation almost everywhere and disagree exactly where the artefacts are.</p>
+<figure class="diagram">
+<svg viewBox="6 6 748 228" role="img" aria-labelledby="dtm-cell-t dtm-cell-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="dtm-cell-t">Cell size against ground density</title>
+  <desc id="dtm-cell-d">A table of ground point density against the cell size that puts about four points in each cell. Half a point per square metre needs a 2.8 metre cell. Two points per square metre need 1.4 metres. Four need 1 metre. Eight need 0.7 metres. Sixteen need half a metre. Publishing a finer cell than the density supports produces interpolation noise rather than detail.</desc>
+  <rect class="svg-bg" x="6" y="6" width="748" height="228" fill="#ffffff"/>
+  <g stroke-width="1.5">
+    <rect x="20" y="20" width="240" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="260" y="20" width="240" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="500" y="20" width="240" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="20" y="54" width="240" height="32" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="260" y="54" width="240" height="32" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="500" y="54" width="240" height="32" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="20" y="86" width="240" height="32" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="260" y="86" width="240" height="32" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="500" y="86" width="240" height="32" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="20" y="118" width="240" height="32" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="260" y="118" width="240" height="32" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="500" y="118" width="240" height="32" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="20" y="150" width="240" height="32" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="260" y="150" width="240" height="32" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="500" y="150" width="240" height="32" fill="#f7dfdc" stroke="#b0413e"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="140" y="43">ground density</text><text x="380" y="43">nominal spacing</text><text x="620" y="43">cell for ~4 pts/cell</text>
+    <text x="140" y="75">0.5 pts/m²</text><text x="380" y="75">1.41 m</text><text x="620" y="75">2.8 m</text>
+    <text x="140" y="107">2 pts/m²</text><text x="380" y="107">0.71 m</text><text x="620" y="107">1.4 m</text>
+    <text x="140" y="139">4 pts/m²</text><text x="380" y="139">0.50 m</text><text x="620" y="139">1.0 m</text>
+    <text x="140" y="171">16 pts/m²</text><text x="380" y="171">0.25 m</text><text x="620" y="171">0.5 m</text>
+  </g>
+  <text x="380" y="216" fill="#15384a" font-size="12.5" text-anchor="middle">Under canopy the ground density is a fraction of the total, and it is the one that binds.</text>
+</svg>
+<figcaption>The cell size is a property of the data, and stating it without stating the ground density it came from is how "1 m DTM" became meaningless.</figcaption>
+</figure>
+<h3 id="6-verify-against-checkpoints-and-the-edges" tabindex="-1"><a class="heading-link" href="#6-verify-against-checkpoints-and-the-edges"><span>6. Verify against checkpoints and the edges</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">verify_dtm</span><span class="token punctuation">(</span>dtm_path<span class="token punctuation">,</span> checkpoints_csv<span class="token punctuation">,</span> cell<span class="token operator">=</span>CELL<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">import</span> csv
+    rows <span class="token operator">=</span> <span class="token builtin">list</span><span class="token punctuation">(</span>csv<span class="token punctuation">.</span>DictReader<span class="token punctuation">(</span><span class="token builtin">open</span><span class="token punctuation">(</span>checkpoints_csv<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    coords <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>r<span class="token punctuation">[</span><span class="token string">"easting"</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token builtin">float</span><span class="token punctuation">(</span>r<span class="token punctuation">[</span><span class="token string">"northing"</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token keyword">for</span> r <span class="token keyword">in</span> rows<span class="token punctuation">]</span>
+    truth <span class="token operator">=</span> np<span class="token punctuation">.</span>array<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token builtin">float</span><span class="token punctuation">(</span>r<span class="token punctuation">[</span><span class="token string">"height"</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token keyword">for</span> r <span class="token keyword">in</span> rows<span class="token punctuation">]</span><span class="token punctuation">)</span>
+    <span class="token keyword">with</span> rasterio<span class="token punctuation">.</span><span class="token builtin">open</span><span class="token punctuation">(</span>dtm_path<span class="token punctuation">)</span> <span class="token keyword">as</span> src<span class="token punctuation">:</span>
+        sampled <span class="token operator">=</span> np<span class="token punctuation">.</span>array<span class="token punctuation">(</span><span class="token punctuation">[</span>v<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span> <span class="token keyword">for</span> v <span class="token keyword">in</span> src<span class="token punctuation">.</span>sample<span class="token punctuation">(</span>coords<span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">,</span> dtype<span class="token operator">=</span><span class="token builtin">float</span><span class="token punctuation">)</span>
+        dem <span class="token operator">=</span> src<span class="token punctuation">.</span>read<span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">,</span> masked<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+        edge <span class="token operator">=</span> np<span class="token punctuation">.</span>ma<span class="token punctuation">.</span>getmaskarray<span class="token punctuation">(</span>dem<span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">,</span> <span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token punctuation">:</span><span class="token punctuation">]</span><span class="token punctuation">.</span>mean<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">+</span> np<span class="token punctuation">.</span>ma<span class="token punctuation">.</span>getmaskarray<span class="token punctuation">(</span>dem<span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">,</span> <span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">]</span><span class="token punctuation">.</span>mean<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    ok <span class="token operator">=</span> np<span class="token punctuation">.</span>isfinite<span class="token punctuation">(</span>sampled<span class="token punctuation">)</span> <span class="token operator">&amp;</span> <span class="token punctuation">(</span>sampled <span class="token operator">></span> <span class="token operator">-</span><span class="token number">1e4</span><span class="token punctuation">)</span>
+    err <span class="token operator">=</span> sampled<span class="token punctuation">[</span>ok<span class="token punctuation">]</span> <span class="token operator">-</span> truth<span class="token punctuation">[</span>ok<span class="token punctuation">]</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token string">"checkpoints_used"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span>ok<span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"rmse_m"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>sqrt<span class="token punctuation">(</span><span class="token punctuation">(</span>err <span class="token operator">**</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">.</span>mean<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"bias_m"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>err<span class="token punctuation">.</span>mean<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"max_abs_m"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span><span class="token builtin">abs</span><span class="token punctuation">(</span>err<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">max</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"edge_nodata_share"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>edge <span class="token operator">/</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+
+<span class="token keyword">print</span><span class="token punctuation">(</span>verify_dtm<span class="token punctuation">(</span><span class="token string">"build/dtm_tin_1m.tif"</span><span class="token punctuation">,</span> <span class="token string">"reference/checkpoints.csv"</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>The edge figure catches the artefact nobody looks for. A tile interpolated from its own points only has a border where the triangulation has no neighbours on one side, so the outermost cells are extrapolated or empty. Interpolating with a buffer of the neighbouring tiles’ points and then clipping to the tile is the fix, and the edge nodata share is how you know whether it was applied.</p>
+<h2 id="expected-output-verification" tabindex="-1"><a class="heading-link" href="#expected-output-verification"><span>Expected Output &amp; Verification</span></a></h2>
+<div class="codeblock" data-lang="text"><div class="codeblock__bar"><span class="codeblock__lang">text</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-text" tabindex="0" role="group" aria-label="text code sample"><code class="language-text">ground   0.5 pts/m² → spacing 1.414 m → cell 2.83 m
+ground   2.0 pts/m² → spacing 0.707 m → cell 1.41 m
+ground   4.0 pts/m² → spacing 0.500 m → cell 1.00 m
+ground   8.0 pts/m² → spacing 0.354 m → cell 0.71 m
+ground  16.0 pts/m² → spacing 0.250 m → cell 0.50 m
+6,204,882 ground points interpolated
+6,204,882 points triangulated and rasterised
+{'void_cells': 184204, 'speckle_filled': 2104, 'voids_under_buildings': 178402}
+{'cells_compared': 815808, 'rmse_between_m': 0.041, 'p95_abs_m': 0.078,
+ 'idw_slope_median_p99': (2.41, 38.8), 'tin_slope_median_p99': (2.38, 31.2)}
+{'checkpoints_used': 24, 'rmse_m': 0.061, 'bias_m': 0.008, 'max_abs_m': 0.118}
+</code></pre></div>
+<p>Two surfaces that agree to 4 cm RMSE, with the triangulation showing a lower 99th-percentile slope, is the normal outcome: they describe the same terrain and IDW’s bullseyes show up in the slope tail. Nearly all of the void cells are under buildings, which is exactly right for an urban tile and is the reason the mask band exists.</p>
+<p>Verify the interpolation is not inventing detail, by comparing against a coarser version of itself:</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">detail_check</span><span class="token punctuation">(</span>dtm_path<span class="token punctuation">,</span> factor<span class="token operator">=</span><span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">from</span> rasterio<span class="token punctuation">.</span>enums <span class="token keyword">import</span> Resampling
+    <span class="token keyword">with</span> rasterio<span class="token punctuation">.</span><span class="token builtin">open</span><span class="token punctuation">(</span>dtm_path<span class="token punctuation">)</span> <span class="token keyword">as</span> src<span class="token punctuation">:</span>
+        fine <span class="token operator">=</span> src<span class="token punctuation">.</span>read<span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">,</span> masked<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+        coarse <span class="token operator">=</span> src<span class="token punctuation">.</span>read<span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">,</span> masked<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span>
+                          out_shape<span class="token operator">=</span><span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">,</span> src<span class="token punctuation">.</span>height <span class="token operator">//</span> factor<span class="token punctuation">,</span> src<span class="token punctuation">.</span>width <span class="token operator">//</span> factor<span class="token punctuation">)</span><span class="token punctuation">,</span>
+                          resampling<span class="token operator">=</span>Resampling<span class="token punctuation">.</span>average<span class="token punctuation">)</span>
+        back <span class="token operator">=</span> src<span class="token punctuation">.</span>read<span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">,</span> masked<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span>
+                        out_shape<span class="token operator">=</span><span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">,</span> src<span class="token punctuation">.</span>height<span class="token punctuation">,</span> src<span class="token punctuation">.</span>width<span class="token punctuation">)</span><span class="token punctuation">,</span> resampling<span class="token operator">=</span>Resampling<span class="token punctuation">.</span>bilinear<span class="token punctuation">)</span>
+    resid <span class="token operator">=</span> <span class="token punctuation">(</span>fine <span class="token operator">-</span> back<span class="token punctuation">)</span><span class="token punctuation">.</span>compressed<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"std_of_detail_m"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>resid<span class="token punctuation">.</span>std<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"p99_detail_m"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>percentile<span class="token punctuation">(</span>np<span class="token punctuation">.</span><span class="token builtin">abs</span><span class="token punctuation">(</span>resid<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">99</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">}</span>
+
+<span class="token keyword">print</span><span class="token punctuation">(</span>detail_check<span class="token punctuation">(</span><span class="token string">"build/dtm_tin_1m.tif"</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>The residual between a surface and a smoothed version of itself is the “detail” the fine resolution adds. On real terrain it correlates with landform — larger on slopes and breaks, small on flats. When it is uniformly distributed and close to the interpolator’s noise level, the fine cell size is adding no information, which is the quantitative version of the cell-size rule.</p>
+<h2 id="performance-notes" tabindex="-1"><a class="heading-link" href="#performance-notes"><span>Performance Notes</span></a></h2>
+<ul>
+<li><strong>IDW is a single pass with a neighbourhood search</strong> and handles tens of millions of points per minute; the triangulation is slower and memory-hungry, roughly 2 GB per 10 million points.</li>
+<li><strong>Tile with a buffer of at least three cells</strong> — more for the triangulation — and clip afterwards, so tile edges have neighbours.</li>
+<li><strong>Interpolate ground only.</strong> Passing the full cloud and relying on the interpolator to prefer low points is slower and produces a surface influenced by vegetation.</li>
+<li><strong>Write float32, not float64.</strong> Terrain heights need millimetre precision over a few hundred metres, which float32 gives comfortably, and the raster is half the size.</li>
+<li><strong>Keep the ground point cloud.</strong> A DTM is a derived product and the cell size will be revisited; re-interpolating takes minutes.</li>
+</ul>
+<h2 id="common-errors" tabindex="-1"><a class="heading-link" href="#common-errors"><span>Common Errors</span></a></h2>
+<p><strong>The raster is empty outside a small area.</strong> <code>bounds</code> was omitted, so the grid was sized to the data, or the bounds are in the wrong order. PDAL uses <code>([minx, maxx], [miny, maxy])</code>.</p>
+<p><strong>Terrain under buildings looks like a smooth hill.</strong> Voids were filled by <code>window_size</code> or by the triangulation and nothing recorded it. Ship the mask band.</p>
+<p><strong>The surface has pits at isolated low points.</strong> Un-removed noise below the ground: a single low return pulls its cell down. Remove outliers before interpolating, as in <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/removing-noise-from-terrestrial-lidar-scans/">removing noise from terrestrial LiDAR scans</a>.</p>
+<p><strong>Tile edges show a seam in the hillshade.</strong> Each tile was interpolated from its own points. Buffer, interpolate, clip.</p>
+<p><strong>A 0.5 m DTM looks noisy where a 1 m one looked clean.</strong> The ground density does not support 0.5 m cells. That is not a bug in the interpolator.</p>
+<h2 id="frequently-asked-questions" tabindex="-1"><a class="heading-link" href="#frequently-asked-questions"><span>Frequently Asked Questions</span></a></h2>
+<h3 id="idw-or-tin-for-a-twins-terrain" tabindex="-1"><a class="heading-link" href="#idw-or-tin-for-a-twins-terrain"><span>IDW or TIN for a twin’s terrain?</span></a></h3>
+<p>TIN for accuracy within the data and for keeping breaks sharp, which matters where terrain meets buildings and roads. IDW for a smoother surface that is cheaper to compute and more forgiving of irregular density. Many programmes use TIN for the product and IDW for quick looks.</p>
+<h3 id="what-about-natural-neighbour-or-spline-interpolation" tabindex="-1"><a class="heading-link" href="#what-about-natural-neighbour-or-spline-interpolation"><span>What about natural-neighbour or spline interpolation?</span></a></h3>
+<p>Both are available through GDAL and both are better than IDW at avoiding bullseyes, at more computational cost. They do not change the void problem or the cell-size rule, which are the two decisions that matter most.</p>
+<h3 id="should-breaklines-be-used" tabindex="-1"><a class="heading-link" href="#should-breaklines-be-used"><span>Should breaklines be used?</span></a></h3>
+<p>Where they exist, yes: inserting road edges, kerbs and water boundaries as constraints produces a surface that respects them instead of smoothing across. It requires a constrained triangulation rather than the plain Delaunay above, and it is what higher-quality terrain specifications ask for.</p>
+<h2 id="related-guides" tabindex="-1"><a class="heading-link" href="#related-guides"><span>Related Guides</span></a></h2>
+<ul>
+<li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/hydro-flattening-water-bodies-in-dems/">Hydro-Flattening Water Bodies in DEMs</a> — correcting water surfaces afterwards</li>
+<li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/resampling-dems-without-stair-step-artifacts/">Resampling DEMs Without Stair-Step Artifacts</a> — changing resolution after interpolation</li>
+<li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/generating-terrain-meshes-from-dem-rasters/">Generating Terrain Meshes from DEM Rasters</a> — turning the result into geometry</li>
+</ul>
+<p>Back to <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/">Digital Elevation Model Workflows</a>.</p>
+
+
+      
+      
+
+      <div class="related-nav">
+        
+
+        
+          <div>
+            <h3>Related</h3>
+            <div class="related-grid">
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/generating-quantized-mesh-terrain-tiles/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Generating Quantized Mesh Terrain Tiles</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/generating-terrain-meshes-from-dem-rasters/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Generating Terrain Meshes from DEM Rasters</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/hydro-flattening-water-bodies-in-dems/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Hydro-Flattening Water Bodies in DEMs</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/merging-and-mosaicking-dem-tiles-with-gdal/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Merging and Mosaicking DEM Tiles with GDAL</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/resampling-dems-without-stair-step-artifacts/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Resampling DEMs Without Stair-Step Artifacts</span>
+                </a>
+              
+            </div>
+          </div>
+        
+      </div>
+    </article>
+
+    
+    <aside class="toc" aria-label="On this page" data-toc hidden>
+      <h4>On this page</h4>
+      <ul></ul>
+    </aside>
+  </div>
+</div>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+  <div class="container site-footer__inner">
+    <div class="site-footer__brand">
+      <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+        <img src="/assets/img/logo-mark.svg" alt="" class="brand__mark" width="36" height="36">
+        <span class="brand__name">
+          3D Geospatial
+          <small>Digital Twin Automation</small>
+        </span>
+      </a>
+      <p>Engineering-grade guides on point cloud processing, mesh pipelines, LOD strategies, and CI/CD automation for digital twin platforms.</p>
+      <a class="footer-social" href="https://github.com/3d-geospatial" aria-label="3D Geospatial on GitHub" rel="noopener" target="_blank">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+          <path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.53-1.34-1.3-1.7-1.3-1.7-1.06-.72.08-.71.08-.71 1.17.08 1.79 1.2 1.79 1.2 1.04 1.79 2.73 1.27 3.4.97.1-.75.4-1.27.73-1.56-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.19-3.08-.12-.3-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.75.11 3.05.74.8 1.19 1.83 1.19 3.08 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.07.78 2.15v3.18c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5Z"/>
+        </svg>
+        <span>GitHub</span>
+      </a>
+    </div>
+
+    <div class="site-footer__col">
+      <h4>Sections</h4>
+      <ul>
+        <li><a href="https://www.3d-geospatial.com/">Home</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management &amp; Optimization</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/">Point Cloud &amp; Mesh Pipelines</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/">Troubleshooting &amp; Reliability</a></li>
+        
+      </ul>
+    </div>
+
+    
+      <div class="site-footer__col">
+        <h4>3D Geospatial Fundamentals</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/">3D Format Standards Comparison</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/">BIM and IFC Georeferencing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/">CityGML and CityJSON Processing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems for 3D Assets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/">Digital Elevation Model Workflows</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/">Spatial Indexing and Tiling Schemes for 3D Data</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>LOD Management &amp; Optimization</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/">Automated Tile Generation for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/">Cesium ion Upload Automation for 3D Tilesets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/">glTF LOD Generation With Draco Compression</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/">Streaming Sync Patterns for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/">Tileset Metadata and 3D Tiles Next</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/">Vector Overlays on 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Point Cloud &amp; Mesh Pipelines</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/">Automated Mesh Decimation for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/">Change Detection Between LiDAR Scan Epochs</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/">CI/CD Automation for Spatial Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">LiDAR Classification and Ground Extraction</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/photogrammetry-processing-pipelines/">Photogrammetry Processing Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/">Point Cloud Filtering Techniques</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/">Surface Reconstruction for Geospatial Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/">Texture Mapping Workflows for Digital Twins</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Troubleshooting &amp; Reliability</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/">Cross-Section Failure Modes in Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/">Data Validation &amp; QA Gates for 3D Tiles</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/">Performance Profiling and Benchmarking</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/">Pipeline Observability and Monitoring</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/">Streaming &amp; Runtime Diagnostics for 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+  </div>
+  <div class="container site-footer__bottom">
+    <span>© 2026 3D Geospatial &amp; Digital Twin Automation</span>
+    <span>Built with Eleventy · PWA-enabled</span>
+  </div>
+</footer>
+
+
+  <script src="/assets/js/site.js?v=b99aa9f971" defer></script>
+  
+</body>
+</html>

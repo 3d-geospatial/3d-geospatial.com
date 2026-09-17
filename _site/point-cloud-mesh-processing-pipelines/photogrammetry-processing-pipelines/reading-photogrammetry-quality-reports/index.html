@@ -1,0 +1,785 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <title>Reading Photogrammetry Quality Reports — 3D Geospatial</title>
+  <meta name="description" content="Turn ODM and COLMAP statistics into an acceptance gate: reprojection error, registered images, track length">
+  <meta name="keywords" content="3D geospatial, digital twin, point cloud, mesh pipeline, LOD, 3D Tiles, Cesium, PDAL, Open3D, Python, CI/CD">
+  <meta name="author" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta name="theme-color" content="#1f6b8a" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f171d" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+
+  
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem("theme");
+        var theme = (stored === "dark" || stored === "light") ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    })();
+  </script>
+  <meta name="generator" content="Eleventy">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="googlebot" content="index,follow,max-image-preview:large">
+
+  
+  <link rel="canonical" href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/photogrammetry-processing-pipelines/reading-photogrammetry-quality-reports/">
+  <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">
+
+  
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/icon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+
+  
+  <link rel="apple-touch-icon" href="/assets/img/icon-180.png">
+  <link rel="mask-icon" href="/assets/img/logo.svg" color="#1f6b8a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="3D Geospatial">
+  <meta name="application-name" content="3D Geospatial">
+
+  
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Reading Photogrammetry Quality Reports — 3D Geospatial">
+  <meta property="og:description" content="Turn ODM and COLMAP statistics into an acceptance gate: reprojection error, registered images, track length">
+  <meta property="og:url" content="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/photogrammetry-processing-pipelines/reading-photogrammetry-quality-reports/">
+  <meta property="og:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+  <meta property="og:site_name" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta property="og:locale" content="en_US">
+  
+  <meta property="article:published_time" content="2026-09-17T23:36:56.457Z">
+  <meta property="article:modified_time" content="2026-09-17T23:36:56.457Z">
+  <meta property="article:publisher" content="https://www.3d-geospatial.com/">
+  
+
+  
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Reading Photogrammetry Quality Reports — 3D Geospatial">
+  <meta name="twitter:description" content="Turn ODM and COLMAP statistics into an acceptance gate: reprojection error, registered images, track length">
+  <meta name="twitter:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta name="twitter:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+
+  
+  <link rel="preload" href="/assets/css/styles.css?v=8c46394d6c" as="style">
+  
+
+  <link rel="stylesheet" href="/assets/css/styles.css?v=8c46394d6c">
+
+  
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.3d-geospatial.com/#organization",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "url": "https://www.3d-geospatial.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/icon-512.png",
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://www.3d-geospatial.com/#website",
+      "url": "https://www.3d-geospatial.com/",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "description": "Build reliable 3D spatial data pipelines for digital twins — point clouds, meshes, LOD strategies, Python processing, and CI/CD automation.",
+      "inLanguage": "en",
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      }
+    },
+    {
+      "@type": "TechArticle",
+      "@id": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/photogrammetry-processing-pipelines/reading-photogrammetry-quality-reports/#article",
+      "isPartOf": {
+        "@id": "https://www.3d-geospatial.com/#website"
+      },
+      "headline": "Reading Photogrammetry Quality Reports",
+      "name": "Reading Photogrammetry Quality Reports",
+      "description": "Turn ODM and COLMAP statistics into an acceptance gate: reprojection error, registered images, track length",
+      "url": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/photogrammetry-processing-pipelines/reading-photogrammetry-quality-reports/",
+      "mainEntityOfPage": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/photogrammetry-processing-pipelines/reading-photogrammetry-quality-reports/",
+      "inLanguage": "en",
+      "datePublished": "2026-09-17T23:36:56.457Z",
+      "dateModified": "2026-09-17T23:36:56.457Z",
+      "author": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "image": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/og-cover.png",
+        "width": 1200,
+        "height": 630
+      },
+      "breadcrumb": {
+        "@id": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/photogrammetry-processing-pipelines/reading-photogrammetry-quality-reports/#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/photogrammetry-processing-pipelines/reading-photogrammetry-quality-reports/#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://www.3d-geospatial.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Point Cloud Mesh Processing Pipelines",
+          "item": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Photogrammetry Processing Pipelines",
+          "item": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/photogrammetry-processing-pipelines/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "name": "Reading Photogrammetry Quality Reports",
+          "item": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/photogrammetry-processing-pipelines/reading-photogrammetry-quality-reports/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  
+<header class="site-header" role="banner">
+  <div class="container site-header__inner">
+    <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+      <img src="/assets/img/logo.svg" alt="" class="brand__mark" width="36" height="36">
+      <span class="brand__name">
+        3D Geospatial
+        <small>Digital Twin Automation</small>
+      </span>
+    </a>
+
+    <button class="theme-toggle" type="button" data-theme-toggle
+            aria-label="Switch to dark theme" title="Switch to dark theme">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4.2"/>
+        <path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/>
+      </svg>
+    </button>
+
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>
+      <span class="nav-toggle__icon" aria-hidden="true"><span></span></span>
+      Menu
+    </button>
+
+    <nav class="primary-nav" id="primary-nav" aria-label="Primary">
+      
+      <a href="https://www.3d-geospatial.com/" >
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/>
+        </svg>
+        Home
+      </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2 3 7l9 5 9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 17l9 5 9-5"/>
+            </svg>
+          
+          3D Geospatial Fundamentals
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+          
+          LOD Management &amp; Optimization
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/" aria-current="page">
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="6" cy="6" r="1.5"/><circle cx="12" cy="6" r="1.5"/><circle cx="18" cy="6" r="1.5"/>
+              <circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/>
+              <circle cx="6" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="18" cy="18" r="1.5"/>
+            </svg>
+          
+          Point Cloud &amp; Mesh Pipelines
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <path d="M12 9v4"/><path d="M12 17h.01"/>
+            </svg>
+          
+          Troubleshooting &amp; Reliability
+        </a>
+      
+    </nav>
+  </div>
+</header>
+
+
+  <main id="main">
+    
+
+
+<div class="container">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    
+      
+        <a href="https://www.3d-geospatial.com/">Home</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/">Point Cloud Mesh Processing Pipelines</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/photogrammetry-processing-pipelines/">Photogrammetry Processing Pipelines</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <span class="current">Reading Photogrammetry Quality Reports</span>
+      
+    
+  </nav>
+
+  <div class="content-page">
+    <article class="article">
+      <h1 id="reading-photogrammetry-quality-reports" tabindex="-1"><a class="heading-link" href="#reading-photogrammetry-quality-reports"><span>Reading Photogrammetry Quality Reports</span></a></h1>
+<p>This page turns the statistics a photogrammetry run produces into an acceptance decision — parsing OpenDroneMap’s <code>stats.json</code> and COLMAP’s model analysis, computing the ground sampling distance from EXIF, combining them with check-point residuals into one machine-readable quality record in EPSG:25832+7837, and gating a pipeline on thresholds that can be defended.</p>
+<h2 id="why-you-hit-this" tabindex="-1"><a class="heading-link" href="#why-you-hit-this"><span>Why you hit this</span></a></h2>
+<p>Every processing tool produces a report, and almost nobody reads it until a measurement is disputed. By then the run has been deleted, the report is a PDF in a project folder, and the only honest answer to “how accurate is this?” is “we don’t know”. The fix is small: extract the four numbers that matter, store them next to the outputs, and refuse to publish a reconstruction whose numbers are outside the agreed range. The four numbers and their meaning are introduced in <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/photogrammetry-processing-pipelines/">photogrammetry processing pipelines</a>; this page is the parsing and the gate.</p>
+<h2 id="prerequisites" tabindex="-1"><a class="heading-link" href="#prerequisites"><span>Prerequisites</span></a></h2>
+<ul>
+<li>A completed OpenDroneMap project with <code>opensfm/stats/stats.json</code>, or a COLMAP sparse model.</li>
+<li>Python 3.10+ with <code>numpy&gt;=1.24</code>, <code>rasterio&gt;=1.3</code>, <code>exifread&gt;=3.0</code>.</li>
+<li>Check points held back from the adjustment, in the target compound CRS, and the run’s surface model for sampling them.</li>
+</ul>
+<h2 id="step-by-step" tabindex="-1"><a class="heading-link" href="#step-by-step"><span>Step-by-Step</span></a></h2>
+<h3 id="1-compute-the-ground-sampling-distance-from-the-imagery" tabindex="-1"><a class="heading-link" href="#1-compute-the-ground-sampling-distance-from-the-imagery"><span>1. Compute the ground sampling distance from the imagery</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> exifread
+<span class="token keyword">from</span> pathlib <span class="token keyword">import</span> Path
+
+<span class="token keyword">def</span> <span class="token function">gsd_cm</span><span class="token punctuation">(</span>image_path<span class="token punctuation">,</span> altitude_m<span class="token punctuation">,</span> sensor_width_mm<span class="token operator">=</span><span class="token boolean">None</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">with</span> <span class="token builtin">open</span><span class="token punctuation">(</span>image_path<span class="token punctuation">,</span> <span class="token string">"rb"</span><span class="token punctuation">)</span> <span class="token keyword">as</span> f<span class="token punctuation">:</span>
+        tags <span class="token operator">=</span> exifread<span class="token punctuation">.</span>process_file<span class="token punctuation">(</span>f<span class="token punctuation">,</span> details<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">)</span>
+    focal <span class="token operator">=</span> <span class="token builtin">float</span><span class="token punctuation">(</span><span class="token builtin">str</span><span class="token punctuation">(</span>tags<span class="token punctuation">[</span><span class="token string">"EXIF FocalLength"</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">.</span>split<span class="token punctuation">(</span><span class="token string">"/"</span><span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    width_px <span class="token operator">=</span> <span class="token builtin">int</span><span class="token punctuation">(</span><span class="token builtin">str</span><span class="token punctuation">(</span>tags<span class="token punctuation">[</span><span class="token string">"EXIF ExifImageWidth"</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token keyword">if</span> sensor_width_mm <span class="token keyword">is</span> <span class="token boolean">None</span><span class="token punctuation">:</span>
+        <span class="token comment"># FocalPlaneXResolution is in pixels per unit; unit 2 = inch, 3 = cm</span>
+        res <span class="token operator">=</span> tags<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"EXIF FocalPlaneXResolution"</span><span class="token punctuation">)</span>
+        unit <span class="token operator">=</span> <span class="token builtin">int</span><span class="token punctuation">(</span><span class="token builtin">str</span><span class="token punctuation">(</span>tags<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"EXIF FocalPlaneResolutionUnit"</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+        <span class="token keyword">if</span> res <span class="token keyword">is</span> <span class="token boolean">None</span><span class="token punctuation">:</span>
+            <span class="token keyword">raise</span> ValueError<span class="token punctuation">(</span><span class="token string">"no sensor size in EXIF: pass sensor_width_mm explicitly"</span><span class="token punctuation">)</span>
+        num<span class="token punctuation">,</span> den <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token builtin">str</span><span class="token punctuation">(</span>res<span class="token punctuation">)</span><span class="token punctuation">.</span>split<span class="token punctuation">(</span><span class="token string">"/"</span><span class="token punctuation">)</span> <span class="token operator">+</span> <span class="token punctuation">[</span><span class="token string">"1"</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token number">2</span><span class="token punctuation">]</span>
+        px_per_unit <span class="token operator">=</span> <span class="token builtin">float</span><span class="token punctuation">(</span>num<span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token builtin">float</span><span class="token punctuation">(</span>den<span class="token punctuation">)</span>
+        sensor_width_mm <span class="token operator">=</span> width_px <span class="token operator">/</span> px_per_unit <span class="token operator">*</span> <span class="token punctuation">(</span><span class="token number">25.4</span> <span class="token keyword">if</span> unit <span class="token operator">==</span> <span class="token number">2</span> <span class="token keyword">else</span> <span class="token number">10.0</span><span class="token punctuation">)</span>
+    pitch_mm <span class="token operator">=</span> sensor_width_mm <span class="token operator">/</span> width_px
+    <span class="token keyword">return</span> pitch_mm <span class="token operator">*</span> altitude_m <span class="token operator">/</span> focal <span class="token operator">*</span> <span class="token number">100</span>
+
+gsd <span class="token operator">=</span> gsd_cm<span class="token punctuation">(</span><span class="token string">"/data/odm/block_09/images/DJI_0123.JPG"</span><span class="token punctuation">,</span> altitude_m<span class="token operator">=</span><span class="token number">92.0</span><span class="token punctuation">,</span> sensor_width_mm<span class="token operator">=</span><span class="token number">13.2</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"GSD </span><span class="token interpolation"><span class="token punctuation">{</span>gsd<span class="token punctuation">:</span><span class="token format-spec">.2f</span><span class="token punctuation">}</span></span><span class="token string"> cm/px"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>The GSD bounds every accuracy claim the project can make, and it is worth computing rather than quoting from the flight plan, which records the intended altitude rather than the flown one. Sensor width from EXIF is unreliable across manufacturers, so pass it explicitly from the camera’s datasheet when a project’s numbers matter.</p>
+<figure class="diagram">
+<svg viewBox="286 4 451 238" role="img" aria-labelledby="qr-gsd-t qr-gsd-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="qr-gsd-t">Ground sampling distance from altitude, focal length and pixel pitch</title>
+  <desc id="qr-gsd-d">A camera at altitude above the ground, with its sensor and focal length shown. One sensor pixel of a given pitch projects to a ground footprint equal to the pitch times the altitude divided by the focal length. A 3.3 micrometre pitch with a 9 millimetre lens at 92 metres gives about 2 centimetres on the ground.</desc>
+  <rect class="svg-bg" x="286" y="4" width="451" height="238" fill="#ffffff"/>
+  <path d="M294 200 H700" fill="none" stroke="#4f7a4d" stroke-width="2.5"/>
+  <path d="M300 40 h120 v18 h-120 Z" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <path d="M340 58 L300 200" fill="none" stroke="#5b6471" stroke-width="1.5" stroke-dasharray="5 4"/>
+  <path d="M380 58 L420 200" fill="none" stroke="#5b6471" stroke-width="1.5" stroke-dasharray="5 4"/>
+  <path d="M300 200 H420" fill="none" stroke="#9a4f26" stroke-width="6"/>
+  <path d="M470 58 V200" fill="none" stroke="#1f6b8a" stroke-width="2"/>
+  <path d="M462 58 H478 M462 200 H478" fill="none" stroke="#1f6b8a" stroke-width="2"/>
+  <path d="M340 58 H380" fill="none" stroke="#9a4f26" stroke-width="4"/>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="360" y="32">sensor, pixel pitch p</text>
+    <text x="520" y="120">altitude h</text>
+    <text x="360" y="224">GSD = p × h / f</text>
+  </g>
+  <text x="392" y="80" fill="#9a4f26" font-size="12" text-anchor="start">focal length f</text>
+  <text x="640" y="180" fill="#15384a" font-size="12.5" text-anchor="middle">3.3 µm · 92 m / 9 mm ≈ 2 cm</text>
+</svg>
+<figcaption>Every accuracy figure in the report is bounded by this one number, which is why it belongs in the dataset's metadata rather than in the flight plan.</figcaption>
+</figure>
+<h3 id="2-parse-the-opendronemap-statistics" tabindex="-1"><a class="heading-link" href="#2-parse-the-opendronemap-statistics"><span>2. Parse the OpenDroneMap statistics</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> json
+
+<span class="token keyword">def</span> <span class="token function">parse_odm_stats</span><span class="token punctuation">(</span>project<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    stats <span class="token operator">=</span> json<span class="token punctuation">.</span>loads<span class="token punctuation">(</span><span class="token punctuation">(</span>Path<span class="token punctuation">(</span>project<span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token string">"opensfm"</span> <span class="token operator">/</span> <span class="token string">"stats"</span> <span class="token operator">/</span> <span class="token string">"stats.json"</span><span class="token punctuation">)</span><span class="token punctuation">.</span>read_text<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    recon <span class="token operator">=</span> stats<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"reconstruction_statistics"</span><span class="token punctuation">,</span> <span class="token punctuation">{</span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+    feats <span class="token operator">=</span> stats<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"features_statistics"</span><span class="token punctuation">,</span> <span class="token punctuation">{</span><span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"detected_features"</span><span class="token punctuation">,</span> <span class="token punctuation">{</span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+    points <span class="token operator">=</span> stats<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"points_statistics"</span><span class="token punctuation">,</span> <span class="token punctuation">{</span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token string">"images_total"</span><span class="token punctuation">:</span> recon<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"initial_shots"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"images_reconstructed"</span><span class="token punctuation">:</span> recon<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"reconstructed_images"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"components"</span><span class="token punctuation">:</span> recon<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"components"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"reprojection_error_px"</span><span class="token punctuation">:</span> recon<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"reprojection_error_normalized"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"mean_track_length"</span><span class="token punctuation">:</span> recon<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"average_track_length"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"points"</span><span class="token punctuation">:</span> points<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"reconstructed"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"features_median"</span><span class="token punctuation">:</span> feats<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"median"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"gps_error_m"</span><span class="token punctuation">:</span> <span class="token punctuation">(</span>stats<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"gps_errors"</span><span class="token punctuation">,</span> <span class="token punctuation">{</span><span class="token punctuation">}</span><span class="token punctuation">)</span> <span class="token keyword">or</span> <span class="token punctuation">{</span><span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"average_error"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+
+odm <span class="token operator">=</span> parse_odm_stats<span class="token punctuation">(</span><span class="token string">"/data/odm/block_09"</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span>json<span class="token punctuation">.</span>dumps<span class="token punctuation">(</span>odm<span class="token punctuation">,</span> indent<span class="token operator">=</span><span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Field names differ between OpenSfM versions, so the parser uses <code>.get</code> throughout and returns <code>None</code> rather than raising — a report that is missing a field is still worth recording, while a parser that crashes on an unfamiliar version blocks the pipeline for no reason. Print the raw JSON once when adopting a new version and adjust the mapping.</p>
+<p><code>components</code> is the field to read first: more than one means the reconstruction split into disconnected parts, and everything else in the report describes only the largest of them.</p>
+<h3 id="3-parse-colmaps-model-analysis" tabindex="-1"><a class="heading-link" href="#3-parse-colmaps-model-analysis"><span>3. Parse COLMAP’s model analysis</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> re
+<span class="token keyword">import</span> subprocess
+
+<span class="token keyword">def</span> <span class="token function">parse_colmap_model</span><span class="token punctuation">(</span>model_path<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    out <span class="token operator">=</span> subprocess<span class="token punctuation">.</span>run<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token string">"colmap"</span><span class="token punctuation">,</span> <span class="token string">"model_analyzer"</span><span class="token punctuation">,</span> <span class="token string">"--path"</span><span class="token punctuation">,</span> <span class="token builtin">str</span><span class="token punctuation">(</span>model_path<span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+                         capture_output<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> text<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span><span class="token punctuation">.</span>stdout
+    <span class="token keyword">def</span> <span class="token function">num</span><span class="token punctuation">(</span>pattern<span class="token punctuation">,</span> cast<span class="token operator">=</span><span class="token builtin">float</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        m <span class="token operator">=</span> re<span class="token punctuation">.</span>search<span class="token punctuation">(</span>pattern<span class="token punctuation">,</span> out<span class="token punctuation">)</span>
+        <span class="token keyword">return</span> cast<span class="token punctuation">(</span>m<span class="token punctuation">.</span>group<span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token keyword">if</span> m <span class="token keyword">else</span> <span class="token boolean">None</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token string">"cameras"</span><span class="token punctuation">:</span> num<span class="token punctuation">(</span><span class="token string">r"Cameras:\s+(\d+)"</span><span class="token punctuation">,</span> <span class="token builtin">int</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"images"</span><span class="token punctuation">:</span> num<span class="token punctuation">(</span><span class="token string">r"Images:\s+(\d+)"</span><span class="token punctuation">,</span> <span class="token builtin">int</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"images_registered"</span><span class="token punctuation">:</span> num<span class="token punctuation">(</span><span class="token string">r"Registered images:\s+(\d+)"</span><span class="token punctuation">,</span> <span class="token builtin">int</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"points"</span><span class="token punctuation">:</span> num<span class="token punctuation">(</span><span class="token string">r"Points:\s+(\d+)"</span><span class="token punctuation">,</span> <span class="token builtin">int</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"observations"</span><span class="token punctuation">:</span> num<span class="token punctuation">(</span><span class="token string">r"Observations:\s+(\d+)"</span><span class="token punctuation">,</span> <span class="token builtin">int</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"mean_track_length"</span><span class="token punctuation">:</span> num<span class="token punctuation">(</span><span class="token string">r"Mean track length:\s+([\d.]+)"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"mean_obs_per_image"</span><span class="token punctuation">:</span> num<span class="token punctuation">(</span><span class="token string">r"Mean observations per image:\s+([\d.]+)"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"reprojection_error_px"</span><span class="token punctuation">:</span> num<span class="token punctuation">(</span><span class="token string">r"Mean reprojection error:\s+([\d.]+)px"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+
+colmap_stats <span class="token operator">=</span> parse_colmap_model<span class="token punctuation">(</span><span class="token string">"/data/colmap/pier_north/sparse/0"</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span>colmap_stats<span class="token punctuation">)</span>
+</code></pre></div>
+<p>The two tools report the same quantities under different names, which is why the record below normalises them: a pipeline that accepts both should not have two acceptance rules.</p>
+<h3 id="4-measure-accuracy-at-the-check-points" tabindex="-1"><a class="heading-link" href="#4-measure-accuracy-at-the-check-points"><span>4. Measure accuracy at the check points</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> numpy <span class="token keyword">as</span> np
+<span class="token keyword">import</span> rasterio
+
+<span class="token keyword">def</span> <span class="token function">check_point_residuals</span><span class="token punctuation">(</span>dsm_path<span class="token punctuation">,</span> check_csv<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    check <span class="token operator">=</span> np<span class="token punctuation">.</span>loadtxt<span class="token punctuation">(</span>check_csv<span class="token punctuation">,</span> delimiter<span class="token operator">=</span><span class="token string">","</span><span class="token punctuation">,</span> skiprows<span class="token operator">=</span><span class="token number">1</span><span class="token punctuation">,</span> usecols<span class="token operator">=</span><span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token keyword">with</span> rasterio<span class="token punctuation">.</span><span class="token builtin">open</span><span class="token punctuation">(</span>dsm_path<span class="token punctuation">)</span> <span class="token keyword">as</span> dsm<span class="token punctuation">:</span>
+        <span class="token keyword">assert</span> dsm<span class="token punctuation">.</span>crs<span class="token punctuation">.</span>to_epsg<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token number">25832</span><span class="token punctuation">,</span> <span class="token string">"check points and DSM must share a CRS"</span>
+        sampled <span class="token operator">=</span> np<span class="token punctuation">.</span>array<span class="token punctuation">(</span><span class="token punctuation">[</span>v<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span> <span class="token keyword">for</span> v <span class="token keyword">in</span> dsm<span class="token punctuation">.</span>sample<span class="token punctuation">(</span>check<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token punctuation">:</span><span class="token number">2</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">,</span> dtype<span class="token operator">=</span><span class="token builtin">float</span><span class="token punctuation">)</span>
+    resid <span class="token operator">=</span> sampled <span class="token operator">-</span> check<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">]</span>
+    resid <span class="token operator">=</span> resid<span class="token punctuation">[</span>np<span class="token punctuation">.</span>isfinite<span class="token punctuation">(</span>resid<span class="token punctuation">)</span><span class="token punctuation">]</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token string">"n"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>resid<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"rmse_z_m"</span><span class="token punctuation">:</span> <span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>sqrt<span class="token punctuation">(</span>np<span class="token punctuation">.</span>mean<span class="token punctuation">(</span>resid <span class="token operator">**</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"bias_z_m"</span><span class="token punctuation">:</span> <span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>mean<span class="token punctuation">(</span>resid<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"max_abs_z_m"</span><span class="token punctuation">:</span> <span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span><span class="token builtin">max</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span><span class="token builtin">abs</span><span class="token punctuation">(</span>resid<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"residuals_m"</span><span class="token punctuation">:</span> <span class="token punctuation">[</span><span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>r<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span> <span class="token keyword">for</span> r <span class="token keyword">in</span> resid<span class="token punctuation">]</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+
+acc <span class="token operator">=</span> check_point_residuals<span class="token punctuation">(</span><span class="token string">"/data/odm/block_09/odm_dem/dsm.tif"</span><span class="token punctuation">,</span> <span class="token string">"check_points.csv"</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span>acc<span class="token punctuation">)</span>
+</code></pre></div>
+<p>Separating bias from RMSE is what makes the number actionable. A bias of +8 cm with an RMSE of 9 cm is a systematic vertical offset — a datum or a calibration problem, fixable and worth fixing. A bias near zero with an RMSE of 9 cm is noise at the level the GSD and the control allow, and no amount of reprocessing will improve it.</p>
+<figure class="diagram">
+<svg viewBox="6 6 748 240" role="img" aria-labelledby="qr-four-t qr-four-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="qr-four-t">The four numbers and what each one can and cannot tell you</title>
+  <desc id="qr-four-d">A table. Reprojection error measures internal consistency, not absolute accuracy. Reconstructed images reveal dropped regions. Mean track length shows how well determined the points are. Check-point residuals are the only measure of absolute accuracy. Each has a typical acceptable range for a two centimetre ground sampling distance survey.</desc>
+  <rect class="svg-bg" x="6" y="6" width="748" height="240" fill="#ffffff"/>
+  <g stroke-width="1.5">
+    <rect x="20" y="20" width="220" height="36" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="240" y="20" width="290" height="36" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="530" y="20" width="210" height="36" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="20" y="56" width="220" height="44" fill="#ffffff" stroke="#5b6471"/>
+    <rect x="240" y="56" width="290" height="44" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="530" y="56" width="210" height="44" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="20" y="100" width="220" height="44" fill="#ffffff" stroke="#5b6471"/>
+    <rect x="240" y="100" width="290" height="44" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="530" y="100" width="210" height="44" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="20" y="144" width="220" height="44" fill="#ffffff" stroke="#5b6471"/>
+    <rect x="240" y="144" width="290" height="44" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="530" y="144" width="210" height="44" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="20" y="188" width="220" height="44" fill="#ffffff" stroke="#5b6471"/>
+    <rect x="240" y="188" width="290" height="44" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="530" y="188" width="210" height="44" fill="#fdf3e0" stroke="#c46a3d"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="130" y="43">number</text>
+    <text x="385" y="43">what it measures</text>
+    <text x="635" y="43">healthy range</text>
+    <text x="130" y="83">reprojection error</text><text x="385" y="83">internal consistency only</text><text x="635" y="83">0.3–1.0 px</text>
+    <text x="130" y="127">images reconstructed</text><text x="385" y="127">whether a region was dropped</text><text x="635" y="127">all of them</text>
+    <text x="130" y="171">mean track length</text><text x="385" y="171">how many views define a point</text><text x="635" y="171">&gt; 3</text>
+    <text x="130" y="215">check-point residuals</text><text x="385" y="215">absolute accuracy — the only one</text><text x="635" y="215">1–3 × GSD</text>
+  </g>
+</svg>
+<figcaption>Only the last row is accuracy. The first three describe whether the solution is coherent, which is necessary and not sufficient.</figcaption>
+</figure>
+<h3 id="5-write-one-quality-record-and-gate-on-it" tabindex="-1"><a class="heading-link" href="#5-write-one-quality-record-and-gate-on-it"><span>5. Write one quality record and gate on it</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">from</span> datetime <span class="token keyword">import</span> date
+
+<span class="token keyword">def</span> <span class="token function">quality_record</span><span class="token punctuation">(</span>project<span class="token punctuation">,</span> gsd_cm<span class="token punctuation">,</span> stats<span class="token punctuation">,</span> accuracy<span class="token punctuation">,</span> tool<span class="token punctuation">,</span> digest<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    rec <span class="token operator">=</span> <span class="token punctuation">{</span>
+        <span class="token string">"project"</span><span class="token punctuation">:</span> <span class="token builtin">str</span><span class="token punctuation">(</span>project<span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"processed"</span><span class="token punctuation">:</span> date<span class="token punctuation">.</span>today<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span>isoformat<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"tool"</span><span class="token punctuation">:</span> tool<span class="token punctuation">,</span>
+        <span class="token string">"container_digest"</span><span class="token punctuation">:</span> digest<span class="token punctuation">,</span>
+        <span class="token string">"gsd_cm"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>gsd_cm<span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"crs"</span><span class="token punctuation">:</span> <span class="token string">"EPSG:25832+7837"</span><span class="token punctuation">,</span>
+        <span class="token string">"images_total"</span><span class="token punctuation">:</span> stats<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"images_total"</span><span class="token punctuation">)</span> <span class="token keyword">or</span> stats<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"images"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"images_reconstructed"</span><span class="token punctuation">:</span> stats<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"images_reconstructed"</span><span class="token punctuation">)</span> <span class="token keyword">or</span> stats<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"images_registered"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"components"</span><span class="token punctuation">:</span> stats<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"components"</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"reprojection_error_px"</span><span class="token punctuation">:</span> stats<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"reprojection_error_px"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"mean_track_length"</span><span class="token punctuation">:</span> stats<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"mean_track_length"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"accuracy"</span><span class="token punctuation">:</span> accuracy<span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+    Path<span class="token punctuation">(</span>project<span class="token punctuation">,</span> <span class="token string">"quality.json"</span><span class="token punctuation">)</span><span class="token punctuation">.</span>write_text<span class="token punctuation">(</span>json<span class="token punctuation">.</span>dumps<span class="token punctuation">(</span>rec<span class="token punctuation">,</span> indent<span class="token operator">=</span><span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> rec
+
+<span class="token keyword">def</span> <span class="token function">gate</span><span class="token punctuation">(</span>rec<span class="token punctuation">,</span> max_reproj_px<span class="token operator">=</span><span class="token number">1.5</span><span class="token punctuation">,</span> min_track<span class="token operator">=</span><span class="token number">3.0</span><span class="token punctuation">,</span> rmse_multiple_of_gsd<span class="token operator">=</span><span class="token number">3.0</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    failures <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>rec<span class="token punctuation">[</span><span class="token string">"components"</span><span class="token punctuation">]</span> <span class="token keyword">or</span> <span class="token number">1</span><span class="token punctuation">)</span> <span class="token operator">></span> <span class="token number">1</span><span class="token punctuation">:</span>
+        failures<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>rec<span class="token punctuation">[</span><span class="token string">'components'</span><span class="token punctuation">]</span><span class="token punctuation">}</span></span><span class="token string"> disconnected components"</span></span><span class="token punctuation">)</span>
+    <span class="token keyword">if</span> rec<span class="token punctuation">[</span><span class="token string">"images_reconstructed"</span><span class="token punctuation">]</span> <span class="token operator">!=</span> rec<span class="token punctuation">[</span><span class="token string">"images_total"</span><span class="token punctuation">]</span><span class="token punctuation">:</span>
+        missing <span class="token operator">=</span> rec<span class="token punctuation">[</span><span class="token string">"images_total"</span><span class="token punctuation">]</span> <span class="token operator">-</span> rec<span class="token punctuation">[</span><span class="token string">"images_reconstructed"</span><span class="token punctuation">]</span>
+        <span class="token keyword">if</span> missing <span class="token operator">></span> <span class="token number">0.02</span> <span class="token operator">*</span> rec<span class="token punctuation">[</span><span class="token string">"images_total"</span><span class="token punctuation">]</span><span class="token punctuation">:</span>
+            failures<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>missing<span class="token punctuation">}</span></span><span class="token string"> images not reconstructed"</span></span><span class="token punctuation">)</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>rec<span class="token punctuation">[</span><span class="token string">"reprojection_error_px"</span><span class="token punctuation">]</span> <span class="token keyword">or</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token operator">></span> max_reproj_px<span class="token punctuation">:</span>
+        failures<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"reprojection error </span><span class="token interpolation"><span class="token punctuation">{</span>rec<span class="token punctuation">[</span><span class="token string">'reprojection_error_px'</span><span class="token punctuation">]</span><span class="token punctuation">:</span><span class="token format-spec">.2f</span><span class="token punctuation">}</span></span><span class="token string"> px"</span></span><span class="token punctuation">)</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>rec<span class="token punctuation">[</span><span class="token string">"mean_track_length"</span><span class="token punctuation">]</span> <span class="token keyword">or</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token operator">&lt;</span> min_track<span class="token punctuation">:</span>
+        failures<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"mean track length </span><span class="token interpolation"><span class="token punctuation">{</span>rec<span class="token punctuation">[</span><span class="token string">'mean_track_length'</span><span class="token punctuation">]</span><span class="token punctuation">:</span><span class="token format-spec">.2f</span><span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+    limit <span class="token operator">=</span> rmse_multiple_of_gsd <span class="token operator">*</span> rec<span class="token punctuation">[</span><span class="token string">"gsd_cm"</span><span class="token punctuation">]</span> <span class="token operator">/</span> <span class="token number">100.0</span>
+    <span class="token keyword">if</span> rec<span class="token punctuation">[</span><span class="token string">"accuracy"</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token string">"rmse_z_m"</span><span class="token punctuation">]</span> <span class="token operator">></span> limit<span class="token punctuation">:</span>
+        failures<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"RMSEz </span><span class="token interpolation"><span class="token punctuation">{</span>rec<span class="token punctuation">[</span><span class="token string">'accuracy'</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token string">'rmse_z_m'</span><span class="token punctuation">]</span><span class="token punctuation">:</span><span class="token format-spec">.3f</span><span class="token punctuation">}</span></span><span class="token string"> m exceeds </span><span class="token interpolation"><span class="token punctuation">{</span>limit<span class="token punctuation">:</span><span class="token format-spec">.3f</span><span class="token punctuation">}</span></span><span class="token string"> m"</span></span><span class="token punctuation">)</span>
+    <span class="token keyword">if</span> <span class="token builtin">abs</span><span class="token punctuation">(</span>rec<span class="token punctuation">[</span><span class="token string">"accuracy"</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token string">"bias_z_m"</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token operator">></span> <span class="token number">0.5</span> <span class="token operator">*</span> limit<span class="token punctuation">:</span>
+        failures<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"vertical bias </span><span class="token interpolation"><span class="token punctuation">{</span>rec<span class="token punctuation">[</span><span class="token string">'accuracy'</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token string">'bias_z_m'</span><span class="token punctuation">]</span><span class="token punctuation">:</span><span class="token format-spec">+.3f</span><span class="token punctuation">}</span></span><span class="token string"> m"</span></span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> failures
+
+rec <span class="token operator">=</span> quality_record<span class="token punctuation">(</span><span class="token string">"/data/odm/block_09"</span><span class="token punctuation">,</span> gsd<span class="token punctuation">,</span> odm<span class="token punctuation">,</span> acc<span class="token punctuation">,</span> <span class="token string">"odm"</span><span class="token punctuation">,</span>
+                     <span class="token string">"sha256:3f0a…"</span><span class="token punctuation">)</span>     <span class="token comment"># the container digest that produced it</span>
+failures <span class="token operator">=</span> gate<span class="token punctuation">(</span>rec<span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"PASS"</span> <span class="token keyword">if</span> <span class="token keyword">not</span> failures <span class="token keyword">else</span> <span class="token string">"FAIL: "</span> <span class="token operator">+</span> <span class="token string">"; "</span><span class="token punctuation">.</span>join<span class="token punctuation">(</span>failures<span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Expressing the accuracy threshold as a multiple of the GSD is what makes one gate work across flights at different altitudes. Three times the GSD vertically is an achievable target for a well-controlled survey; a 2 cm GSD flight should land inside 6 cm, and a 5 cm GSD flight inside 15 cm. Recording the container digest alongside makes the run reproducible, which is the other half of a defensible number.</p>
+<h3 id="6-track-the-record-across-flights" tabindex="-1"><a class="heading-link" href="#6-track-the-record-across-flights"><span>6. Track the record across flights</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> glob
+
+records <span class="token operator">=</span> <span class="token punctuation">[</span>json<span class="token punctuation">.</span>loads<span class="token punctuation">(</span>Path<span class="token punctuation">(</span>p<span class="token punctuation">)</span><span class="token punctuation">.</span>read_text<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token keyword">for</span> p <span class="token keyword">in</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span>glob<span class="token punctuation">.</span>glob<span class="token punctuation">(</span><span class="token string">"/data/odm/*/quality.json"</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">]</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span><span class="token string">'project'</span><span class="token punctuation">:</span><span class="token format-spec">&lt;22</span><span class="token punctuation">}</span></span><span class="token interpolation"><span class="token punctuation">{</span><span class="token string">'GSD'</span><span class="token punctuation">:</span><span class="token format-spec">>6</span><span class="token punctuation">}</span></span><span class="token interpolation"><span class="token punctuation">{</span><span class="token string">'reproj'</span><span class="token punctuation">:</span><span class="token format-spec">>8</span><span class="token punctuation">}</span></span><span class="token interpolation"><span class="token punctuation">{</span><span class="token string">'track'</span><span class="token punctuation">:</span><span class="token format-spec">>7</span><span class="token punctuation">}</span></span><span class="token interpolation"><span class="token punctuation">{</span><span class="token string">'RMSEz'</span><span class="token punctuation">:</span><span class="token format-spec">>8</span><span class="token punctuation">}</span></span><span class="token interpolation"><span class="token punctuation">{</span><span class="token string">'bias'</span><span class="token punctuation">:</span><span class="token format-spec">>8</span><span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+<span class="token keyword">for</span> r <span class="token keyword">in</span> records<span class="token punctuation">:</span>
+    a <span class="token operator">=</span> r<span class="token punctuation">[</span><span class="token string">"accuracy"</span><span class="token punctuation">]</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>Path<span class="token punctuation">(</span>r<span class="token punctuation">[</span><span class="token string">'project'</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">.</span>name<span class="token punctuation">:</span><span class="token format-spec">&lt;22</span><span class="token punctuation">}</span></span><span class="token interpolation"><span class="token punctuation">{</span>r<span class="token punctuation">[</span><span class="token string">'gsd_cm'</span><span class="token punctuation">]</span><span class="token punctuation">:</span><span class="token format-spec">>6.2f</span><span class="token punctuation">}</span></span><span class="token interpolation"><span class="token punctuation">{</span>r<span class="token punctuation">[</span><span class="token string">'reprojection_error_px'</span><span class="token punctuation">]</span><span class="token punctuation">:</span><span class="token format-spec">>8.2f</span><span class="token punctuation">}</span></span><span class="token string">"</span></span>
+          <span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>r<span class="token punctuation">[</span><span class="token string">'mean_track_length'</span><span class="token punctuation">]</span><span class="token punctuation">:</span><span class="token format-spec">>7.2f</span><span class="token punctuation">}</span></span><span class="token interpolation"><span class="token punctuation">{</span>a<span class="token punctuation">[</span><span class="token string">'rmse_z_m'</span><span class="token punctuation">]</span><span class="token punctuation">:</span><span class="token format-spec">>8.3f</span><span class="token punctuation">}</span></span><span class="token interpolation"><span class="token punctuation">{</span>a<span class="token punctuation">[</span><span class="token string">'bias_z_m'</span><span class="token punctuation">]</span><span class="token punctuation">:</span><span class="token format-spec">>+8.3f</span><span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>A table of past runs is the most useful artefact this whole page produces. It answers “is this flight worse than usual?” — which is a far better question than “is this flight acceptable?” — and it exposes slow drifts, such as a camera whose calibration has changed or a control network that has been disturbed.</p>
+<h2 id="expected-output-verification" tabindex="-1"><a class="heading-link" href="#expected-output-verification"><span>Expected Output &amp; Verification</span></a></h2>
+<div class="codeblock" data-lang="text"><div class="codeblock__bar"><span class="codeblock__lang">text</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-text" tabindex="0" role="group" aria-label="text code sample"><code class="language-text">GSD 2.04 cm/px
+{
+  "images_total": 412,
+  "images_reconstructed": 412,
+  "components": 1,
+  "reprojection_error_px": 0.42,
+  "mean_track_length": 5.61,
+  "points": 214882,
+  "features_median": 18422,
+  "gps_error_m": 1.42
+}
+{'n': 3, 'rmse_z_m': 0.038, 'bias_z_m': 0.011, 'max_abs_z_m': 0.049, 'residuals_m': [0.049, -0.021, 0.011]}
+PASS
+
+project                  GSD  reproj  track   RMSEz    bias
+block_09                2.04    0.42   5.61   0.038  +0.011
+block_11                2.11    0.51   5.02   0.044  -0.008
+block_12                2.08    1.62   3.21   0.128  +0.092
+</code></pre></div>
+<p><code>block_12</code> in that table is the point of the exercise: its reprojection error is above the threshold, its track length has collapsed and its vertical bias is 9 cm, all of which point at the same cause — a weakly connected reconstruction with control on one side. The gate rejects it, and the table shows it is the exception rather than the norm for this project.</p>
+<p>Verify the gate itself against a run you know is bad. Keep the statistics of a past failed run as a fixture and assert that <code>gate</code> rejects it:</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python">bad <span class="token operator">=</span> json<span class="token punctuation">.</span>loads<span class="token punctuation">(</span>Path<span class="token punctuation">(</span><span class="token string">"tests/fixtures/quality_bad.json"</span><span class="token punctuation">)</span><span class="token punctuation">.</span>read_text<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+<span class="token keyword">assert</span> gate<span class="token punctuation">(</span>bad<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"the gate accepted a known-bad run"</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"gate rejects the known-bad fixture"</span><span class="token punctuation">)</span>
+</code></pre></div>
+<figure class="diagram">
+<svg viewBox="56 8 658 238" role="img" aria-labelledby="qr-trend-t qr-trend-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="qr-trend-t">Vertical RMSE across flights against the GSD-based limit</title>
+  <desc id="qr-trend-d">A series of flights with their vertical root mean square error plotted against a limit of three times the ground sampling distance. Most flights sit between one and two times the GSD. One flight exceeds the limit, and the same flight also shows a large vertical bias, which identifies a control problem rather than noise.</desc>
+  <rect class="svg-bg" x="56" y="8" width="658" height="238" fill="#ffffff"/>
+  <path d="M70 30 V180 H700" fill="none" stroke="#5b6471" stroke-width="1.5"/>
+  <path d="M70 70 H700" fill="none" stroke="#b0413e" stroke-width="2" stroke-dasharray="6 4"/>
+  <g stroke-width="1.5" fill="#e3f0f4" stroke="#1f6b8a">
+    <rect x="110" y="140" width="44" height="40"/>
+    <rect x="190" y="132" width="44" height="48"/>
+    <rect x="270" y="146" width="44" height="34"/>
+    <rect x="350" y="136" width="44" height="44"/>
+    <rect x="510" y="128" width="44" height="52"/>
+    <rect x="590" y="142" width="44" height="38"/>
+  </g>
+  <rect x="430" y="44" width="44" height="136" fill="#f7dfdc" stroke="#b0413e" stroke-width="1.5"/>
+  <text x="688" y="62" fill="#b0413e" font-size="12" text-anchor="end">limit: 3 × GSD</text>
+  <text x="452" y="36" fill="#b0413e" font-size="12.5" text-anchor="middle">block_12</text>
+  <g fill="#1f2937" font-size="12" text-anchor="middle">
+    <text x="132" y="200">07</text><text x="212" y="200">08</text><text x="292" y="200">09</text>
+    <text x="372" y="200">11</text><text x="452" y="200">12</text><text x="532" y="200">13</text><text x="612" y="200">14</text>
+  </g>
+  <text x="385" y="228" fill="#15384a" font-size="12.5" text-anchor="middle">vertical RMSE per block, in the same units as the limit</text>
+</svg>
+<figcaption>A per-project history turns a threshold into context: one flight outside the band is a specific problem to investigate, not a reason to move the threshold.</figcaption>
+</figure>
+<h2 id="performance-notes" tabindex="-1"><a class="heading-link" href="#performance-notes"><span>Performance Notes</span></a></h2>
+<ul>
+<li><strong>Parsing is free</strong>; sampling the surface model at a handful of check points is milliseconds. There is no performance reason to skip any of this.</li>
+<li><strong>Store <code>quality.json</code> with the outputs, not in a build directory</strong> that gets cleaned. It is the smallest and most valuable artefact of the run.</li>
+<li><strong>Keep the raw report too.</strong> A normalised record loses fields you will want when the next question is unexpected.</li>
+<li><strong>Run the gate inside the processing job</strong>, so a failing reconstruction never reaches the tiling stage and waste compute downstream.</li>
+</ul>
+<h2 id="common-errors" tabindex="-1"><a class="heading-link" href="#common-errors"><span>Common Errors</span></a></h2>
+<p><strong><code>KeyError</code> on a statistics field.</strong> The tool version changed its schema. Use <code>.get</code> and log unknown structures rather than failing.</p>
+<p><strong>Check-point sampling returns nodata.</strong> The points fall outside the surface model, or on a masked cell such as water. Print the sampled values before computing statistics and exclude nodata explicitly.</p>
+<p><strong>RMSE looks excellent because the check points were in the adjustment.</strong> The most common way to produce a flattering number. The split has to be enforced where the control file is generated, as in <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/photogrammetry-processing-pipelines/preparing-ground-control-point-files/">preparing ground control point files</a>.</p>
+<p><strong>Reprojection error is tiny and the model is visibly wrong.</strong> Expected — it is an internal measure. A reconstruction can fit its own observations beautifully and be domed by 30 cm.</p>
+<h2 id="frequently-asked-questions" tabindex="-1"><a class="heading-link" href="#frequently-asked-questions"><span>Frequently Asked Questions</span></a></h2>
+<h3 id="what-accuracy-should-i-promise-a-client" tabindex="-1"><a class="heading-link" href="#what-accuracy-should-i-promise-a-client"><span>What accuracy should I promise a client?</span></a></h3>
+<p>Whatever the check points measured on their site, with the number of points stated. For planning purposes before flying, one to three times the GSD horizontally and two to three times vertically is a defensible expectation for a controlled survey.</p>
+<h3 id="three-check-points-seems-few" tabindex="-1"><a class="heading-link" href="#three-check-points-seems-few"><span>Three check points seems few.</span></a></h3>
+<p>It is the practical minimum and it gives a weak estimate. Five to ten spread across the site is much better, and on a large project the marginal survey cost is small against the cost of an accuracy dispute.</p>
+<h3 id="can-i-compare-reprojection-error-between-odm-and-colmap" tabindex="-1"><a class="heading-link" href="#can-i-compare-reprojection-error-between-odm-and-colmap"><span>Can I compare reprojection error between ODM and COLMAP?</span></a></h3>
+<p>Only loosely. Both report a mean in pixels, but the feature detectors, the image scales at which features were found and the outlier thresholds differ. Compare each tool against its own history.</p>
+<h2 id="related-guides" tabindex="-1"><a class="heading-link" href="#related-guides"><span>Related Guides</span></a></h2>
+<ul>
+<li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/photogrammetry-processing-pipelines/running-opendronemap-in-docker-for-city-blocks/">Running OpenDroneMap in Docker for City Blocks</a> — the run that produces these statistics</li>
+<li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/photogrammetry-processing-pipelines/preparing-ground-control-point-files/">Preparing Ground Control Point Files</a> — where the check-point split is enforced</li>
+<li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/schema-validation-gates-for-spatial-data/">Schema Validation Gates for Spatial Data</a> — the same gate pattern for other data</li>
+</ul>
+<p>Back to <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/photogrammetry-processing-pipelines/">Photogrammetry Processing Pipelines</a>.</p>
+
+
+      
+      
+
+      <div class="related-nav">
+        
+
+        
+          <div>
+            <h3>Related</h3>
+            <div class="related-grid">
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/photogrammetry-processing-pipelines/fusing-lidar-and-photogrammetry-point-clouds/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Fusing LiDAR and Photogrammetry Point Clouds</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/photogrammetry-processing-pipelines/georeferencing-photogrammetric-point-clouds/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Georeferencing Photogrammetric Point Clouds</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/photogrammetry-processing-pipelines/preparing-ground-control-point-files/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Preparing Ground Control Point Files</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/photogrammetry-processing-pipelines/running-opendronemap-in-docker-for-city-blocks/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Running OpenDroneMap in Docker for City Blocks</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/photogrammetry-processing-pipelines/sparse-and-dense-reconstruction-with-colmap/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Sparse and Dense Reconstruction with COLMAP</span>
+                </a>
+              
+            </div>
+          </div>
+        
+      </div>
+    </article>
+
+    
+    <aside class="toc" aria-label="On this page" data-toc hidden>
+      <h4>On this page</h4>
+      <ul></ul>
+    </aside>
+  </div>
+</div>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+  <div class="container site-footer__inner">
+    <div class="site-footer__brand">
+      <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+        <img src="/assets/img/logo-mark.svg" alt="" class="brand__mark" width="36" height="36">
+        <span class="brand__name">
+          3D Geospatial
+          <small>Digital Twin Automation</small>
+        </span>
+      </a>
+      <p>Engineering-grade guides on point cloud processing, mesh pipelines, LOD strategies, and CI/CD automation for digital twin platforms.</p>
+      <a class="footer-social" href="https://github.com/3d-geospatial" aria-label="3D Geospatial on GitHub" rel="noopener" target="_blank">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+          <path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.53-1.34-1.3-1.7-1.3-1.7-1.06-.72.08-.71.08-.71 1.17.08 1.79 1.2 1.79 1.2 1.04 1.79 2.73 1.27 3.4.97.1-.75.4-1.27.73-1.56-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.19-3.08-.12-.3-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.75.11 3.05.74.8 1.19 1.83 1.19 3.08 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.07.78 2.15v3.18c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5Z"/>
+        </svg>
+        <span>GitHub</span>
+      </a>
+    </div>
+
+    <div class="site-footer__col">
+      <h4>Sections</h4>
+      <ul>
+        <li><a href="https://www.3d-geospatial.com/">Home</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management &amp; Optimization</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/">Point Cloud &amp; Mesh Pipelines</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/">Troubleshooting &amp; Reliability</a></li>
+        
+      </ul>
+    </div>
+
+    
+      <div class="site-footer__col">
+        <h4>3D Geospatial Fundamentals</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/">3D Format Standards Comparison</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/">BIM and IFC Georeferencing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/">CityGML and CityJSON Processing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems for 3D Assets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/">Digital Elevation Model Workflows</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/">Spatial Indexing and Tiling Schemes for 3D Data</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>LOD Management &amp; Optimization</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/">Automated Tile Generation for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/">Cesium ion Upload Automation for 3D Tilesets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/">glTF LOD Generation With Draco Compression</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/">Streaming Sync Patterns for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/">Tileset Metadata and 3D Tiles Next</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/">Vector Overlays on 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Point Cloud &amp; Mesh Pipelines</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/">Automated Mesh Decimation for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/">Change Detection Between LiDAR Scan Epochs</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/">CI/CD Automation for Spatial Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">LiDAR Classification and Ground Extraction</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/photogrammetry-processing-pipelines/">Photogrammetry Processing Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/">Point Cloud Filtering Techniques</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/">Surface Reconstruction for Geospatial Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/">Texture Mapping Workflows for Digital Twins</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Troubleshooting &amp; Reliability</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/">Cross-Section Failure Modes in Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/">Data Validation &amp; QA Gates for 3D Tiles</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/">Performance Profiling and Benchmarking</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/">Pipeline Observability and Monitoring</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/">Streaming &amp; Runtime Diagnostics for 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+  </div>
+  <div class="container site-footer__bottom">
+    <span>© 2026 3D Geospatial &amp; Digital Twin Automation</span>
+    <span>Built with Eleventy · PWA-enabled</span>
+  </div>
+</footer>
+
+
+  <script src="/assets/js/site.js?v=b99aa9f971" defer></script>
+  
+</body>
+</html>

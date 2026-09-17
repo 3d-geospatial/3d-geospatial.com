@@ -1,0 +1,816 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <title>Orchestrating Tiling Jobs with Dask — 3D Geospatial</title>
+  <meta name="description" content="Run a city tiling job across cores and machines with Dask: task graphs per shard, memory-aware workers, retries, progress">
+  <meta name="keywords" content="3D geospatial, digital twin, point cloud, mesh pipeline, LOD, 3D Tiles, Cesium, PDAL, Open3D, Python, CI/CD">
+  <meta name="author" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta name="theme-color" content="#1f6b8a" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f171d" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+
+  
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem("theme");
+        var theme = (stored === "dark" || stored === "light") ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    })();
+  </script>
+  <meta name="generator" content="Eleventy">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="googlebot" content="index,follow,max-image-preview:large">
+
+  
+  <link rel="canonical" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/orchestrating-tiling-jobs-with-dask/">
+  <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">
+
+  
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/icon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+
+  
+  <link rel="apple-touch-icon" href="/assets/img/icon-180.png">
+  <link rel="mask-icon" href="/assets/img/logo.svg" color="#1f6b8a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="3D Geospatial">
+  <meta name="application-name" content="3D Geospatial">
+
+  
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Orchestrating Tiling Jobs with Dask — 3D Geospatial">
+  <meta property="og:description" content="Run a city tiling job across cores and machines with Dask: task graphs per shard, memory-aware workers, retries, progress">
+  <meta property="og:url" content="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/orchestrating-tiling-jobs-with-dask/">
+  <meta property="og:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+  <meta property="og:site_name" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta property="og:locale" content="en_US">
+  
+  <meta property="article:published_time" content="2026-09-17T23:36:56.452Z">
+  <meta property="article:modified_time" content="2026-09-17T23:36:56.452Z">
+  <meta property="article:publisher" content="https://www.3d-geospatial.com/">
+  
+
+  
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Orchestrating Tiling Jobs with Dask — 3D Geospatial">
+  <meta name="twitter:description" content="Run a city tiling job across cores and machines with Dask: task graphs per shard, memory-aware workers, retries, progress">
+  <meta name="twitter:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta name="twitter:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+
+  
+  <link rel="preload" href="/assets/css/styles.css?v=8c46394d6c" as="style">
+  
+
+  <link rel="stylesheet" href="/assets/css/styles.css?v=8c46394d6c">
+
+  
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.3d-geospatial.com/#organization",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "url": "https://www.3d-geospatial.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/icon-512.png",
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://www.3d-geospatial.com/#website",
+      "url": "https://www.3d-geospatial.com/",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "description": "Build reliable 3D spatial data pipelines for digital twins — point clouds, meshes, LOD strategies, Python processing, and CI/CD automation.",
+      "inLanguage": "en",
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      }
+    },
+    {
+      "@type": "TechArticle",
+      "@id": "https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/orchestrating-tiling-jobs-with-dask/#article",
+      "isPartOf": {
+        "@id": "https://www.3d-geospatial.com/#website"
+      },
+      "headline": "Orchestrating Tiling Jobs with Dask",
+      "name": "Orchestrating Tiling Jobs with Dask",
+      "description": "Run a city tiling job across cores and machines with Dask: task graphs per shard, memory-aware workers, retries, progress",
+      "url": "https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/orchestrating-tiling-jobs-with-dask/",
+      "mainEntityOfPage": "https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/orchestrating-tiling-jobs-with-dask/",
+      "inLanguage": "en",
+      "datePublished": "2026-09-17T23:36:56.452Z",
+      "dateModified": "2026-09-17T23:36:56.452Z",
+      "author": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "image": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/og-cover.png",
+        "width": 1200,
+        "height": 630
+      },
+      "breadcrumb": {
+        "@id": "https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/orchestrating-tiling-jobs-with-dask/#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/orchestrating-tiling-jobs-with-dask/#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://www.3d-geospatial.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "LOD Management Optimization Strategies",
+          "item": "https://www.3d-geospatial.com/lod-management-optimization-strategies/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "3D Tiles Batch Tiling Pipelines",
+          "item": "https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "name": "Orchestrating Tiling Jobs With Dask",
+          "item": "https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/orchestrating-tiling-jobs-with-dask/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  
+<header class="site-header" role="banner">
+  <div class="container site-header__inner">
+    <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+      <img src="/assets/img/logo.svg" alt="" class="brand__mark" width="36" height="36">
+      <span class="brand__name">
+        3D Geospatial
+        <small>Digital Twin Automation</small>
+      </span>
+    </a>
+
+    <button class="theme-toggle" type="button" data-theme-toggle
+            aria-label="Switch to dark theme" title="Switch to dark theme">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4.2"/>
+        <path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/>
+      </svg>
+    </button>
+
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>
+      <span class="nav-toggle__icon" aria-hidden="true"><span></span></span>
+      Menu
+    </button>
+
+    <nav class="primary-nav" id="primary-nav" aria-label="Primary">
+      
+      <a href="https://www.3d-geospatial.com/" >
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/>
+        </svg>
+        Home
+      </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2 3 7l9 5 9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 17l9 5 9-5"/>
+            </svg>
+          
+          3D Geospatial Fundamentals
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/" aria-current="page">
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+          
+          LOD Management &amp; Optimization
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="6" cy="6" r="1.5"/><circle cx="12" cy="6" r="1.5"/><circle cx="18" cy="6" r="1.5"/>
+              <circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/>
+              <circle cx="6" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="18" cy="18" r="1.5"/>
+            </svg>
+          
+          Point Cloud &amp; Mesh Pipelines
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <path d="M12 9v4"/><path d="M12 17h.01"/>
+            </svg>
+          
+          Troubleshooting &amp; Reliability
+        </a>
+      
+    </nav>
+  </div>
+</header>
+
+
+  <main id="main">
+    
+
+
+<div class="container">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    
+      
+        <a href="https://www.3d-geospatial.com/">Home</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management Optimization Strategies</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <span class="current">Orchestrating Tiling Jobs With Dask</span>
+      
+    
+  </nav>
+
+  <div class="content-page">
+    <article class="article">
+      <h1 id="orchestrating-tiling-jobs-with-dask" tabindex="-1"><a class="heading-link" href="#orchestrating-tiling-jobs-with-dask"><span>Orchestrating Tiling Jobs with Dask</span></a></h1>
+<p>This page runs a shard-per-task tiling job with Dask — building a task graph from the shard list, sizing workers by memory rather than by cores, retrying transient failures without re-running successful shards, reporting progress, and writing a manifest as results arrive so a crashed run resumes instead of restarting, for a city tiled from EPSG:25832 into EPSG:4978.</p>
+<h2 id="why-you-hit-this" tabindex="-1"><a class="heading-link" href="#why-you-hit-this"><span>Why you hit this</span></a></h2>
+<p>A city tiling job is a few thousand independent tasks with wildly uneven cost, each needing a gigabyte or two of memory, producing files and a manifest entry. A <code>for</code> loop takes two days; <code>multiprocessing.Pool</code> runs it in two hours and loses everything when one shard raises; a shell script with <code>xargs -P</code> works until a worker is killed by the OOM killer and nobody notices which shards are missing. Dask handles the shape of this problem — heterogeneous tasks, memory pressure, partial failure, progress — without becoming a distributed-systems project. The shard grid it consumes comes from <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/choosing-shard-sizes-for-city-scale-tiling/">choosing shard sizes for city-scale tiling</a>.</p>
+<h2 id="prerequisites" tabindex="-1"><a class="heading-link" href="#prerequisites"><span>Prerequisites</span></a></h2>
+<ul>
+<li>Python 3.10+ with <code>dask[distributed]&gt;=2024.1</code>, plus the tiling code itself and its dependencies available in the worker environment.</li>
+<li>A shard list with an estimate of each shard’s cost — feature count is a good proxy.</li>
+<li>Shared storage both the scheduler and the workers can write: a local path on a single machine, or object storage for a cluster.</li>
+</ul>
+<h2 id="step-by-step" tabindex="-1"><a class="heading-link" href="#step-by-step"><span>Step-by-Step</span></a></h2>
+<h3 id="1-make-the-unit-of-work-a-pure-function" tabindex="-1"><a class="heading-link" href="#1-make-the-unit-of-work-a-pure-function"><span>1. Make the unit of work a pure function</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> json
+<span class="token keyword">import</span> os
+<span class="token keyword">import</span> time
+<span class="token keyword">from</span> dataclasses <span class="token keyword">import</span> dataclass<span class="token punctuation">,</span> asdict
+<span class="token keyword">from</span> pathlib <span class="token keyword">import</span> Path
+
+<span class="token decorator annotation punctuation">@dataclass</span><span class="token punctuation">(</span>frozen<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+<span class="token keyword">class</span> <span class="token class-name">ShardTask</span><span class="token punctuation">:</span>
+    quadkey<span class="token punctuation">:</span> <span class="token builtin">str</span>
+    source_uri<span class="token punctuation">:</span> <span class="token builtin">str</span>
+    out_dir<span class="token punctuation">:</span> <span class="token builtin">str</span>
+    feature_count<span class="token punctuation">:</span> <span class="token builtin">int</span>
+    params_hash<span class="token punctuation">:</span> <span class="token builtin">str</span>
+
+<span class="token decorator annotation punctuation">@dataclass</span><span class="token punctuation">(</span>frozen<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+<span class="token keyword">class</span> <span class="token class-name">ShardResult</span><span class="token punctuation">:</span>
+    quadkey<span class="token punctuation">:</span> <span class="token builtin">str</span>
+    ok<span class="token punctuation">:</span> <span class="token builtin">bool</span>
+    triangles<span class="token punctuation">:</span> <span class="token builtin">int</span> <span class="token operator">=</span> <span class="token number">0</span>
+    <span class="token builtin">bytes</span><span class="token punctuation">:</span> <span class="token builtin">int</span> <span class="token operator">=</span> <span class="token number">0</span>
+    seconds<span class="token punctuation">:</span> <span class="token builtin">float</span> <span class="token operator">=</span> <span class="token number">0.0</span>
+    worker<span class="token punctuation">:</span> <span class="token builtin">str</span> <span class="token operator">=</span> <span class="token string">""</span>
+    error<span class="token punctuation">:</span> <span class="token builtin">str</span> <span class="token operator">=</span> <span class="token string">""</span>
+
+<span class="token keyword">def</span> <span class="token function">tile_shard</span><span class="token punctuation">(</span>task<span class="token punctuation">:</span> ShardTask<span class="token punctuation">)</span> <span class="token operator">-</span><span class="token operator">></span> ShardResult<span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Pure with respect to the process: reads its inputs, writes its outputs, returns a record."""</span>
+    t0 <span class="token operator">=</span> time<span class="token punctuation">.</span>perf_counter<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    out <span class="token operator">=</span> Path<span class="token punctuation">(</span>task<span class="token punctuation">.</span>out_dir<span class="token punctuation">)</span> <span class="token operator">/</span> task<span class="token punctuation">.</span>quadkey
+    <span class="token keyword">try</span><span class="token punctuation">:</span>
+        out<span class="token punctuation">.</span>mkdir<span class="token punctuation">(</span>parents<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> exist_ok<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+        <span class="token keyword">from</span> twin<span class="token punctuation">.</span>tiler <span class="token keyword">import</span> build_shard          <span class="token comment"># imported inside: workers import lazily</span>
+        stats <span class="token operator">=</span> build_shard<span class="token punctuation">(</span>task<span class="token punctuation">.</span>source_uri<span class="token punctuation">,</span> task<span class="token punctuation">.</span>quadkey<span class="token punctuation">,</span> out<span class="token punctuation">)</span>
+        <span class="token keyword">return</span> ShardResult<span class="token punctuation">(</span>task<span class="token punctuation">.</span>quadkey<span class="token punctuation">,</span> <span class="token boolean">True</span><span class="token punctuation">,</span> stats<span class="token punctuation">[</span><span class="token string">"triangles"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> stats<span class="token punctuation">[</span><span class="token string">"bytes"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+                           <span class="token builtin">round</span><span class="token punctuation">(</span>time<span class="token punctuation">.</span>perf_counter<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">-</span> t0<span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span> os<span class="token punctuation">.</span>uname<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span>nodename<span class="token punctuation">)</span>
+    <span class="token keyword">except</span> Exception <span class="token keyword">as</span> exc<span class="token punctuation">:</span>                        <span class="token comment"># a failed shard must not kill the run</span>
+        <span class="token keyword">return</span> ShardResult<span class="token punctuation">(</span>task<span class="token punctuation">.</span>quadkey<span class="token punctuation">,</span> <span class="token boolean">False</span><span class="token punctuation">,</span> seconds<span class="token operator">=</span><span class="token builtin">round</span><span class="token punctuation">(</span>time<span class="token punctuation">.</span>perf_counter<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">-</span> t0<span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                           worker<span class="token operator">=</span>os<span class="token punctuation">.</span>uname<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span>nodename<span class="token punctuation">,</span> error<span class="token operator">=</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span><span class="token builtin">type</span><span class="token punctuation">(</span>exc<span class="token punctuation">)</span><span class="token punctuation">.</span>__name__<span class="token punctuation">}</span></span><span class="token string">: </span><span class="token interpolation"><span class="token punctuation">{</span>exc<span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Returning a result object rather than raising is the decision that shapes everything else. A task that raises makes Dask retry it, mark the graph as failed and lose the partial information; a task that returns a record lets the run continue, records <em>why</em> a shard failed, and leaves the retry decision to the orchestrator where it belongs. Genuinely transient failures — a dropped object-store connection — are worth retrying inside the task, and everything else is worth reporting.</p>
+<p>Importing the tiler inside the function keeps the module importable on the scheduler, which does not need the heavy dependencies, and avoids serialising the whole library into the task graph.</p>
+<h3 id="2-size-the-cluster-by-memory-not-by-cores" tabindex="-1"><a class="heading-link" href="#2-size-the-cluster-by-memory-not-by-cores"><span>2. Size the cluster by memory, not by cores</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> psutil
+<span class="token keyword">from</span> dask<span class="token punctuation">.</span>distributed <span class="token keyword">import</span> Client<span class="token punctuation">,</span> LocalCluster
+
+<span class="token keyword">def</span> <span class="token function">size_cluster</span><span class="token punctuation">(</span>memory_per_task_gb<span class="token operator">=</span><span class="token number">2.0</span><span class="token punctuation">,</span> reserve_gb<span class="token operator">=</span><span class="token number">4.0</span><span class="token punctuation">,</span> max_workers<span class="token operator">=</span><span class="token boolean">None</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    total_gb <span class="token operator">=</span> psutil<span class="token punctuation">.</span>virtual_memory<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span>total <span class="token operator">/</span> <span class="token number">1e9</span>
+    cores <span class="token operator">=</span> os<span class="token punctuation">.</span>cpu_count<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">or</span> <span class="token number">4</span>
+    by_memory <span class="token operator">=</span> <span class="token builtin">max</span><span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">,</span> <span class="token builtin">int</span><span class="token punctuation">(</span><span class="token punctuation">(</span>total_gb <span class="token operator">-</span> reserve_gb<span class="token punctuation">)</span> <span class="token operator">//</span> memory_per_task_gb<span class="token punctuation">)</span><span class="token punctuation">)</span>
+    workers <span class="token operator">=</span> <span class="token builtin">min</span><span class="token punctuation">(</span>cores<span class="token punctuation">,</span> by_memory<span class="token punctuation">,</span> max_workers <span class="token keyword">or</span> cores<span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"workers"</span><span class="token punctuation">:</span> workers<span class="token punctuation">,</span> <span class="token string">"threads_per_worker"</span><span class="token punctuation">:</span> <span class="token number">1</span><span class="token punctuation">,</span>
+            <span class="token string">"memory_limit"</span><span class="token punctuation">:</span> <span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span><span class="token punctuation">(</span>total_gb <span class="token operator">-</span> reserve_gb<span class="token punctuation">)</span> <span class="token operator">/</span> workers<span class="token punctuation">:</span><span class="token format-spec">.1f</span><span class="token punctuation">}</span></span><span class="token string">GB"</span></span><span class="token punctuation">,</span>
+            <span class="token string">"bound_by"</span><span class="token punctuation">:</span> <span class="token string">"memory"</span> <span class="token keyword">if</span> by_memory <span class="token operator">&lt;</span> cores <span class="token keyword">else</span> <span class="token string">"cores"</span><span class="token punctuation">}</span>
+
+spec <span class="token operator">=</span> size_cluster<span class="token punctuation">(</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span>spec<span class="token punctuation">)</span>
+cluster <span class="token operator">=</span> LocalCluster<span class="token punctuation">(</span>n_workers<span class="token operator">=</span>spec<span class="token punctuation">[</span><span class="token string">"workers"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+                       threads_per_worker<span class="token operator">=</span>spec<span class="token punctuation">[</span><span class="token string">"threads_per_worker"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+                       memory_limit<span class="token operator">=</span>spec<span class="token punctuation">[</span><span class="token string">"memory_limit"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+                       processes<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+client <span class="token operator">=</span> Client<span class="token punctuation">(</span>cluster<span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span>client<span class="token punctuation">.</span>dashboard_link<span class="token punctuation">)</span>
+</code></pre></div>
+<p>Tiling tasks are memory-bound, not CPU-bound: a shard holding three hundred buildings with textures peaks at a couple of gigabytes, so a 16-core machine with 32 GB runs twelve workers, not sixteen. Setting <code>memory_limit</code> per worker lets Dask spill and, if a worker still exceeds it, restart that worker rather than let the kernel kill the process — which is the difference between losing one shard and losing the run.</p>
+<p>One thread per worker is deliberate. The tiling code holds the GIL in places and uses native libraries with their own threading, so multiple threads per worker produce contention rather than throughput.</p>
+<figure class="diagram">
+<svg viewBox="6 6 748 228" role="img" aria-labelledby="dask-size-t dask-size-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="dask-size-t">Worker count from memory rather than cores</title>
+  <desc id="dask-size-d">A table of machines. A sixteen core machine with thirty-two gigabytes and two gigabytes per task runs fourteen workers bound by memory. The same cores with sixty-four gigabytes run sixteen, bound by cores. A thirty-two core machine with sixty-four gigabytes runs thirty, bound by memory. Setting workers to the core count on a memory-bound machine invites the out-of-memory killer.</desc>
+  <rect class="svg-bg" x="6" y="6" width="748" height="228" fill="#ffffff"/>
+  <g stroke-width="1.5">
+    <rect x="20" y="20" width="180" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="200" y="20" width="160" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="360" y="20" width="180" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="540" y="20" width="200" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="20" y="54" width="180" height="36" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="200" y="54" width="160" height="36" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="360" y="54" width="180" height="36" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="540" y="54" width="200" height="36" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="20" y="90" width="180" height="36" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="200" y="90" width="160" height="36" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="360" y="90" width="180" height="36" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="540" y="90" width="200" height="36" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="20" y="126" width="180" height="36" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="200" y="126" width="160" height="36" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="360" y="126" width="180" height="36" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="540" y="126" width="200" height="36" fill="#eef5e9" stroke="#4f7a4d"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="110" y="43">machine</text><text x="280" y="43">per-task memory</text>
+    <text x="450" y="43">workers</text><text x="640" y="43">bound by</text>
+    <text x="110" y="77">16 cores, 32 GB</text><text x="280" y="77">2 GB</text><text x="450" y="77">14</text><text x="640" y="77">memory</text>
+    <text x="110" y="113">16 cores, 64 GB</text><text x="280" y="113">2 GB</text><text x="450" y="113">16</text><text x="640" y="113">cores</text>
+    <text x="110" y="149">32 cores, 64 GB</text><text x="280" y="149">2 GB</text><text x="450" y="149">30</text><text x="640" y="149">memory</text>
+  </g>
+  <text x="380" y="216" fill="#15384a" font-size="12.5" text-anchor="middle">Reserve a few gigabytes for the scheduler, the OS and the page cache before dividing.</text>
+</svg>
+<figcaption>The per-task memory figure comes from a pilot run; everything else follows from it arithmetically.</figcaption>
+</figure>
+<h3 id="3-submit-the-graph-largest-shards-first" tabindex="-1"><a class="heading-link" href="#3-submit-the-graph-largest-shards-first"><span>3. Submit the graph, largest shards first</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">from</span> dask<span class="token punctuation">.</span>distributed <span class="token keyword">import</span> as_completed
+
+<span class="token keyword">def</span> <span class="token function">submit_shards</span><span class="token punctuation">(</span>client<span class="token punctuation">,</span> tasks<span class="token punctuation">,</span> retries<span class="token operator">=</span><span class="token number">2</span><span class="token punctuation">,</span> priority_by_cost<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    ordered <span class="token operator">=</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span>tasks<span class="token punctuation">,</span> key<span class="token operator">=</span><span class="token keyword">lambda</span> t<span class="token punctuation">:</span> <span class="token operator">-</span>t<span class="token punctuation">.</span>feature_count<span class="token punctuation">)</span> <span class="token keyword">if</span> priority_by_cost <span class="token keyword">else</span> <span class="token builtin">list</span><span class="token punctuation">(</span>tasks<span class="token punctuation">)</span>
+    futures <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    <span class="token keyword">for</span> i<span class="token punctuation">,</span> task <span class="token keyword">in</span> <span class="token builtin">enumerate</span><span class="token punctuation">(</span>ordered<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        futures<span class="token punctuation">.</span>append<span class="token punctuation">(</span>client<span class="token punctuation">.</span>submit<span class="token punctuation">(</span>
+            tile_shard<span class="token punctuation">,</span> task<span class="token punctuation">,</span>
+            key<span class="token operator">=</span><span class="token string-interpolation"><span class="token string">f"shard-</span><span class="token interpolation"><span class="token punctuation">{</span>task<span class="token punctuation">.</span>quadkey<span class="token punctuation">}</span></span><span class="token string">-</span><span class="token interpolation"><span class="token punctuation">{</span>task<span class="token punctuation">.</span>params_hash<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token format-spec">8]</span><span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">,</span>   <span class="token comment"># stable, deduplicating key</span>
+            retries<span class="token operator">=</span>retries<span class="token punctuation">,</span>
+            priority<span class="token operator">=</span><span class="token builtin">len</span><span class="token punctuation">(</span>ordered<span class="token punctuation">)</span> <span class="token operator">-</span> i<span class="token punctuation">,</span>                            <span class="token comment"># bigger shards start earlier</span>
+        <span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> futures
+
+tasks <span class="token operator">=</span> <span class="token punctuation">[</span>ShardTask<span class="token punctuation">(</span><span class="token operator">**</span>row<span class="token punctuation">)</span> <span class="token keyword">for</span> row <span class="token keyword">in</span> json<span class="token punctuation">.</span>loads<span class="token punctuation">(</span>Path<span class="token punctuation">(</span><span class="token string">"build/shard_plan.json"</span><span class="token punctuation">)</span><span class="token punctuation">.</span>read_text<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">]</span>
+futures <span class="token operator">=</span> submit_shards<span class="token punctuation">(</span>client<span class="token punctuation">,</span> tasks<span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span><span class="token builtin">len</span><span class="token punctuation">(</span>futures<span class="token punctuation">)</span><span class="token punctuation">:</span><span class="token format-spec">,</span><span class="token punctuation">}</span></span><span class="token string"> shard tasks submitted"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Submitting the expensive shards first is the scheduling detail that shortens the whole run. With uniform submission order, the last task to start might be the 400-building historic centre shard, and every worker waits for it; with cost-descending order that shard starts in the first wave and the small ones fill the tail. On a city job the difference is routinely 20–30% of wall clock.</p>
+<p>The <code>key</code> matters too: a deterministic key that includes the parameters’ hash means resubmitting the same work is deduplicated by Dask, and a key that changes when the parameters change avoids reusing a result computed with different settings.</p>
+<figure class="diagram">
+<svg viewBox="6 16 748 224" role="img" aria-labelledby="dask-task-t dask-task-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="dask-task-t">What crosses the wire for one shard</title>
+  <desc id="dask-task-d">The scheduler sends a small task record holding the quadkey, the source URI, the output directory and a parameter hash. The worker reads the features for that shard from shared storage, writes the tile files there, and returns a small result record with counts, timing and any error. No geometry travels through the scheduler in either direction.</desc>
+  <rect class="svg-bg" x="6" y="16" width="748" height="224" fill="#ffffff"/>
+  <defs>
+    <marker id="dask-task-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
+    </marker>
+  </defs>
+  <rect x="20" y="80" width="150" height="60" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="300" y="80" width="150" height="60" rx="8" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <rect x="580" y="30" width="160" height="56" rx="8" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <rect x="580" y="130" width="160" height="56" rx="8" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <g stroke="#5b6471" stroke-width="2" fill="none" marker-end="url(#dask-task-arrow)">
+    <path d="M170 98 H298"/>
+    <path d="M298 126 H172"/>
+    <path d="M450 100 L578 66"/>
+    <path d="M450 122 L578 152"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="95" y="104">scheduler</text><text x="95" y="124">holds the graph</text>
+    <text x="375" y="104">worker</text><text x="375" y="124">one shard at a time</text>
+    <text x="660" y="52">shared storage:</text><text x="660" y="70">features in</text>
+    <text x="660" y="152">shared storage:</text><text x="660" y="170">tiles out</text>
+  </g>
+  <g fill="#5b6471" font-size="11.5" text-anchor="middle">
+    <text x="234" y="72">task: ~200 B</text>
+    <text x="234" y="164">result: ~200 B</text>
+  </g>
+  <text x="380" y="222" fill="#15384a" font-size="12.5" text-anchor="middle">Passing geometry as a task argument is the most common way to make a Dask job slow.</text>
+</svg>
+<figcaption>Small tasks in, small records out, and the bulk data moves directly between the worker and storage.</figcaption>
+</figure>
+<h3 id="4-write-the-manifest-as-results-arrive" tabindex="-1"><a class="heading-link" href="#4-write-the-manifest-as-results-arrive"><span>4. Write the manifest as results arrive</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">run_with_manifest</span><span class="token punctuation">(</span>client<span class="token punctuation">,</span> futures<span class="token punctuation">,</span> manifest_path<span class="token punctuation">,</span> flush_every<span class="token operator">=</span><span class="token number">25</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    manifest <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token punctuation">}</span>
+    path <span class="token operator">=</span> Path<span class="token punctuation">(</span>manifest_path<span class="token punctuation">)</span>
+    <span class="token keyword">if</span> path<span class="token punctuation">.</span>exists<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        manifest <span class="token operator">=</span> json<span class="token punctuation">.</span>loads<span class="token punctuation">(</span>path<span class="token punctuation">.</span>read_text<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+
+    done <span class="token operator">=</span> failed <span class="token operator">=</span> <span class="token number">0</span>
+    pending_writes <span class="token operator">=</span> <span class="token number">0</span>
+    <span class="token keyword">for</span> future<span class="token punctuation">,</span> result <span class="token keyword">in</span> as_completed<span class="token punctuation">(</span>futures<span class="token punctuation">,</span> with_results<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> raise_errors<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">if</span> <span class="token builtin">isinstance</span><span class="token punctuation">(</span>result<span class="token punctuation">,</span> ShardResult<span class="token punctuation">)</span><span class="token punctuation">:</span>
+            manifest<span class="token punctuation">[</span>result<span class="token punctuation">.</span>quadkey<span class="token punctuation">]</span> <span class="token operator">=</span> asdict<span class="token punctuation">(</span>result<span class="token punctuation">)</span>
+            done <span class="token operator">+=</span> result<span class="token punctuation">.</span>ok
+            failed <span class="token operator">+=</span> <span class="token keyword">not</span> result<span class="token punctuation">.</span>ok
+        <span class="token keyword">else</span><span class="token punctuation">:</span>                                    <span class="token comment"># a task that died despite the try/except</span>
+            manifest<span class="token punctuation">[</span><span class="token builtin">str</span><span class="token punctuation">(</span>future<span class="token punctuation">.</span>key<span class="token punctuation">)</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token string">"ok"</span><span class="token punctuation">:</span> <span class="token boolean">False</span><span class="token punctuation">,</span> <span class="token string">"error"</span><span class="token punctuation">:</span> <span class="token builtin">repr</span><span class="token punctuation">(</span>result<span class="token punctuation">)</span><span class="token punctuation">}</span>
+            failed <span class="token operator">+=</span> <span class="token number">1</span>
+        pending_writes <span class="token operator">+=</span> <span class="token number">1</span>
+        <span class="token keyword">if</span> pending_writes <span class="token operator">>=</span> flush_every<span class="token punctuation">:</span>
+            path<span class="token punctuation">.</span>write_text<span class="token punctuation">(</span>json<span class="token punctuation">.</span>dumps<span class="token punctuation">(</span>manifest<span class="token punctuation">,</span> indent<span class="token operator">=</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+            pending_writes <span class="token operator">=</span> <span class="token number">0</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>done <span class="token operator">+</span> failed<span class="token punctuation">)</span> <span class="token operator">%</span> <span class="token number">100</span> <span class="token operator">==</span> <span class="token number">0</span><span class="token punctuation">:</span>
+            <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>done <span class="token operator">+</span> failed<span class="token punctuation">:</span><span class="token format-spec">>6,</span><span class="token punctuation">}</span></span><span class="token string">/</span><span class="token interpolation"><span class="token punctuation">{</span><span class="token builtin">len</span><span class="token punctuation">(</span>futures<span class="token punctuation">)</span><span class="token punctuation">:</span><span class="token format-spec">,</span><span class="token punctuation">}</span></span><span class="token string">  ok </span><span class="token interpolation"><span class="token punctuation">{</span>done<span class="token punctuation">:</span><span class="token format-spec">,</span><span class="token punctuation">}</span></span><span class="token string">  failed </span><span class="token interpolation"><span class="token punctuation">{</span>failed<span class="token punctuation">:</span><span class="token format-spec">,</span><span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+    path<span class="token punctuation">.</span>write_text<span class="token punctuation">(</span>json<span class="token punctuation">.</span>dumps<span class="token punctuation">(</span>manifest<span class="token punctuation">,</span> indent<span class="token operator">=</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> manifest<span class="token punctuation">,</span> done<span class="token punctuation">,</span> failed
+
+manifest<span class="token punctuation">,</span> done<span class="token punctuation">,</span> failed <span class="token operator">=</span> run_with_manifest<span class="token punctuation">(</span>client<span class="token punctuation">,</span> futures<span class="token punctuation">,</span> <span class="token string">"build/manifest.json"</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"finished: </span><span class="token interpolation"><span class="token punctuation">{</span>done<span class="token punctuation">:</span><span class="token format-spec">,</span><span class="token punctuation">}</span></span><span class="token string"> ok, </span><span class="token interpolation"><span class="token punctuation">{</span>failed<span class="token punctuation">:</span><span class="token format-spec">,</span><span class="token punctuation">}</span></span><span class="token string"> failed"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Flushing the manifest every twenty-five results is what makes a long run survivable. A four-hour job that writes its manifest at the end loses everything to a scheduler restart; one that flushes incrementally loses at most twenty-five shards’ bookkeeping, and the resume logic in <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/resuming-failed-tiling-runs-from-checkpoints/">resuming failed tiling runs from checkpoints</a> picks up from there.</p>
+<p><code>as_completed</code> with <code>raise_errors=False</code> is the other half: results arrive as they finish rather than in submission order, and a task that died in a way the function could not catch — a worker killed mid-execution — surfaces as an exception object instead of ending the loop.</p>
+<h3 id="5-watch-for-the-failure-modes-dask-makes-visible" tabindex="-1"><a class="heading-link" href="#5-watch-for-the-failure-modes-dask-makes-visible"><span>5. Watch for the failure modes Dask makes visible</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">cluster_health</span><span class="token punctuation">(</span>client<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    info <span class="token operator">=</span> client<span class="token punctuation">.</span>scheduler_info<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    workers <span class="token operator">=</span> info<span class="token punctuation">[</span><span class="token string">"workers"</span><span class="token punctuation">]</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token string">"workers"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>workers<span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"threads"</span><span class="token punctuation">:</span> <span class="token builtin">sum</span><span class="token punctuation">(</span>w<span class="token punctuation">[</span><span class="token string">"nthreads"</span><span class="token punctuation">]</span> <span class="token keyword">for</span> w <span class="token keyword">in</span> workers<span class="token punctuation">.</span>values<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"memory_gb"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">sum</span><span class="token punctuation">(</span>w<span class="token punctuation">[</span><span class="token string">"memory_limit"</span><span class="token punctuation">]</span> <span class="token keyword">for</span> w <span class="token keyword">in</span> workers<span class="token punctuation">.</span>values<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token number">1e9</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"tasks_processing"</span><span class="token punctuation">:</span> <span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>w<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"processing"</span><span class="token punctuation">,</span> <span class="token punctuation">{</span><span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token keyword">for</span> w <span class="token keyword">in</span> workers<span class="token punctuation">.</span>values<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"spilled_gb"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">sum</span><span class="token punctuation">(</span>w<span class="token punctuation">[</span><span class="token string">"metrics"</span><span class="token punctuation">]</span><span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"spilled_bytes"</span><span class="token punctuation">,</span> <span class="token punctuation">{</span><span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"disk"</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span>
+                                <span class="token keyword">for</span> w <span class="token keyword">in</span> workers<span class="token punctuation">.</span>values<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token number">1e9</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"restart_counts"</span><span class="token punctuation">:</span> <span class="token punctuation">{</span>addr<span class="token punctuation">:</span> w<span class="token punctuation">[</span><span class="token string">"metrics"</span><span class="token punctuation">]</span><span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"event_loop_interval"</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token keyword">for</span> addr<span class="token punctuation">,</span> w <span class="token keyword">in</span>
+                           <span class="token builtin">list</span><span class="token punctuation">(</span>workers<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token number">3</span><span class="token punctuation">]</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+
+<span class="token keyword">print</span><span class="token punctuation">(</span>cluster_health<span class="token punctuation">(</span>client<span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Three numbers from that snapshot tell you whether the run is healthy. Spilled bytes above zero means workers are exceeding their memory limit and paging to disk, which is ten to a hundred times slower than the work itself — the fix is fewer workers, not more. A task-processing count well below the worker count means the scheduler is starved, usually because the task list is exhausted and a few long tasks are finishing. And repeated worker restarts mean the per-task memory estimate is too low.</p>
+<figure class="diagram">
+<svg viewBox="-9 11 719 235" role="img" aria-labelledby="dask-shape-t dask-shape-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="dask-shape-t">Worker occupancy with and without cost-ordered submission</title>
+  <desc id="dask-shape-d">Two timelines of eight workers. With shards submitted in arbitrary order, the largest shard starts late and seven workers idle while it finishes, leaving a long tail. With shards submitted largest first, the expensive shards run in the first wave and the small ones fill the gaps, so the run ends when the work ends.</desc>
+  <rect class="svg-bg" x="-9" y="11" width="719" height="235" fill="#ffffff"/>
+  <g stroke-width="1.2">
+    <rect x="80" y="26" width="200" height="14" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="80" y="44" width="230" height="14" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="80" y="62" width="180" height="14" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="80" y="80" width="210" height="14" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="310" y="44" width="330" height="14" fill="#f7dfdc" stroke="#b0413e"/>
+  </g>
+  <text x="70" y="38" fill="#1f2937" font-size="12" text-anchor="end">arbitrary</text>
+  <text x="650" y="55" fill="#b0413e" font-size="12" text-anchor="start">long tail</text>
+  <g stroke-width="1.2">
+    <rect x="80" y="130" width="330" height="14" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="80" y="148" width="180" height="14" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="260" y="148" width="140" height="14" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="80" y="166" width="210" height="14" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="290" y="166" width="120" height="14" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="80" y="184" width="200" height="14" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="280" y="184" width="130" height="14" fill="#e3f0f4" stroke="#1f6b8a"/>
+  </g>
+  <text x="70" y="142" fill="#1f2937" font-size="12" text-anchor="end">largest first</text>
+  <path d="M640 20 V100" fill="none" stroke="#b0413e" stroke-width="1.5" stroke-dasharray="4 4"/>
+  <path d="M410 124 V206" fill="none" stroke="#4f7a4d" stroke-width="1.5" stroke-dasharray="4 4"/>
+  <text x="380" y="228" fill="#15384a" font-size="12.5" text-anchor="middle">time — the green line is where the cost-ordered run finishes, the red where the other does</text>
+</svg>
+<figcaption>The tail is set by the largest task, so the only way to shorten a run is to start the largest tasks first.</figcaption>
+</figure>
+<h3 id="6-move-to-a-real-cluster-without-changing-the-code" tabindex="-1"><a class="heading-link" href="#6-move-to-a-real-cluster-without-changing-the-code"><span>6. Move to a real cluster without changing the code</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">make_client</span><span class="token punctuation">(</span>mode<span class="token operator">=</span><span class="token string">"local"</span><span class="token punctuation">,</span> <span class="token operator">**</span>kw<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">if</span> mode <span class="token operator">==</span> <span class="token string">"local"</span><span class="token punctuation">:</span>
+        spec <span class="token operator">=</span> size_cluster<span class="token punctuation">(</span><span class="token operator">**</span>kw<span class="token punctuation">)</span>
+        <span class="token keyword">return</span> Client<span class="token punctuation">(</span>LocalCluster<span class="token punctuation">(</span>n_workers<span class="token operator">=</span>spec<span class="token punctuation">[</span><span class="token string">"workers"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> threads_per_worker<span class="token operator">=</span><span class="token number">1</span><span class="token punctuation">,</span>
+                                   memory_limit<span class="token operator">=</span>spec<span class="token punctuation">[</span><span class="token string">"memory_limit"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> processes<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token keyword">if</span> mode <span class="token operator">==</span> <span class="token string">"ssh"</span><span class="token punctuation">:</span>
+        <span class="token keyword">from</span> dask<span class="token punctuation">.</span>distributed <span class="token keyword">import</span> SSHCluster
+        <span class="token keyword">return</span> Client<span class="token punctuation">(</span>SSHCluster<span class="token punctuation">(</span>hosts<span class="token operator">=</span>kw<span class="token punctuation">[</span><span class="token string">"hosts"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+                                 worker_options<span class="token operator">=</span><span class="token punctuation">{</span><span class="token string">"n_workers"</span><span class="token punctuation">:</span> kw<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"per_host"</span><span class="token punctuation">,</span> <span class="token number">8</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                                                 <span class="token string">"nthreads"</span><span class="token punctuation">:</span> <span class="token number">1</span><span class="token punctuation">,</span>
+                                                 <span class="token string">"memory_limit"</span><span class="token punctuation">:</span> kw<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"memory_limit"</span><span class="token punctuation">,</span> <span class="token string">"3GB"</span><span class="token punctuation">)</span><span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token keyword">if</span> mode <span class="token operator">==</span> <span class="token string">"kubernetes"</span><span class="token punctuation">:</span>
+        <span class="token keyword">from</span> dask_kubernetes<span class="token punctuation">.</span>operator <span class="token keyword">import</span> KubeCluster
+        cluster <span class="token operator">=</span> KubeCluster<span class="token punctuation">(</span>name<span class="token operator">=</span><span class="token string">"twin-tiler"</span><span class="token punctuation">,</span> image<span class="token operator">=</span>kw<span class="token punctuation">[</span><span class="token string">"image"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+                              n_workers<span class="token operator">=</span>kw<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"workers"</span><span class="token punctuation">,</span> <span class="token number">32</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                              resources<span class="token operator">=</span><span class="token punctuation">{</span><span class="token string">"requests"</span><span class="token punctuation">:</span> <span class="token punctuation">{</span><span class="token string">"memory"</span><span class="token punctuation">:</span> <span class="token string">"3Gi"</span><span class="token punctuation">,</span> <span class="token string">"cpu"</span><span class="token punctuation">:</span> <span class="token string">"1"</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+                                         <span class="token string">"limits"</span><span class="token punctuation">:</span> <span class="token punctuation">{</span><span class="token string">"memory"</span><span class="token punctuation">:</span> <span class="token string">"4Gi"</span><span class="token punctuation">,</span> <span class="token string">"cpu"</span><span class="token punctuation">:</span> <span class="token string">"1"</span><span class="token punctuation">}</span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+        <span class="token keyword">return</span> Client<span class="token punctuation">(</span>cluster<span class="token punctuation">)</span>
+    <span class="token keyword">raise</span> ValueError<span class="token punctuation">(</span>mode<span class="token punctuation">)</span>
+
+<span class="token comment"># the task function, the submission and the manifest logic are identical in all three</span>
+client <span class="token operator">=</span> make_client<span class="token punctuation">(</span><span class="token string">"local"</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>The portability is the reason to use Dask rather than <code>multiprocessing</code> for this. The same <code>tile_shard</code>, the same submission and the same manifest run on a laptop, on four machines over SSH and on Kubernetes; only the client construction changes. What does <em>not</em> travel for free is the environment — the workers need the tiling code and its native dependencies, which is what the container image is for — and shared storage, since a worker on another machine cannot write to a local path.</p>
+<h2 id="expected-output-verification" tabindex="-1"><a class="heading-link" href="#expected-output-verification"><span>Expected Output &amp; Verification</span></a></h2>
+<div class="codeblock" data-lang="text"><div class="codeblock__bar"><span class="codeblock__lang">text</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-text" tabindex="0" role="group" aria-label="text code sample"><code class="language-text">{'workers': 14, 'threads_per_worker': 1, 'memory_limit': '2.0GB', 'bound_by': 'memory'}
+http://127.0.0.1:8787/status
+1,742 shard tasks submitted
+   100/1,742  ok 98  failed 2
+   200/1,742  ok 197  failed 3
+ …
+ 1,742/1,742  ok 1,736  failed 6
+finished: 1,736 ok, 6 failed
+{'workers': 14, 'threads': 14, 'memory_gb': 28.0, 'tasks_processing': 14, 'spilled_gb': 0.0}
+</code></pre></div>
+<p>Verify completeness against the plan, which is the check that catches the silent partial build:</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">verify_run</span><span class="token punctuation">(</span>plan_path<span class="token punctuation">,</span> manifest_path<span class="token punctuation">,</span> out_dir<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    plan <span class="token operator">=</span> <span class="token punctuation">{</span>row<span class="token punctuation">[</span><span class="token string">"quadkey"</span><span class="token punctuation">]</span> <span class="token keyword">for</span> row <span class="token keyword">in</span> json<span class="token punctuation">.</span>loads<span class="token punctuation">(</span>Path<span class="token punctuation">(</span>plan_path<span class="token punctuation">)</span><span class="token punctuation">.</span>read_text<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">}</span>
+    manifest <span class="token operator">=</span> json<span class="token punctuation">.</span>loads<span class="token punctuation">(</span>Path<span class="token punctuation">(</span>manifest_path<span class="token punctuation">)</span><span class="token punctuation">.</span>read_text<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    ok <span class="token operator">=</span> <span class="token punctuation">{</span>k <span class="token keyword">for</span> k<span class="token punctuation">,</span> v <span class="token keyword">in</span> manifest<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">if</span> v<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"ok"</span><span class="token punctuation">)</span><span class="token punctuation">}</span>
+    failed <span class="token operator">=</span> <span class="token punctuation">{</span>k<span class="token punctuation">:</span> v<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"error"</span><span class="token punctuation">,</span> <span class="token string">""</span><span class="token punctuation">)</span> <span class="token keyword">for</span> k<span class="token punctuation">,</span> v <span class="token keyword">in</span> manifest<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">if</span> <span class="token keyword">not</span> v<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"ok"</span><span class="token punctuation">)</span><span class="token punctuation">}</span>
+    missing <span class="token operator">=</span> plan <span class="token operator">-</span> <span class="token builtin">set</span><span class="token punctuation">(</span>manifest<span class="token punctuation">)</span>
+    on_disk <span class="token operator">=</span> <span class="token punctuation">{</span>p<span class="token punctuation">.</span>parent<span class="token punctuation">.</span>name <span class="token keyword">for</span> p <span class="token keyword">in</span> Path<span class="token punctuation">(</span>out_dir<span class="token punctuation">)</span><span class="token punctuation">.</span>glob<span class="token punctuation">(</span><span class="token string">"*/tileset.json"</span><span class="token punctuation">)</span><span class="token punctuation">}</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token string">"planned"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>plan<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"ok"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>ok<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"failed"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>failed<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"never_ran"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>missing<span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"on_disk"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>on_disk<span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"ok_without_output"</span><span class="token punctuation">:</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span>ok <span class="token operator">-</span> on_disk<span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token number">5</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+        <span class="token string">"output_without_ok"</span><span class="token punctuation">:</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span>on_disk <span class="token operator">-</span> ok<span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token number">5</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+        <span class="token string">"error_kinds"</span><span class="token punctuation">:</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span><span class="token punctuation">{</span>e<span class="token punctuation">.</span>split<span class="token punctuation">(</span><span class="token string">":"</span><span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span> <span class="token keyword">for</span> e <span class="token keyword">in</span> failed<span class="token punctuation">.</span>values<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+
+result <span class="token operator">=</span> verify_run<span class="token punctuation">(</span><span class="token string">"build/shard_plan.json"</span><span class="token punctuation">,</span> <span class="token string">"build/manifest.json"</span><span class="token punctuation">,</span> <span class="token string">"build/tiles/city/shards"</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span>result<span class="token punctuation">)</span>
+<span class="token keyword">assert</span> <span class="token keyword">not</span> result<span class="token punctuation">[</span><span class="token string">"ok_without_output"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token string">"manifest claims shards that have no output"</span>
+<span class="token keyword">assert</span> result<span class="token punctuation">[</span><span class="token string">"never_ran"</span><span class="token punctuation">]</span> <span class="token operator">==</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>result<span class="token punctuation">[</span><span class="token string">'never_ran'</span><span class="token punctuation">]</span><span class="token punctuation">}</span></span><span class="token string"> planned shards never ran"</span></span>
+</code></pre></div>
+<p>Three discrepancies matter and each has a distinct cause. A shard marked <code>ok</code> with no output on disk means the task wrote to a path the verification does not read — usually a worker with a different working directory. Output with no <code>ok</code> entry means a manifest flush was lost, which is harmless but should reconcile. And a planned shard that never ran means a future was never submitted or its result never arrived, which is the case that produces a hole in the city.</p>
+<p>Then look at the error kinds rather than the count: six failures all reporting <code>InvalidGeometry</code> is one data problem in six shards, while six different exception types is a pipeline that is unwell.</p>
+<h2 id="performance-notes" tabindex="-1"><a class="heading-link" href="#performance-notes"><span>Performance Notes</span></a></h2>
+<ul>
+<li><strong>Per-task overhead in Dask is a few milliseconds</strong>, negligible against a shard that takes seconds. It is not negligible for tasks under about 50 ms, so do not make the unit of work a single building.</li>
+<li><strong>Keep task arguments small.</strong> A <code>ShardTask</code> of a few hundred bytes serialises instantly; passing a GeoDataFrame as an argument serialises it to every worker and is the most common way to make a Dask job slower than a loop.</li>
+<li><strong>Read inputs inside the task, from shared storage.</strong> Workers should pull the features for their own shard rather than receive them.</li>
+<li><strong>Watch the spill metric, not the CPU graph.</strong> A cluster at 100% CPU with spilling is doing less work than one at 70% without.</li>
+<li><strong>Cap concurrency against object storage.</strong> Thirty workers each opening eight connections will hit rate limits; a semaphore or a smaller worker count is cheaper than the retries.</li>
+</ul>
+<h2 id="common-errors" tabindex="-1"><a class="heading-link" href="#common-errors"><span>Common Errors</span></a></h2>
+<p><strong>Workers die with no error and the run stalls.</strong> The kernel’s OOM killer, because <code>memory_limit</code> was unset or larger than the machine allows per worker. Set it explicitly, as in step 2, so Dask restarts the worker cleanly instead.</p>
+<p><strong><code>KilledWorker</code> for one particular shard.</strong> That shard genuinely needs more memory than a worker has. Give it its own submission with a larger resource requirement, or split it a level deeper.</p>
+<p><strong>The dashboard shows all workers idle with tasks pending.</strong> The task graph depends on a large object being transferred, or the scheduler is blocked serialising results. Return small records from tasks, never geometry.</p>
+<p><strong>Every task re-runs on a resubmitted graph.</strong> The keys were non-deterministic, so Dask treats them as new work. Use a stable key including the parameter hash.</p>
+<p><strong>Results arrive but the manifest is empty.</strong> <code>as_completed</code> was iterated without <code>with_results=True</code>, so the loop yielded futures whose results were never collected.</p>
+<h2 id="frequently-asked-questions" tabindex="-1"><a class="heading-link" href="#frequently-asked-questions"><span>Frequently Asked Questions</span></a></h2>
+<h3 id="why-dask-rather-than-airflow-or-a-queue" tabindex="-1"><a class="heading-link" href="#why-dask-rather-than-airflow-or-a-queue"><span>Why Dask rather than Airflow or a queue?</span></a></h3>
+<p>Different granularity. Airflow orchestrates the <em>pipeline</em> — classify, mesh, tile, publish — as a handful of long steps; Dask parallelises the thousands of tasks inside one of those steps. Most twin pipelines end up with both, with Airflow calling a script that builds a Dask graph.</p>
+<h3 id="is-a-task-graph-better-than-a-process-pool-here" tabindex="-1"><a class="heading-link" href="#is-a-task-graph-better-than-a-process-pool-here"><span>Is a task graph better than a process pool here?</span></a></h3>
+<p>For a flat map over shards, a pool is adequate and simpler. Dask earns its place through memory-aware scheduling, retries with stable keys, the live dashboard and the ability to move to several machines unchanged — all of which matter once a run takes hours.</p>
+<h3 id="how-do-i-keep-the-workers-environment-in-sync" tabindex="-1"><a class="heading-link" href="#how-do-i-keep-the-workers-environment-in-sync"><span>How do I keep the workers’ environment in sync?</span></a></h3>
+<p>A container image, pinned by digest, used for both local and cluster runs. Mismatched environments produce failures that look like data problems, and the digest belongs in the run summary alongside the manifest.</p>
+<h2 id="related-guides" tabindex="-1"><a class="heading-link" href="#related-guides"><span>Related Guides</span></a></h2>
+<ul>
+<li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/choosing-shard-sizes-for-city-scale-tiling/">Choosing Shard Sizes for City-Scale Tiling</a> — deciding the task granularity</li>
+<li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/resuming-failed-tiling-runs-from-checkpoints/">Resuming Failed Tiling Runs from Checkpoints</a> — using the manifest this writes</li>
+<li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/exporting-prometheus-metrics-from-tiling-jobs/">Exporting Prometheus Metrics from Tiling Jobs</a> — reporting the run’s counts</li>
+</ul>
+<p>Back to <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a>.</p>
+
+
+      
+      
+
+      <div class="related-nav">
+        
+
+        
+          <div>
+            <h3>Related</h3>
+            <div class="related-grid">
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/choosing-shard-sizes-for-city-scale-tiling/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Choosing Shard Sizes for City-Scale Tiling</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/making-tile-output-deterministic/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Making Tile Output Deterministic</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/merging-shard-tilesets-into-a-root-tileset/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Merging Shard Tilesets into a Root Tileset</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/parallel-b3dm-encoding-with-process-pools/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Parallel b3dm Encoding with Process Pools</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/resuming-failed-tiling-runs-from-checkpoints/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Resuming Failed Tiling Runs from Checkpoints</span>
+                </a>
+              
+            </div>
+          </div>
+        
+      </div>
+    </article>
+
+    
+    <aside class="toc" aria-label="On this page" data-toc hidden>
+      <h4>On this page</h4>
+      <ul></ul>
+    </aside>
+  </div>
+</div>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+  <div class="container site-footer__inner">
+    <div class="site-footer__brand">
+      <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+        <img src="/assets/img/logo-mark.svg" alt="" class="brand__mark" width="36" height="36">
+        <span class="brand__name">
+          3D Geospatial
+          <small>Digital Twin Automation</small>
+        </span>
+      </a>
+      <p>Engineering-grade guides on point cloud processing, mesh pipelines, LOD strategies, and CI/CD automation for digital twin platforms.</p>
+      <a class="footer-social" href="https://github.com/3d-geospatial" aria-label="3D Geospatial on GitHub" rel="noopener" target="_blank">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+          <path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.53-1.34-1.3-1.7-1.3-1.7-1.06-.72.08-.71.08-.71 1.17.08 1.79 1.2 1.79 1.2 1.04 1.79 2.73 1.27 3.4.97.1-.75.4-1.27.73-1.56-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.19-3.08-.12-.3-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.75.11 3.05.74.8 1.19 1.83 1.19 3.08 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.07.78 2.15v3.18c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5Z"/>
+        </svg>
+        <span>GitHub</span>
+      </a>
+    </div>
+
+    <div class="site-footer__col">
+      <h4>Sections</h4>
+      <ul>
+        <li><a href="https://www.3d-geospatial.com/">Home</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management &amp; Optimization</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/">Point Cloud &amp; Mesh Pipelines</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/">Troubleshooting &amp; Reliability</a></li>
+        
+      </ul>
+    </div>
+
+    
+      <div class="site-footer__col">
+        <h4>3D Geospatial Fundamentals</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/">3D Format Standards Comparison</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/">BIM and IFC Georeferencing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/">CityGML and CityJSON Processing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems for 3D Assets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/">Digital Elevation Model Workflows</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/">Spatial Indexing and Tiling Schemes for 3D Data</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>LOD Management &amp; Optimization</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/">Automated Tile Generation for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/">Cesium ion Upload Automation for 3D Tilesets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/">glTF LOD Generation With Draco Compression</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/">Streaming Sync Patterns for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/">Tileset Metadata and 3D Tiles Next</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/">Vector Overlays on 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Point Cloud &amp; Mesh Pipelines</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/">Automated Mesh Decimation for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/">Change Detection Between LiDAR Scan Epochs</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/">CI/CD Automation for Spatial Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">LiDAR Classification and Ground Extraction</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/photogrammetry-processing-pipelines/">Photogrammetry Processing Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/">Point Cloud Filtering Techniques</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/">Surface Reconstruction for Geospatial Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/">Texture Mapping Workflows for Digital Twins</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Troubleshooting &amp; Reliability</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/">Cross-Section Failure Modes in Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/">Data Validation &amp; QA Gates for 3D Tiles</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/">Performance Profiling and Benchmarking</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/">Pipeline Observability and Monitoring</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/">Streaming &amp; Runtime Diagnostics for 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+  </div>
+  <div class="container site-footer__bottom">
+    <span>© 2026 3D Geospatial &amp; Digital Twin Automation</span>
+    <span>Built with Eleventy · PWA-enabled</span>
+  </div>
+</footer>
+
+
+  <script src="/assets/js/site.js?v=b99aa9f971" defer></script>
+  
+</body>
+</html>

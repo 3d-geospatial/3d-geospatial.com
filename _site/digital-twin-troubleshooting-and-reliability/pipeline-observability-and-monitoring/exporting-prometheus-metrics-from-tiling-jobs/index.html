@@ -1,0 +1,779 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <title>Exporting Prometheus Metrics from Tiling Jobs — 3D Geospatial</title>
+  <meta name="description" content="Instrument batch tiling with Prometheus: the metric set, label cardinality limits, push gateway grouping for jobs that exit">
+  <meta name="keywords" content="3D geospatial, digital twin, point cloud, mesh pipeline, LOD, 3D Tiles, Cesium, PDAL, Open3D, Python, CI/CD">
+  <meta name="author" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta name="theme-color" content="#1f6b8a" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f171d" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+
+  
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem("theme");
+        var theme = (stored === "dark" || stored === "light") ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    })();
+  </script>
+  <meta name="generator" content="Eleventy">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="googlebot" content="index,follow,max-image-preview:large">
+
+  
+  <link rel="canonical" href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/exporting-prometheus-metrics-from-tiling-jobs/">
+  <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">
+
+  
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/icon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+
+  
+  <link rel="apple-touch-icon" href="/assets/img/icon-180.png">
+  <link rel="mask-icon" href="/assets/img/logo.svg" color="#1f6b8a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="3D Geospatial">
+  <meta name="application-name" content="3D Geospatial">
+
+  
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Exporting Prometheus Metrics from Tiling Jobs — 3D Geospatial">
+  <meta property="og:description" content="Instrument batch tiling with Prometheus: the metric set, label cardinality limits, push gateway grouping for jobs that exit">
+  <meta property="og:url" content="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/exporting-prometheus-metrics-from-tiling-jobs/">
+  <meta property="og:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+  <meta property="og:site_name" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta property="og:locale" content="en_US">
+  
+  <meta property="article:published_time" content="2026-09-17T23:36:56.452Z">
+  <meta property="article:modified_time" content="2026-09-17T23:36:56.452Z">
+  <meta property="article:publisher" content="https://www.3d-geospatial.com/">
+  
+
+  
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Exporting Prometheus Metrics from Tiling Jobs — 3D Geospatial">
+  <meta name="twitter:description" content="Instrument batch tiling with Prometheus: the metric set, label cardinality limits, push gateway grouping for jobs that exit">
+  <meta name="twitter:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta name="twitter:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+
+  
+  <link rel="preload" href="/assets/css/styles.css?v=8c46394d6c" as="style">
+  
+
+  <link rel="stylesheet" href="/assets/css/styles.css?v=8c46394d6c">
+
+  
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.3d-geospatial.com/#organization",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "url": "https://www.3d-geospatial.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/icon-512.png",
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://www.3d-geospatial.com/#website",
+      "url": "https://www.3d-geospatial.com/",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "description": "Build reliable 3D spatial data pipelines for digital twins — point clouds, meshes, LOD strategies, Python processing, and CI/CD automation.",
+      "inLanguage": "en",
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      }
+    },
+    {
+      "@type": "TechArticle",
+      "@id": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/exporting-prometheus-metrics-from-tiling-jobs/#article",
+      "isPartOf": {
+        "@id": "https://www.3d-geospatial.com/#website"
+      },
+      "headline": "Exporting Prometheus Metrics from Tiling Jobs",
+      "name": "Exporting Prometheus Metrics from Tiling Jobs",
+      "description": "Instrument batch tiling with Prometheus: the metric set, label cardinality limits, push gateway grouping for jobs that exit",
+      "url": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/exporting-prometheus-metrics-from-tiling-jobs/",
+      "mainEntityOfPage": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/exporting-prometheus-metrics-from-tiling-jobs/",
+      "inLanguage": "en",
+      "datePublished": "2026-09-17T23:36:56.452Z",
+      "dateModified": "2026-09-17T23:36:56.452Z",
+      "author": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "image": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/og-cover.png",
+        "width": 1200,
+        "height": 630
+      },
+      "breadcrumb": {
+        "@id": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/exporting-prometheus-metrics-from-tiling-jobs/#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/exporting-prometheus-metrics-from-tiling-jobs/#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://www.3d-geospatial.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Digital Twin Troubleshooting And Reliability",
+          "item": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Pipeline Observability And Monitoring",
+          "item": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "name": "Exporting Prometheus Metrics From Tiling Jobs",
+          "item": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/exporting-prometheus-metrics-from-tiling-jobs/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  
+<header class="site-header" role="banner">
+  <div class="container site-header__inner">
+    <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+      <img src="/assets/img/logo.svg" alt="" class="brand__mark" width="36" height="36">
+      <span class="brand__name">
+        3D Geospatial
+        <small>Digital Twin Automation</small>
+      </span>
+    </a>
+
+    <button class="theme-toggle" type="button" data-theme-toggle
+            aria-label="Switch to dark theme" title="Switch to dark theme">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4.2"/>
+        <path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/>
+      </svg>
+    </button>
+
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>
+      <span class="nav-toggle__icon" aria-hidden="true"><span></span></span>
+      Menu
+    </button>
+
+    <nav class="primary-nav" id="primary-nav" aria-label="Primary">
+      
+      <a href="https://www.3d-geospatial.com/" >
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/>
+        </svg>
+        Home
+      </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2 3 7l9 5 9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 17l9 5 9-5"/>
+            </svg>
+          
+          3D Geospatial Fundamentals
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+          
+          LOD Management &amp; Optimization
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="6" cy="6" r="1.5"/><circle cx="12" cy="6" r="1.5"/><circle cx="18" cy="6" r="1.5"/>
+              <circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/>
+              <circle cx="6" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="18" cy="18" r="1.5"/>
+            </svg>
+          
+          Point Cloud &amp; Mesh Pipelines
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/" aria-current="page">
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <path d="M12 9v4"/><path d="M12 17h.01"/>
+            </svg>
+          
+          Troubleshooting &amp; Reliability
+        </a>
+      
+    </nav>
+  </div>
+</header>
+
+
+  <main id="main">
+    
+
+
+<div class="container">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    
+      
+        <a href="https://www.3d-geospatial.com/">Home</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/">Digital Twin Troubleshooting And Reliability</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/">Pipeline Observability And Monitoring</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <span class="current">Exporting Prometheus Metrics From Tiling Jobs</span>
+      
+    
+  </nav>
+
+  <div class="content-page">
+    <article class="article">
+      <h1 id="exporting-prometheus-metrics-from-tiling-jobs" tabindex="-1"><a class="heading-link" href="#exporting-prometheus-metrics-from-tiling-jobs"><span>Exporting Prometheus Metrics from Tiling Jobs</span></a></h1>
+<p>This page instruments a batch tiling job with Prometheus metrics that are actually alertable — a small metric set with useful label dimensions, a hard rule about cardinality, pushing from processes that exit, and alert rules that compare what a run produced against what its plan expected, for a city tileset built from EPSG:25832 data.</p>
+<h2 id="why-you-hit-this" tabindex="-1"><a class="heading-link" href="#why-you-hit-this"><span>Why you hit this</span></a></h2>
+<p>Prometheus is built for long-running services that get scraped. A tiling job runs for twenty minutes and exits, so there is nothing to scrape, and the naive fix — a gauge pushed at the end — loses everything about how the run went. Worse, the obvious labelling instinct, one series per shard, produces four thousand series per run and a Prometheus that falls over within a month. The pattern that works is small: a handful of metrics, labels only for dimensions you alert on, and a push per stage. The surrounding approach is in <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/">pipeline observability and monitoring</a>.</p>
+<h2 id="prerequisites" tabindex="-1"><a class="heading-link" href="#prerequisites"><span>Prerequisites</span></a></h2>
+<ul>
+<li>Python 3.10+ with <code>prometheus-client&gt;=0.20</code>.</li>
+<li>A Prometheus server, and a Pushgateway reachable from the build machines.</li>
+<li>Grafana or any alerting front end for the rules at the end.</li>
+<li>A build plan: the number of shards, features or tiles the run is <em>supposed</em> to produce.</li>
+</ul>
+<h2 id="step-by-step" tabindex="-1"><a class="heading-link" href="#step-by-step"><span>Step-by-Step</span></a></h2>
+<h3 id="1-define-a-small-metric-set" tabindex="-1"><a class="heading-link" href="#1-define-a-small-metric-set"><span>1. Define a small metric set</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">from</span> prometheus_client <span class="token keyword">import</span> CollectorRegistry<span class="token punctuation">,</span> Counter<span class="token punctuation">,</span> Gauge<span class="token punctuation">,</span> Histogram
+
+<span class="token keyword">def</span> <span class="token function">build_registry</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    reg <span class="token operator">=</span> CollectorRegistry<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    m <span class="token operator">=</span> <span class="token punctuation">{</span>
+        <span class="token string">"shards_expected"</span><span class="token punctuation">:</span> Gauge<span class="token punctuation">(</span>
+            <span class="token string">"twin_shards_expected"</span><span class="token punctuation">,</span> <span class="token string">"shards in the build plan"</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token string">"dataset"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> registry<span class="token operator">=</span>reg<span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"shards_written"</span><span class="token punctuation">:</span> Counter<span class="token punctuation">(</span>
+            <span class="token string">"twin_shards_written_total"</span><span class="token punctuation">,</span> <span class="token string">"shards successfully written"</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token string">"dataset"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> registry<span class="token operator">=</span>reg<span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"shards_failed"</span><span class="token punctuation">:</span> Counter<span class="token punctuation">(</span>
+            <span class="token string">"twin_shards_failed_total"</span><span class="token punctuation">,</span> <span class="token string">"shards that raised"</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token string">"dataset"</span><span class="token punctuation">,</span> <span class="token string">"reason"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> registry<span class="token operator">=</span>reg<span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"stage_seconds"</span><span class="token punctuation">:</span> Histogram<span class="token punctuation">(</span>
+            <span class="token string">"twin_stage_duration_seconds"</span><span class="token punctuation">,</span> <span class="token string">"stage wall-clock duration"</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token string">"dataset"</span><span class="token punctuation">,</span> <span class="token string">"stage"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+            buckets<span class="token operator">=</span><span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">,</span> <span class="token number">5</span><span class="token punctuation">,</span> <span class="token number">15</span><span class="token punctuation">,</span> <span class="token number">60</span><span class="token punctuation">,</span> <span class="token number">180</span><span class="token punctuation">,</span> <span class="token number">600</span><span class="token punctuation">,</span> <span class="token number">1800</span><span class="token punctuation">,</span> <span class="token number">3600</span><span class="token punctuation">)</span><span class="token punctuation">,</span> registry<span class="token operator">=</span>reg<span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"shard_seconds"</span><span class="token punctuation">:</span> Histogram<span class="token punctuation">(</span>
+            <span class="token string">"twin_shard_duration_seconds"</span><span class="token punctuation">,</span> <span class="token string">"per-shard duration"</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token string">"dataset"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+            buckets<span class="token operator">=</span><span class="token punctuation">(</span><span class="token number">0.5</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">,</span> <span class="token number">5</span><span class="token punctuation">,</span> <span class="token number">10</span><span class="token punctuation">,</span> <span class="token number">30</span><span class="token punctuation">,</span> <span class="token number">120</span><span class="token punctuation">)</span><span class="token punctuation">,</span> registry<span class="token operator">=</span>reg<span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"output_bytes"</span><span class="token punctuation">:</span> Gauge<span class="token punctuation">(</span>
+            <span class="token string">"twin_output_bytes"</span><span class="token punctuation">,</span> <span class="token string">"size of the published output"</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token string">"dataset"</span><span class="token punctuation">,</span> <span class="token string">"kind"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> registry<span class="token operator">=</span>reg<span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"triangles"</span><span class="token punctuation">:</span> Gauge<span class="token punctuation">(</span>
+            <span class="token string">"twin_output_triangles"</span><span class="token punctuation">,</span> <span class="token string">"triangles in the published output"</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token string">"dataset"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> registry<span class="token operator">=</span>reg<span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"run_timestamp"</span><span class="token punctuation">:</span> Gauge<span class="token punctuation">(</span>
+            <span class="token string">"twin_run_completed_timestamp_seconds"</span><span class="token punctuation">,</span> <span class="token string">"unix time of run completion"</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token string">"dataset"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> registry<span class="token operator">=</span>reg<span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+    <span class="token keyword">return</span> reg<span class="token punctuation">,</span> m
+
+registry<span class="token punctuation">,</span> M <span class="token operator">=</span> build_registry<span class="token punctuation">(</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Eight metrics is enough for a tiling job, and each one answers a question somebody has actually asked: did the run finish, did it produce everything, what failed and why, how long did it take, how big is the result, and when did it last succeed. Counters end in <code>_total</code>, durations in <code>_seconds</code>, and sizes in <code>_bytes</code> — the conventions matter because they are what makes the rate and histogram functions behave as expected.</p>
+<p>The <code>reason</code> label on failures is the one exception to keeping labels minimal: a handful of values (<code>invalid_geometry</code>, <code>missing_dtm</code>, <code>timeout</code>) turns an alert from “something failed” into “the same thing failed forty times”.</p>
+<h3 id="2-respect-cardinality" tabindex="-1"><a class="heading-link" href="#2-respect-cardinality"><span>2. Respect cardinality</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token comment"># WRONG: one series per shard is 4,096 series per run, and they never expire</span>
+M<span class="token punctuation">[</span><span class="token string">"shard_seconds"</span><span class="token punctuation">]</span><span class="token punctuation">.</span>labels<span class="token punctuation">(</span>dataset<span class="token operator">=</span><span class="token string">"city"</span><span class="token punctuation">,</span> shard<span class="token operator">=</span>shard<span class="token punctuation">)</span><span class="token punctuation">.</span>observe<span class="token punctuation">(</span><span class="token number">4.2</span><span class="token punctuation">)</span>      <span class="token comment"># do not do this</span>
+
+<span class="token comment"># RIGHT: the shard identity lives in logs and traces; the metric keeps the distribution</span>
+M<span class="token punctuation">[</span><span class="token string">"shard_seconds"</span><span class="token punctuation">]</span><span class="token punctuation">.</span>labels<span class="token punctuation">(</span>dataset<span class="token operator">=</span><span class="token string">"city"</span><span class="token punctuation">)</span><span class="token punctuation">.</span>observe<span class="token punctuation">(</span><span class="token number">4.2</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>A Prometheus series is defined by its label values, so a label with high cardinality — a shard key, a building identifier, a file name, a timestamp — multiplies the storage and the query cost of everything that touches it. The rule is that labels are for dimensions you group or alert by, of which there are usually three or four: dataset, stage, and a small enumeration of outcomes.</p>
+<p>The information that is genuinely per shard goes where per-item detail belongs: <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/structured-logging-for-spatial-pipelines/">structured logs</a> and <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/tracing-pipeline-stages-with-opentelemetry/">traces</a>. The histogram keeps the shape of the distribution, which is what an alert needs.</p>
+<figure class="diagram">
+<svg viewBox="6 6 748 232" role="img" aria-labelledby="prom-card-t prom-card-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="prom-card-t">Label cardinality and series count</title>
+  <desc id="prom-card-d">A table of label choices and the resulting number of time series. Dataset alone gives a handful of series. Dataset and stage gives tens. Dataset, stage and a failure reason gives a few hundred, which is fine. Adding a shard label gives four thousand series per run and they accumulate, which is what overwhelms a Prometheus instance.</desc>
+  <rect class="svg-bg" x="6" y="6" width="748" height="232" fill="#ffffff"/>
+  <g stroke-width="1.5">
+    <rect x="20" y="20" width="360" height="36" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="380" y="20" width="180" height="36" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="560" y="20" width="180" height="36" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="20" y="56" width="360" height="42" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="380" y="56" width="180" height="42" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="560" y="56" width="180" height="42" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="20" y="98" width="360" height="42" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="380" y="98" width="180" height="42" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="560" y="98" width="180" height="42" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="20" y="140" width="360" height="42" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="380" y="140" width="180" height="42" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="560" y="140" width="180" height="42" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="20" y="182" width="360" height="42" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="380" y="182" width="180" height="42" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="560" y="182" width="180" height="42" fill="#f7dfdc" stroke="#b0413e"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="200" y="43">labels</text>
+    <text x="470" y="43">series per metric</text>
+    <text x="650" y="43">verdict</text>
+    <text x="200" y="82">dataset</text><text x="470" y="82">~5</text><text x="650" y="82">ideal</text>
+    <text x="200" y="124">dataset, stage</text><text x="470" y="124">~40</text><text x="650" y="124">ideal</text>
+    <text x="200" y="166">dataset, stage, reason</text><text x="470" y="166">~300</text><text x="650" y="166">acceptable</text>
+    <text x="200" y="208">dataset, stage, shard</text><text x="470" y="208">4,096 per run, cumulative</text><text x="650" y="208">never</text>
+  </g>
+</svg>
+<figcaption>Every label multiplies. The identity of an individual unit of work belongs in logs and traces, where it costs nothing.</figcaption>
+</figure>
+<figure class="diagram">
+<svg viewBox="6 6 748 232" role="img" aria-labelledby="prom-types-t prom-types-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="prom-types-t">Which metric type for which quantity</title>
+  <desc id="prom-types-d">A table. A counter only goes up and suits shards written or failures. A gauge can move in either direction and suits the plan size, output bytes and the last successful run timestamp. A histogram records a distribution and suits stage and per-shard durations. A summary is avoided because its quantiles cannot be aggregated across jobs.</desc>
+  <rect class="svg-bg" x="6" y="6" width="748" height="232" fill="#ffffff"/>
+  <g stroke-width="1.5">
+    <rect x="20" y="20" width="150" height="36" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="170" y="20" width="270" height="36" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="440" y="20" width="300" height="36" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="20" y="56" width="150" height="42" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="170" y="56" width="270" height="42" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="440" y="56" width="300" height="42" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="20" y="98" width="150" height="42" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="170" y="98" width="270" height="42" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="440" y="98" width="300" height="42" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="20" y="140" width="150" height="42" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="170" y="140" width="270" height="42" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="440" y="140" width="300" height="42" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="20" y="182" width="150" height="42" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="170" y="182" width="270" height="42" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="440" y="182" width="300" height="42" fill="#f7dfdc" stroke="#b0413e"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="95" y="43">type</text>
+    <text x="305" y="43">behaviour</text>
+    <text x="590" y="43">use it for</text>
+    <text x="95" y="82">counter</text><text x="305" y="82">only increases</text><text x="590" y="82">shards written, failures by reason</text>
+    <text x="95" y="124">gauge</text><text x="305" y="124">moves either way</text><text x="590" y="124">plan size, output bytes, last success time</text>
+    <text x="95" y="166">histogram</text><text x="305" y="166">bucketed distribution</text><text x="590" y="166">stage and per-shard durations</text>
+    <text x="95" y="208">summary</text><text x="305" y="208">pre-computed quantiles</text><text x="590" y="208">avoid: cannot be aggregated across jobs</text>
+  </g>
+</svg>
+<figcaption>Three types cover a pipeline. Summaries look convenient and cannot be combined across parallel workers, which is exactly what a tiling job has.</figcaption>
+</figure>
+<h3 id="3-push-from-a-job-that-exits" tabindex="-1"><a class="heading-link" href="#3-push-from-a-job-that-exits"><span>3. Push from a job that exits</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> time
+<span class="token keyword">from</span> prometheus_client <span class="token keyword">import</span> push_to_gateway<span class="token punctuation">,</span> delete_from_gateway
+
+GATEWAY <span class="token operator">=</span> <span class="token string">"pushgw.internal:9091"</span>
+JOB <span class="token operator">=</span> <span class="token string">"twin-tiling"</span>
+
+<span class="token keyword">def</span> <span class="token function">push</span><span class="token punctuation">(</span>dataset<span class="token punctuation">,</span> stage<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Grouping key includes the dataset so two datasets do not overwrite each other."""</span>
+    push_to_gateway<span class="token punctuation">(</span>GATEWAY<span class="token punctuation">,</span> job<span class="token operator">=</span>JOB<span class="token punctuation">,</span> registry<span class="token operator">=</span>registry<span class="token punctuation">,</span>
+                    grouping_key<span class="token operator">=</span><span class="token punctuation">{</span><span class="token string">"dataset"</span><span class="token punctuation">:</span> dataset<span class="token punctuation">,</span> <span class="token string">"stage"</span><span class="token punctuation">:</span> stage<span class="token punctuation">}</span><span class="token punctuation">)</span>
+
+<span class="token keyword">def</span> <span class="token function">run_stage</span><span class="token punctuation">(</span>dataset<span class="token punctuation">,</span> stage<span class="token punctuation">,</span> work<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">with</span> M<span class="token punctuation">[</span><span class="token string">"stage_seconds"</span><span class="token punctuation">]</span><span class="token punctuation">.</span>labels<span class="token punctuation">(</span>dataset<span class="token punctuation">,</span> stage<span class="token punctuation">)</span><span class="token punctuation">.</span>time<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        result <span class="token operator">=</span> work<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    push<span class="token punctuation">(</span>dataset<span class="token punctuation">,</span> stage<span class="token punctuation">)</span>
+    <span class="token keyword">return</span> result
+</code></pre></div>
+<p>The grouping key is the part people get wrong. A push with only <code>job=</code> replaces whatever was there, so two datasets tiled in parallel overwrite each other’s metrics and the alert sees whichever finished last. Including the dataset and the stage in the grouping key gives each combination its own group, which is what makes the series meaningful.</p>
+<p>Pushing after each stage rather than once at the end means a job that dies halfway still leaves evidence — the stages that completed are recorded, and the missing stage is itself the signal.</p>
+<h3 id="4-record-counts-against-the-plan" tabindex="-1"><a class="heading-link" href="#4-record-counts-against-the-plan"><span>4. Record counts against the plan</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">tile_dataset</span><span class="token punctuation">(</span>dataset<span class="token punctuation">,</span> plan<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    M<span class="token punctuation">[</span><span class="token string">"shards_expected"</span><span class="token punctuation">]</span><span class="token punctuation">.</span>labels<span class="token punctuation">(</span>dataset<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">set</span><span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>plan<span class="token punctuation">)</span><span class="token punctuation">)</span>
+    written <span class="token operator">=</span> <span class="token number">0</span>
+    <span class="token keyword">for</span> shard <span class="token keyword">in</span> plan<span class="token punctuation">:</span>
+        t0 <span class="token operator">=</span> time<span class="token punctuation">.</span>perf_counter<span class="token punctuation">(</span><span class="token punctuation">)</span>
+        <span class="token keyword">try</span><span class="token punctuation">:</span>
+            res <span class="token operator">=</span> tile_shard<span class="token punctuation">(</span>shard<span class="token punctuation">)</span>
+        <span class="token keyword">except</span> InvalidGeometry<span class="token punctuation">:</span>
+            M<span class="token punctuation">[</span><span class="token string">"shards_failed"</span><span class="token punctuation">]</span><span class="token punctuation">.</span>labels<span class="token punctuation">(</span>dataset<span class="token punctuation">,</span> <span class="token string">"invalid_geometry"</span><span class="token punctuation">)</span><span class="token punctuation">.</span>inc<span class="token punctuation">(</span><span class="token punctuation">)</span>
+            <span class="token keyword">continue</span>
+        <span class="token keyword">except</span> MissingTerrain<span class="token punctuation">:</span>
+            M<span class="token punctuation">[</span><span class="token string">"shards_failed"</span><span class="token punctuation">]</span><span class="token punctuation">.</span>labels<span class="token punctuation">(</span>dataset<span class="token punctuation">,</span> <span class="token string">"missing_dtm"</span><span class="token punctuation">)</span><span class="token punctuation">.</span>inc<span class="token punctuation">(</span><span class="token punctuation">)</span>
+            <span class="token keyword">continue</span>
+        M<span class="token punctuation">[</span><span class="token string">"shard_seconds"</span><span class="token punctuation">]</span><span class="token punctuation">.</span>labels<span class="token punctuation">(</span>dataset<span class="token punctuation">)</span><span class="token punctuation">.</span>observe<span class="token punctuation">(</span>time<span class="token punctuation">.</span>perf_counter<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">-</span> t0<span class="token punctuation">)</span>
+        M<span class="token punctuation">[</span><span class="token string">"shards_written"</span><span class="token punctuation">]</span><span class="token punctuation">.</span>labels<span class="token punctuation">(</span>dataset<span class="token punctuation">)</span><span class="token punctuation">.</span>inc<span class="token punctuation">(</span><span class="token punctuation">)</span>
+        written <span class="token operator">+=</span> <span class="token number">1</span>
+    M<span class="token punctuation">[</span><span class="token string">"run_timestamp"</span><span class="token punctuation">]</span><span class="token punctuation">.</span>labels<span class="token punctuation">(</span>dataset<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">set</span><span class="token punctuation">(</span>time<span class="token punctuation">.</span>time<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    push<span class="token punctuation">(</span>dataset<span class="token punctuation">,</span> <span class="token string">"tiling"</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> written
+
+written <span class="token operator">=</span> run_stage<span class="token punctuation">(</span><span class="token string">"city"</span><span class="token punctuation">,</span> <span class="token string">"tiling"</span><span class="token punctuation">,</span> <span class="token keyword">lambda</span><span class="token punctuation">:</span> tile_dataset<span class="token punctuation">(</span><span class="token string">"city"</span><span class="token punctuation">,</span> build_plan<span class="token punctuation">)</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>written<span class="token punctuation">}</span></span><span class="token string"> of </span><span class="token interpolation"><span class="token punctuation">{</span><span class="token builtin">len</span><span class="token punctuation">(</span>build_plan<span class="token punctuation">)</span><span class="token punctuation">}</span></span><span class="token string"> shards written"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p><code>shards_expected</code> next to <code>shards_written_total</code> is the pattern the whole page exists for. It makes a partial build detectable on the first run, without a baseline and without history, and it survives legitimate changes of scope — a district added to the plan raises both numbers.</p>
+<h3 id="5-publish-output-facts-too" tabindex="-1"><a class="heading-link" href="#5-publish-output-facts-too"><span>5. Publish output facts too</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">from</span> pathlib <span class="token keyword">import</span> Path
+
+<span class="token keyword">def</span> <span class="token function">record_outputs</span><span class="token punctuation">(</span>dataset<span class="token punctuation">,</span> tileset_dir<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    total <span class="token operator">=</span> <span class="token builtin">sum</span><span class="token punctuation">(</span>p<span class="token punctuation">.</span>stat<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span>st_size <span class="token keyword">for</span> p <span class="token keyword">in</span> Path<span class="token punctuation">(</span>tileset_dir<span class="token punctuation">)</span><span class="token punctuation">.</span>rglob<span class="token punctuation">(</span><span class="token string">"*"</span><span class="token punctuation">)</span> <span class="token keyword">if</span> p<span class="token punctuation">.</span>is_file<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    M<span class="token punctuation">[</span><span class="token string">"output_bytes"</span><span class="token punctuation">]</span><span class="token punctuation">.</span>labels<span class="token punctuation">(</span>dataset<span class="token punctuation">,</span> <span class="token string">"tileset"</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">set</span><span class="token punctuation">(</span>total<span class="token punctuation">)</span>
+    M<span class="token punctuation">[</span><span class="token string">"triangles"</span><span class="token punctuation">]</span><span class="token punctuation">.</span>labels<span class="token punctuation">(</span>dataset<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">set</span><span class="token punctuation">(</span>count_triangles<span class="token punctuation">(</span>tileset_dir<span class="token punctuation">)</span><span class="token punctuation">)</span>
+    push<span class="token punctuation">(</span>dataset<span class="token punctuation">,</span> <span class="token string">"publish"</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> total
+
+record_outputs<span class="token punctuation">(</span><span class="token string">"city"</span><span class="token punctuation">,</span> <span class="token string">"build/tiles/city"</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Output size and triangle count are the cheapest regression detectors available. A build whose bytes fall by 30% with an unchanged shard count has lost content — an empty district, a texture step that silently skipped — and a build whose triangles double has lost a decimation step. Neither shows up in exit codes.</p>
+<h3 id="6-write-the-alert-rules" tabindex="-1"><a class="heading-link" href="#6-write-the-alert-rules"><span>6. Write the alert rules</span></a></h3>
+<div class="codeblock" data-lang="yaml"><div class="codeblock__bar"><span class="codeblock__lang">yaml</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-yaml" tabindex="0" role="group" aria-label="yaml code sample"><code class="language-yaml"><span class="token key atrule">groups</span><span class="token punctuation">:</span>
+  <span class="token punctuation">-</span> <span class="token key atrule">name</span><span class="token punctuation">:</span> twin<span class="token punctuation">-</span>pipeline
+    <span class="token key atrule">rules</span><span class="token punctuation">:</span>
+      <span class="token punctuation">-</span> <span class="token key atrule">alert</span><span class="token punctuation">:</span> TwinBuildIncomplete
+        <span class="token key atrule">expr</span><span class="token punctuation">:</span> <span class="token punctuation">|</span><span class="token scalar string">
+          twin_shards_written_total &lt; twin_shards_expected</span>
+        <span class="token key atrule">for</span><span class="token punctuation">:</span> 10m
+        <span class="token key atrule">labels</span><span class="token punctuation">:</span> <span class="token punctuation">{</span> <span class="token key atrule">severity</span><span class="token punctuation">:</span> critical <span class="token punctuation">}</span>
+        <span class="token key atrule">annotations</span><span class="token punctuation">:</span>
+          <span class="token key atrule">summary</span><span class="token punctuation">:</span> <span class="token string">"{{ $labels.dataset }}: build wrote fewer shards than planned"</span>
+
+      <span class="token punctuation">-</span> <span class="token key atrule">alert</span><span class="token punctuation">:</span> TwinBuildStale
+        <span class="token key atrule">expr</span><span class="token punctuation">:</span> <span class="token punctuation">|</span><span class="token scalar string">
+          time() - twin_run_completed_timestamp_seconds > 36 * 3600</span>
+        <span class="token key atrule">labels</span><span class="token punctuation">:</span> <span class="token punctuation">{</span> <span class="token key atrule">severity</span><span class="token punctuation">:</span> warning <span class="token punctuation">}</span>
+        <span class="token key atrule">annotations</span><span class="token punctuation">:</span>
+          <span class="token key atrule">summary</span><span class="token punctuation">:</span> <span class="token string">"{{ $labels.dataset }}: no successful run in 36 hours"</span>
+
+      <span class="token punctuation">-</span> <span class="token key atrule">alert</span><span class="token punctuation">:</span> TwinStageSlowdown
+        <span class="token key atrule">expr</span><span class="token punctuation">:</span> <span class="token punctuation">|</span><span class="token scalar string">
+          histogram_quantile(0.95, sum by (le, dataset, stage) (rate(twin_stage_duration_seconds_bucket[6h])))
+          > 2 * histogram_quantile(0.95, sum by (le, dataset, stage) (rate(twin_stage_duration_seconds_bucket[7d] offset 7d)))</span>
+        <span class="token key atrule">for</span><span class="token punctuation">:</span> 1h
+        <span class="token key atrule">labels</span><span class="token punctuation">:</span> <span class="token punctuation">{</span> <span class="token key atrule">severity</span><span class="token punctuation">:</span> warning <span class="token punctuation">}</span>
+        <span class="token key atrule">annotations</span><span class="token punctuation">:</span>
+          <span class="token key atrule">summary</span><span class="token punctuation">:</span> <span class="token string">"{{ $labels.dataset }}/{{ $labels.stage }}: p95 duration doubled against last week"</span>
+
+      <span class="token punctuation">-</span> <span class="token key atrule">alert</span><span class="token punctuation">:</span> TwinOutputShrank
+        <span class="token key atrule">expr</span><span class="token punctuation">:</span> <span class="token punctuation">|</span><span class="token scalar string">
+          twin_output_bytes &lt; 0.7 * (twin_output_bytes offset 1d)</span>
+        <span class="token key atrule">for</span><span class="token punctuation">:</span> 30m
+        <span class="token key atrule">labels</span><span class="token punctuation">:</span> <span class="token punctuation">{</span> <span class="token key atrule">severity</span><span class="token punctuation">:</span> critical <span class="token punctuation">}</span>
+        <span class="token key atrule">annotations</span><span class="token punctuation">:</span>
+          <span class="token key atrule">summary</span><span class="token punctuation">:</span> <span class="token string">"{{ $labels.dataset }}: output is 30% smaller than yesterday"</span>
+</code></pre></div>
+<p>Four rules cover the failure modes that matter: an incomplete build, a pipeline that stopped running at all, a stage that got much slower, and an output that shrank. <code>TwinBuildStale</code> is the one most often missing and most often needed — a scheduler that silently stops firing produces no errors anywhere, and a twin quietly freezes.</p>
+<figure class="diagram">
+<svg viewBox="6 6 748 224" role="img" aria-labelledby="prom-alert-t prom-alert-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="prom-alert-t">What each alert catches</title>
+  <desc id="prom-alert-d">Four alerts against four failure modes. Written fewer shards than planned catches a partial build. No successful run in thirty-six hours catches a scheduler that stopped. A doubled stage duration catches a performance regression or a growing input. An output thirty percent smaller than yesterday catches lost content that still produced a valid tileset.</desc>
+  <rect class="svg-bg" x="6" y="6" width="748" height="224" fill="#ffffff"/>
+  <g stroke-width="1.5">
+    <rect x="20" y="20" width="330" height="36" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="350" y="20" width="390" height="36" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="20" y="56" width="330" height="40" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="350" y="56" width="390" height="40" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="20" y="96" width="330" height="40" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="350" y="96" width="390" height="40" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="20" y="136" width="330" height="40" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="350" y="136" width="390" height="40" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="20" y="176" width="330" height="40" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="350" y="176" width="390" height="40" fill="#f7dfdc" stroke="#b0413e"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="185" y="43">alert</text>
+    <text x="545" y="43">failure it catches</text>
+    <text x="185" y="81">written &lt; expected</text><text x="545" y="81">a district silently missing from the build</text>
+    <text x="185" y="121">no run in 36 h</text><text x="545" y="121">the scheduler stopped firing</text>
+    <text x="185" y="161">p95 duration doubled</text><text x="545" y="161">regression, or the input grew</text>
+    <text x="185" y="201">output 30% smaller</text><text x="545" y="201">content lost in a stage that still succeeded</text>
+  </g>
+</svg>
+<figcaption>Each rule corresponds to an incident that has happened to somebody; none of them is detectable from exit codes alone.</figcaption>
+</figure>
+<h2 id="expected-output-verification" tabindex="-1"><a class="heading-link" href="#expected-output-verification"><span>Expected Output &amp; Verification</span></a></h2>
+<div class="codeblock" data-lang="text"><div class="codeblock__bar"><span class="codeblock__lang">text</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-text" tabindex="0" role="group" aria-label="text code sample"><code class="language-text">4096 of 4096 shards written
+</code></pre></div>
+<p>Verify the metrics arrive and mean what you think. Query the gateway directly and assert on the exposition text, which is the contract between the job and Prometheus:</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> requests
+
+text <span class="token operator">=</span> requests<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"http://</span><span class="token interpolation"><span class="token punctuation">{</span>GATEWAY<span class="token punctuation">}</span></span><span class="token string">/metrics"</span></span><span class="token punctuation">,</span> timeout<span class="token operator">=</span><span class="token number">10</span><span class="token punctuation">)</span><span class="token punctuation">.</span>text
+<span class="token keyword">def</span> <span class="token function">value</span><span class="token punctuation">(</span>name<span class="token punctuation">,</span> <span class="token operator">**</span>labels<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    needle <span class="token operator">=</span> name <span class="token operator">+</span> <span class="token string">"{"</span> <span class="token keyword">if</span> labels <span class="token keyword">else</span> name
+    <span class="token keyword">for</span> line <span class="token keyword">in</span> text<span class="token punctuation">.</span>splitlines<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">if</span> line<span class="token punctuation">.</span>startswith<span class="token punctuation">(</span>needle<span class="token punctuation">)</span> <span class="token keyword">and</span> <span class="token builtin">all</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f'</span><span class="token interpolation"><span class="token punctuation">{</span>k<span class="token punctuation">}</span></span><span class="token string">="</span><span class="token interpolation"><span class="token punctuation">{</span>v<span class="token punctuation">}</span></span><span class="token string">"'</span></span> <span class="token keyword">in</span> line <span class="token keyword">for</span> k<span class="token punctuation">,</span> v <span class="token keyword">in</span> labels<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+            <span class="token keyword">return</span> <span class="token builtin">float</span><span class="token punctuation">(</span>line<span class="token punctuation">.</span>rsplit<span class="token punctuation">(</span><span class="token string">" "</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    <span class="token keyword">raise</span> AssertionError<span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>name<span class="token punctuation">}</span></span><span class="token interpolation"><span class="token punctuation">{</span>labels<span class="token punctuation">}</span></span><span class="token string"> not found in the gateway"</span></span><span class="token punctuation">)</span>
+
+expected <span class="token operator">=</span> value<span class="token punctuation">(</span><span class="token string">"twin_shards_expected"</span><span class="token punctuation">,</span> dataset<span class="token operator">=</span><span class="token string">"city"</span><span class="token punctuation">)</span>
+written <span class="token operator">=</span> value<span class="token punctuation">(</span><span class="token string">"twin_shards_written_total"</span><span class="token punctuation">,</span> dataset<span class="token operator">=</span><span class="token string">"city"</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"gateway reports </span><span class="token interpolation"><span class="token punctuation">{</span>written<span class="token punctuation">:</span><span class="token format-spec">.0f</span><span class="token punctuation">}</span></span><span class="token string"> of </span><span class="token interpolation"><span class="token punctuation">{</span>expected<span class="token punctuation">:</span><span class="token format-spec">.0f</span><span class="token punctuation">}</span></span><span class="token string"> shards"</span></span><span class="token punctuation">)</span>
+<span class="token keyword">assert</span> written <span class="token operator">==</span> expected<span class="token punctuation">,</span> <span class="token string">"incomplete build recorded in metrics"</span>
+<span class="token keyword">assert</span> value<span class="token punctuation">(</span><span class="token string">"twin_run_completed_timestamp_seconds"</span><span class="token punctuation">,</span> dataset<span class="token operator">=</span><span class="token string">"city"</span><span class="token punctuation">)</span> <span class="token operator">></span> time<span class="token punctuation">.</span>time<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">-</span> <span class="token number">3600</span>
+</code></pre></div>
+<p>Also verify the alerts themselves, which is the step almost always skipped. <code>promtool</code> evaluates rules against synthetic series, so an incomplete-build alert can be proved to fire:</p>
+<div class="codeblock" data-lang="bash"><div class="codeblock__bar"><span class="codeblock__lang">bash</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-bash" tabindex="0" role="group" aria-label="bash code sample"><code class="language-bash">promtool <span class="token builtin class-name">test</span> rules alerts_test.yml
+</code></pre></div>
+<p>Keeping a rule test file with one case per alert — a series that should fire and one that should not — is what stops a refactor of the metric names from silently disabling monitoring.</p>
+<h2 id="performance-notes" tabindex="-1"><a class="heading-link" href="#performance-notes"><span>Performance Notes</span></a></h2>
+<ul>
+<li><strong>A push is a single HTTP request</strong> with a few kilobytes of text; pushing once per stage is free relative to any spatial work.</li>
+<li><strong>Histograms cost buckets × label combinations.</strong> Eight buckets on two labels is nothing; eight buckets on a shard label is the cardinality problem again.</li>
+<li><strong>Delete stale groups</strong> when a dataset is retired, with <code>delete_from_gateway</code>, or its last values linger forever and keep satisfying staleness alerts.</li>
+<li><strong>Push before a long stage as well as after</strong>, with a zeroed counter, so a job that dies mid-stage is visibly mid-stage rather than absent.</li>
+<li><strong>Keep the registry per run</strong>, not global, so a retry inside the same process does not double-count a counter.</li>
+</ul>
+<h2 id="common-errors" tabindex="-1"><a class="heading-link" href="#common-errors"><span>Common Errors</span></a></h2>
+<p><strong>Metrics from two datasets overwrite each other.</strong> The grouping key did not include the dataset. Push with <code>grouping_key={&quot;dataset&quot;: …, &quot;stage&quot;: …}</code>.</p>
+<p><strong>A counter resets to zero mid-run in the graphs.</strong> A new <code>CollectorRegistry</code> was created per stage, so the counter started again. Build the registry once per run.</p>
+<p><strong><code>rate()</code> returns nothing for pushed counters.</strong> Pushed metrics update at push time, not continuously, so short rate windows see no change. Alert on the value against a plan, as above, rather than on rates.</p>
+<p><strong>The staleness alert never fires even though the pipeline is dead.</strong> The Pushgateway keeps serving the last values indefinitely, so <code>up</code>-style absence checks do not work. Alert on the age of <code>twin_run_completed_timestamp_seconds</code>, which the job itself sets.</p>
+<h2 id="frequently-asked-questions" tabindex="-1"><a class="heading-link" href="#frequently-asked-questions"><span>Frequently Asked Questions</span></a></h2>
+<h3 id="pushgateway-or-a-textfile-exporter" tabindex="-1"><a class="heading-link" href="#pushgateway-or-a-textfile-exporter"><span>Pushgateway or a textfile exporter?</span></a></h3>
+<p>Pushgateway when jobs run on ephemeral runners; the node exporter’s textfile collector when jobs run on a machine with a node exporter already scraping it. The textfile route avoids the staleness trap because the file’s own timestamps are visible, and it does not work for containers that disappear.</p>
+<h3 id="should-the-runs-exit-code-be-a-metric" tabindex="-1"><a class="heading-link" href="#should-the-runs-exit-code-be-a-metric"><span>Should the run’s exit code be a metric?</span></a></h3>
+<p>Record success as a timestamp gauge, as above, rather than as a boolean — a boolean tells you nothing about <em>when</em>, and “when did this last succeed” is the question during an incident.</p>
+<h3 id="how-do-these-metrics-relate-to-the-qa-gates" tabindex="-1"><a class="heading-link" href="#how-do-these-metrics-relate-to-the-qa-gates"><span>How do these metrics relate to the QA gates?</span></a></h3>
+<p>The gates decide whether a build is publishable; the metrics record what the gates decided and how the run behaved. Exporting a gate result as a gauge per gate turns a pass/fail into a trend, which is where a slowly degrading dataset shows up.</p>
+<h2 id="related-guides" tabindex="-1"><a class="heading-link" href="#related-guides"><span>Related Guides</span></a></h2>
+<ul>
+<li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/">Pipeline Observability and Monitoring</a> — how this fits with logs and traces</li>
+<li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/monitoring-twin-data-freshness-slos/">Monitoring Twin Data Freshness SLOs</a> — the freshness metric in depth</li>
+<li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/alerting-on-tile-error-rates-from-cdn-logs/">Alerting on Tile Error Rates from CDN Logs</a> — the user-facing alert to pair with these</li>
+</ul>
+<p>Back to <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/">Pipeline Observability and Monitoring</a>.</p>
+
+
+      
+      
+
+      <div class="related-nav">
+        
+
+        
+          <div>
+            <h3>Related</h3>
+            <div class="related-grid">
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/alerting-on-tile-error-rates-from-cdn-logs/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Alerting on Tile Error Rates from CDN Logs</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/detecting-data-drift-between-deliveries/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Detecting Data Drift Between Deliveries</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/monitoring-twin-data-freshness-slos/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Monitoring Twin Data Freshness SLOs</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/structured-logging-for-spatial-pipelines/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Structured Logging for Spatial Pipelines</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/tracing-pipeline-stages-with-opentelemetry/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Tracing Pipeline Stages with OpenTelemetry</span>
+                </a>
+              
+            </div>
+          </div>
+        
+      </div>
+    </article>
+
+    
+    <aside class="toc" aria-label="On this page" data-toc hidden>
+      <h4>On this page</h4>
+      <ul></ul>
+    </aside>
+  </div>
+</div>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+  <div class="container site-footer__inner">
+    <div class="site-footer__brand">
+      <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+        <img src="/assets/img/logo-mark.svg" alt="" class="brand__mark" width="36" height="36">
+        <span class="brand__name">
+          3D Geospatial
+          <small>Digital Twin Automation</small>
+        </span>
+      </a>
+      <p>Engineering-grade guides on point cloud processing, mesh pipelines, LOD strategies, and CI/CD automation for digital twin platforms.</p>
+      <a class="footer-social" href="https://github.com/3d-geospatial" aria-label="3D Geospatial on GitHub" rel="noopener" target="_blank">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+          <path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.53-1.34-1.3-1.7-1.3-1.7-1.06-.72.08-.71.08-.71 1.17.08 1.79 1.2 1.79 1.2 1.04 1.79 2.73 1.27 3.4.97.1-.75.4-1.27.73-1.56-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.19-3.08-.12-.3-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.75.11 3.05.74.8 1.19 1.83 1.19 3.08 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.07.78 2.15v3.18c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5Z"/>
+        </svg>
+        <span>GitHub</span>
+      </a>
+    </div>
+
+    <div class="site-footer__col">
+      <h4>Sections</h4>
+      <ul>
+        <li><a href="https://www.3d-geospatial.com/">Home</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management &amp; Optimization</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/">Point Cloud &amp; Mesh Pipelines</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/">Troubleshooting &amp; Reliability</a></li>
+        
+      </ul>
+    </div>
+
+    
+      <div class="site-footer__col">
+        <h4>3D Geospatial Fundamentals</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/">3D Format Standards Comparison</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/">BIM and IFC Georeferencing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/">CityGML and CityJSON Processing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems for 3D Assets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/">Digital Elevation Model Workflows</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/">Spatial Indexing and Tiling Schemes for 3D Data</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>LOD Management &amp; Optimization</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/">Automated Tile Generation for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/">Cesium ion Upload Automation for 3D Tilesets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/">glTF LOD Generation With Draco Compression</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/">Streaming Sync Patterns for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/">Tileset Metadata and 3D Tiles Next</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/">Vector Overlays on 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Point Cloud &amp; Mesh Pipelines</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/">Automated Mesh Decimation for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/">Change Detection Between LiDAR Scan Epochs</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/">CI/CD Automation for Spatial Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">LiDAR Classification and Ground Extraction</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/photogrammetry-processing-pipelines/">Photogrammetry Processing Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/">Point Cloud Filtering Techniques</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/">Surface Reconstruction for Geospatial Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/">Texture Mapping Workflows for Digital Twins</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Troubleshooting &amp; Reliability</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/">Cross-Section Failure Modes in Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/">Data Validation &amp; QA Gates for 3D Tiles</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/">Performance Profiling and Benchmarking</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/">Pipeline Observability and Monitoring</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/">Streaming &amp; Runtime Diagnostics for 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+  </div>
+  <div class="container site-footer__bottom">
+    <span>© 2026 3D Geospatial &amp; Digital Twin Automation</span>
+    <span>Built with Eleventy · PWA-enabled</span>
+  </div>
+</footer>
+
+
+  <script src="/assets/js/site.js?v=b99aa9f971" defer></script>
+  
+</body>
+</html>

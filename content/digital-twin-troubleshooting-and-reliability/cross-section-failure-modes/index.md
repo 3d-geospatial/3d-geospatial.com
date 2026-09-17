@@ -311,5 +311,7 @@ A closing note on where these assertions belong. Putting them in the pipeline me
 - [Coordinate Reference Systems for 3D Assets](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/) — the CRS contract these checks enforce
 - [Mesh Topology Basics](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/) — manifoldness and the non-manifold repair path
 - [Automated Mesh Decimation for Digital Twins](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/) — the stage that widens topological flaws if unchecked
+- [Diagnosing Inverted Normals Across Pipeline Stages](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/diagnosing-inverted-normals-across-pipeline-stages/) — find the stage that flipped your winding
+- [Tracing Unit Errors from Feet to Metres](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/tracing-unit-errors-from-feet-to-metres/) — find the stage that applied the wrong unit
 
 Back to [Digital Twin Troubleshooting & Reliability](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/).

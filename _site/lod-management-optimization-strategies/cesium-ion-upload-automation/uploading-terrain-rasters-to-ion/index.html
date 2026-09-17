@@ -1,0 +1,936 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <title>Uploading Terrain Rasters to ion — 3D Geospatial</title>
+  <meta name="description" content="Prepare and upload elevation rasters as ion terrain: nodata and vertical datum handling, mosaicking, base terrain choice">
+  <meta name="keywords" content="3D geospatial, digital twin, point cloud, mesh pipeline, LOD, 3D Tiles, Cesium, PDAL, Open3D, Python, CI/CD">
+  <meta name="author" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta name="theme-color" content="#1f6b8a" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f171d" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+
+  
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem("theme");
+        var theme = (stored === "dark" || stored === "light") ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    })();
+  </script>
+  <meta name="generator" content="Eleventy">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="googlebot" content="index,follow,max-image-preview:large">
+
+  
+  <link rel="canonical" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/uploading-terrain-rasters-to-ion/">
+  <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">
+
+  
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/icon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+
+  
+  <link rel="apple-touch-icon" href="/assets/img/icon-180.png">
+  <link rel="mask-icon" href="/assets/img/logo.svg" color="#1f6b8a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="3D Geospatial">
+  <meta name="application-name" content="3D Geospatial">
+
+  
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Uploading Terrain Rasters to ion — 3D Geospatial">
+  <meta property="og:description" content="Prepare and upload elevation rasters as ion terrain: nodata and vertical datum handling, mosaicking, base terrain choice">
+  <meta property="og:url" content="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/uploading-terrain-rasters-to-ion/">
+  <meta property="og:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+  <meta property="og:site_name" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta property="og:locale" content="en_US">
+  
+  <meta property="article:published_time" content="2026-09-17T23:36:56.453Z">
+  <meta property="article:modified_time" content="2026-09-17T23:36:56.453Z">
+  <meta property="article:publisher" content="https://www.3d-geospatial.com/">
+  
+
+  
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Uploading Terrain Rasters to ion — 3D Geospatial">
+  <meta name="twitter:description" content="Prepare and upload elevation rasters as ion terrain: nodata and vertical datum handling, mosaicking, base terrain choice">
+  <meta name="twitter:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta name="twitter:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+
+  
+  <link rel="preload" href="/assets/css/styles.css?v=8c46394d6c" as="style">
+  
+
+  <link rel="stylesheet" href="/assets/css/styles.css?v=8c46394d6c">
+
+  
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.3d-geospatial.com/#organization",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "url": "https://www.3d-geospatial.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/icon-512.png",
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://www.3d-geospatial.com/#website",
+      "url": "https://www.3d-geospatial.com/",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "description": "Build reliable 3D spatial data pipelines for digital twins — point clouds, meshes, LOD strategies, Python processing, and CI/CD automation.",
+      "inLanguage": "en",
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      }
+    },
+    {
+      "@type": "TechArticle",
+      "@id": "https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/uploading-terrain-rasters-to-ion/#article",
+      "isPartOf": {
+        "@id": "https://www.3d-geospatial.com/#website"
+      },
+      "headline": "Uploading Terrain Rasters to ion",
+      "name": "Uploading Terrain Rasters to ion",
+      "description": "Prepare and upload elevation rasters as ion terrain: nodata and vertical datum handling, mosaicking, base terrain choice",
+      "url": "https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/uploading-terrain-rasters-to-ion/",
+      "mainEntityOfPage": "https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/uploading-terrain-rasters-to-ion/",
+      "inLanguage": "en",
+      "datePublished": "2026-09-17T23:36:56.453Z",
+      "dateModified": "2026-09-17T23:36:56.453Z",
+      "author": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "image": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/og-cover.png",
+        "width": 1200,
+        "height": 630
+      },
+      "breadcrumb": {
+        "@id": "https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/uploading-terrain-rasters-to-ion/#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/uploading-terrain-rasters-to-ion/#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://www.3d-geospatial.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "LOD Management Optimization Strategies",
+          "item": "https://www.3d-geospatial.com/lod-management-optimization-strategies/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Cesium Ion Upload Automation",
+          "item": "https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "name": "Uploading Terrain Rasters To Ion",
+          "item": "https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/uploading-terrain-rasters-to-ion/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  
+<header class="site-header" role="banner">
+  <div class="container site-header__inner">
+    <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+      <img src="/assets/img/logo.svg" alt="" class="brand__mark" width="36" height="36">
+      <span class="brand__name">
+        3D Geospatial
+        <small>Digital Twin Automation</small>
+      </span>
+    </a>
+
+    <button class="theme-toggle" type="button" data-theme-toggle
+            aria-label="Switch to dark theme" title="Switch to dark theme">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4.2"/>
+        <path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/>
+      </svg>
+    </button>
+
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>
+      <span class="nav-toggle__icon" aria-hidden="true"><span></span></span>
+      Menu
+    </button>
+
+    <nav class="primary-nav" id="primary-nav" aria-label="Primary">
+      
+      <a href="https://www.3d-geospatial.com/" >
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/>
+        </svg>
+        Home
+      </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2 3 7l9 5 9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 17l9 5 9-5"/>
+            </svg>
+          
+          3D Geospatial Fundamentals
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/" aria-current="page">
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+          
+          LOD Management &amp; Optimization
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="6" cy="6" r="1.5"/><circle cx="12" cy="6" r="1.5"/><circle cx="18" cy="6" r="1.5"/>
+              <circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/>
+              <circle cx="6" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="18" cy="18" r="1.5"/>
+            </svg>
+          
+          Point Cloud &amp; Mesh Pipelines
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <path d="M12 9v4"/><path d="M12 17h.01"/>
+            </svg>
+          
+          Troubleshooting &amp; Reliability
+        </a>
+      
+    </nav>
+  </div>
+</header>
+
+
+  <main id="main">
+    
+
+
+<div class="container">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    
+      
+        <a href="https://www.3d-geospatial.com/">Home</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management Optimization Strategies</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/">Cesium Ion Upload Automation</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <span class="current">Uploading Terrain Rasters To Ion</span>
+      
+    
+  </nav>
+
+  <div class="content-page">
+    <article class="article">
+      <h1 id="uploading-terrain-rasters-to-ion" tabindex="-1"><a class="heading-link" href="#uploading-terrain-rasters-to-ion"><span>Uploading Terrain Rasters to ion</span></a></h1>
+<p>This page prepares a set of GeoTIFF elevation tiles — 1 m lidar-derived DTM covering 900 km² — for upload as a Cesium ion terrain asset: fixing nodata so the sea does not become a cliff, declaring the vertical datum, mosaicking or not, choosing the base terrain to blend into, and verifying the result against survey control points before anything is built on it.</p>
+<h2 id="why-you-hit-this" tabindex="-1"><a class="heading-link" href="#why-you-hit-this"><span>Why you hit this</span></a></h2>
+<p>Terrain is the layer everything else sits on. A building tileset clamped to terrain that is 40 m out puts every building underground; a point cloud draped over terrain with nodata read as zero shows a 100 m cliff at every water body. And terrain tiling is the slowest and most expensive ion operation, so a mistake discovered afterwards costs hours rather than minutes.</p>
+<p>Most of the work is in the raster before it is uploaded. ion tiles what it is given faithfully, including the parts that are wrong.</p>
+<h2 id="prerequisites" tabindex="-1"><a class="heading-link" href="#prerequisites"><span>Prerequisites</span></a></h2>
+<ul>
+<li>Python 3.10+ with <code>rasterio</code>, <code>numpy</code>, <code>pyproj</code>; GDAL command-line tools available.</li>
+<li>An ion token with <code>assets:write</code>.</li>
+<li>The rasters’ horizontal <strong>and</strong> vertical CRS, and a handful of survey control points with known heights for verification.</li>
+</ul>
+<h2 id="step-by-step" tabindex="-1"><a class="heading-link" href="#step-by-step"><span>Step-by-Step</span></a></h2>
+<h3 id="1-inspect-every-input-raster-not-just-the-first" tabindex="-1"><a class="heading-link" href="#1-inspect-every-input-raster-not-just-the-first"><span>1. Inspect every input raster, not just the first</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> json
+<span class="token keyword">import</span> math
+<span class="token keyword">import</span> os
+<span class="token keyword">import</span> subprocess
+<span class="token keyword">from</span> collections <span class="token keyword">import</span> Counter
+<span class="token keyword">from</span> pathlib <span class="token keyword">import</span> Path
+
+<span class="token keyword">import</span> numpy <span class="token keyword">as</span> np
+<span class="token keyword">import</span> rasterio
+<span class="token keyword">from</span> rasterio<span class="token punctuation">.</span>crs <span class="token keyword">import</span> CRS
+
+<span class="token keyword">def</span> <span class="token function">inspect</span><span class="token punctuation">(</span>paths<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    rows <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    <span class="token keyword">for</span> p <span class="token keyword">in</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span>paths<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">with</span> rasterio<span class="token punctuation">.</span><span class="token builtin">open</span><span class="token punctuation">(</span>p<span class="token punctuation">)</span> <span class="token keyword">as</span> ds<span class="token punctuation">:</span>
+            band <span class="token operator">=</span> ds<span class="token punctuation">.</span>read<span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">,</span> masked<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+            rows<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span>
+                <span class="token string">"file"</span><span class="token punctuation">:</span> Path<span class="token punctuation">(</span>p<span class="token punctuation">)</span><span class="token punctuation">.</span>name<span class="token punctuation">,</span>
+                <span class="token string">"crs"</span><span class="token punctuation">:</span> ds<span class="token punctuation">.</span>crs<span class="token punctuation">.</span>to_string<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">if</span> ds<span class="token punctuation">.</span>crs <span class="token keyword">else</span> <span class="token boolean">None</span><span class="token punctuation">,</span>
+                <span class="token string">"res_m"</span><span class="token punctuation">:</span> <span class="token punctuation">[</span><span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">abs</span><span class="token punctuation">(</span>ds<span class="token punctuation">.</span>transform<span class="token punctuation">.</span>a<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">abs</span><span class="token punctuation">(</span>ds<span class="token punctuation">.</span>transform<span class="token punctuation">.</span>e<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+                <span class="token string">"size"</span><span class="token punctuation">:</span> <span class="token punctuation">[</span>ds<span class="token punctuation">.</span>width<span class="token punctuation">,</span> ds<span class="token punctuation">.</span>height<span class="token punctuation">]</span><span class="token punctuation">,</span>
+                <span class="token string">"dtype"</span><span class="token punctuation">:</span> <span class="token builtin">str</span><span class="token punctuation">(</span>ds<span class="token punctuation">.</span>dtypes<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                <span class="token string">"nodata"</span><span class="token punctuation">:</span> ds<span class="token punctuation">.</span>nodata<span class="token punctuation">,</span>
+                <span class="token string">"valid_pct"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token number">100.0</span> <span class="token operator">*</span> band<span class="token punctuation">.</span>count<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">/</span> band<span class="token punctuation">.</span>size<span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                <span class="token string">"min"</span><span class="token punctuation">:</span> <span class="token boolean">None</span> <span class="token keyword">if</span> band<span class="token punctuation">.</span>count<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token number">0</span> <span class="token keyword">else</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>band<span class="token punctuation">.</span><span class="token builtin">min</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                <span class="token string">"max"</span><span class="token punctuation">:</span> <span class="token boolean">None</span> <span class="token keyword">if</span> band<span class="token punctuation">.</span>count<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token number">0</span> <span class="token keyword">else</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>band<span class="token punctuation">.</span><span class="token builtin">max</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token punctuation">}</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> rows
+
+rasters <span class="token operator">=</span> <span class="token builtin">list</span><span class="token punctuation">(</span>Path<span class="token punctuation">(</span><span class="token string">"input/dtm"</span><span class="token punctuation">)</span><span class="token punctuation">.</span>glob<span class="token punctuation">(</span><span class="token string">"*.tif"</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+rows <span class="token operator">=</span> inspect<span class="token punctuation">(</span>rasters<span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span><span class="token builtin">len</span><span class="token punctuation">(</span>rows<span class="token punctuation">)</span><span class="token punctuation">}</span></span><span class="token string"> rasters"</span></span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"CRS values:"</span><span class="token punctuation">,</span> Counter<span class="token punctuation">(</span>r<span class="token punctuation">[</span><span class="token string">"crs"</span><span class="token punctuation">]</span> <span class="token keyword">for</span> r <span class="token keyword">in</span> rows<span class="token punctuation">)</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"dtypes:"</span><span class="token punctuation">,</span> Counter<span class="token punctuation">(</span>r<span class="token punctuation">[</span><span class="token string">"dtype"</span><span class="token punctuation">]</span> <span class="token keyword">for</span> r <span class="token keyword">in</span> rows<span class="token punctuation">)</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"resolutions:"</span><span class="token punctuation">,</span> Counter<span class="token punctuation">(</span><span class="token builtin">tuple</span><span class="token punctuation">(</span>r<span class="token punctuation">[</span><span class="token string">"res_m"</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token keyword">for</span> r <span class="token keyword">in</span> rows<span class="token punctuation">)</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"nodata:"</span><span class="token punctuation">,</span> Counter<span class="token punctuation">(</span><span class="token builtin">str</span><span class="token punctuation">(</span>r<span class="token punctuation">[</span><span class="token string">"nodata"</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token keyword">for</span> r <span class="token keyword">in</span> rows<span class="token punctuation">)</span><span class="token punctuation">)</span>
+extremes <span class="token operator">=</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span>rows<span class="token punctuation">,</span> key<span class="token operator">=</span><span class="token keyword">lambda</span> r<span class="token punctuation">:</span> <span class="token punctuation">(</span>r<span class="token punctuation">[</span><span class="token string">"min"</span><span class="token punctuation">]</span> <span class="token keyword">is</span> <span class="token boolean">None</span><span class="token punctuation">,</span> r<span class="token punctuation">[</span><span class="token string">"min"</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token number">3</span><span class="token punctuation">]</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"lowest:"</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token punctuation">(</span>r<span class="token punctuation">[</span><span class="token string">"file"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> r<span class="token punctuation">[</span><span class="token string">"min"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> r<span class="token punctuation">[</span><span class="token string">"max"</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token keyword">for</span> r <span class="token keyword">in</span> extremes<span class="token punctuation">]</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Checking all of them matters because a delivery of 900 tiles is rarely uniform: a few will have a different nodata value, one or two will be <code>float64</code> where the rest are <code>float32</code>, and occasionally a handful arrive in a different CRS entirely because they came from a neighbouring authority. Each inconsistency becomes a visible artefact in the tiled terrain.</p>
+<p>The <code>min</code> value across the set is the fastest nodata diagnostic there is. A DTM whose minimum is −9999 or −32768 has nodata being read as elevation, and that is what produces the cliffs.</p>
+<figure class="diagram">
+<svg viewBox="6 10 728 230" role="img" aria-labelledby="ter-nodata-t ter-nodata-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="ter-nodata-t">Nodata read as elevation versus nodata masked</title>
+  <desc id="ter-nodata-d">Two terrain cross-sections. On the left, nodata cells over a lake carry the value minus 9999 and are tiled as elevation, producing a vertical shaft descending far below the surrounding ground. On the right the same cells are declared as nodata, so the tiler interpolates or leaves a hole and the lake surface stays level with its shoreline.</desc>
+  <rect class="svg-bg" x="6" y="10" width="728" height="230" fill="#ffffff"/>
+  <rect x="20" y="24" width="336" height="176" rx="9" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <rect x="384" y="24" width="336" height="176" rx="9" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <text x="188" y="48" fill="#1f2937" font-size="13" text-anchor="middle">nodata = −9999 tiled as elevation</text>
+  <text x="552" y="48" fill="#1f2937" font-size="13" text-anchor="middle">nodata declared and masked</text>
+  <path d="M44 96 H128 V186 H168 V96 H332" stroke="#b0413e" stroke-width="2.5" fill="none"/>
+  <path d="M408 96 H492 L512 99 L532 99 L552 96 H696" stroke="#4f7a4d" stroke-width="2.5" fill="none"/>
+  <path d="M492 99 H552" stroke="#1f6b8a" stroke-width="3" fill="none"/>
+  <g fill="#1f2937" font-size="12" text-anchor="middle">
+    <text x="148" y="126">100 m shaft</text>
+    <text x="148" y="144">at every</text>
+    <text x="148" y="162">water body</text>
+    <text x="522" y="130">lake surface level</text>
+    <text x="522" y="148">with its shoreline</text>
+  </g>
+  <g fill="#5b6471" font-size="12">
+    <text x="44" y="88">ground</text>
+    <text x="408" y="88">ground</text>
+  </g>
+  <text x="370" y="222" fill="#5b6471" font-size="12" text-anchor="middle">one GDAL flag decides which of these the terrain asset becomes</text>
+</svg>
+<figcaption>The left picture is what an undeclared nodata value looks like after tiling, and it cannot be fixed without re-tiling.</figcaption>
+</figure>
+<h3 id="2-normalise-nodata-dtype-and-crs" tabindex="-1"><a class="heading-link" href="#2-normalise-nodata-dtype-and-crs"><span>2. Normalise nodata, dtype and CRS</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">normalise_raster</span><span class="token punctuation">(</span>src_path<span class="token punctuation">,</span> out_path<span class="token punctuation">,</span> target_crs<span class="token operator">=</span><span class="token string">"EPSG:25832"</span><span class="token punctuation">,</span>
+                     nodata_out<span class="token operator">=</span><span class="token operator">-</span><span class="token number">9999.0</span><span class="token punctuation">,</span> dtype<span class="token operator">=</span><span class="token string">"float32"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""One pass: reproject if needed, set a single nodata value, mask sentinel values."""</span>
+    <span class="token keyword">with</span> rasterio<span class="token punctuation">.</span><span class="token builtin">open</span><span class="token punctuation">(</span>src_path<span class="token punctuation">)</span> <span class="token keyword">as</span> ds<span class="token punctuation">:</span>
+        data <span class="token operator">=</span> ds<span class="token punctuation">.</span>read<span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">.</span>astype<span class="token punctuation">(</span><span class="token string">"float32"</span><span class="token punctuation">)</span>
+        src_nodata <span class="token operator">=</span> ds<span class="token punctuation">.</span>nodata
+        mask <span class="token operator">=</span> np<span class="token punctuation">.</span>zeros<span class="token punctuation">(</span>data<span class="token punctuation">.</span>shape<span class="token punctuation">,</span> dtype<span class="token operator">=</span><span class="token builtin">bool</span><span class="token punctuation">)</span>
+        <span class="token keyword">if</span> src_nodata <span class="token keyword">is</span> <span class="token keyword">not</span> <span class="token boolean">None</span><span class="token punctuation">:</span>
+            mask <span class="token operator">|</span><span class="token operator">=</span> np<span class="token punctuation">.</span>isclose<span class="token punctuation">(</span>data<span class="token punctuation">,</span> src_nodata<span class="token punctuation">)</span>
+        <span class="token keyword">for</span> sentinel <span class="token keyword">in</span> <span class="token punctuation">(</span><span class="token operator">-</span><span class="token number">9999.0</span><span class="token punctuation">,</span> <span class="token operator">-</span><span class="token number">32767.0</span><span class="token punctuation">,</span> <span class="token operator">-</span><span class="token number">32768.0</span><span class="token punctuation">,</span> <span class="token number">3.4028234663852886e38</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+            mask <span class="token operator">|</span><span class="token operator">=</span> np<span class="token punctuation">.</span>isclose<span class="token punctuation">(</span>data<span class="token punctuation">,</span> sentinel<span class="token punctuation">,</span> rtol<span class="token operator">=</span><span class="token number">0</span><span class="token punctuation">,</span> atol<span class="token operator">=</span><span class="token number">1e-3</span><span class="token punctuation">)</span>
+        mask <span class="token operator">|</span><span class="token operator">=</span> <span class="token operator">~</span>np<span class="token punctuation">.</span>isfinite<span class="token punctuation">(</span>data<span class="token punctuation">)</span>
+        mask <span class="token operator">|</span><span class="token operator">=</span> data <span class="token operator">&lt;</span> <span class="token operator">-</span><span class="token number">500.0</span>                    <span class="token comment"># no land below this in this project</span>
+        mask <span class="token operator">|</span><span class="token operator">=</span> data <span class="token operator">></span> <span class="token number">9000.0</span>
+        data<span class="token punctuation">[</span>mask<span class="token punctuation">]</span> <span class="token operator">=</span> nodata_out
+
+        profile <span class="token operator">=</span> ds<span class="token punctuation">.</span>profile
+        profile<span class="token punctuation">.</span>update<span class="token punctuation">(</span>dtype<span class="token operator">=</span>dtype<span class="token punctuation">,</span> nodata<span class="token operator">=</span>nodata_out<span class="token punctuation">,</span> compress<span class="token operator">=</span><span class="token string">"deflate"</span><span class="token punctuation">,</span>
+                       predictor<span class="token operator">=</span><span class="token number">3</span><span class="token punctuation">,</span> tiled<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> blockxsize<span class="token operator">=</span><span class="token number">512</span><span class="token punctuation">,</span> blockysize<span class="token operator">=</span><span class="token number">512</span><span class="token punctuation">,</span>
+                       BIGTIFF<span class="token operator">=</span><span class="token string">"IF_SAFER"</span><span class="token punctuation">)</span>
+        needs_warp <span class="token operator">=</span> ds<span class="token punctuation">.</span>crs <span class="token keyword">is</span> <span class="token boolean">None</span> <span class="token keyword">or</span> ds<span class="token punctuation">.</span>crs <span class="token operator">!=</span> CRS<span class="token punctuation">.</span>from_string<span class="token punctuation">(</span>target_crs<span class="token punctuation">)</span>
+        Path<span class="token punctuation">(</span>out_path<span class="token punctuation">)</span><span class="token punctuation">.</span>parent<span class="token punctuation">.</span>mkdir<span class="token punctuation">(</span>parents<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> exist_ok<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+        <span class="token keyword">with</span> rasterio<span class="token punctuation">.</span><span class="token builtin">open</span><span class="token punctuation">(</span>out_path<span class="token punctuation">,</span> <span class="token string">"w"</span><span class="token punctuation">,</span> <span class="token operator">**</span>profile<span class="token punctuation">)</span> <span class="token keyword">as</span> dst<span class="token punctuation">:</span>
+            dst<span class="token punctuation">.</span>write<span class="token punctuation">(</span>data<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span>
+    <span class="token keyword">if</span> needs_warp<span class="token punctuation">:</span>
+        warped <span class="token operator">=</span> <span class="token builtin">str</span><span class="token punctuation">(</span>out_path<span class="token punctuation">)</span><span class="token punctuation">.</span>replace<span class="token punctuation">(</span><span class="token string">".tif"</span><span class="token punctuation">,</span> <span class="token string">"_warp.tif"</span><span class="token punctuation">)</span>
+        subprocess<span class="token punctuation">.</span>run<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token string">"gdalwarp"</span><span class="token punctuation">,</span> <span class="token string">"-t_srs"</span><span class="token punctuation">,</span> target_crs<span class="token punctuation">,</span> <span class="token string">"-r"</span><span class="token punctuation">,</span> <span class="token string">"bilinear"</span><span class="token punctuation">,</span>
+                        <span class="token string">"-dstnodata"</span><span class="token punctuation">,</span> <span class="token builtin">str</span><span class="token punctuation">(</span>nodata_out<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"-co"</span><span class="token punctuation">,</span> <span class="token string">"COMPRESS=DEFLATE"</span><span class="token punctuation">,</span>
+                        <span class="token string">"-co"</span><span class="token punctuation">,</span> <span class="token string">"PREDICTOR=3"</span><span class="token punctuation">,</span> <span class="token string">"-co"</span><span class="token punctuation">,</span> <span class="token string">"TILED=YES"</span><span class="token punctuation">,</span>
+                        <span class="token builtin">str</span><span class="token punctuation">(</span>out_path<span class="token punctuation">)</span><span class="token punctuation">,</span> warped<span class="token punctuation">]</span><span class="token punctuation">,</span> check<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> capture_output<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+        os<span class="token punctuation">.</span>replace<span class="token punctuation">(</span>warped<span class="token punctuation">,</span> out_path<span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"file"</span><span class="token punctuation">:</span> Path<span class="token punctuation">(</span>out_path<span class="token punctuation">)</span><span class="token punctuation">.</span>name<span class="token punctuation">,</span> <span class="token string">"masked_pct"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token number">100.0</span> <span class="token operator">*</span> mask<span class="token punctuation">.</span>mean<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+             <span class="token string">"warped"</span><span class="token punctuation">:</span> needs_warp<span class="token punctuation">}</span>
+
+stats <span class="token operator">=</span> <span class="token punctuation">[</span>normalise_raster<span class="token punctuation">(</span>p<span class="token punctuation">,</span> <span class="token string-interpolation"><span class="token string">f"work/dtm/</span><span class="token interpolation"><span class="token punctuation">{</span>p<span class="token punctuation">.</span>name<span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span> <span class="token keyword">for</span> p <span class="token keyword">in</span> rasters<span class="token punctuation">]</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"masked on average </span><span class="token interpolation"><span class="token punctuation">{</span>np<span class="token punctuation">.</span>mean<span class="token punctuation">(</span><span class="token punctuation">[</span>s<span class="token punctuation">[</span><span class="token string">'masked_pct'</span><span class="token punctuation">]</span> <span class="token keyword">for</span> s <span class="token keyword">in</span> stats<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">:</span><span class="token format-spec">.2f</span><span class="token punctuation">}</span></span><span class="token string">% of cells"</span></span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span><span class="token builtin">sum</span><span class="token punctuation">(</span>s<span class="token punctuation">[</span><span class="token string">'warped'</span><span class="token punctuation">]</span> <span class="token keyword">for</span> s <span class="token keyword">in</span> stats<span class="token punctuation">)</span><span class="token punctuation">}</span></span><span class="token string"> raster(s) needed reprojection"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Declaring nodata is necessary and not sufficient, because the sentinel values are often present <em>without</em> being declared in the header — which is exactly the case the loop over known sentinels handles. Adding a physical plausibility range on top catches the ones nobody has seen before: a DTM cell at −3.4e38 is a float32 minimum written by some export path, and a cell at 32767 is an integer sentinel that survived a dtype conversion.</p>
+<p><code>predictor=3</code> is the floating-point predictor for DEFLATE and typically halves the file size of an elevation raster against no predictor, which matters directly because upload bandwidth is the bottleneck.</p>
+<p>Reprojecting with <code>bilinear</code> rather than <code>nearest</code> is right for continuous elevation; nearest leaves stair-stepping that shows up as terracing in the tiled terrain.</p>
+<h3 id="3-declare-the-vertical-datum" tabindex="-1"><a class="heading-link" href="#3-declare-the-vertical-datum"><span>3. Declare the vertical datum</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">from</span> pyproj <span class="token keyword">import</span> CRS <span class="token keyword">as</span> PyCRS<span class="token punctuation">,</span> Transformer
+
+<span class="token keyword">def</span> <span class="token function">vertical_offset_sample</span><span class="token punctuation">(</span>lon<span class="token punctuation">,</span> lat<span class="token punctuation">,</span> h_orthometric<span class="token punctuation">,</span>
+                           compound<span class="token operator">=</span><span class="token string">"EPSG:25832+5941"</span><span class="token punctuation">,</span> target<span class="token operator">=</span><span class="token string">"EPSG:4979"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""How far the declared vertical datum moves a height. Sanity-check before upload."""</span>
+    t <span class="token operator">=</span> Transformer<span class="token punctuation">.</span>from_crs<span class="token punctuation">(</span>PyCRS<span class="token punctuation">.</span>from_user_input<span class="token punctuation">(</span>compound<span class="token punctuation">)</span><span class="token punctuation">,</span>
+                             PyCRS<span class="token punctuation">.</span>from_user_input<span class="token punctuation">(</span>target<span class="token punctuation">)</span><span class="token punctuation">,</span> always_xy<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+    x<span class="token punctuation">,</span> y<span class="token punctuation">,</span> z <span class="token operator">=</span> t<span class="token punctuation">.</span>transform<span class="token punctuation">(</span>lon<span class="token punctuation">,</span> lat<span class="token punctuation">,</span> h_orthometric<span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"orthometric_m"</span><span class="token punctuation">:</span> h_orthometric<span class="token punctuation">,</span> <span class="token string">"ellipsoidal_m"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>z<span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"separation_m"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>z <span class="token operator">-</span> h_orthometric<span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">}</span>
+
+<span class="token keyword">print</span><span class="token punctuation">(</span>vertical_offset_sample<span class="token punctuation">(</span><span class="token number">10.7522</span><span class="token punctuation">,</span> <span class="token number">59.9139</span><span class="token punctuation">,</span> <span class="token number">24.0</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+
+<span class="token keyword">def</span> <span class="token function">terrain_options</span><span class="token punctuation">(</span>horizontal_epsg<span class="token punctuation">,</span> vertical_epsg<span class="token punctuation">,</span> base_terrain_id<span class="token operator">=</span><span class="token number">1</span><span class="token punctuation">,</span> water_mask<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    opts <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token string">"sourceType"</span><span class="token punctuation">:</span> <span class="token string">"RASTER_TERRAIN"</span><span class="token punctuation">,</span>
+            <span class="token string">"srs"</span><span class="token punctuation">:</span> <span class="token string-interpolation"><span class="token string">f"EPSG:</span><span class="token interpolation"><span class="token punctuation">{</span>horizontal_epsg<span class="token punctuation">}</span></span><span class="token string">+</span><span class="token interpolation"><span class="token punctuation">{</span>vertical_epsg<span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">,</span>
+            <span class="token string">"baseTerrainId"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span>base_terrain_id<span class="token punctuation">)</span><span class="token punctuation">}</span>
+    <span class="token keyword">if</span> water_mask<span class="token punctuation">:</span>
+        opts<span class="token punctuation">[</span><span class="token string">"waterMask"</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token boolean">True</span>
+    <span class="token keyword">return</span> opts
+
+<span class="token keyword">print</span><span class="token punctuation">(</span>terrain_options<span class="token punctuation">(</span><span class="token number">25832</span><span class="token punctuation">,</span> <span class="token number">5941</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Terrain is where the vertical datum matters most, because the error is systematic across the whole dataset and everything else is positioned relative to it. National height systems are orthometric — NN2000, DHHN2016, NAVD88, ODN — and 3D Tiles terrain is ellipsoidal, so the separation has to be applied somewhere. Declaring the compound CRS makes ion apply it; not declaring it means the whole city sits at the wrong height while looking internally consistent.</p>
+<p>Printing the separation for one point before uploading is thirty seconds of work that catches a wrong vertical code, because the number should match what a national geoid map says for that location — around 40 m in southern Norway, 45 m in Germany, −30 m in parts of the US.</p>
+<h3 id="4-choose-the-base-terrain-and-decide-about-mosaicking" tabindex="-1"><a class="heading-link" href="#4-choose-the-base-terrain-and-decide-about-mosaicking"><span>4. Choose the base terrain and decide about mosaicking</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python">BASE_TERRAIN <span class="token operator">=</span> <span class="token punctuation">{</span>
+    <span class="token string">"world_terrain"</span><span class="token punctuation">:</span> <span class="token number">1</span><span class="token punctuation">,</span>      <span class="token comment"># blend into Cesium World Terrain outside the extent</span>
+    <span class="token string">"none"</span><span class="token punctuation">:</span> <span class="token number">0</span><span class="token punctuation">,</span>               <span class="token comment"># ellipsoid outside the extent — a visible edge</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">def</span> <span class="token function">upload_plan</span><span class="token punctuation">(</span>rasters<span class="token punctuation">,</span> max_files<span class="token operator">=</span><span class="token number">1000</span><span class="token punctuation">,</span> max_total_gb<span class="token operator">=</span><span class="token number">120.0</span><span class="token punctuation">,</span> mosaic_threshold<span class="token operator">=</span><span class="token number">500</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    total_gb <span class="token operator">=</span> <span class="token builtin">sum</span><span class="token punctuation">(</span>Path<span class="token punctuation">(</span>p<span class="token punctuation">)</span><span class="token punctuation">.</span>stat<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span>st_size <span class="token keyword">for</span> p <span class="token keyword">in</span> rasters<span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token number">1e9</span>
+    plan <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token string">"files"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>rasters<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"total_gb"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>total_gb<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"mosaic"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>rasters<span class="token punctuation">)</span> <span class="token operator">></span> mosaic_threshold<span class="token punctuation">,</span>
+            <span class="token string">"base_terrain_id"</span><span class="token punctuation">:</span> BASE_TERRAIN<span class="token punctuation">[</span><span class="token string">"world_terrain"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+            <span class="token string">"water_mask"</span><span class="token punctuation">:</span> <span class="token boolean">False</span><span class="token punctuation">}</span>
+    <span class="token keyword">if</span> plan<span class="token punctuation">[</span><span class="token string">"files"</span><span class="token punctuation">]</span> <span class="token operator">></span> max_files <span class="token keyword">and</span> <span class="token keyword">not</span> plan<span class="token punctuation">[</span><span class="token string">"mosaic"</span><span class="token punctuation">]</span><span class="token punctuation">:</span>
+        plan<span class="token punctuation">[</span><span class="token string">"mosaic"</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token boolean">True</span>
+        plan<span class="token punctuation">[</span><span class="token string">"reason"</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>plan<span class="token punctuation">[</span><span class="token string">'files'</span><span class="token punctuation">]</span><span class="token punctuation">}</span></span><span class="token string"> files exceeds the practical per-asset limit"</span></span>
+    <span class="token keyword">if</span> total_gb <span class="token operator">></span> max_total_gb<span class="token punctuation">:</span>
+        plan<span class="token punctuation">[</span><span class="token string">"split_into_assets"</span><span class="token punctuation">]</span> <span class="token operator">=</span> math<span class="token punctuation">.</span>ceil<span class="token punctuation">(</span>total_gb <span class="token operator">/</span> max_total_gb<span class="token punctuation">)</span>
+    <span class="token keyword">return</span> plan
+
+<span class="token keyword">def</span> <span class="token function">mosaic_to_vrt</span><span class="token punctuation">(</span>rasters<span class="token punctuation">,</span> out_vrt<span class="token operator">=</span><span class="token string">"work/dtm.vrt"</span><span class="token punctuation">,</span> out_tif<span class="token operator">=</span><span class="token boolean">None</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    listing <span class="token operator">=</span> Path<span class="token punctuation">(</span><span class="token string">"work/dtm_list.txt"</span><span class="token punctuation">)</span>
+    listing<span class="token punctuation">.</span>write_text<span class="token punctuation">(</span><span class="token string">"\n"</span><span class="token punctuation">.</span>join<span class="token punctuation">(</span><span class="token builtin">str</span><span class="token punctuation">(</span>p<span class="token punctuation">)</span> <span class="token keyword">for</span> p <span class="token keyword">in</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span>rasters<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    subprocess<span class="token punctuation">.</span>run<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token string">"gdalbuildvrt"</span><span class="token punctuation">,</span> <span class="token string">"-input_file_list"</span><span class="token punctuation">,</span> <span class="token builtin">str</span><span class="token punctuation">(</span>listing<span class="token punctuation">)</span><span class="token punctuation">,</span>
+                    <span class="token string">"-resolution"</span><span class="token punctuation">,</span> <span class="token string">"highest"</span><span class="token punctuation">,</span> <span class="token string">"-r"</span><span class="token punctuation">,</span> <span class="token string">"bilinear"</span><span class="token punctuation">,</span> out_vrt<span class="token punctuation">]</span><span class="token punctuation">,</span>
+                   check<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> capture_output<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+    <span class="token keyword">if</span> out_tif<span class="token punctuation">:</span>
+        subprocess<span class="token punctuation">.</span>run<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token string">"gdal_translate"</span><span class="token punctuation">,</span> <span class="token string">"-of"</span><span class="token punctuation">,</span> <span class="token string">"COG"</span><span class="token punctuation">,</span> <span class="token string">"-co"</span><span class="token punctuation">,</span> <span class="token string">"COMPRESS=DEFLATE"</span><span class="token punctuation">,</span>
+                        <span class="token string">"-co"</span><span class="token punctuation">,</span> <span class="token string">"PREDICTOR=3"</span><span class="token punctuation">,</span> <span class="token string">"-co"</span><span class="token punctuation">,</span> <span class="token string">"BIGTIFF=YES"</span><span class="token punctuation">,</span>
+                        out_vrt<span class="token punctuation">,</span> out_tif<span class="token punctuation">]</span><span class="token punctuation">,</span> check<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> capture_output<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+        <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"vrt"</span><span class="token punctuation">:</span> out_vrt<span class="token punctuation">,</span> <span class="token string">"tif"</span><span class="token punctuation">:</span> out_tif<span class="token punctuation">,</span>
+                <span class="token string">"gb"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>Path<span class="token punctuation">(</span>out_tif<span class="token punctuation">)</span><span class="token punctuation">.</span>stat<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span>st_size <span class="token operator">/</span> <span class="token number">1e9</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">}</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"vrt"</span><span class="token punctuation">:</span> out_vrt<span class="token punctuation">}</span>
+
+plan <span class="token operator">=</span> upload_plan<span class="token punctuation">(</span><span class="token builtin">list</span><span class="token punctuation">(</span>Path<span class="token punctuation">(</span><span class="token string">"work/dtm"</span><span class="token punctuation">)</span><span class="token punctuation">.</span>glob<span class="token punctuation">(</span><span class="token string">"*.tif"</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span>plan<span class="token punctuation">)</span>
+</code></pre></div>
+<p><code>baseTerrainId: 1</code> blends the asset into Cesium World Terrain at its edges, which is what you want for a city inside a country: outside the extent the viewer shows global terrain rather than a cliff down to the ellipsoid. <code>0</code> is right only when the asset covers the whole area of interest, or when the surrounding terrain would be misleading.</p>
+<p>Mosaicking is a trade. A single large COG uploads as one file and tiles as one coherent surface with no tile-boundary artefacts; 900 separate GeoTIFFs upload in parallel and let a failed file be replaced individually. Past a few hundred files the mosaic wins, mostly because per-file upload overhead and the chance that one file is subtly different both grow.</p>
+<p>A <code>.vrt</code> is not uploadable — it is a reference to other files — so mosaicking for upload means materialising a COG.</p>
+<h3 id="5-upload-and-tile" tabindex="-1"><a class="heading-link" href="#5-upload-and-tile"><span>5. Upload and tile</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> boto3
+<span class="token keyword">import</span> requests
+
+API <span class="token operator">=</span> <span class="token string">"https://api.cesium.com/v1"</span>
+HEADERS <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token string">"Authorization"</span><span class="token punctuation">:</span> <span class="token string-interpolation"><span class="token string">f"Bearer </span><span class="token interpolation"><span class="token punctuation">{</span>os<span class="token punctuation">.</span>environ<span class="token punctuation">[</span><span class="token string">'ION_UPLOAD_TOKEN'</span><span class="token punctuation">]</span><span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">,</span>
+           <span class="token string">"Content-Type"</span><span class="token punctuation">:</span> <span class="token string">"application/json"</span><span class="token punctuation">}</span>
+
+<span class="token keyword">def</span> <span class="token function">upload_terrain</span><span class="token punctuation">(</span>name<span class="token punctuation">,</span> description<span class="token punctuation">,</span> files<span class="token punctuation">,</span> options<span class="token punctuation">,</span> attribution<span class="token operator">=</span><span class="token string">""</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    body <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token string">"name"</span><span class="token punctuation">:</span> name<span class="token punctuation">,</span> <span class="token string">"description"</span><span class="token punctuation">:</span> description<span class="token punctuation">,</span> <span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"TERRAIN"</span><span class="token punctuation">,</span>
+            <span class="token string">"options"</span><span class="token punctuation">:</span> options<span class="token punctuation">}</span>
+    <span class="token keyword">if</span> attribution<span class="token punctuation">:</span>
+        body<span class="token punctuation">[</span><span class="token string">"attribution"</span><span class="token punctuation">]</span> <span class="token operator">=</span> attribution
+    r <span class="token operator">=</span> requests<span class="token punctuation">.</span>post<span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>API<span class="token punctuation">}</span></span><span class="token string">/assets"</span></span><span class="token punctuation">,</span> headers<span class="token operator">=</span>HEADERS<span class="token punctuation">,</span> data<span class="token operator">=</span>json<span class="token punctuation">.</span>dumps<span class="token punctuation">(</span>body<span class="token punctuation">)</span><span class="token punctuation">,</span> timeout<span class="token operator">=</span><span class="token number">60</span><span class="token punctuation">)</span>
+    r<span class="token punctuation">.</span>raise_for_status<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    payload <span class="token operator">=</span> r<span class="token punctuation">.</span>json<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    loc<span class="token punctuation">,</span> meta <span class="token operator">=</span> payload<span class="token punctuation">[</span><span class="token string">"uploadLocation"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> payload<span class="token punctuation">[</span><span class="token string">"assetMetadata"</span><span class="token punctuation">]</span>
+
+    s3 <span class="token operator">=</span> boto3<span class="token punctuation">.</span>client<span class="token punctuation">(</span><span class="token string">"s3"</span><span class="token punctuation">,</span> aws_access_key_id<span class="token operator">=</span>loc<span class="token punctuation">[</span><span class="token string">"accessKey"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+                      aws_secret_access_key<span class="token operator">=</span>loc<span class="token punctuation">[</span><span class="token string">"secretAccessKey"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+                      aws_session_token<span class="token operator">=</span>loc<span class="token punctuation">[</span><span class="token string">"sessionToken"</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    sent_bytes <span class="token operator">=</span> <span class="token number">0</span>
+    <span class="token keyword">for</span> p <span class="token keyword">in</span> files<span class="token punctuation">:</span>
+        s3<span class="token punctuation">.</span>upload_file<span class="token punctuation">(</span><span class="token builtin">str</span><span class="token punctuation">(</span>p<span class="token punctuation">)</span><span class="token punctuation">,</span> loc<span class="token punctuation">[</span><span class="token string">"bucket"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>loc<span class="token punctuation">[</span><span class="token string">'prefix'</span><span class="token punctuation">]</span><span class="token punctuation">}</span></span><span class="token interpolation"><span class="token punctuation">{</span>Path<span class="token punctuation">(</span>p<span class="token punctuation">)</span><span class="token punctuation">.</span>name<span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+        sent_bytes <span class="token operator">+=</span> Path<span class="token punctuation">(</span>p<span class="token punctuation">)</span><span class="token punctuation">.</span>stat<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span>st_size
+
+    oc <span class="token operator">=</span> payload<span class="token punctuation">[</span><span class="token string">"onComplete"</span><span class="token punctuation">]</span>
+    done <span class="token operator">=</span> requests<span class="token punctuation">.</span>request<span class="token punctuation">(</span>oc<span class="token punctuation">[</span><span class="token string">"method"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> oc<span class="token punctuation">[</span><span class="token string">"url"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> headers<span class="token operator">=</span>HEADERS<span class="token punctuation">,</span>
+                            data<span class="token operator">=</span>json<span class="token punctuation">.</span>dumps<span class="token punctuation">(</span>oc<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"fields"</span><span class="token punctuation">,</span> <span class="token punctuation">{</span><span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> timeout<span class="token operator">=</span><span class="token number">60</span><span class="token punctuation">)</span>
+    done<span class="token punctuation">.</span>raise_for_status<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"asset_id"</span><span class="token punctuation">:</span> meta<span class="token punctuation">[</span><span class="token string">"id"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token string">"files"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>files<span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"uploaded_gb"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>sent_bytes <span class="token operator">/</span> <span class="token number">1e9</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">}</span>
+
+result <span class="token operator">=</span> upload_terrain<span class="token punctuation">(</span>
+    <span class="token string">"City DTM 1 m 2026"</span><span class="token punctuation">,</span>
+    <span class="token string">"Lidar-derived DTM, 1 m, ETRS89/UTM32N + NN2000"</span><span class="token punctuation">,</span>
+    <span class="token punctuation">[</span>Path<span class="token punctuation">(</span><span class="token string">"work/dtm_mosaic.tif"</span><span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+    terrain_options<span class="token punctuation">(</span><span class="token number">25832</span><span class="token punctuation">,</span> <span class="token number">5941</span><span class="token punctuation">,</span> base_terrain_id<span class="token operator">=</span><span class="token number">1</span><span class="token punctuation">,</span> water_mask<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    attribution<span class="token operator">=</span><span class="token string">"City of Example, CC BY 4.0"</span><span class="token punctuation">,</span>
+<span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span>result<span class="token punctuation">)</span>
+</code></pre></div>
+<p><code>waterMask: True</code> adds a water-mask layer so the viewer can render water surfaces specially, and it roughly doubles terrain tiling time. It is worth it for a coastal or lake-heavy area where water rendering matters visually, and not worth it for an inland city where the only water is a river.</p>
+<p>The 1 m source resolution will be tiled down to whatever the terrain tiling scheme supports at the deepest level, which is finer than 1 m in a city extent — so no detail is lost, but no detail is invented either. Uploading a 0.25 m DTM produces a slightly better terrain asset and takes four times the storage and tiling time.</p>
+<figure class="diagram">
+<svg viewBox="4 6 732 278" role="img" aria-labelledby="ter-prep-t ter-prep-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="ter-prep-t">The five raster problems to fix before uploading</title>
+  <desc id="ter-prep-d">A table of five input problems found in a 912-tile DTM delivery, each with the number of rasters affected and the consequence of not fixing it. Undeclared nodata affects 32 rasters and produces cliffs at every water body. A mismatched CRS affects 4 and places them wrongly. Float64 dtype affects 6 and doubles the upload. A missing vertical datum affects all of them and shifts the city by 40 metres. Coarse resolution affects none here.</desc>
+  <rect class="svg-bg" x="4" y="6" width="732" height="278" fill="#ffffff"/>
+  <g stroke-width="1.5">
+    <rect x="18" y="20" width="236" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="254" y="20" width="110" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="364" y="20" width="358" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="18" y="54" width="236" height="34" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="254" y="54" width="110" height="34" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="364" y="54" width="358" height="34" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="18" y="88" width="236" height="34" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="254" y="88" width="110" height="34" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="364" y="88" width="358" height="34" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="18" y="122" width="236" height="34" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="254" y="122" width="110" height="34" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="364" y="122" width="358" height="34" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="18" y="156" width="236" height="34" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="254" y="156" width="110" height="34" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="364" y="156" width="358" height="34" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="18" y="190" width="236" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="254" y="190" width="110" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="364" y="190" width="358" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="136" y="42">problem</text><text x="309" y="42">rasters</text><text x="543" y="42">if not fixed</text>
+    <text x="136" y="76">nodata not declared</text><text x="309" y="76">32</text><text x="543" y="76">cliffs at every water body</text>
+    <text x="136" y="110">different CRS</text><text x="309" y="110">4</text><text x="543" y="110">those tiles land elsewhere</text>
+    <text x="136" y="144">float64 dtype</text><text x="309" y="144">6</text><text x="543" y="144">double the upload for nothing</text>
+    <text x="136" y="178">no vertical datum in srs</text><text x="309" y="178">all 912</text><text x="543" y="178">the city sits 40 m out</text>
+    <text x="136" y="212">resolution mismatch</text><text x="309" y="212">0</text><text x="543" y="212">terracing in the tiled surface</text>
+  </g>
+  <text x="20" y="244" fill="#1f2937" font-size="12.5">Four of the five are one-line fixes in the normalisation pass and cannot be fixed after tiling.</text>
+  <text x="20" y="266" fill="#5b6471" font-size="12">The vertical datum is the one that is invisible in a viewer and wrong for everything built on it.</text>
+</svg>
+<figcaption>Every one of these is cheap to fix before the upload and impossible to fix after the tiling.</figcaption>
+</figure>
+<h3 id="6-verify-heights-against-control-points" tabindex="-1"><a class="heading-link" href="#6-verify-heights-against-control-points"><span>6. Verify heights against control points</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">sample_terrain_heights</span><span class="token punctuation">(</span>asset_id<span class="token punctuation">,</span> points_lonlat<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Ask ion for heights at known positions and compare with surveyed values."""</span>
+    ep <span class="token operator">=</span> requests<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>API<span class="token punctuation">}</span></span><span class="token string">/assets/</span><span class="token interpolation"><span class="token punctuation">{</span>asset_id<span class="token punctuation">}</span></span><span class="token string">/endpoint"</span></span><span class="token punctuation">,</span> headers<span class="token operator">=</span>HEADERS<span class="token punctuation">,</span> timeout<span class="token operator">=</span><span class="token number">30</span><span class="token punctuation">)</span>
+    ep<span class="token punctuation">.</span>raise_for_status<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    endpoint <span class="token operator">=</span> ep<span class="token punctuation">.</span>json<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    layer <span class="token operator">=</span> requests<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>endpoint<span class="token punctuation">[</span><span class="token string">'url'</span><span class="token punctuation">]</span><span class="token punctuation">}</span></span><span class="token string">layer.json"</span></span><span class="token punctuation">,</span>
+                         headers<span class="token operator">=</span><span class="token punctuation">{</span><span class="token string">"Authorization"</span><span class="token punctuation">:</span> <span class="token string-interpolation"><span class="token string">f"Bearer </span><span class="token interpolation"><span class="token punctuation">{</span>endpoint<span class="token punctuation">[</span><span class="token string">'accessToken'</span><span class="token punctuation">]</span><span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+                         timeout<span class="token operator">=</span><span class="token number">30</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"endpoint_ok"</span><span class="token punctuation">:</span> layer<span class="token punctuation">.</span>status_code <span class="token operator">==</span> <span class="token number">200</span><span class="token punctuation">,</span>
+            <span class="token string">"available_levels"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>layer<span class="token punctuation">.</span>json<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"available"</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+                                <span class="token keyword">if</span> layer<span class="token punctuation">.</span>status_code <span class="token operator">==</span> <span class="token number">200</span> <span class="token keyword">else</span> <span class="token boolean">None</span><span class="token punctuation">}</span>
+
+<span class="token keyword">def</span> <span class="token function">verify_against_control</span><span class="token punctuation">(</span>local_raster<span class="token punctuation">,</span> control_points<span class="token punctuation">,</span> expected_datum<span class="token operator">=</span><span class="token string">"orthometric"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Compare the prepared raster against control before uploading — much faster."""</span>
+    rows <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    <span class="token keyword">with</span> rasterio<span class="token punctuation">.</span><span class="token builtin">open</span><span class="token punctuation">(</span>local_raster<span class="token punctuation">)</span> <span class="token keyword">as</span> ds<span class="token punctuation">:</span>
+        to_raster <span class="token operator">=</span> Transformer<span class="token punctuation">.</span>from_crs<span class="token punctuation">(</span><span class="token string">"EPSG:4326"</span><span class="token punctuation">,</span> ds<span class="token punctuation">.</span>crs<span class="token punctuation">,</span> always_xy<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+        <span class="token keyword">for</span> cp <span class="token keyword">in</span> control_points<span class="token punctuation">:</span>
+            x<span class="token punctuation">,</span> y <span class="token operator">=</span> to_raster<span class="token punctuation">.</span>transform<span class="token punctuation">(</span>cp<span class="token punctuation">[</span><span class="token string">"lon"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> cp<span class="token punctuation">[</span><span class="token string">"lat"</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+            <span class="token keyword">try</span><span class="token punctuation">:</span>
+                val <span class="token operator">=</span> <span class="token builtin">next</span><span class="token punctuation">(</span>ds<span class="token punctuation">.</span>sample<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token punctuation">(</span>x<span class="token punctuation">,</span> y<span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">,</span> indexes<span class="token operator">=</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span>
+            <span class="token keyword">except</span> StopIteration<span class="token punctuation">:</span>
+                val <span class="token operator">=</span> <span class="token boolean">None</span>
+            <span class="token keyword">if</span> val <span class="token keyword">is</span> <span class="token boolean">None</span> <span class="token keyword">or</span> <span class="token punctuation">(</span>ds<span class="token punctuation">.</span>nodata <span class="token keyword">is</span> <span class="token keyword">not</span> <span class="token boolean">None</span> <span class="token keyword">and</span> np<span class="token punctuation">.</span>isclose<span class="token punctuation">(</span>val<span class="token punctuation">,</span> ds<span class="token punctuation">.</span>nodata<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+                rows<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"id"</span><span class="token punctuation">:</span> cp<span class="token punctuation">[</span><span class="token string">"id"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token string">"status"</span><span class="token punctuation">:</span> <span class="token string">"nodata"</span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+                <span class="token keyword">continue</span>
+            rows<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"id"</span><span class="token punctuation">:</span> cp<span class="token punctuation">[</span><span class="token string">"id"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token string">"raster_m"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>val<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                         <span class="token string">"control_m"</span><span class="token punctuation">:</span> cp<span class="token punctuation">[</span><span class="token string">"h_m"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+                         <span class="token string">"residual_m"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>val<span class="token punctuation">)</span> <span class="token operator">-</span> cp<span class="token punctuation">[</span><span class="token string">"h_m"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+    resid <span class="token operator">=</span> <span class="token punctuation">[</span>r<span class="token punctuation">[</span><span class="token string">"residual_m"</span><span class="token punctuation">]</span> <span class="token keyword">for</span> r <span class="token keyword">in</span> rows <span class="token keyword">if</span> <span class="token string">"residual_m"</span> <span class="token keyword">in</span> r<span class="token punctuation">]</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"points"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>rows<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"with_value"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>resid<span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"mean_m"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>mean<span class="token punctuation">(</span>resid<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span> <span class="token keyword">if</span> resid <span class="token keyword">else</span> <span class="token boolean">None</span><span class="token punctuation">,</span>
+            <span class="token string">"rmse_m"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>sqrt<span class="token punctuation">(</span>np<span class="token punctuation">.</span>mean<span class="token punctuation">(</span>np<span class="token punctuation">.</span>square<span class="token punctuation">(</span>resid<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span> <span class="token keyword">if</span> resid <span class="token keyword">else</span> <span class="token boolean">None</span><span class="token punctuation">,</span>
+            <span class="token string">"max_abs_m"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span><span class="token builtin">max</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span><span class="token builtin">abs</span><span class="token punctuation">(</span>resid<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span> <span class="token keyword">if</span> resid <span class="token keyword">else</span> <span class="token boolean">None</span><span class="token punctuation">,</span>
+            <span class="token string">"worst"</span><span class="token punctuation">:</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span><span class="token punctuation">(</span>r <span class="token keyword">for</span> r <span class="token keyword">in</span> rows <span class="token keyword">if</span> <span class="token string">"residual_m"</span> <span class="token keyword">in</span> r<span class="token punctuation">)</span><span class="token punctuation">,</span>
+                            key<span class="token operator">=</span><span class="token keyword">lambda</span> r<span class="token punctuation">:</span> <span class="token operator">-</span><span class="token builtin">abs</span><span class="token punctuation">(</span>r<span class="token punctuation">[</span><span class="token string">"residual_m"</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token number">3</span><span class="token punctuation">]</span><span class="token punctuation">}</span>
+
+CONTROL <span class="token operator">=</span> <span class="token punctuation">[</span>
+    <span class="token punctuation">{</span><span class="token string">"id"</span><span class="token punctuation">:</span> <span class="token string">"GP-014"</span><span class="token punctuation">,</span> <span class="token string">"lon"</span><span class="token punctuation">:</span> <span class="token number">10.7461</span><span class="token punctuation">,</span> <span class="token string">"lat"</span><span class="token punctuation">:</span> <span class="token number">59.9128</span><span class="token punctuation">,</span> <span class="token string">"h_m"</span><span class="token punctuation">:</span> <span class="token number">18.412</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+    <span class="token punctuation">{</span><span class="token string">"id"</span><span class="token punctuation">:</span> <span class="token string">"GP-027"</span><span class="token punctuation">,</span> <span class="token string">"lon"</span><span class="token punctuation">:</span> <span class="token number">10.7702</span><span class="token punctuation">,</span> <span class="token string">"lat"</span><span class="token punctuation">:</span> <span class="token number">59.9214</span><span class="token punctuation">,</span> <span class="token string">"h_m"</span><span class="token punctuation">:</span> <span class="token number">41.067</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+    <span class="token punctuation">{</span><span class="token string">"id"</span><span class="token punctuation">:</span> <span class="token string">"GP-041"</span><span class="token punctuation">,</span> <span class="token string">"lon"</span><span class="token punctuation">:</span> <span class="token number">10.7318</span><span class="token punctuation">,</span> <span class="token string">"lat"</span><span class="token punctuation">:</span> <span class="token number">59.9042</span><span class="token punctuation">,</span> <span class="token string">"h_m"</span><span class="token punctuation">:</span> <span class="token number">6.885</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+    <span class="token punctuation">{</span><span class="token string">"id"</span><span class="token punctuation">:</span> <span class="token string">"GP-058"</span><span class="token punctuation">,</span> <span class="token string">"lon"</span><span class="token punctuation">:</span> <span class="token number">10.8011</span><span class="token punctuation">,</span> <span class="token string">"lat"</span><span class="token punctuation">:</span> <span class="token number">59.9380</span><span class="token punctuation">,</span> <span class="token string">"h_m"</span><span class="token punctuation">:</span> <span class="token number">96.204</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+<span class="token punctuation">]</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span>json<span class="token punctuation">.</span>dumps<span class="token punctuation">(</span>verify_against_control<span class="token punctuation">(</span><span class="token string">"work/dtm_mosaic.tif"</span><span class="token punctuation">,</span> CONTROL<span class="token punctuation">)</span><span class="token punctuation">,</span> indent<span class="token operator">=</span><span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Verifying the <em>local</em> raster against control before uploading is the change that saves the most time on this page. The residual statistics answer both questions at once: a mean near zero with a small RMSE means the raster is right, and a mean of −40 with a small RMSE means the vertical datum is wrong while the surface itself is fine.</p>
+<p>A large RMSE with a near-zero mean is a different problem — the surface is noisy or the control points fall on structures the DTM removed — and is worth resolving before terrain becomes the reference everything else is clamped to.</p>
+<figure class="diagram">
+<svg viewBox="4 10 732 240" role="img" aria-labelledby="ter-resid-t ter-resid-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="ter-resid-t">Reading the control-point residuals</title>
+  <desc id="ter-resid-d">Three residual patterns against survey control. A mean near zero with a root-mean-square error under 0.2 metres means the raster and its declared datum are correct. A mean of about minus 40 metres with the same small spread means the vertical datum is wrong, since the surface shape is right but shifted. A near-zero mean with a spread of several metres means the surface itself is noisy or the control points fall on removed structures.</desc>
+  <rect class="svg-bg" x="4" y="10" width="732" height="240" fill="#ffffff"/>
+  <g stroke-width="1.5">
+    <rect x="18" y="24" width="160" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="178" y="24" width="150" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="328" y="24" width="150" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="478" y="24" width="244" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="18" y="58" width="160" height="50" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="178" y="58" width="150" height="50" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="328" y="58" width="150" height="50" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="478" y="58" width="244" height="50" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="18" y="108" width="160" height="50" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="178" y="108" width="150" height="50" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="328" y="108" width="150" height="50" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="478" y="108" width="244" height="50" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="18" y="158" width="160" height="50" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="178" y="158" width="150" height="50" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="328" y="158" width="150" height="50" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="478" y="158" width="244" height="50" fill="#fdf3e0" stroke="#c46a3d"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="98" y="45">pattern</text><text x="253" y="45">mean</text><text x="403" y="45">RMSE</text><text x="600" y="45">diagnosis</text>
+    <text x="98" y="80">good</text><text x="98" y="98">ship it</text>
+    <text x="253" y="88">−0.02 m</text><text x="403" y="88">0.11 m</text>
+    <text x="600" y="80">raster and declared datum</text><text x="600" y="98">are both correct</text>
+    <text x="98" y="130">shifted</text><text x="98" y="148">re-declare</text>
+    <text x="253" y="138">−39.8 m</text><text x="403" y="138">0.12 m</text>
+    <text x="600" y="130">vertical datum wrong:</text><text x="600" y="148">shape right, height not</text>
+    <text x="98" y="180">noisy</text><text x="98" y="198">investigate</text>
+    <text x="253" y="188">+0.04 m</text><text x="403" y="188">3.7 m</text>
+    <text x="600" y="180">surface noise, or control</text><text x="600" y="198">on removed structures</text>
+  </g>
+  <text x="370" y="232" fill="#5b6471" font-size="12" text-anchor="middle">the mean and the spread separate a datum error from a data-quality error</text>
+</svg>
+<figcaption>Two statistics from four control points tell you which of three situations you are in before the upload starts.</figcaption>
+</figure>
+<h2 id="expected-output-verification" tabindex="-1"><a class="heading-link" href="#expected-output-verification"><span>Expected Output &amp; Verification</span></a></h2>
+<div class="codeblock" data-lang="text"><div class="codeblock__bar"><span class="codeblock__lang">text</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-text" tabindex="0" role="group" aria-label="text code sample"><code class="language-text">912 rasters
+CRS values: Counter({'EPSG:25832': 908, 'EPSG:4258': 4})
+dtypes: Counter({'float32': 906, 'float64': 6})
+resolutions: Counter({(1.0, 1.0): 912})
+nodata: Counter({'-9999.0': 880, 'None': 32})
+lowest: [('dtm_32_598_6642.tif', -9999.0, 84.21), ...]
+masked on average 6.81% of cells
+4 raster(s) needed reprojection
+{'orthometric_m': 24.0, 'ellipsoidal_m': 63.842, 'separation_m': 39.842}
+{'files': 912, 'total_gb': 41.7, 'mosaic': True, 'base_terrain_id': 1, 'water_mask': False}
+{'asset_id': 2884401, 'files': 1, 'uploaded_gb': 38.4}
+{
+  "points": 4, "with_value": 4,
+  "mean_m": -0.018, "rmse_m": 0.104, "max_abs_m": 0.141,
+  "worst": [{"id": "GP-058", "raster_m": 96.063, "control_m": 96.204, "residual_m": -0.141}]
+}
+</code></pre></div>
+<p>Three findings from the inspection that each needed fixing: 32 rasters with no declared nodata, 4 in a different CRS, and 6 in <code>float64</code>. The 39.8 m separation confirms the vertical EPSG is the right one for this location, and a 0.10 m RMSE against control says the prepared surface is good.</p>
+<p>Verify the tiled asset covers the extent at the depth you expect, since a terrain asset that tiled only to level 12 will look smooth and featureless in a city:</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">verify_terrain_levels</span><span class="token punctuation">(</span>asset_id<span class="token punctuation">,</span> expect_max_level<span class="token operator">=</span><span class="token number">14</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    ep <span class="token operator">=</span> requests<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>API<span class="token punctuation">}</span></span><span class="token string">/assets/</span><span class="token interpolation"><span class="token punctuation">{</span>asset_id<span class="token punctuation">}</span></span><span class="token string">/endpoint"</span></span><span class="token punctuation">,</span> headers<span class="token operator">=</span>HEADERS<span class="token punctuation">,</span> timeout<span class="token operator">=</span><span class="token number">30</span><span class="token punctuation">)</span>
+    ep<span class="token punctuation">.</span>raise_for_status<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    endpoint <span class="token operator">=</span> ep<span class="token punctuation">.</span>json<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    r <span class="token operator">=</span> requests<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>endpoint<span class="token punctuation">[</span><span class="token string">'url'</span><span class="token punctuation">]</span><span class="token punctuation">}</span></span><span class="token string">layer.json"</span></span><span class="token punctuation">,</span>
+                     headers<span class="token operator">=</span><span class="token punctuation">{</span><span class="token string">"Authorization"</span><span class="token punctuation">:</span> <span class="token string-interpolation"><span class="token string">f"Bearer </span><span class="token interpolation"><span class="token punctuation">{</span>endpoint<span class="token punctuation">[</span><span class="token string">'accessToken'</span><span class="token punctuation">]</span><span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+                     timeout<span class="token operator">=</span><span class="token number">30</span><span class="token punctuation">)</span>
+    <span class="token keyword">if</span> r<span class="token punctuation">.</span>status_code <span class="token operator">!=</span> <span class="token number">200</span><span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"ok"</span><span class="token punctuation">:</span> <span class="token boolean">False</span><span class="token punctuation">,</span> <span class="token string">"status"</span><span class="token punctuation">:</span> r<span class="token punctuation">.</span>status_code<span class="token punctuation">}</span>
+    layer <span class="token operator">=</span> r<span class="token punctuation">.</span>json<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    avail <span class="token operator">=</span> layer<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"available"</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    per_level <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">{</span><span class="token string">"level"</span><span class="token punctuation">:</span> i<span class="token punctuation">,</span> <span class="token string">"ranges"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>rs<span class="token punctuation">)</span><span class="token punctuation">}</span> <span class="token keyword">for</span> i<span class="token punctuation">,</span> rs <span class="token keyword">in</span> <span class="token builtin">enumerate</span><span class="token punctuation">(</span>avail<span class="token punctuation">)</span><span class="token punctuation">]</span>
+    deepest <span class="token operator">=</span> <span class="token builtin">max</span><span class="token punctuation">(</span><span class="token punctuation">(</span>i <span class="token keyword">for</span> i<span class="token punctuation">,</span> rs <span class="token keyword">in</span> <span class="token builtin">enumerate</span><span class="token punctuation">(</span>avail<span class="token punctuation">)</span> <span class="token keyword">if</span> rs<span class="token punctuation">)</span><span class="token punctuation">,</span> default<span class="token operator">=</span><span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"ok"</span><span class="token punctuation">:</span> deepest <span class="token operator">>=</span> expect_max_level<span class="token punctuation">,</span> <span class="token string">"deepest_level"</span><span class="token punctuation">:</span> deepest<span class="token punctuation">,</span>
+            <span class="token string">"tile_scheme"</span><span class="token punctuation">:</span> layer<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"scheme"</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"projection"</span><span class="token punctuation">:</span> layer<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"projection"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"levels"</span><span class="token punctuation">:</span> per_level<span class="token punctuation">[</span><span class="token operator">-</span><span class="token number">4</span><span class="token punctuation">:</span><span class="token punctuation">]</span><span class="token punctuation">}</span>
+
+<span class="token keyword">print</span><span class="token punctuation">(</span>json<span class="token punctuation">.</span>dumps<span class="token punctuation">(</span>verify_terrain_levels<span class="token punctuation">(</span>result<span class="token punctuation">[</span><span class="token string">"asset_id"</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">,</span> indent<span class="token operator">=</span><span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Then verify the water bodies are flat rather than shafts, which is the nodata check applied to the tiled output:</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">water_flatness_check</span><span class="token punctuation">(</span>local_raster<span class="token punctuation">,</span> lake_polygons_gdf<span class="token punctuation">,</span> tol_m<span class="token operator">=</span><span class="token number">0.5</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Standard deviation of heights inside each water polygon."""</span>
+    <span class="token keyword">import</span> rasterio<span class="token punctuation">.</span>mask
+    rows <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    <span class="token keyword">with</span> rasterio<span class="token punctuation">.</span><span class="token builtin">open</span><span class="token punctuation">(</span>local_raster<span class="token punctuation">)</span> <span class="token keyword">as</span> ds<span class="token punctuation">:</span>
+        <span class="token keyword">for</span> _<span class="token punctuation">,</span> poly <span class="token keyword">in</span> lake_polygons_gdf<span class="token punctuation">.</span>to_crs<span class="token punctuation">(</span>ds<span class="token punctuation">.</span>crs<span class="token punctuation">)</span><span class="token punctuation">.</span>iterrows<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+            <span class="token keyword">try</span><span class="token punctuation">:</span>
+                out<span class="token punctuation">,</span> _ <span class="token operator">=</span> rasterio<span class="token punctuation">.</span>mask<span class="token punctuation">.</span>mask<span class="token punctuation">(</span>ds<span class="token punctuation">,</span> <span class="token punctuation">[</span>poly<span class="token punctuation">.</span>geometry<span class="token punctuation">]</span><span class="token punctuation">,</span> crop<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> filled<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">)</span>
+            <span class="token keyword">except</span> ValueError<span class="token punctuation">:</span>
+                <span class="token keyword">continue</span>
+            band <span class="token operator">=</span> out<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span>
+            vals <span class="token operator">=</span> band<span class="token punctuation">.</span>compressed<span class="token punctuation">(</span><span class="token punctuation">)</span>
+            vals <span class="token operator">=</span> vals<span class="token punctuation">[</span><span class="token operator">~</span>np<span class="token punctuation">.</span>isclose<span class="token punctuation">(</span>vals<span class="token punctuation">,</span> ds<span class="token punctuation">.</span>nodata <span class="token keyword">if</span> ds<span class="token punctuation">.</span>nodata <span class="token keyword">is</span> <span class="token keyword">not</span> <span class="token boolean">None</span> <span class="token keyword">else</span> <span class="token operator">-</span><span class="token number">9999.0</span><span class="token punctuation">)</span><span class="token punctuation">]</span>
+            <span class="token keyword">if</span> vals<span class="token punctuation">.</span>size <span class="token operator">&lt;</span> <span class="token number">10</span><span class="token punctuation">:</span>
+                rows<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"name"</span><span class="token punctuation">:</span> poly<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"name"</span><span class="token punctuation">,</span> <span class="token string">"?"</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"status"</span><span class="token punctuation">:</span> <span class="token string">"all nodata"</span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+                <span class="token keyword">continue</span>
+            rows<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"name"</span><span class="token punctuation">:</span> poly<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"name"</span><span class="token punctuation">,</span> <span class="token string">"?"</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"n"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span>vals<span class="token punctuation">.</span>size<span class="token punctuation">)</span><span class="token punctuation">,</span>
+                         <span class="token string">"std_m"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>vals<span class="token punctuation">.</span>std<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                         <span class="token string">"range_m"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>vals<span class="token punctuation">.</span><span class="token builtin">max</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">-</span> vals<span class="token punctuation">.</span><span class="token builtin">min</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                         <span class="token string">"flat"</span><span class="token punctuation">:</span> <span class="token builtin">float</span><span class="token punctuation">(</span>vals<span class="token punctuation">.</span>std<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">&lt;=</span> tol_m<span class="token punctuation">}</span><span class="token punctuation">)</span>
+    bad <span class="token operator">=</span> <span class="token punctuation">[</span>r <span class="token keyword">for</span> r <span class="token keyword">in</span> rows <span class="token keyword">if</span> r<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"flat"</span><span class="token punctuation">)</span> <span class="token keyword">is</span> <span class="token boolean">False</span><span class="token punctuation">]</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"polygons"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>rows<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"not_flat"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>bad<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"worst"</span><span class="token punctuation">:</span> bad<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token number">3</span><span class="token punctuation">]</span><span class="token punctuation">}</span>
+</code></pre></div>
+<h2 id="performance-notes" tabindex="-1"><a class="heading-link" href="#performance-notes"><span>Performance Notes</span></a></h2>
+<ul>
+<li><strong>Terrain tiling is the slowest ion operation</strong>: budget 20–40 minutes per 10 GB, doubled with a water mask.</li>
+<li><strong>DEFLATE with <code>predictor=3</code></strong> typically halves a float32 elevation raster. On 41 GB that is 20 GB less to upload.</li>
+<li><strong>Mosaic to a COG rather than uploading a VRT.</strong> A VRT references files ion cannot see.</li>
+<li><strong>Overviews do not help the upload</strong> — ion builds its own pyramid — so skip them in the COG to save space and time.</li>
+<li><strong>Resolution beyond 1 m rarely pays.</strong> The terrain tiling scheme’s deepest level in a city extent is finer than 1 m, but the visual difference against a 0.5 m source is negligible while the cost is 4×.</li>
+<li><strong>Split above about 100 GB per asset.</strong> Very large single assets tile slowly and fail expensively.</li>
+</ul>
+<h2 id="common-errors" tabindex="-1"><a class="heading-link" href="#common-errors"><span>Common Errors</span></a></h2>
+<p><strong>Cliffs at every water body and building edge.</strong> Undeclared nodata. Normalise before uploading; it cannot be fixed afterwards.</p>
+<p><strong>The whole city is 40 m too low or too high.</strong> Missing vertical EPSG in <code>srs</code>. The control-point mean identifies it before the upload.</p>
+<p><strong>Terracing across the surface.</strong> Reprojection with <code>nearest</code>, or an integer dtype holding decimetre values. Use <code>bilinear</code> and <code>float32</code>.</p>
+<p><strong>A visible square edge where the asset ends.</strong> <code>baseTerrainId: 0</code>. Set it to 1 to blend into world terrain.</p>
+<p><strong><code>DATA_ERROR</code> on the terrain asset.</strong> Usually a raster with no CRS at all, or a file that is not elevation — an RGB orthophoto in the same folder is the classic case.</p>
+<p><strong>Terrain looks smooth in the city.</strong> The asset tiled to a shallow level because the source resolution was coarse, or the mosaic’s resolution was set by <code>-resolution average</code> over mixed inputs. Use <code>-resolution highest</code>.</p>
+<p><strong>Buildings float or sink after terrain changes.</strong> Everything clamped to terrain moves when terrain does. Re-verify building heights whenever the terrain asset is replaced.</p>
+<h2 id="frequently-asked-questions" tabindex="-1"><a class="heading-link" href="#frequently-asked-questions"><span>Frequently Asked Questions</span></a></h2>
+<h3 id="dtm-or-dsm-for-terrain" tabindex="-1"><a class="heading-link" href="#dtm-or-dsm-for-terrain"><span>DTM or DSM for terrain?</span></a></h3>
+<p>DTM — bare earth. A DSM includes buildings and trees, so a building tileset placed on it sits on top of its own roof. Keep the DSM as a separate asset if it is needed for analysis.</p>
+<h3 id="should-the-water-mask-be-enabled" tabindex="-1"><a class="heading-link" href="#should-the-water-mask-be-enabled"><span>Should the water mask be enabled?</span></a></h3>
+<p>Only where water rendering matters visually and the extent has significant water. It doubles tiling time and cannot be added later without re-tiling.</p>
+<h3 id="can-i-update-terrain-incrementally" tabindex="-1"><a class="heading-link" href="#can-i-update-terrain-incrementally"><span>Can I update terrain incrementally?</span></a></h3>
+<p>No — a terrain asset is tiled as a whole. Replacing a district means a new asset, which is why the lineage and pruning process in <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/listing-and-pruning-old-ion-assets/">listing and pruning old ion assets</a> matters for terrain in particular.</p>
+<h2 id="related-guides" tabindex="-1"><a class="heading-link" href="#related-guides"><span>Related Guides</span></a></h2>
+<ul>
+<li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/choosing-ion-source-types-and-options/">Choosing ion Source Types and Options</a> — the option set this page specialises</li>
+<li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/handling-vertical-datums-and-geoid-separation/">Handling Vertical Datums and Geoid Separation</a> — why the 40 m appears</li>
+<li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/listing-and-pruning-old-ion-assets/">Listing and Pruning Old ion Assets</a> — retention for assets that are expensive to rebuild</li>
+</ul>
+<p>Back to <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/">Cesium ion Upload Automation</a>.</p>
+
+
+      
+      
+
+      <div class="related-nav">
+        
+
+        
+          <div>
+            <h3>Related</h3>
+            <div class="related-grid">
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/automating-ion-tileset-uploads-with-the-rest-api/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Automating ion Tileset Uploads With the REST API</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/choosing-ion-source-types-and-options/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Choosing ion Source Types and Options</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/listing-and-pruning-old-ion-assets/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Listing and Pruning Old ion Assets</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/managing-ion-access-tokens-and-scopes/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Managing ion Access Tokens and Scopes</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/polling-ion-asset-status-and-handling-tiling-errors/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Polling Cesium ion Asset Status and Handling Tiling Errors</span>
+                </a>
+              
+            </div>
+          </div>
+        
+      </div>
+    </article>
+
+    
+    <aside class="toc" aria-label="On this page" data-toc hidden>
+      <h4>On this page</h4>
+      <ul></ul>
+    </aside>
+  </div>
+</div>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+  <div class="container site-footer__inner">
+    <div class="site-footer__brand">
+      <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+        <img src="/assets/img/logo-mark.svg" alt="" class="brand__mark" width="36" height="36">
+        <span class="brand__name">
+          3D Geospatial
+          <small>Digital Twin Automation</small>
+        </span>
+      </a>
+      <p>Engineering-grade guides on point cloud processing, mesh pipelines, LOD strategies, and CI/CD automation for digital twin platforms.</p>
+      <a class="footer-social" href="https://github.com/3d-geospatial" aria-label="3D Geospatial on GitHub" rel="noopener" target="_blank">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+          <path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.53-1.34-1.3-1.7-1.3-1.7-1.06-.72.08-.71.08-.71 1.17.08 1.79 1.2 1.79 1.2 1.04 1.79 2.73 1.27 3.4.97.1-.75.4-1.27.73-1.56-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.19-3.08-.12-.3-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.75.11 3.05.74.8 1.19 1.83 1.19 3.08 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.07.78 2.15v3.18c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5Z"/>
+        </svg>
+        <span>GitHub</span>
+      </a>
+    </div>
+
+    <div class="site-footer__col">
+      <h4>Sections</h4>
+      <ul>
+        <li><a href="https://www.3d-geospatial.com/">Home</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management &amp; Optimization</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/">Point Cloud &amp; Mesh Pipelines</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/">Troubleshooting &amp; Reliability</a></li>
+        
+      </ul>
+    </div>
+
+    
+      <div class="site-footer__col">
+        <h4>3D Geospatial Fundamentals</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/">3D Format Standards Comparison</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/">BIM and IFC Georeferencing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/">CityGML and CityJSON Processing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems for 3D Assets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/">Digital Elevation Model Workflows</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/">Spatial Indexing and Tiling Schemes for 3D Data</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>LOD Management &amp; Optimization</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/">Automated Tile Generation for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/">Cesium ion Upload Automation for 3D Tilesets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/">glTF LOD Generation With Draco Compression</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/">Streaming Sync Patterns for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/">Tileset Metadata and 3D Tiles Next</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/">Vector Overlays on 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Point Cloud &amp; Mesh Pipelines</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/">Automated Mesh Decimation for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/">Change Detection Between LiDAR Scan Epochs</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/">CI/CD Automation for Spatial Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">LiDAR Classification and Ground Extraction</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/photogrammetry-processing-pipelines/">Photogrammetry Processing Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/">Point Cloud Filtering Techniques</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/">Surface Reconstruction for Geospatial Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/">Texture Mapping Workflows for Digital Twins</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Troubleshooting &amp; Reliability</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/">Cross-Section Failure Modes in Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/">Data Validation &amp; QA Gates for 3D Tiles</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/">Performance Profiling and Benchmarking</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/">Pipeline Observability and Monitoring</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/">Streaming &amp; Runtime Diagnostics for 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+  </div>
+  <div class="container site-footer__bottom">
+    <span>© 2026 3D Geospatial &amp; Digital Twin Automation</span>
+    <span>Built with Eleventy · PWA-enabled</span>
+  </div>
+</footer>
+
+
+  <script src="/assets/js/site.js?v=b99aa9f971" defer></script>
+  
+</body>
+</html>

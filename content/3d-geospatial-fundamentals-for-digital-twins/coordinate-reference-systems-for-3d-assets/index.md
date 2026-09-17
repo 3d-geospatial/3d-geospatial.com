@@ -341,5 +341,6 @@ Use a single projected, metric, compound CRS internally (a UTM zone or national 
 - [Digital Elevation Model Workflows](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/) — aligning raster terrain to the same vertical datum
 - [Point Cloud Density Standards](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/) — density targets that depend on a consistent CRS grid
 - [3D Format Standards Comparison](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/) — how each container preserves or discards CRS metadata
+- [Detecting Swapped Axis Order in Pipeline Data](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/detecting-swapped-axis-order-in-pipeline-data/) — catch latitude/longitude and easting/northing swaps automatically
 
 Back to [3D Geospatial Fundamentals for Digital Twins](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/).

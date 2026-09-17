@@ -376,5 +376,9 @@ Target 100–500 KB per tile payload. Smaller tiles raise request overhead and H
 - [Implementing Quadtree LOD for Urban Models](https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/implementing-quadtree-lod-for-urban-models/) — building the spatial index that feeds streaming
 - [Automated Tile Generation for 3D Geospatial](https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/) — producing the 3D Tiles payloads and metadata this pipeline streams
 - [3D Geospatial Fundamentals for Digital Twins](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/) — the CRS and mesh contracts streaming assumes upstream
+- [HTTP/2 and Connection Limits for Tile Streaming](https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/http2-and-connection-limits-for-tile-streaming/) — why a tileset stalls at six parallel requests on HTTP/1.1, what HTTP/2 and HTTP/3 change, how to measure concu
+- [Prefetching Tiles Along a Camera Path](https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/prefetching-tiles-along-a-camera-path/) — warm the tile cache ahead of a moving camera
+- [Streaming Live Sensor Updates onto Tilesets](https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/streaming-live-sensor-updates-onto-tilesets/) — drive a digital twin's live layer from sensor data
+- [Versioning Tilesets with Immutable Prefixes](https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/versioning-tilesets-with-immutable-prefixes/) — deploy tileset updates without cache invalidation
 
 Back to [LOD Management & Optimization Strategies](https://www.3d-geospatial.com/lod-management-optimization-strategies/).

@@ -1,0 +1,787 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <title>Mapping Density Coverage Gaps with PDAL — 3D Geospatial</title>
+  <meta name="description" content="Find where a LiDAR delivery is too thin: rasterise point counts with PDAL, separate real voids from coverage gaps">
+  <meta name="keywords" content="3D geospatial, digital twin, point cloud, mesh pipeline, LOD, 3D Tiles, Cesium, PDAL, Open3D, Python, CI/CD">
+  <meta name="author" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta name="theme-color" content="#1f6b8a" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f171d" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+
+  
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem("theme");
+        var theme = (stored === "dark" || stored === "light") ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    })();
+  </script>
+  <meta name="generator" content="Eleventy">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="googlebot" content="index,follow,max-image-preview:large">
+
+  
+  <link rel="canonical" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/mapping-density-coverage-gaps-with-pdal/">
+  <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">
+
+  
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/icon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+
+  
+  <link rel="apple-touch-icon" href="/assets/img/icon-180.png">
+  <link rel="mask-icon" href="/assets/img/logo.svg" color="#1f6b8a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="3D Geospatial">
+  <meta name="application-name" content="3D Geospatial">
+
+  
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Mapping Density Coverage Gaps with PDAL — 3D Geospatial">
+  <meta property="og:description" content="Find where a LiDAR delivery is too thin: rasterise point counts with PDAL, separate real voids from coverage gaps">
+  <meta property="og:url" content="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/mapping-density-coverage-gaps-with-pdal/">
+  <meta property="og:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+  <meta property="og:site_name" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta property="og:locale" content="en_US">
+  
+  <meta property="article:published_time" content="2026-09-17T23:36:56.450Z">
+  <meta property="article:modified_time" content="2026-09-17T23:36:56.450Z">
+  <meta property="article:publisher" content="https://www.3d-geospatial.com/">
+  
+
+  
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Mapping Density Coverage Gaps with PDAL — 3D Geospatial">
+  <meta name="twitter:description" content="Find where a LiDAR delivery is too thin: rasterise point counts with PDAL, separate real voids from coverage gaps">
+  <meta name="twitter:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta name="twitter:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+
+  
+  <link rel="preload" href="/assets/css/styles.css?v=8c46394d6c" as="style">
+  
+
+  <link rel="stylesheet" href="/assets/css/styles.css?v=8c46394d6c">
+
+  
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.3d-geospatial.com/#organization",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "url": "https://www.3d-geospatial.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/icon-512.png",
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://www.3d-geospatial.com/#website",
+      "url": "https://www.3d-geospatial.com/",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "description": "Build reliable 3D spatial data pipelines for digital twins — point clouds, meshes, LOD strategies, Python processing, and CI/CD automation.",
+      "inLanguage": "en",
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      }
+    },
+    {
+      "@type": "TechArticle",
+      "@id": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/mapping-density-coverage-gaps-with-pdal/#article",
+      "isPartOf": {
+        "@id": "https://www.3d-geospatial.com/#website"
+      },
+      "headline": "Mapping Density Coverage Gaps with PDAL",
+      "name": "Mapping Density Coverage Gaps with PDAL",
+      "description": "Find where a LiDAR delivery is too thin: rasterise point counts with PDAL, separate real voids from coverage gaps",
+      "url": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/mapping-density-coverage-gaps-with-pdal/",
+      "mainEntityOfPage": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/mapping-density-coverage-gaps-with-pdal/",
+      "inLanguage": "en",
+      "datePublished": "2026-09-17T23:36:56.450Z",
+      "dateModified": "2026-09-17T23:36:56.450Z",
+      "author": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "image": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/og-cover.png",
+        "width": 1200,
+        "height": 630
+      },
+      "breadcrumb": {
+        "@id": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/mapping-density-coverage-gaps-with-pdal/#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/mapping-density-coverage-gaps-with-pdal/#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://www.3d-geospatial.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "3D Geospatial Fundamentals For Digital Twins",
+          "item": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Point Cloud Density Standards",
+          "item": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "name": "Mapping Density Coverage Gaps With Pdal",
+          "item": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/mapping-density-coverage-gaps-with-pdal/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  
+<header class="site-header" role="banner">
+  <div class="container site-header__inner">
+    <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+      <img src="/assets/img/logo.svg" alt="" class="brand__mark" width="36" height="36">
+      <span class="brand__name">
+        3D Geospatial
+        <small>Digital Twin Automation</small>
+      </span>
+    </a>
+
+    <button class="theme-toggle" type="button" data-theme-toggle
+            aria-label="Switch to dark theme" title="Switch to dark theme">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4.2"/>
+        <path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/>
+      </svg>
+    </button>
+
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>
+      <span class="nav-toggle__icon" aria-hidden="true"><span></span></span>
+      Menu
+    </button>
+
+    <nav class="primary-nav" id="primary-nav" aria-label="Primary">
+      
+      <a href="https://www.3d-geospatial.com/" >
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/>
+        </svg>
+        Home
+      </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/" aria-current="page">
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2 3 7l9 5 9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 17l9 5 9-5"/>
+            </svg>
+          
+          3D Geospatial Fundamentals
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+          
+          LOD Management &amp; Optimization
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="6" cy="6" r="1.5"/><circle cx="12" cy="6" r="1.5"/><circle cx="18" cy="6" r="1.5"/>
+              <circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/>
+              <circle cx="6" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="18" cy="18" r="1.5"/>
+            </svg>
+          
+          Point Cloud &amp; Mesh Pipelines
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <path d="M12 9v4"/><path d="M12 17h.01"/>
+            </svg>
+          
+          Troubleshooting &amp; Reliability
+        </a>
+      
+    </nav>
+  </div>
+</header>
+
+
+  <main id="main">
+    
+
+
+<div class="container">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    
+      
+        <a href="https://www.3d-geospatial.com/">Home</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals For Digital Twins</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <span class="current">Mapping Density Coverage Gaps With Pdal</span>
+      
+    
+  </nav>
+
+  <div class="content-page">
+    <article class="article">
+      <h1 id="mapping-density-coverage-gaps-with-pdal" tabindex="-1"><a class="heading-link" href="#mapping-density-coverage-gaps-with-pdal"><span>Mapping Density Coverage Gaps with PDAL</span></a></h1>
+<p>This page turns a density requirement into a map — rasterising point counts per cell with PDAL’s <code>writers.gdal</code>, distinguishing genuine voids such as water from coverage gaps caused by flight-line spacing, and reporting the deficient area as a percentage and as polygons a contractor can be shown, for a delivery in EPSG:25832+7837.</p>
+<h2 id="why-you-hit-this" tabindex="-1"><a class="heading-link" href="#why-you-hit-this"><span>Why you hit this</span></a></h2>
+<p>A delivery specification says “8 points per square metre, minimum”. The delivered file reports a mean of 11.4 and passes. Then a terrain model built from it has stripes, a building extraction misses the north side of a street, and a reflight is needed. The mean was never the requirement: a cloud with 20 pts/m² over half the area and 2 over the other half averages 11. What matters is the <em>distribution</em> and specifically where it falls below the target, which is a raster question rather than a statistic. The targets themselves are in <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">point cloud density standards</a>.</p>
+<h2 id="prerequisites" tabindex="-1"><a class="heading-link" href="#prerequisites"><span>Prerequisites</span></a></h2>
+<ul>
+<li>PDAL 2.6+ with Python bindings (<code>pdal&gt;=3.4</code>), plus <code>rasterio&gt;=1.3</code>, <code>numpy&gt;=1.24</code>, <code>shapely&gt;=2.0</code>, <code>geopandas&gt;=0.14</code>.</li>
+<li>A classified LAZ delivery in EPSG:25832 with NAVD-equivalent heights — DHHN2016 here — and its delivery extent as a polygon.</li>
+<li>The density target and the aggregation cell size from the specification. Both matter: 8 pts/m² assessed on 1 m cells is a much stricter requirement than the same figure on 10 m cells.</li>
+</ul>
+<h2 id="step-by-step" tabindex="-1"><a class="heading-link" href="#step-by-step"><span>Step-by-Step</span></a></h2>
+<h3 id="1-rasterise-the-point-count-not-the-mean" tabindex="-1"><a class="heading-link" href="#1-rasterise-the-point-count-not-the-mean"><span>1. Rasterise the point count, not the mean</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> json
+<span class="token keyword">from</span> pathlib <span class="token keyword">import</span> Path
+
+<span class="token keyword">import</span> pdal
+
+TILE <span class="token operator">=</span> <span class="token string">"deliveries/2026-09/tile_691_5335.laz"</span>
+CELL <span class="token operator">=</span> <span class="token number">1.0</span>                     <span class="token comment"># metres; the specification's assessment cell</span>
+BOUNDS <span class="token operator">=</span> <span class="token string">"([691000, 692000], [5335000, 5336000])"</span>
+
+<span class="token keyword">def</span> <span class="token function">density_raster</span><span class="token punctuation">(</span>src<span class="token punctuation">,</span> out_tif<span class="token punctuation">,</span> cell<span class="token operator">=</span>CELL<span class="token punctuation">,</span> bounds<span class="token operator">=</span>BOUNDS<span class="token punctuation">,</span> classes<span class="token operator">=</span><span class="token boolean">None</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    stages <span class="token operator">=</span> <span class="token punctuation">[</span>src<span class="token punctuation">]</span>
+    <span class="token keyword">if</span> classes<span class="token punctuation">:</span>
+        limits <span class="token operator">=</span> <span class="token string">","</span><span class="token punctuation">.</span>join<span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"Classification[</span><span class="token interpolation"><span class="token punctuation">{</span>c<span class="token punctuation">}</span></span><span class="token string">:</span><span class="token interpolation"><span class="token punctuation">{</span>c<span class="token punctuation">}</span></span><span class="token string">]"</span></span> <span class="token keyword">for</span> c <span class="token keyword">in</span> classes<span class="token punctuation">)</span>
+        stages<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"filters.range"</span><span class="token punctuation">,</span> <span class="token string">"limits"</span><span class="token punctuation">:</span> limits<span class="token punctuation">}</span><span class="token punctuation">)</span>
+    stages<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span>
+        <span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"writers.gdal"</span><span class="token punctuation">,</span>
+        <span class="token string">"filename"</span><span class="token punctuation">:</span> out_tif<span class="token punctuation">,</span>
+        <span class="token string">"resolution"</span><span class="token punctuation">:</span> cell<span class="token punctuation">,</span>
+        <span class="token string">"bounds"</span><span class="token punctuation">:</span> bounds<span class="token punctuation">,</span>
+        <span class="token string">"output_type"</span><span class="token punctuation">:</span> <span class="token string">"count"</span><span class="token punctuation">,</span>          <span class="token comment"># points per cell, the quantity the spec means</span>
+        <span class="token string">"data_type"</span><span class="token punctuation">:</span> <span class="token string">"uint16"</span><span class="token punctuation">,</span>
+        <span class="token string">"nodata"</span><span class="token punctuation">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+        <span class="token string">"gdaldriver"</span><span class="token punctuation">:</span> <span class="token string">"GTiff"</span><span class="token punctuation">,</span>
+        <span class="token string">"override_srs"</span><span class="token punctuation">:</span> <span class="token string">"EPSG:25832"</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span><span class="token punctuation">)</span>
+    count <span class="token operator">=</span> pdal<span class="token punctuation">.</span>Pipeline<span class="token punctuation">(</span>json<span class="token punctuation">.</span>dumps<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"pipeline"</span><span class="token punctuation">:</span> stages<span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">.</span>execute<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> count
+
+n_all <span class="token operator">=</span> density_raster<span class="token punctuation">(</span>TILE<span class="token punctuation">,</span> <span class="token string">"build/density_all.tif"</span><span class="token punctuation">)</span>
+n_ground <span class="token operator">=</span> density_raster<span class="token punctuation">(</span>TILE<span class="token punctuation">,</span> <span class="token string">"build/density_ground.tif"</span><span class="token punctuation">,</span> classes<span class="token operator">=</span><span class="token punctuation">[</span><span class="token number">2</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>n_all<span class="token punctuation">:</span><span class="token format-spec">,</span><span class="token punctuation">}</span></span><span class="token string"> points rasterised; </span><span class="token interpolation"><span class="token punctuation">{</span>n_ground<span class="token punctuation">:</span><span class="token format-spec">,</span><span class="token punctuation">}</span></span><span class="token string"> ground points"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p><code>output_type: &quot;count&quot;</code> is the whole trick. The instinct is to compute a mean density from the header — total points divided by area — and that number is exactly the one that hides the problem. A count raster at the specification’s cell size <em>is</em> the requirement, rendered.</p>
+<p>Passing explicit <code>bounds</code> matters too: without them, <code>writers.gdal</code> sizes the grid to the data, so an area with no points at all simply falls outside the raster and never appears as a gap.</p>
+<h3 id="2-separate-real-voids-from-coverage-gaps" tabindex="-1"><a class="heading-link" href="#2-separate-real-voids-from-coverage-gaps"><span>2. Separate real voids from coverage gaps</span></a></h3>
+<p>Not every empty cell is a failure. Water absorbs the pulse, building interiors have no returns, and a cell under a bridge deck is legitimately empty at ground level.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> geopandas <span class="token keyword">as</span> gpd
+<span class="token keyword">import</span> numpy <span class="token keyword">as</span> np
+<span class="token keyword">import</span> rasterio
+<span class="token keyword">from</span> rasterio<span class="token punctuation">.</span>features <span class="token keyword">import</span> rasterize
+
+<span class="token keyword">def</span> <span class="token function">void_mask</span><span class="token punctuation">(</span>shape<span class="token punctuation">,</span> transform<span class="token punctuation">,</span> water_path<span class="token operator">=</span><span class="token boolean">None</span><span class="token punctuation">,</span> buildings_path<span class="token operator">=</span><span class="token boolean">None</span><span class="token punctuation">,</span> crs<span class="token operator">=</span><span class="token number">25832</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    mask <span class="token operator">=</span> np<span class="token punctuation">.</span>zeros<span class="token punctuation">(</span>shape<span class="token punctuation">,</span> dtype<span class="token operator">=</span><span class="token builtin">bool</span><span class="token punctuation">)</span>
+    <span class="token keyword">for</span> path<span class="token punctuation">,</span> buffer_m <span class="token keyword">in</span> <span class="token punctuation">(</span><span class="token punctuation">(</span>water_path<span class="token punctuation">,</span> <span class="token number">1.0</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token punctuation">(</span>buildings_path<span class="token punctuation">,</span> <span class="token number">0.0</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">if</span> <span class="token keyword">not</span> path<span class="token punctuation">:</span>
+            <span class="token keyword">continue</span>
+        gdf <span class="token operator">=</span> gpd<span class="token punctuation">.</span>read_file<span class="token punctuation">(</span>path<span class="token punctuation">)</span><span class="token punctuation">.</span>to_crs<span class="token punctuation">(</span>crs<span class="token punctuation">)</span>
+        geoms <span class="token operator">=</span> <span class="token punctuation">[</span>g<span class="token punctuation">.</span><span class="token builtin">buffer</span><span class="token punctuation">(</span>buffer_m<span class="token punctuation">)</span> <span class="token keyword">for</span> g <span class="token keyword">in</span> gdf<span class="token punctuation">.</span>geometry <span class="token keyword">if</span> g <span class="token keyword">is</span> <span class="token keyword">not</span> <span class="token boolean">None</span> <span class="token keyword">and</span> <span class="token keyword">not</span> g<span class="token punctuation">.</span>is_empty<span class="token punctuation">]</span>
+        <span class="token keyword">if</span> geoms<span class="token punctuation">:</span>
+            mask <span class="token operator">|</span><span class="token operator">=</span> rasterize<span class="token punctuation">(</span>geoms<span class="token punctuation">,</span> out_shape<span class="token operator">=</span>shape<span class="token punctuation">,</span> transform<span class="token operator">=</span>transform<span class="token punctuation">,</span>
+                              fill<span class="token operator">=</span><span class="token number">0</span><span class="token punctuation">,</span> default_value<span class="token operator">=</span><span class="token number">1</span><span class="token punctuation">,</span> dtype<span class="token operator">=</span><span class="token string">"uint8"</span><span class="token punctuation">)</span><span class="token punctuation">.</span>astype<span class="token punctuation">(</span><span class="token builtin">bool</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> mask
+
+<span class="token keyword">with</span> rasterio<span class="token punctuation">.</span><span class="token builtin">open</span><span class="token punctuation">(</span><span class="token string">"build/density_all.tif"</span><span class="token punctuation">)</span> <span class="token keyword">as</span> src<span class="token punctuation">:</span>
+    counts <span class="token operator">=</span> src<span class="token punctuation">.</span>read<span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">.</span>astype<span class="token punctuation">(</span>np<span class="token punctuation">.</span>int32<span class="token punctuation">)</span>
+    transform<span class="token punctuation">,</span> shape<span class="token punctuation">,</span> crs <span class="token operator">=</span> src<span class="token punctuation">.</span>transform<span class="token punctuation">,</span> src<span class="token punctuation">.</span>shape<span class="token punctuation">,</span> src<span class="token punctuation">.</span>crs
+
+legit_void <span class="token operator">=</span> void_mask<span class="token punctuation">(</span>shape<span class="token punctuation">,</span> transform<span class="token punctuation">,</span>
+                       water_path<span class="token operator">=</span><span class="token string">"reference/water.gpkg"</span><span class="token punctuation">,</span>
+                       buildings_path<span class="token operator">=</span><span class="token string">"reference/footprints.gpkg"</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span><span class="token number">100</span> <span class="token operator">*</span> legit_void<span class="token punctuation">.</span>mean<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span><span class="token format-spec">.1f</span><span class="token punctuation">}</span></span><span class="token string">% of the tile is water or building interior"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Excluding known voids is what makes the resulting number defensible. A tile with a lake covering 12% of it can never reach the target everywhere, and reporting 12% deficiency against a specification that did not intend it wastes everyone’s time. Buffering water outward by a metre also absorbs the shoreline, where partial returns produce genuinely low counts.</p>
+<figure class="diagram">
+<svg viewBox="26 -9 708 267" role="img" aria-labelledby="dens-kinds-t dens-kinds-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="dens-kinds-t">Three reasons a cell is empty or thin</title>
+  <desc id="dens-kinds-d">A tile in plan. A lake and the interior of a building are legitimate voids with no returns and are excluded from assessment. A strip between two flight lines has low but non-zero counts and is a coverage gap that fails the specification. A dense overlap between flight lines has double the target density and inflates the mean.</desc>
+  <rect class="svg-bg" x="26" y="-9" width="708" height="267" fill="#ffffff"/>
+  <rect x="40" y="30" width="680" height="170" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <path d="M90 90 C140 60 200 70 230 100 C250 130 200 160 150 155 C100 150 70 120 90 90 Z" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="300" y="60" width="80" height="60" fill="#ffffff" stroke="#5b6471" stroke-width="2"/>
+  <rect x="430" y="30" width="40" height="170" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <rect x="560" y="30" width="60" height="170" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="155" y="180">water: excluded</text>
+    <text x="340" y="140">building: excluded</text>
+    <text x="450" y="222">gap between</text>
+    <text x="450" y="240">flight lines: fails</text>
+    <text x="590" y="222">overlap: inflates</text>
+    <text x="590" y="240">the mean</text>
+  </g>
+  <text x="380" y="18" fill="#15384a" font-size="12" text-anchor="middle">The mean over this tile passes; two thin strips still fail the specification.</text>
+</svg>
+<figcaption>Only the third region is a delivery defect, and it is invisible in any aggregate statistic that includes the fourth.</figcaption>
+</figure>
+<h3 id="3-measure-the-deficiency" tabindex="-1"><a class="heading-link" href="#3-measure-the-deficiency"><span>3. Measure the deficiency</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python">TARGET <span class="token operator">=</span> <span class="token number">8.0</span>                              <span class="token comment"># points per m², from the specification</span>
+
+<span class="token keyword">def</span> <span class="token function">deficiency</span><span class="token punctuation">(</span>counts<span class="token punctuation">,</span> cell<span class="token punctuation">,</span> target<span class="token punctuation">,</span> legit_void<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    density <span class="token operator">=</span> counts <span class="token operator">/</span> <span class="token punctuation">(</span>cell <span class="token operator">*</span> cell<span class="token punctuation">)</span>
+    assessable <span class="token operator">=</span> <span class="token operator">~</span>legit_void
+    deficient <span class="token operator">=</span> assessable <span class="token operator">&amp;</span> <span class="token punctuation">(</span>density <span class="token operator">&lt;</span> target<span class="token punctuation">)</span>
+    empty <span class="token operator">=</span> assessable <span class="token operator">&amp;</span> <span class="token punctuation">(</span>counts <span class="token operator">==</span> <span class="token number">0</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token string">"target_per_m2"</span><span class="token punctuation">:</span> target<span class="token punctuation">,</span>
+        <span class="token string">"cell_m"</span><span class="token punctuation">:</span> cell<span class="token punctuation">,</span>
+        <span class="token string">"assessable_cells"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span>assessable<span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"deficient_cells"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span>deficient<span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"deficient_pct"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token number">100</span> <span class="token operator">*</span> deficient<span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token builtin">max</span><span class="token punctuation">(</span>assessable<span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"empty_cells"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span>empty<span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"median_density"</span><span class="token punctuation">:</span> <span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>median<span class="token punctuation">(</span>density<span class="token punctuation">[</span>assessable<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"p05_density"</span><span class="token punctuation">:</span> <span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>percentile<span class="token punctuation">(</span>density<span class="token punctuation">[</span>assessable<span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token number">5</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"mean_density"</span><span class="token punctuation">:</span> <span class="token builtin">float</span><span class="token punctuation">(</span>density<span class="token punctuation">[</span>assessable<span class="token punctuation">]</span><span class="token punctuation">.</span>mean<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span><span class="token punctuation">,</span> deficient
+
+report<span class="token punctuation">,</span> deficient <span class="token operator">=</span> deficiency<span class="token punctuation">(</span>counts<span class="token punctuation">,</span> CELL<span class="token punctuation">,</span> TARGET<span class="token punctuation">,</span> legit_void<span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span>json<span class="token punctuation">.</span>dumps<span class="token punctuation">(</span>report<span class="token punctuation">,</span> indent<span class="token operator">=</span><span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Reporting the fifth percentile next to the mean is what makes the difference visible in one line. A healthy delivery has a p05 above the target; the failing delivery in the output below has a mean of 11.4 and a p05 of 2.1, which is the whole story.</p>
+<h3 id="4-turn-deficient-cells-into-polygons" tabindex="-1"><a class="heading-link" href="#4-turn-deficient-cells-into-polygons"><span>4. Turn deficient cells into polygons</span></a></h3>
+<p>A percentage starts a discussion; a map of where ends it.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">from</span> rasterio<span class="token punctuation">.</span>features <span class="token keyword">import</span> shapes
+<span class="token keyword">from</span> shapely<span class="token punctuation">.</span>geometry <span class="token keyword">import</span> shape <span class="token keyword">as</span> to_shape
+
+<span class="token keyword">def</span> <span class="token function">deficiency_polygons</span><span class="token punctuation">(</span>deficient<span class="token punctuation">,</span> transform<span class="token punctuation">,</span> crs<span class="token punctuation">,</span> min_area_m2<span class="token operator">=</span><span class="token number">200.0</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    geoms <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    <span class="token keyword">for</span> geom<span class="token punctuation">,</span> value <span class="token keyword">in</span> shapes<span class="token punctuation">(</span>deficient<span class="token punctuation">.</span>astype<span class="token punctuation">(</span><span class="token string">"uint8"</span><span class="token punctuation">)</span><span class="token punctuation">,</span> mask<span class="token operator">=</span>deficient<span class="token punctuation">,</span> transform<span class="token operator">=</span>transform<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        poly <span class="token operator">=</span> to_shape<span class="token punctuation">(</span>geom<span class="token punctuation">)</span>
+        <span class="token keyword">if</span> poly<span class="token punctuation">.</span>area <span class="token operator">>=</span> min_area_m2<span class="token punctuation">:</span>
+            geoms<span class="token punctuation">.</span>append<span class="token punctuation">(</span>poly<span class="token punctuation">)</span>
+    gdf <span class="token operator">=</span> gpd<span class="token punctuation">.</span>GeoDataFrame<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"area_m2"</span><span class="token punctuation">:</span> <span class="token punctuation">[</span><span class="token builtin">round</span><span class="token punctuation">(</span>g<span class="token punctuation">.</span>area<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span> <span class="token keyword">for</span> g <span class="token keyword">in</span> geoms<span class="token punctuation">]</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+                           geometry<span class="token operator">=</span>geoms<span class="token punctuation">,</span> crs<span class="token operator">=</span>crs<span class="token punctuation">)</span>
+    <span class="token keyword">return</span> gdf<span class="token punctuation">.</span>sort_values<span class="token punctuation">(</span><span class="token string">"area_m2"</span><span class="token punctuation">,</span> ascending<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">)</span><span class="token punctuation">.</span>reset_index<span class="token punctuation">(</span>drop<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+
+gaps <span class="token operator">=</span> deficiency_polygons<span class="token punctuation">(</span>deficient<span class="token punctuation">,</span> transform<span class="token punctuation">,</span> crs<span class="token punctuation">)</span>
+gaps<span class="token punctuation">.</span>to_file<span class="token punctuation">(</span><span class="token string">"build/density_gaps.gpkg"</span><span class="token punctuation">,</span> layer<span class="token operator">=</span><span class="token string">"gaps"</span><span class="token punctuation">,</span> driver<span class="token operator">=</span><span class="token string">"GPKG"</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span>gaps<span class="token punctuation">.</span>head<span class="token punctuation">(</span><span class="token number">5</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span><span class="token builtin">len</span><span class="token punctuation">(</span>gaps<span class="token punctuation">)</span><span class="token punctuation">}</span></span><span class="token string"> gap polygons ≥ 200 m², total </span><span class="token interpolation"><span class="token punctuation">{</span>gaps<span class="token punctuation">[</span><span class="token string">'area_m2'</span><span class="token punctuation">]</span><span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token number">1e4</span><span class="token punctuation">:</span><span class="token format-spec">.2f</span><span class="token punctuation">}</span></span><span class="token string"> ha"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>The minimum-area filter removes the speckle of individual cells that any real survey has — a wet patch of asphalt, a dark roof — and keeps the contiguous regions that indicate a systematic problem. A long, straight, narrow polygon is a flight-line gap; a compact one under a canopy is vegetation absorbing the pulse; a large irregular one is a missing pass.</p>
+<h3 id="5-classify-each-gap-by-its-likely-cause" tabindex="-1"><a class="heading-link" href="#5-classify-each-gap-by-its-likely-cause"><span>5. Classify each gap by its likely cause</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">classify_gap</span><span class="token punctuation">(</span>poly<span class="token punctuation">,</span> counts<span class="token punctuation">,</span> transform<span class="token punctuation">,</span> legit_void<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    minx<span class="token punctuation">,</span> miny<span class="token punctuation">,</span> maxx<span class="token punctuation">,</span> maxy <span class="token operator">=</span> poly<span class="token punctuation">.</span>bounds
+    aspect <span class="token operator">=</span> <span class="token punctuation">(</span>maxx <span class="token operator">-</span> minx<span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token builtin">max</span><span class="token punctuation">(</span>maxy <span class="token operator">-</span> miny<span class="token punctuation">,</span> <span class="token number">1e-6</span><span class="token punctuation">)</span>
+    elongated <span class="token operator">=</span> aspect <span class="token operator">></span> <span class="token number">4</span> <span class="token keyword">or</span> aspect <span class="token operator">&lt;</span> <span class="token number">0.25</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token string">"area_m2"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>poly<span class="token punctuation">.</span>area<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"aspect"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>aspect<span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"shape"</span><span class="token punctuation">:</span> <span class="token string">"strip"</span> <span class="token keyword">if</span> elongated <span class="token keyword">else</span> <span class="token string">"patch"</span><span class="token punctuation">,</span>
+        <span class="token string">"likely_cause"</span><span class="token punctuation">:</span> <span class="token punctuation">(</span><span class="token string">"flight-line spacing"</span> <span class="token keyword">if</span> elongated
+                         <span class="token keyword">else</span> <span class="token string">"absorption or occlusion"</span> <span class="token keyword">if</span> poly<span class="token punctuation">.</span>area <span class="token operator">&lt;</span> <span class="token number">2000</span>
+                         <span class="token keyword">else</span> <span class="token string">"missing pass"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+
+<span class="token keyword">for</span> i<span class="token punctuation">,</span> row <span class="token keyword">in</span> gaps<span class="token punctuation">.</span>head<span class="token punctuation">(</span><span class="token number">6</span><span class="token punctuation">)</span><span class="token punctuation">.</span>iterrows<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span>classify_gap<span class="token punctuation">(</span>row<span class="token punctuation">.</span>geometry<span class="token punctuation">,</span> counts<span class="token punctuation">,</span> transform<span class="token punctuation">,</span> legit_void<span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Classifying by shape is crude and useful: flight-line gaps are long and straight because they follow the aircraft’s track, absorption patches are compact and scattered, and a missing pass is a large block. Handing a contractor a list of three strips at a consistent spacing is a different conversation from handing them a percentage.</p>
+<figure class="diagram">
+<svg viewBox="56 16 658 230" role="img" aria-labelledby="dens-dist-t dens-dist-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="dens-dist-t">Why the mean passes and the delivery fails</title>
+  <desc id="dens-dist-d">A histogram of per-cell density for a delivery with a target of eight points per square metre. A large mode sits near eighteen in the flight-line overlaps, a second mode sits near nine, and a tail below the target holds about nine percent of the assessable cells. The mean of 11.4 lies above the target while the fifth percentile is 2.1.</desc>
+  <rect class="svg-bg" x="56" y="16" width="658" height="230" fill="#ffffff"/>
+  <path d="M70 30 V180 H700" fill="none" stroke="#5b6471" stroke-width="1.5"/>
+  <g stroke-width="1.2">
+    <rect x="90" y="150" width="34" height="30" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="126" y="140" width="34" height="40" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="162" y="158" width="34" height="22" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="198" y="120" width="34" height="60" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="234" y="80" width="34" height="100" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="270" y="96" width="34" height="84" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="306" y="120" width="34" height="60" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="342" y="132" width="34" height="48" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="414" y="60" width="34" height="120" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="450" y="44" width="34" height="136" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="486" y="70" width="34" height="110" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="522" y="110" width="34" height="70" fill="#fdf3e0" stroke="#c46a3d"/>
+  </g>
+  <path d="M196 30 V180" fill="none" stroke="#b0413e" stroke-width="2.5"/>
+  <text x="190" y="46" fill="#b0413e" font-size="12" text-anchor="end">target 8</text>
+  <path d="M340 30 V180" fill="none" stroke="#4f7a4d" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="348" y="46" fill="#4f7a4d" font-size="12" text-anchor="start">mean 11.4</text>
+  <g fill="#1f2937" font-size="12" text-anchor="middle">
+    <text x="130" y="200">2</text><text x="250" y="200">9</text><text x="450" y="200">18</text><text x="620" y="200">30 pts/m²</text>
+  </g>
+  <text x="380" y="228" fill="#15384a" font-size="12.5" text-anchor="middle">9% of assessable cells are below target; the overlap mode pulls the mean above it</text>
+</svg>
+<figcaption>The two upper modes are flight-line coverage and overlap; the failing tail is the delivery defect the mean conceals.</figcaption>
+</figure>
+<figure class="diagram">
+<svg viewBox="6 6 748 232" role="img" aria-labelledby="dens-gate-t dens-gate-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="dens-gate-t">Three acceptance criteria and what each catches</title>
+  <desc id="dens-gate-d">A table. A limit on the share of deficient cells catches diffuse thinness across a tile. A floor on the fifth percentile catches a distribution whose tail is below target even when its area is small. A limit on the largest single gap catches one large hole that passes the percentage test. A delivery has to satisfy all three.</desc>
+  <rect class="svg-bg" x="6" y="6" width="748" height="232" fill="#ffffff"/>
+  <g stroke-width="1.5">
+    <rect x="20" y="20" width="250" height="36" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="270" y="20" width="470" height="36" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="20" y="56" width="250" height="44" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="270" y="56" width="470" height="44" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="20" y="100" width="250" height="44" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="270" y="100" width="470" height="44" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="20" y="144" width="250" height="44" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="270" y="144" width="470" height="44" fill="#eef5e9" stroke="#4f7a4d"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="145" y="43">criterion</text><text x="505" y="43">the failure it catches</text>
+    <text x="145" y="83">deficient cells ≤ 2%</text><text x="505" y="83">thinness spread thinly across the whole tile</text>
+    <text x="145" y="127">p05 density ≥ target</text><text x="505" y="127">a below-target tail with a small area share</text>
+    <text x="145" y="171">largest gap ≤ 0.5 ha</text><text x="505" y="171">one big hole inside an acceptable percentage</text>
+  </g>
+  <text x="380" y="220" fill="#15384a" font-size="12.5" text-anchor="middle">Any one criterion alone can be satisfied by a delivery that fails the other two.</text>
+</svg>
+<figcaption>Three criteria because thinness has three shapes: everywhere a little, somewhere a lot, and one hole.</figcaption>
+</figure>
+<h3 id="6-gate-the-delivery" tabindex="-1"><a class="heading-link" href="#6-gate-the-delivery"><span>6. Gate the delivery</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> sys
+
+MAX_DEFICIENT_PCT <span class="token operator">=</span> <span class="token number">2.0</span>
+MAX_SINGLE_GAP_HA <span class="token operator">=</span> <span class="token number">0.5</span>
+
+<span class="token keyword">def</span> <span class="token function">gate</span><span class="token punctuation">(</span>report<span class="token punctuation">,</span> gaps<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    failures <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    <span class="token keyword">if</span> report<span class="token punctuation">[</span><span class="token string">"deficient_pct"</span><span class="token punctuation">]</span> <span class="token operator">></span> MAX_DEFICIENT_PCT<span class="token punctuation">:</span>
+        failures<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>report<span class="token punctuation">[</span><span class="token string">'deficient_pct'</span><span class="token punctuation">]</span><span class="token punctuation">}</span></span><span class="token string">% of assessable cells below "</span></span>
+                        <span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>report<span class="token punctuation">[</span><span class="token string">'target_per_m2'</span><span class="token punctuation">]</span><span class="token punctuation">}</span></span><span class="token string"> pts/m² (limit </span><span class="token interpolation"><span class="token punctuation">{</span>MAX_DEFICIENT_PCT<span class="token punctuation">}</span></span><span class="token string">%)"</span></span><span class="token punctuation">)</span>
+    <span class="token keyword">if</span> report<span class="token punctuation">[</span><span class="token string">"p05_density"</span><span class="token punctuation">]</span> <span class="token operator">&lt;</span> report<span class="token punctuation">[</span><span class="token string">"target_per_m2"</span><span class="token punctuation">]</span><span class="token punctuation">:</span>
+        failures<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"p05 density </span><span class="token interpolation"><span class="token punctuation">{</span>report<span class="token punctuation">[</span><span class="token string">'p05_density'</span><span class="token punctuation">]</span><span class="token punctuation">:</span><span class="token format-spec">.1f</span><span class="token punctuation">}</span></span><span class="token string"> is below the target"</span></span><span class="token punctuation">)</span>
+    <span class="token keyword">if</span> <span class="token builtin">len</span><span class="token punctuation">(</span>gaps<span class="token punctuation">)</span> <span class="token keyword">and</span> gaps<span class="token punctuation">[</span><span class="token string">"area_m2"</span><span class="token punctuation">]</span><span class="token punctuation">.</span><span class="token builtin">max</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token number">1e4</span> <span class="token operator">></span> MAX_SINGLE_GAP_HA<span class="token punctuation">:</span>
+        failures<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"largest gap </span><span class="token interpolation"><span class="token punctuation">{</span>gaps<span class="token punctuation">[</span><span class="token string">'area_m2'</span><span class="token punctuation">]</span><span class="token punctuation">.</span><span class="token builtin">max</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token number">1e4</span><span class="token punctuation">:</span><span class="token format-spec">.2f</span><span class="token punctuation">}</span></span><span class="token string"> ha exceeds "</span></span>
+                        <span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>MAX_SINGLE_GAP_HA<span class="token punctuation">}</span></span><span class="token string"> ha"</span></span><span class="token punctuation">)</span>
+    <span class="token keyword">for</span> f <span class="token keyword">in</span> failures<span class="token punctuation">:</span>
+        <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"FAIL:"</span><span class="token punctuation">,</span> f<span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token number">1</span> <span class="token keyword">if</span> failures <span class="token keyword">else</span> <span class="token number">0</span>
+
+sys<span class="token punctuation">.</span>exit<span class="token punctuation">(</span>gate<span class="token punctuation">(</span>report<span class="token punctuation">,</span> gaps<span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Three criteria, because one is never enough. A percentage limit catches diffuse thinness; a fifth-percentile floor catches a distribution whose tail is below target even when its area share is small; and a single-gap limit catches the case where 1.8% of the tile is deficient and all of it is one 2-hectare hole.</p>
+<h2 id="expected-output-verification" tabindex="-1"><a class="heading-link" href="#expected-output-verification"><span>Expected Output &amp; Verification</span></a></h2>
+<div class="codeblock" data-lang="text"><div class="codeblock__bar"><span class="codeblock__lang">text</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-text" tabindex="0" role="group" aria-label="text code sample"><code class="language-text">18,402,118 points rasterised; 6,204,882 ground points
+0.4% of the tile is water or building interior
+{
+  "target_per_m2": 8.0,
+  "cell_m": 1.0,
+  "assessable_cells": 996012,
+  "deficient_cells": 89204,
+  "deficient_pct": 8.96,
+  "empty_cells": 1204,
+  "median_density": 12.0,
+  "p05_density": 2.1,
+  "mean_density": 11.42
+}
+   area_m2                                           geometry
+0  18420.0  POLYGON ((691204.000 5335000.000, 691204.000 5...
+1   9204.0  POLYGON ((691680.000 5335000.000, 691680.000 5...
+2    884.0  POLYGON ((691402.000 5335612.000, 691402.000 5...
+5 gap polygons ≥ 200 m², total 2.94 ha
+{'area_m2': 18420.0, 'aspect': 0.02, 'shape': 'strip', 'likely_cause': 'flight-line spacing'}
+FAIL: 8.96% of assessable cells below 8.0 pts/m² (limit 2.0%)
+FAIL: p05 density 2.1 is below the target
+FAIL: largest gap 1.84 ha exceeds 0.5 ha
+</code></pre></div>
+<p>Verify the raster before trusting the report, because an incorrectly georeferenced or wrongly scaled count raster produces confident nonsense:</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">with</span> rasterio<span class="token punctuation">.</span><span class="token builtin">open</span><span class="token punctuation">(</span><span class="token string">"build/density_all.tif"</span><span class="token punctuation">)</span> <span class="token keyword">as</span> src<span class="token punctuation">:</span>
+    <span class="token keyword">assert</span> src<span class="token punctuation">.</span>crs<span class="token punctuation">.</span>to_epsg<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token number">25832</span><span class="token punctuation">,</span> <span class="token string">"density raster CRS is wrong"</span>
+    <span class="token keyword">assert</span> <span class="token builtin">abs</span><span class="token punctuation">(</span>src<span class="token punctuation">.</span>res<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span> <span class="token operator">-</span> CELL<span class="token punctuation">)</span> <span class="token operator">&lt;</span> <span class="token number">1e-9</span> <span class="token keyword">and</span> <span class="token builtin">abs</span><span class="token punctuation">(</span>src<span class="token punctuation">.</span>res<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span> <span class="token operator">-</span> CELL<span class="token punctuation">)</span> <span class="token operator">&lt;</span> <span class="token number">1e-9</span><span class="token punctuation">,</span> <span class="token string">"cell size mismatch"</span>
+    total_in_raster <span class="token operator">=</span> <span class="token builtin">int</span><span class="token punctuation">(</span>src<span class="token punctuation">.</span>read<span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">.</span>astype<span class="token punctuation">(</span>np<span class="token punctuation">.</span>int64<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"points in raster </span><span class="token interpolation"><span class="token punctuation">{</span>total_in_raster<span class="token punctuation">:</span><span class="token format-spec">,</span><span class="token punctuation">}</span></span><span class="token string"> vs points rasterised </span><span class="token interpolation"><span class="token punctuation">{</span>n_all<span class="token punctuation">:</span><span class="token format-spec">,</span><span class="token punctuation">}</span></span><span class="token string"> "</span></span>
+      <span class="token string-interpolation"><span class="token string">f"(</span><span class="token interpolation"><span class="token punctuation">{</span><span class="token number">100</span> <span class="token operator">*</span> total_in_raster <span class="token operator">/</span> n_all<span class="token punctuation">:</span><span class="token format-spec">.2f</span><span class="token punctuation">}</span></span><span class="token string">%)"</span></span><span class="token punctuation">)</span>
+<span class="token keyword">assert</span> total_in_raster <span class="token operator">>=</span> <span class="token number">0.98</span> <span class="token operator">*</span> n_all<span class="token punctuation">,</span> <span class="token string">"points lost: raster bounds do not cover the data"</span>
+</code></pre></div>
+<p>The sum of the count raster must equal the number of points PDAL processed, within the handful that fall exactly on a boundary. A total that is 60% of the point count means the explicit bounds do not cover the tile, and every gap the report found is an artefact of the grid rather than of the survey.</p>
+<p>Then verify the gap polygons against the flight-line geometry if the delivery includes trajectory data: a strip gap should fall exactly between two adjacent lines, which both confirms the diagnosis and gives the contractor the line numbers.</p>
+<h2 id="performance-notes" tabindex="-1"><a class="heading-link" href="#performance-notes"><span>Performance Notes</span></a></h2>
+<ul>
+<li><strong>Rasterising is a single pass over the points</strong> and is fast: a 20-million-point tile at 1 m cells takes seconds and the output raster is a few megabytes.</li>
+<li><strong>Assess per delivery tile, aggregate afterwards.</strong> A city-wide raster at 1 m is large and unnecessary; per-tile reports summed into one table answer the same question.</li>
+<li><strong>Keep the count rasters.</strong> They are small, and they are the evidence behind an acceptance decision; regenerating them years later needs the original LAZ.</li>
+<li><strong>Rasterise ground separately</strong> when the specification sets a ground-point target, as most do for terrain products. A cloud can pass overall and fail on ground under canopy.</li>
+<li><strong>Use <code>uint16</code> and guard against overflow.</strong> At 1 m cells a dense terrestrial scan can exceed 65,535 points in a cell; switch to <code>uint32</code> for mobile-mapping data.</li>
+</ul>
+<h2 id="common-errors" tabindex="-1"><a class="heading-link" href="#common-errors"><span>Common Errors</span></a></h2>
+<p><strong>Every cell reports zero.</strong> The bounds are in the wrong CRS or the wrong order. PDAL’s <code>bounds</code> syntax is <code>([minx, maxx], [miny, maxy])</code>, which is easy to confuse with the more common min/max-pair ordering.</p>
+<p><strong>Deficiency is 100% at a plausible-looking mean.</strong> The cell size and the target disagree in units — a 0.5 m cell with a per-square-metre target means each cell’s count has to be divided by 0.25, which the code above does and a hand calculation often does not.</p>
+<p><strong>Building roofs appear as gaps.</strong> The building mask excluded roofs as well as interiors. Mask only what genuinely has no returns: water, and building <em>interiors</em> if assessing ground points. Roofs are a legitimate part of an all-returns assessment.</p>
+<p><strong>Gaps appear along every tile edge.</strong> Neighbouring tiles’ points are missing, so the edge cells are half-empty. Assess with a buffer of neighbouring data, or exclude a one-cell border from the statistics.</p>
+<h2 id="frequently-asked-questions" tabindex="-1"><a class="heading-link" href="#frequently-asked-questions"><span>Frequently Asked Questions</span></a></h2>
+<h3 id="what-cell-size-should-a-specification-use" tabindex="-1"><a class="heading-link" href="#what-cell-size-should-a-specification-use"><span>What cell size should a specification use?</span></a></h3>
+<p>The one the product needs. A 1 m cell is right for terrain at 1 m resolution; a 2 m cell is more forgiving and appropriate for regional mapping. State it in the specification, because the same point cloud passes at 5 m and fails at 1 m.</p>
+<h3 id="should-overlap-be-counted-towards-the-target" tabindex="-1"><a class="heading-link" href="#should-overlap-be-counted-towards-the-target"><span>Should overlap be counted towards the target?</span></a></h3>
+<p>It is genuinely there, so yes for an all-returns assessment. It should not be allowed to <em>compensate</em> for a gap elsewhere, which is exactly what a mean does and what the percentile and per-cell criteria prevent.</p>
+<h3 id="is-nominal-point-spacing-a-better-requirement-than-density" tabindex="-1"><a class="heading-link" href="#is-nominal-point-spacing-a-better-requirement-than-density"><span>Is nominal point spacing a better requirement than density?</span></a></h3>
+<p>They are two views of the same quantity — spacing is roughly the inverse square root of density — and spacing is more intuitive for judging whether a feature will be resolved. Assessing either one per cell is what matters; the conversion is in <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/estimating-point-spacing-for-mobile-mapping-scans/">estimating point spacing for mobile mapping scans</a>.</p>
+<h2 id="related-guides" tabindex="-1"><a class="heading-link" href="#related-guides"><span>Related Guides</span></a></h2>
+<ul>
+<li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/computing-point-density-from-laz-with-pdal/">Computing Point Density from LAZ with PDAL</a> — the per-file statistics this builds on</li>
+<li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/validating-density-against-usgs-quality-levels/">Validating Density Against USGS Quality Levels</a> — mapping the numbers to a published standard</li>
+<li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/thinning-point-clouds-to-a-target-density/">Thinning Point Clouds to a Target Density</a> — the opposite problem, too many points</li>
+</ul>
+<p>Back to <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a>.</p>
+
+
+      
+      
+
+      <div class="related-nav">
+        
+
+        
+          <div>
+            <h3>Related</h3>
+            <div class="related-grid">
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/computing-point-density-from-laz-with-pdal/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Computing Point Density from LAZ with PDAL</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/estimating-point-spacing-for-mobile-mapping-scans/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Estimating Point Spacing for Mobile Mapping Scans</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/best-practices-for-lidar-point-density-in-infrastructure/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">LiDAR Point Density Best Practices</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/thinning-point-clouds-to-a-target-density/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Thinning Point Clouds to a Target Density</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/validating-density-against-usgs-quality-levels/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Validating Density Against USGS Quality Levels</span>
+                </a>
+              
+            </div>
+          </div>
+        
+      </div>
+    </article>
+
+    
+    <aside class="toc" aria-label="On this page" data-toc hidden>
+      <h4>On this page</h4>
+      <ul></ul>
+    </aside>
+  </div>
+</div>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+  <div class="container site-footer__inner">
+    <div class="site-footer__brand">
+      <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+        <img src="/assets/img/logo-mark.svg" alt="" class="brand__mark" width="36" height="36">
+        <span class="brand__name">
+          3D Geospatial
+          <small>Digital Twin Automation</small>
+        </span>
+      </a>
+      <p>Engineering-grade guides on point cloud processing, mesh pipelines, LOD strategies, and CI/CD automation for digital twin platforms.</p>
+      <a class="footer-social" href="https://github.com/3d-geospatial" aria-label="3D Geospatial on GitHub" rel="noopener" target="_blank">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+          <path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.53-1.34-1.3-1.7-1.3-1.7-1.06-.72.08-.71.08-.71 1.17.08 1.79 1.2 1.79 1.2 1.04 1.79 2.73 1.27 3.4.97.1-.75.4-1.27.73-1.56-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.19-3.08-.12-.3-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.75.11 3.05.74.8 1.19 1.83 1.19 3.08 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.07.78 2.15v3.18c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5Z"/>
+        </svg>
+        <span>GitHub</span>
+      </a>
+    </div>
+
+    <div class="site-footer__col">
+      <h4>Sections</h4>
+      <ul>
+        <li><a href="https://www.3d-geospatial.com/">Home</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management &amp; Optimization</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/">Point Cloud &amp; Mesh Pipelines</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/">Troubleshooting &amp; Reliability</a></li>
+        
+      </ul>
+    </div>
+
+    
+      <div class="site-footer__col">
+        <h4>3D Geospatial Fundamentals</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/">3D Format Standards Comparison</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/">BIM and IFC Georeferencing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/">CityGML and CityJSON Processing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems for 3D Assets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/">Digital Elevation Model Workflows</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/">Spatial Indexing and Tiling Schemes for 3D Data</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>LOD Management &amp; Optimization</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/">Automated Tile Generation for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/">Cesium ion Upload Automation for 3D Tilesets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/">glTF LOD Generation With Draco Compression</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/">Streaming Sync Patterns for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/">Tileset Metadata and 3D Tiles Next</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/">Vector Overlays on 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Point Cloud &amp; Mesh Pipelines</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/">Automated Mesh Decimation for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/">Change Detection Between LiDAR Scan Epochs</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/">CI/CD Automation for Spatial Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">LiDAR Classification and Ground Extraction</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/photogrammetry-processing-pipelines/">Photogrammetry Processing Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/">Point Cloud Filtering Techniques</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/">Surface Reconstruction for Geospatial Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/">Texture Mapping Workflows for Digital Twins</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Troubleshooting &amp; Reliability</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/">Cross-Section Failure Modes in Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/">Data Validation &amp; QA Gates for 3D Tiles</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/">Performance Profiling and Benchmarking</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/">Pipeline Observability and Monitoring</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/">Streaming &amp; Runtime Diagnostics for 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+  </div>
+  <div class="container site-footer__bottom">
+    <span>© 2026 3D Geospatial &amp; Digital Twin Automation</span>
+    <span>Built with Eleventy · PWA-enabled</span>
+  </div>
+</footer>
+
+
+  <script src="/assets/js/site.js?v=b99aa9f971" defer></script>
+  
+</body>
+</html>

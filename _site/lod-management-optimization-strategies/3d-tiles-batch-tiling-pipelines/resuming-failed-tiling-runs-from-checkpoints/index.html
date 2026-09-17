@@ -1,0 +1,862 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <title>Resuming Failed Tiling Runs from Checkpoints — 3D Geospatial</title>
+  <meta name="description" content="Restart a half-finished city tiling run without redoing completed work: an append-only manifest, atomic shard commits">
+  <meta name="keywords" content="3D geospatial, digital twin, point cloud, mesh pipeline, LOD, 3D Tiles, Cesium, PDAL, Open3D, Python, CI/CD">
+  <meta name="author" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta name="theme-color" content="#1f6b8a" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f171d" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+
+  
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem("theme");
+        var theme = (stored === "dark" || stored === "light") ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    })();
+  </script>
+  <meta name="generator" content="Eleventy">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="googlebot" content="index,follow,max-image-preview:large">
+
+  
+  <link rel="canonical" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/resuming-failed-tiling-runs-from-checkpoints/">
+  <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">
+
+  
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/icon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+
+  
+  <link rel="apple-touch-icon" href="/assets/img/icon-180.png">
+  <link rel="mask-icon" href="/assets/img/logo.svg" color="#1f6b8a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="3D Geospatial">
+  <meta name="application-name" content="3D Geospatial">
+
+  
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Resuming Failed Tiling Runs from Checkpoints — 3D Geospatial">
+  <meta property="og:description" content="Restart a half-finished city tiling run without redoing completed work: an append-only manifest, atomic shard commits">
+  <meta property="og:url" content="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/resuming-failed-tiling-runs-from-checkpoints/">
+  <meta property="og:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+  <meta property="og:site_name" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta property="og:locale" content="en_US">
+  
+  <meta property="article:published_time" content="2026-09-17T23:36:56.453Z">
+  <meta property="article:modified_time" content="2026-09-17T23:36:56.453Z">
+  <meta property="article:publisher" content="https://www.3d-geospatial.com/">
+  
+
+  
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Resuming Failed Tiling Runs from Checkpoints — 3D Geospatial">
+  <meta name="twitter:description" content="Restart a half-finished city tiling run without redoing completed work: an append-only manifest, atomic shard commits">
+  <meta name="twitter:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta name="twitter:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+
+  
+  <link rel="preload" href="/assets/css/styles.css?v=8c46394d6c" as="style">
+  
+
+  <link rel="stylesheet" href="/assets/css/styles.css?v=8c46394d6c">
+
+  
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.3d-geospatial.com/#organization",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "url": "https://www.3d-geospatial.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/icon-512.png",
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://www.3d-geospatial.com/#website",
+      "url": "https://www.3d-geospatial.com/",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "description": "Build reliable 3D spatial data pipelines for digital twins — point clouds, meshes, LOD strategies, Python processing, and CI/CD automation.",
+      "inLanguage": "en",
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      }
+    },
+    {
+      "@type": "TechArticle",
+      "@id": "https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/resuming-failed-tiling-runs-from-checkpoints/#article",
+      "isPartOf": {
+        "@id": "https://www.3d-geospatial.com/#website"
+      },
+      "headline": "Resuming Failed Tiling Runs from Checkpoints",
+      "name": "Resuming Failed Tiling Runs from Checkpoints",
+      "description": "Restart a half-finished city tiling run without redoing completed work: an append-only manifest, atomic shard commits",
+      "url": "https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/resuming-failed-tiling-runs-from-checkpoints/",
+      "mainEntityOfPage": "https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/resuming-failed-tiling-runs-from-checkpoints/",
+      "inLanguage": "en",
+      "datePublished": "2026-09-17T23:36:56.453Z",
+      "dateModified": "2026-09-17T23:36:56.453Z",
+      "author": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "image": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/og-cover.png",
+        "width": 1200,
+        "height": 630
+      },
+      "breadcrumb": {
+        "@id": "https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/resuming-failed-tiling-runs-from-checkpoints/#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/resuming-failed-tiling-runs-from-checkpoints/#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://www.3d-geospatial.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "LOD Management Optimization Strategies",
+          "item": "https://www.3d-geospatial.com/lod-management-optimization-strategies/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "3D Tiles Batch Tiling Pipelines",
+          "item": "https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "name": "Resuming Failed Tiling Runs From Checkpoints",
+          "item": "https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/resuming-failed-tiling-runs-from-checkpoints/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  
+<header class="site-header" role="banner">
+  <div class="container site-header__inner">
+    <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+      <img src="/assets/img/logo.svg" alt="" class="brand__mark" width="36" height="36">
+      <span class="brand__name">
+        3D Geospatial
+        <small>Digital Twin Automation</small>
+      </span>
+    </a>
+
+    <button class="theme-toggle" type="button" data-theme-toggle
+            aria-label="Switch to dark theme" title="Switch to dark theme">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4.2"/>
+        <path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/>
+      </svg>
+    </button>
+
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>
+      <span class="nav-toggle__icon" aria-hidden="true"><span></span></span>
+      Menu
+    </button>
+
+    <nav class="primary-nav" id="primary-nav" aria-label="Primary">
+      
+      <a href="https://www.3d-geospatial.com/" >
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/>
+        </svg>
+        Home
+      </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2 3 7l9 5 9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 17l9 5 9-5"/>
+            </svg>
+          
+          3D Geospatial Fundamentals
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/" aria-current="page">
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+          
+          LOD Management &amp; Optimization
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="6" cy="6" r="1.5"/><circle cx="12" cy="6" r="1.5"/><circle cx="18" cy="6" r="1.5"/>
+              <circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/>
+              <circle cx="6" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="18" cy="18" r="1.5"/>
+            </svg>
+          
+          Point Cloud &amp; Mesh Pipelines
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <path d="M12 9v4"/><path d="M12 17h.01"/>
+            </svg>
+          
+          Troubleshooting &amp; Reliability
+        </a>
+      
+    </nav>
+  </div>
+</header>
+
+
+  <main id="main">
+    
+
+
+<div class="container">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    
+      
+        <a href="https://www.3d-geospatial.com/">Home</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management Optimization Strategies</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <span class="current">Resuming Failed Tiling Runs From Checkpoints</span>
+      
+    
+  </nav>
+
+  <div class="content-page">
+    <article class="article">
+      <h1 id="resuming-failed-tiling-runs-from-checkpoints" tabindex="-1"><a class="heading-link" href="#resuming-failed-tiling-runs-from-checkpoints"><span>Resuming Failed Tiling Runs from Checkpoints</span></a></h1>
+<p>This page makes a long tiling run restartable — an append-only manifest of completed shards, atomic commits so a killed worker never leaves a half-written tile, a resume path that recomputes only what is outstanding, and a reconciliation pass that proves the resumed run is complete, for a 6,000-shard city job that takes nine hours.</p>
+<h2 id="why-you-hit-this" tabindex="-1"><a class="heading-link" href="#why-you-hit-this"><span>Why you hit this</span></a></h2>
+<p>A nine-hour job will be interrupted. A spot instance is reclaimed, the object store returns 503 for a minute, one shard hits a geometry bug and the process exits, or someone needs the machine. Without a checkpoint, the only recovery is to start again, which turns a 30-minute setback into another nine hours and makes people reluctant to run the pipeline at all.</p>
+<p>The requirement is stronger than “skip files that exist”. A shard whose tile was written but whose <code>tileset.json</code> entry was not is worse than a missing shard, because the resume will skip it and the tileset will reference nothing. The design below makes completion a single atomic fact per shard.</p>
+<h2 id="prerequisites" tabindex="-1"><a class="heading-link" href="#prerequisites"><span>Prerequisites</span></a></h2>
+<ul>
+<li>The sharded tiling run from <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/orchestrating-tiling-jobs-with-dask/">orchestrating tiling jobs with Dask</a>, or any pipeline with one unit of work per shard.</li>
+<li>Deterministic output, per <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/making-tile-output-deterministic/">making tile output deterministic</a> — a resume that produces different bytes for an already-built shard defeats the purpose.</li>
+<li>Python 3.10+; a filesystem or object store where a rename is atomic within a prefix.</li>
+</ul>
+<h2 id="step-by-step" tabindex="-1"><a class="heading-link" href="#step-by-step"><span>Step-by-Step</span></a></h2>
+<h3 id="1-make-one-shards-completion-a-single-atomic-event" tabindex="-1"><a class="heading-link" href="#1-make-one-shards-completion-a-single-atomic-event"><span>1. Make one shard’s completion a single atomic event</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> hashlib
+<span class="token keyword">import</span> json
+<span class="token keyword">import</span> os
+<span class="token keyword">import</span> shutil
+<span class="token keyword">import</span> tempfile
+<span class="token keyword">import</span> time
+<span class="token keyword">from</span> dataclasses <span class="token keyword">import</span> dataclass<span class="token punctuation">,</span> asdict
+<span class="token keyword">from</span> pathlib <span class="token keyword">import</span> Path
+
+<span class="token decorator annotation punctuation">@dataclass</span><span class="token punctuation">(</span>frozen<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+<span class="token keyword">class</span> <span class="token class-name">ShardRecord</span><span class="token punctuation">:</span>
+    shard<span class="token punctuation">:</span> <span class="token builtin">str</span>
+    provenance_hash<span class="token punctuation">:</span> <span class="token builtin">str</span>
+    content_hash<span class="token punctuation">:</span> <span class="token builtin">str</span>
+    tiles<span class="token punctuation">:</span> <span class="token builtin">int</span>
+    bytes_out<span class="token punctuation">:</span> <span class="token builtin">int</span>
+    seconds<span class="token punctuation">:</span> <span class="token builtin">float</span>
+    finished_at<span class="token punctuation">:</span> <span class="token builtin">float</span>
+
+<span class="token keyword">def</span> <span class="token function">commit_shard</span><span class="token punctuation">(</span>shard<span class="token punctuation">,</span> staging_dir<span class="token punctuation">,</span> final_root<span class="token punctuation">,</span> provenance_hash<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Write to a staging dir, then move it into place in one rename."""</span>
+    staging <span class="token operator">=</span> Path<span class="token punctuation">(</span>staging_dir<span class="token punctuation">)</span>
+    final <span class="token operator">=</span> Path<span class="token punctuation">(</span>final_root<span class="token punctuation">)</span> <span class="token operator">/</span> shard
+    payload <span class="token operator">=</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span>p <span class="token keyword">for</span> p <span class="token keyword">in</span> staging<span class="token punctuation">.</span>rglob<span class="token punctuation">(</span><span class="token string">"*"</span><span class="token punctuation">)</span> <span class="token keyword">if</span> p<span class="token punctuation">.</span>is_file<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    h <span class="token operator">=</span> hashlib<span class="token punctuation">.</span>sha256<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    <span class="token keyword">for</span> p <span class="token keyword">in</span> payload<span class="token punctuation">:</span>
+        h<span class="token punctuation">.</span>update<span class="token punctuation">(</span><span class="token builtin">str</span><span class="token punctuation">(</span>p<span class="token punctuation">.</span>relative_to<span class="token punctuation">(</span>staging<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">.</span>encode<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+        h<span class="token punctuation">.</span>update<span class="token punctuation">(</span>p<span class="token punctuation">.</span>read_bytes<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    content_hash <span class="token operator">=</span> h<span class="token punctuation">.</span>hexdigest<span class="token punctuation">(</span><span class="token punctuation">)</span>
+
+    <span class="token keyword">if</span> final<span class="token punctuation">.</span>exists<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        shutil<span class="token punctuation">.</span>rmtree<span class="token punctuation">(</span>final<span class="token punctuation">)</span>
+    final<span class="token punctuation">.</span>parent<span class="token punctuation">.</span>mkdir<span class="token punctuation">(</span>parents<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> exist_ok<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+    os<span class="token punctuation">.</span>replace<span class="token punctuation">(</span>staging<span class="token punctuation">,</span> final<span class="token punctuation">)</span>                 <span class="token comment"># atomic: the shard appears complete or not at all</span>
+    <span class="token keyword">return</span> ShardRecord<span class="token punctuation">(</span>
+        shard<span class="token operator">=</span>shard<span class="token punctuation">,</span>
+        provenance_hash<span class="token operator">=</span>provenance_hash<span class="token punctuation">,</span>
+        content_hash<span class="token operator">=</span>content_hash<span class="token punctuation">,</span>
+        tiles<span class="token operator">=</span><span class="token builtin">len</span><span class="token punctuation">(</span><span class="token punctuation">[</span>p <span class="token keyword">for</span> p <span class="token keyword">in</span> payload <span class="token keyword">if</span> p<span class="token punctuation">.</span>suffix <span class="token keyword">in</span> <span class="token punctuation">{</span><span class="token string">".glb"</span><span class="token punctuation">,</span> <span class="token string">".b3dm"</span><span class="token punctuation">}</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        bytes_out<span class="token operator">=</span><span class="token builtin">sum</span><span class="token punctuation">(</span>p<span class="token punctuation">.</span>stat<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span>st_size <span class="token keyword">for</span> p <span class="token keyword">in</span> payload<span class="token punctuation">)</span><span class="token punctuation">,</span>
+        seconds<span class="token operator">=</span><span class="token number">0.0</span><span class="token punctuation">,</span>
+        finished_at<span class="token operator">=</span>time<span class="token punctuation">.</span>time<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token punctuation">)</span>
+</code></pre></div>
+<p>Staging then renaming is the whole trick. A worker killed mid-write leaves a directory under <code>staging/</code>, which the resume ignores and deletes; it can never leave a partially populated shard under the final prefix. On object storage without directory renames, the equivalent is to write every object under a per-shard prefix and then write a single small <code>_complete</code> marker last — the marker is the atomic event.</p>
+<p>The content hash covers the shard’s whole payload in sorted order, so it is comparable across runs and is what the reconciliation pass in step 5 checks.</p>
+<h3 id="2-append-the-record-to-a-manifest-and-never-rewrite-it" tabindex="-1"><a class="heading-link" href="#2-append-the-record-to-a-manifest-and-never-rewrite-it"><span>2. Append the record to a manifest, and never rewrite it</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">class</span> <span class="token class-name">Manifest</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Append-only JSON Lines. Crash-safe because a partial last line is discarded on read."""</span>
+
+    <span class="token keyword">def</span> <span class="token function">__init__</span><span class="token punctuation">(</span>self<span class="token punctuation">,</span> path<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        self<span class="token punctuation">.</span>path <span class="token operator">=</span> Path<span class="token punctuation">(</span>path<span class="token punctuation">)</span>
+        self<span class="token punctuation">.</span>path<span class="token punctuation">.</span>parent<span class="token punctuation">.</span>mkdir<span class="token punctuation">(</span>parents<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> exist_ok<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+
+    <span class="token keyword">def</span> <span class="token function">append</span><span class="token punctuation">(</span>self<span class="token punctuation">,</span> record<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        line <span class="token operator">=</span> json<span class="token punctuation">.</span>dumps<span class="token punctuation">(</span>asdict<span class="token punctuation">(</span>record<span class="token punctuation">)</span><span class="token punctuation">,</span> sort_keys<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> separators<span class="token operator">=</span><span class="token punctuation">(</span><span class="token string">","</span><span class="token punctuation">,</span> <span class="token string">":"</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+        <span class="token keyword">with</span> <span class="token builtin">open</span><span class="token punctuation">(</span>self<span class="token punctuation">.</span>path<span class="token punctuation">,</span> <span class="token string">"a"</span><span class="token punctuation">,</span> encoding<span class="token operator">=</span><span class="token string">"utf-8"</span><span class="token punctuation">)</span> <span class="token keyword">as</span> f<span class="token punctuation">:</span>
+            f<span class="token punctuation">.</span>write<span class="token punctuation">(</span>line <span class="token operator">+</span> <span class="token string">"\n"</span><span class="token punctuation">)</span>
+            f<span class="token punctuation">.</span>flush<span class="token punctuation">(</span><span class="token punctuation">)</span>
+            os<span class="token punctuation">.</span>fsync<span class="token punctuation">(</span>f<span class="token punctuation">.</span>fileno<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>               <span class="token comment"># the record survives a power loss</span>
+
+    <span class="token keyword">def</span> <span class="token function">read</span><span class="token punctuation">(</span>self<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        done<span class="token punctuation">,</span> skipped <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token punctuation">}</span><span class="token punctuation">,</span> <span class="token number">0</span>
+        <span class="token keyword">if</span> <span class="token keyword">not</span> self<span class="token punctuation">.</span>path<span class="token punctuation">.</span>exists<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+            <span class="token keyword">return</span> done<span class="token punctuation">,</span> skipped
+        <span class="token keyword">for</span> raw <span class="token keyword">in</span> self<span class="token punctuation">.</span>path<span class="token punctuation">.</span>read_text<span class="token punctuation">(</span>encoding<span class="token operator">=</span><span class="token string">"utf-8"</span><span class="token punctuation">)</span><span class="token punctuation">.</span>splitlines<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+            <span class="token keyword">try</span><span class="token punctuation">:</span>
+                rec <span class="token operator">=</span> json<span class="token punctuation">.</span>loads<span class="token punctuation">(</span>raw<span class="token punctuation">)</span>
+            <span class="token keyword">except</span> json<span class="token punctuation">.</span>JSONDecodeError<span class="token punctuation">:</span>
+                skipped <span class="token operator">+=</span> <span class="token number">1</span>                   <span class="token comment"># truncated final line from a hard kill</span>
+                <span class="token keyword">continue</span>
+            done<span class="token punctuation">[</span>rec<span class="token punctuation">[</span><span class="token string">"shard"</span><span class="token punctuation">]</span><span class="token punctuation">]</span> <span class="token operator">=</span> rec           <span class="token comment"># a later record supersedes an earlier one</span>
+        <span class="token keyword">return</span> done<span class="token punctuation">,</span> skipped
+
+manifest <span class="token operator">=</span> Manifest<span class="token punctuation">(</span><span class="token string">"build/city/manifest.jsonl"</span><span class="token punctuation">)</span>
+completed<span class="token punctuation">,</span> partial_lines <span class="token operator">=</span> manifest<span class="token punctuation">.</span>read<span class="token punctuation">(</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span><span class="token builtin">len</span><span class="token punctuation">(</span>completed<span class="token punctuation">)</span><span class="token punctuation">}</span></span><span class="token string"> shards recorded, </span><span class="token interpolation"><span class="token punctuation">{</span>partial_lines<span class="token punctuation">}</span></span><span class="token string"> truncated line(s) ignored"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Append-only with <code>fsync</code> and one JSON object per line is the cheapest durable structure there is, and its failure mode is benign: the only record a crash can damage is the last one, and an unparsable line is simply dropped. Rewriting a whole manifest file, by contrast, can lose every record if the process dies during the write.</p>
+<p>Letting a later record supersede an earlier one means re-running a shard needs no deletion — the newest line wins, which is what you want when a shard is rebuilt after a data fix.</p>
+<figure class="diagram">
+<svg viewBox="10 32 608 212" role="img" aria-labelledby="ck-commit-t ck-commit-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="ck-commit-t">Staging, atomic rename, manifest append</title>
+  <desc id="ck-commit-d">A worker writes a shard's tiles into a per-run staging directory. When the shard is complete the directory is renamed into the final output prefix in one atomic operation, and only then is a record appended to the manifest and flushed to disk. A crash before the rename leaves only staging garbage; a crash between rename and append leaves an unrecorded but complete shard, which reconciliation adopts.</desc>
+  <rect class="svg-bg" x="10" y="32" width="608" height="212" fill="#ffffff"/>
+  <defs>
+    <marker id="ck-commit-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
+    </marker>
+  </defs>
+  <rect x="24" y="46" width="150" height="76" rx="8" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <rect x="234" y="46" width="160" height="76" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="454" y="46" width="150" height="76" rx="8" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <rect x="454" y="158" width="150" height="72" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="234" y="158" width="160" height="72" rx="8" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <g stroke="#5b6471" stroke-width="2" fill="none" marker-end="url(#ck-commit-arrow)">
+    <path d="M174 84 H232"/>
+    <path d="M394 84 H452"/>
+    <path d="M529 122 V156"/>
+    <path d="M394 194 H452" marker-end="none" stroke-dasharray="5 4"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="99" y="76">tile the shard</text><text x="99" y="94">into staging/</text><text x="99" y="112">(crash ⇒ garbage)</text>
+    <text x="314" y="70">one rename into</text><text x="314" y="88">output/&lt;shard&gt;/</text><text x="314" y="106">atomic, no partials</text>
+    <text x="529" y="70">append record:</text><text x="529" y="88">hashes, tiles,</text><text x="529" y="106">bytes, seconds</text>
+    <text x="529" y="184">fsync — survives</text><text x="529" y="202">power loss;</text><text x="529" y="220">last line may tear</text>
+    <text x="314" y="184">gap here ⇒ shard</text><text x="314" y="202">complete but</text><text x="314" y="220">unrecorded</text>
+  </g>
+</svg>
+<figcaption>The rename is the commit point; the manifest append is a record of it, and the gap between them is the only case reconciliation has to handle.</figcaption>
+</figure>
+<h3 id="3-compute-the-outstanding-work-at-start-up" tabindex="-1"><a class="heading-link" href="#3-compute-the-outstanding-work-at-start-up"><span>3. Compute the outstanding work at start-up</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">plan_run</span><span class="token punctuation">(</span>all_shards<span class="token punctuation">,</span> manifest<span class="token punctuation">,</span> provenance_hash<span class="token punctuation">,</span> force<span class="token operator">=</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Split the shard list into skip / rebuild / new, and explain each decision."""</span>
+    completed<span class="token punctuation">,</span> _ <span class="token operator">=</span> manifest<span class="token punctuation">.</span>read<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    plan <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token string">"skip"</span><span class="token punctuation">:</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token string">"stale"</span><span class="token punctuation">:</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token string">"new"</span><span class="token punctuation">:</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token string">"forced"</span><span class="token punctuation">:</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">}</span>
+    <span class="token keyword">for</span> shard <span class="token keyword">in</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span>all_shards<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        rec <span class="token operator">=</span> completed<span class="token punctuation">.</span>get<span class="token punctuation">(</span>shard<span class="token punctuation">)</span>
+        <span class="token keyword">if</span> shard <span class="token keyword">in</span> force<span class="token punctuation">:</span>
+            plan<span class="token punctuation">[</span><span class="token string">"forced"</span><span class="token punctuation">]</span><span class="token punctuation">.</span>append<span class="token punctuation">(</span>shard<span class="token punctuation">)</span>
+        <span class="token keyword">elif</span> rec <span class="token keyword">is</span> <span class="token boolean">None</span><span class="token punctuation">:</span>
+            plan<span class="token punctuation">[</span><span class="token string">"new"</span><span class="token punctuation">]</span><span class="token punctuation">.</span>append<span class="token punctuation">(</span>shard<span class="token punctuation">)</span>
+        <span class="token keyword">elif</span> rec<span class="token punctuation">[</span><span class="token string">"provenance_hash"</span><span class="token punctuation">]</span> <span class="token operator">!=</span> provenance_hash<span class="token punctuation">:</span>
+            plan<span class="token punctuation">[</span><span class="token string">"stale"</span><span class="token punctuation">]</span><span class="token punctuation">.</span>append<span class="token punctuation">(</span>shard<span class="token punctuation">)</span>                <span class="token comment"># inputs, params or tools changed</span>
+        <span class="token keyword">else</span><span class="token punctuation">:</span>
+            plan<span class="token punctuation">[</span><span class="token string">"skip"</span><span class="token punctuation">]</span><span class="token punctuation">.</span>append<span class="token punctuation">(</span>shard<span class="token punctuation">)</span>
+    plan<span class="token punctuation">[</span><span class="token string">"todo"</span><span class="token punctuation">]</span> <span class="token operator">=</span> plan<span class="token punctuation">[</span><span class="token string">"new"</span><span class="token punctuation">]</span> <span class="token operator">+</span> plan<span class="token punctuation">[</span><span class="token string">"stale"</span><span class="token punctuation">]</span> <span class="token operator">+</span> plan<span class="token punctuation">[</span><span class="token string">"forced"</span><span class="token punctuation">]</span>
+    <span class="token keyword">return</span> plan
+
+ALL <span class="token operator">=</span> <span class="token punctuation">[</span>line<span class="token punctuation">.</span>strip<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">for</span> line <span class="token keyword">in</span> Path<span class="token punctuation">(</span><span class="token string">"build/city/shards.txt"</span><span class="token punctuation">)</span><span class="token punctuation">.</span>read_text<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span>splitlines<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">if</span> line<span class="token punctuation">.</span>strip<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">]</span>
+plan <span class="token operator">=</span> plan_run<span class="token punctuation">(</span>ALL<span class="token punctuation">,</span> manifest<span class="token punctuation">,</span> provenance_hash<span class="token operator">=</span><span class="token string">"c41d9f8a2b703e55"</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token punctuation">{</span>k<span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>v<span class="token punctuation">)</span> <span class="token keyword">for</span> k<span class="token punctuation">,</span> v <span class="token keyword">in</span> plan<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Separating <em>new</em> from <em>stale</em> is what makes the resume trustworthy rather than merely fast. A shard skipped because its provenance hash matches is skipped for a stated reason — same inputs, same parameters, same tool versions — and a shard whose inputs changed is rebuilt even though its output exists. Skipping on file existence alone silently keeps stale tiles after a parameter change, which is the most common way a resumed pipeline ships wrong data.</p>
+<h3 id="4-clean-the-staging-area-before-doing-anything-else" tabindex="-1"><a class="heading-link" href="#4-clean-the-staging-area-before-doing-anything-else"><span>4. Clean the staging area before doing anything else</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">sweep_staging</span><span class="token punctuation">(</span>staging_root<span class="token punctuation">,</span> max_age_s<span class="token operator">=</span><span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Remove leftovers from the interrupted run. Nothing here is ever valid output."""</span>
+    removed<span class="token punctuation">,</span> kept <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    root <span class="token operator">=</span> Path<span class="token punctuation">(</span>staging_root<span class="token punctuation">)</span>
+    <span class="token keyword">if</span> <span class="token keyword">not</span> root<span class="token punctuation">.</span>exists<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"removed"</span><span class="token punctuation">:</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token string">"kept"</span><span class="token punctuation">:</span> <span class="token number">0</span><span class="token punctuation">}</span>
+    now <span class="token operator">=</span> time<span class="token punctuation">.</span>time<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    <span class="token keyword">for</span> child <span class="token keyword">in</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span>root<span class="token punctuation">.</span>iterdir<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        age <span class="token operator">=</span> now <span class="token operator">-</span> child<span class="token punctuation">.</span>stat<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span>st_mtime
+        <span class="token keyword">if</span> age <span class="token operator">>=</span> max_age_s<span class="token punctuation">:</span>
+            shutil<span class="token punctuation">.</span>rmtree<span class="token punctuation">(</span>child<span class="token punctuation">,</span> ignore_errors<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+            removed<span class="token punctuation">.</span>append<span class="token punctuation">(</span>child<span class="token punctuation">.</span>name<span class="token punctuation">)</span>
+        <span class="token keyword">else</span><span class="token punctuation">:</span>
+            kept<span class="token punctuation">.</span>append<span class="token punctuation">(</span>child<span class="token punctuation">.</span>name<span class="token punctuation">)</span>                    <span class="token comment"># another live worker owns it</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"removed"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>removed<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"kept"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>kept<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"examples"</span><span class="token punctuation">:</span> removed<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token number">3</span><span class="token punctuation">]</span><span class="token punctuation">}</span>
+
+<span class="token keyword">print</span><span class="token punctuation">(</span>sweep_staging<span class="token punctuation">(</span><span class="token string">"build/city/staging"</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>The <code>max_age_s</code> guard is there for the case where a second worker is still running — sweeping a live worker’s staging directory turns a partial failure into a total one. In a single-process resume, zero is correct; with concurrent workers, set it comfortably above the slowest shard’s runtime, or give each run its own staging prefix and sweep only your own.</p>
+<h3 id="5-reconcile-output-against-the-manifest" tabindex="-1"><a class="heading-link" href="#5-reconcile-output-against-the-manifest"><span>5. Reconcile output against the manifest</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">reconcile</span><span class="token punctuation">(</span>all_shards<span class="token punctuation">,</span> manifest<span class="token punctuation">,</span> final_root<span class="token punctuation">,</span> adopt<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Find the three inconsistencies a crash can leave, and optionally repair them."""</span>
+    completed<span class="token punctuation">,</span> _ <span class="token operator">=</span> manifest<span class="token punctuation">.</span>read<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    on_disk <span class="token operator">=</span> <span class="token punctuation">{</span>p<span class="token punctuation">.</span>name <span class="token keyword">for</span> p <span class="token keyword">in</span> Path<span class="token punctuation">(</span>final_root<span class="token punctuation">)</span><span class="token punctuation">.</span>iterdir<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">if</span> p<span class="token punctuation">.</span>is_dir<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">}</span> \
+        <span class="token keyword">if</span> Path<span class="token punctuation">(</span>final_root<span class="token punctuation">)</span><span class="token punctuation">.</span>exists<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">else</span> <span class="token builtin">set</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+    expected <span class="token operator">=</span> <span class="token builtin">set</span><span class="token punctuation">(</span>all_shards<span class="token punctuation">)</span>
+
+    report <span class="token operator">=</span> <span class="token punctuation">{</span>
+        <span class="token string">"recorded_and_present"</span><span class="token punctuation">:</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span><span class="token builtin">set</span><span class="token punctuation">(</span>completed<span class="token punctuation">)</span> <span class="token operator">&amp;</span> on_disk<span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"present_not_recorded"</span><span class="token punctuation">:</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span>on_disk <span class="token operator">-</span> <span class="token builtin">set</span><span class="token punctuation">(</span>completed<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>   <span class="token comment"># crashed after rename</span>
+        <span class="token string">"recorded_not_present"</span><span class="token punctuation">:</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span><span class="token builtin">set</span><span class="token punctuation">(</span>completed<span class="token punctuation">)</span> <span class="token operator">-</span> on_disk<span class="token punctuation">)</span><span class="token punctuation">,</span>   <span class="token comment"># deleted or wrong root</span>
+        <span class="token string">"never_built"</span><span class="token punctuation">:</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span>expected <span class="token operator">-</span> on_disk <span class="token operator">-</span> <span class="token builtin">set</span><span class="token punctuation">(</span>completed<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"unexpected"</span><span class="token punctuation">:</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span>on_disk <span class="token operator">-</span> expected<span class="token punctuation">)</span><span class="token punctuation">,</span>                   <span class="token comment"># stale shard, schema changed</span>
+    <span class="token punctuation">}</span>
+    <span class="token keyword">if</span> adopt<span class="token punctuation">:</span>
+        adopted <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+        <span class="token keyword">for</span> shard <span class="token keyword">in</span> report<span class="token punctuation">[</span><span class="token string">"present_not_recorded"</span><span class="token punctuation">]</span><span class="token punctuation">:</span>
+            rec <span class="token operator">=</span> rehash_existing<span class="token punctuation">(</span>shard<span class="token punctuation">,</span> final_root<span class="token punctuation">)</span>
+            manifest<span class="token punctuation">.</span>append<span class="token punctuation">(</span>rec<span class="token punctuation">)</span>
+            adopted<span class="token punctuation">.</span>append<span class="token punctuation">(</span>shard<span class="token punctuation">)</span>
+        report<span class="token punctuation">[</span><span class="token string">"adopted"</span><span class="token punctuation">]</span> <span class="token operator">=</span> adopted
+    <span class="token keyword">return</span> report
+
+<span class="token keyword">def</span> <span class="token function">rehash_existing</span><span class="token punctuation">(</span>shard<span class="token punctuation">,</span> final_root<span class="token punctuation">,</span> provenance_hash<span class="token operator">=</span><span class="token string">"unknown"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    d <span class="token operator">=</span> Path<span class="token punctuation">(</span>final_root<span class="token punctuation">)</span> <span class="token operator">/</span> shard
+    files <span class="token operator">=</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span>p <span class="token keyword">for</span> p <span class="token keyword">in</span> d<span class="token punctuation">.</span>rglob<span class="token punctuation">(</span><span class="token string">"*"</span><span class="token punctuation">)</span> <span class="token keyword">if</span> p<span class="token punctuation">.</span>is_file<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    h <span class="token operator">=</span> hashlib<span class="token punctuation">.</span>sha256<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    <span class="token keyword">for</span> p <span class="token keyword">in</span> files<span class="token punctuation">:</span>
+        h<span class="token punctuation">.</span>update<span class="token punctuation">(</span><span class="token builtin">str</span><span class="token punctuation">(</span>p<span class="token punctuation">.</span>relative_to<span class="token punctuation">(</span>d<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">.</span>encode<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+        h<span class="token punctuation">.</span>update<span class="token punctuation">(</span>p<span class="token punctuation">.</span>read_bytes<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> ShardRecord<span class="token punctuation">(</span>shard<span class="token punctuation">,</span> provenance_hash<span class="token punctuation">,</span> h<span class="token punctuation">.</span>hexdigest<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                       <span class="token builtin">len</span><span class="token punctuation">(</span><span class="token punctuation">[</span>p <span class="token keyword">for</span> p <span class="token keyword">in</span> files <span class="token keyword">if</span> p<span class="token punctuation">.</span>suffix <span class="token keyword">in</span> <span class="token punctuation">{</span><span class="token string">".glb"</span><span class="token punctuation">,</span> <span class="token string">".b3dm"</span><span class="token punctuation">}</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                       <span class="token builtin">sum</span><span class="token punctuation">(</span>p<span class="token punctuation">.</span>stat<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span>st_size <span class="token keyword">for</span> p <span class="token keyword">in</span> files<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">0.0</span><span class="token punctuation">,</span> time<span class="token punctuation">.</span>time<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+
+report <span class="token operator">=</span> reconcile<span class="token punctuation">(</span>ALL<span class="token punctuation">,</span> manifest<span class="token punctuation">,</span> <span class="token string">"build/city/output"</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token punctuation">{</span>k<span class="token punctuation">:</span> <span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>v<span class="token punctuation">)</span> <span class="token keyword">if</span> <span class="token builtin">isinstance</span><span class="token punctuation">(</span>v<span class="token punctuation">,</span> <span class="token builtin">list</span><span class="token punctuation">)</span> <span class="token keyword">else</span> v<span class="token punctuation">)</span> <span class="token keyword">for</span> k<span class="token punctuation">,</span> v <span class="token keyword">in</span> report<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p><code>present_not_recorded</code> is the gap in the diagram above: the rename succeeded and the process died before the append. Adopting those shards by re-hashing them is cheap and correct — the output is complete by construction, because the rename only happens once it is. Setting <code>adopt=False</code> and rebuilding them instead is also defensible and costs one shard’s work.</p>
+<p><code>recorded_not_present</code> always means something outside the pipeline removed output, and the right response is to drop those records and rebuild, never to trust the manifest over the disk.</p>
+<figure class="diagram">
+<svg viewBox="6 2 728 244" role="img" aria-labelledby="ck-recon-t ck-recon-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="ck-recon-t">Reconciling the manifest against the output</title>
+  <desc id="ck-recon-d">Two overlapping sets. Shards recorded in the manifest and shards present on disk. The overlap is healthy and is skipped. Present but not recorded means the run crashed between the rename and the append, and those shards are adopted by re-hashing. Recorded but not present means output was deleted, and those records are dropped so the shards rebuild. Outside both sets are shards that were never built.</desc>
+  <rect class="svg-bg" x="6" y="2" width="728" height="244" fill="#ffffff"/>
+  <rect x="20" y="16" width="700" height="216" rx="10" fill="#ffffff" stroke="#e6e0d4" stroke-width="1.5"/>
+  <circle cx="290" cy="120" r="94" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <circle cx="430" cy="120" r="94" fill="#eef5e9" fill-opacity="0.75" stroke="#4f7a4d" stroke-width="2"/>
+  <g fill="#15384a" font-size="12.5" text-anchor="middle">
+    <text x="205" y="112">recorded,</text><text x="205" y="130">not present:</text><text x="205" y="148">drop &amp; rebuild</text>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="360" y="112">both:</text><text x="360" y="130">skip</text>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="518" y="112">present, not</text><text x="518" y="130">recorded:</text><text x="518" y="148">adopt by rehash</text>
+  </g>
+  <text x="290" y="44" fill="#1f6b8a" font-size="13" text-anchor="middle">manifest records</text>
+  <text x="470" y="44" fill="#1f2937" font-size="13" text-anchor="middle">shards on disk</text>
+  <text x="640" y="206" fill="#5b6471" font-size="12.5" text-anchor="middle">outside both:</text>
+  <text x="640" y="222" fill="#5b6471" font-size="12.5" text-anchor="middle">never built</text>
+  <text x="96" y="206" fill="#5b6471" font-size="12.5" text-anchor="middle">every shard in</text>
+  <text x="96" y="222" fill="#5b6471" font-size="12.5" text-anchor="middle">shards.txt</text>
+</svg>
+<figcaption>Four regions, four fixed responses — and a resume that starts by naming which region every shard is in.</figcaption>
+</figure>
+<figure class="diagram">
+<svg viewBox="4 6 732 278" role="img" aria-labelledby="ck-states-t ck-states-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="ck-states-t">What each shard state means on resume</title>
+  <desc id="ck-states-d">A table of five shard states and the resume action for each. A shard with a manifest record and matching provenance is skipped. One with a record but a changed provenance hash is rebuilt because its inputs moved. One present on disk with no record is adopted by re-hashing. One recorded but missing from disk is rebuilt because something deleted the output. One in the failures file is left alone until the bug is fixed and it is forced.</desc>
+  <rect class="svg-bg" x="4" y="6" width="732" height="278" fill="#ffffff"/>
+  <g stroke-width="1.5">
+    <rect x="18" y="20" width="212" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="230" y="20" width="108" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="338" y="20" width="100" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="438" y="20" width="284" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="18" y="54" width="212" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="230" y="54" width="108" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="338" y="54" width="100" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="438" y="54" width="284" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="18" y="88" width="212" height="34" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="230" y="88" width="108" height="34" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="338" y="88" width="100" height="34" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="438" y="88" width="284" height="34" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="18" y="122" width="212" height="34" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="230" y="122" width="108" height="34" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="338" y="122" width="100" height="34" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="438" y="122" width="284" height="34" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="18" y="156" width="212" height="34" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="230" y="156" width="108" height="34" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="338" y="156" width="100" height="34" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="438" y="156" width="284" height="34" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="18" y="190" width="212" height="34" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="230" y="190" width="108" height="34" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="338" y="190" width="100" height="34" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="438" y="190" width="284" height="34" fill="#f7dfdc" stroke="#b0413e"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="124" y="42">state</text><text x="284" y="42">manifest</text><text x="388" y="42">on disk</text><text x="580" y="42">resume action</text>
+    <text x="124" y="76">provenance matches</text><text x="284" y="76">yes</text><text x="388" y="76">yes</text><text x="580" y="76">skip</text>
+    <text x="124" y="110">provenance changed</text><text x="284" y="110">yes</text><text x="388" y="110">yes</text><text x="580" y="110">rebuild — inputs moved</text>
+    <text x="124" y="144">complete, unrecorded</text><text x="284" y="144">no</text><text x="388" y="144">yes</text><text x="580" y="144">adopt by re-hashing</text>
+    <text x="124" y="178">recorded, missing</text><text x="284" y="178">yes</text><text x="388" y="178">no</text><text x="580" y="178">drop record, rebuild</text>
+    <text x="124" y="212">in failures.jsonl</text><text x="284" y="212">no</text><text x="388" y="212">no</text><text x="580" y="212">leave until fixed, then force</text>
+  </g>
+  <text x="20" y="244" fill="#1f2937" font-size="12.5">Five states, five fixed responses — the resume names the state before it does anything.</text>
+  <text x="20" y="266" fill="#5b6471" font-size="12">The third row is the crash window between the atomic rename and the manifest append.</text>
+</svg>
+<figcaption>Every shard falls into exactly one of these five states, and each has a single correct response.</figcaption>
+</figure>
+<h3 id="6-run-it-and-checkpoint-the-aggregate-too" tabindex="-1"><a class="heading-link" href="#6-run-it-and-checkpoint-the-aggregate-too"><span>6. Run it, and checkpoint the aggregate too</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">resumable_run</span><span class="token punctuation">(</span>all_shards<span class="token punctuation">,</span> provenance_hash<span class="token punctuation">,</span> build_fn<span class="token punctuation">,</span>
+                  root<span class="token operator">=</span><span class="token string">"build/city"</span><span class="token punctuation">,</span> force<span class="token operator">=</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    manifest <span class="token operator">=</span> Manifest<span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>root<span class="token punctuation">}</span></span><span class="token string">/manifest.jsonl"</span></span><span class="token punctuation">)</span>
+    sweep_staging<span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>root<span class="token punctuation">}</span></span><span class="token string">/staging"</span></span><span class="token punctuation">)</span>
+    recon <span class="token operator">=</span> reconcile<span class="token punctuation">(</span>all_shards<span class="token punctuation">,</span> manifest<span class="token punctuation">,</span> <span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>root<span class="token punctuation">}</span></span><span class="token string">/output"</span></span><span class="token punctuation">)</span>
+    plan <span class="token operator">=</span> plan_run<span class="token punctuation">(</span>all_shards<span class="token punctuation">,</span> manifest<span class="token punctuation">,</span> provenance_hash<span class="token punctuation">,</span> force<span class="token operator">=</span>force<span class="token punctuation">)</span>
+
+    started <span class="token operator">=</span> time<span class="token punctuation">.</span>time<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    <span class="token keyword">for</span> i<span class="token punctuation">,</span> shard <span class="token keyword">in</span> <span class="token builtin">enumerate</span><span class="token punctuation">(</span>plan<span class="token punctuation">[</span><span class="token string">"todo"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> start<span class="token operator">=</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        staging <span class="token operator">=</span> tempfile<span class="token punctuation">.</span>mkdtemp<span class="token punctuation">(</span>prefix<span class="token operator">=</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>shard<span class="token punctuation">}</span></span><span class="token string">-"</span></span><span class="token punctuation">,</span> <span class="token builtin">dir</span><span class="token operator">=</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>root<span class="token punctuation">}</span></span><span class="token string">/staging"</span></span><span class="token punctuation">)</span>
+        t0 <span class="token operator">=</span> time<span class="token punctuation">.</span>time<span class="token punctuation">(</span><span class="token punctuation">)</span>
+        <span class="token keyword">try</span><span class="token punctuation">:</span>
+            build_fn<span class="token punctuation">(</span>shard<span class="token punctuation">,</span> staging<span class="token punctuation">)</span>
+            rec <span class="token operator">=</span> commit_shard<span class="token punctuation">(</span>shard<span class="token punctuation">,</span> staging<span class="token punctuation">,</span> <span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>root<span class="token punctuation">}</span></span><span class="token string">/output"</span></span><span class="token punctuation">,</span> provenance_hash<span class="token punctuation">)</span>
+            manifest<span class="token punctuation">.</span>append<span class="token punctuation">(</span>ShardRecord<span class="token punctuation">(</span><span class="token operator">**</span><span class="token punctuation">{</span><span class="token operator">**</span>asdict<span class="token punctuation">(</span>rec<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"seconds"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>time<span class="token punctuation">.</span>time<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">-</span> t0<span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+        <span class="token keyword">except</span> Exception <span class="token keyword">as</span> exc<span class="token punctuation">:</span>                        <span class="token comment"># one bad shard must not end the run</span>
+            shutil<span class="token punctuation">.</span>rmtree<span class="token punctuation">(</span>staging<span class="token punctuation">,</span> ignore_errors<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+            <span class="token keyword">with</span> <span class="token builtin">open</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>root<span class="token punctuation">}</span></span><span class="token string">/failures.jsonl"</span></span><span class="token punctuation">,</span> <span class="token string">"a"</span><span class="token punctuation">,</span> encoding<span class="token operator">=</span><span class="token string">"utf-8"</span><span class="token punctuation">)</span> <span class="token keyword">as</span> f<span class="token punctuation">:</span>
+                f<span class="token punctuation">.</span>write<span class="token punctuation">(</span>json<span class="token punctuation">.</span>dumps<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"shard"</span><span class="token punctuation">:</span> shard<span class="token punctuation">,</span> <span class="token string">"error"</span><span class="token punctuation">:</span> <span class="token builtin">repr</span><span class="token punctuation">(</span>exc<span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token number">400</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+                                    <span class="token string">"at"</span><span class="token punctuation">:</span> time<span class="token punctuation">.</span>time<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">}</span><span class="token punctuation">)</span> <span class="token operator">+</span> <span class="token string">"\n"</span><span class="token punctuation">)</span>
+        <span class="token keyword">if</span> i <span class="token operator">%</span> <span class="token number">50</span> <span class="token operator">==</span> <span class="token number">0</span><span class="token punctuation">:</span>
+            done <span class="token operator">=</span> i <span class="token operator">/</span> <span class="token builtin">len</span><span class="token punctuation">(</span>plan<span class="token punctuation">[</span><span class="token string">"todo"</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+            eta <span class="token operator">=</span> <span class="token punctuation">(</span>time<span class="token punctuation">.</span>time<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">-</span> started<span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token builtin">max</span><span class="token punctuation">(</span>done<span class="token punctuation">,</span> <span class="token number">1e-9</span><span class="token punctuation">)</span> <span class="token operator">*</span> <span class="token punctuation">(</span><span class="token number">1</span> <span class="token operator">-</span> done<span class="token punctuation">)</span>
+            <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>i<span class="token punctuation">}</span></span><span class="token string">/</span><span class="token interpolation"><span class="token punctuation">{</span><span class="token builtin">len</span><span class="token punctuation">(</span>plan<span class="token punctuation">[</span><span class="token string">'todo'</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">}</span></span><span class="token string"> shards, eta </span><span class="token interpolation"><span class="token punctuation">{</span>eta<span class="token operator">/</span><span class="token number">60</span><span class="token punctuation">:</span><span class="token format-spec">.0f</span><span class="token punctuation">}</span></span><span class="token string"> min"</span></span><span class="token punctuation">)</span>
+
+    final<span class="token punctuation">,</span> _ <span class="token operator">=</span> manifest<span class="token punctuation">.</span>read<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"reconciled"</span><span class="token punctuation">:</span> <span class="token punctuation">{</span>k<span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>v<span class="token punctuation">)</span> <span class="token keyword">for</span> k<span class="token punctuation">,</span> v <span class="token keyword">in</span> recon<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">if</span> <span class="token builtin">isinstance</span><span class="token punctuation">(</span>v<span class="token punctuation">,</span> <span class="token builtin">list</span><span class="token punctuation">)</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+            <span class="token string">"skipped"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>plan<span class="token punctuation">[</span><span class="token string">"skip"</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"built"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>plan<span class="token punctuation">[</span><span class="token string">"todo"</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"recorded_total"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>final<span class="token punctuation">)</span><span class="token punctuation">}</span>
+</code></pre></div>
+<p>Catching the per-shard exception and logging it to <code>failures.jsonl</code> rather than propagating is what turns one geometry bug into a 5,999-shard success plus a list to fix, instead of an aborted run. The failures file is a work list for the next resume: pass those shard keys as <code>force</code> once the bug is fixed.</p>
+<p>Writing the tileset that references these shards belongs <em>after</em> the loop, built from the manifest, so it always describes what actually exists.</p>
+<h2 id="expected-output-verification" tabindex="-1"><a class="heading-link" href="#expected-output-verification"><span>Expected Output &amp; Verification</span></a></h2>
+<div class="codeblock" data-lang="text"><div class="codeblock__bar"><span class="codeblock__lang">text</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-text" tabindex="0" role="group" aria-label="text code sample"><code class="language-text">4127 shards recorded, 1 truncated line(s) ignored
+{'removed': 3, 'kept': 0, 'examples': ['120210233010-a1b2', '120210233011-cd34', '120210233012-ef56']}
+{'recorded_and_present': 4127, 'present_not_recorded': 2, 'recorded_not_present': 0,
+ 'never_built': 1871, 'unexpected': 0, 'adopted': 2}
+{'skip': 4129, 'stale': 0, 'new': 1871, 'forced': 0, 'todo': 1871}
+50/1871 shards, eta 168 min
+...
+{'reconciled': {...}, 'skipped': 4129, 'built': 1871, 'recorded_total': 6000}
+</code></pre></div>
+<p>The resume skipped 4,129 shards — 4,127 from the manifest plus the 2 adopted by reconciliation — and rebuilt only the 1,871 that had never run. Three staging directories were swept, which is the signature of a run killed with three workers in flight, and one manifest line was torn by the kill and correctly ignored.</p>
+<p>Verify that the resumed result is identical to what an uninterrupted run would have produced:</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">resume_equivalence_check</span><span class="token punctuation">(</span>all_shards<span class="token punctuation">,</span> root_resumed<span class="token punctuation">,</span> root_clean<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Every shard's content hash must match between the resumed and the from-scratch run."""</span>
+    a<span class="token punctuation">,</span> _ <span class="token operator">=</span> Manifest<span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>root_resumed<span class="token punctuation">}</span></span><span class="token string">/manifest.jsonl"</span></span><span class="token punctuation">)</span><span class="token punctuation">.</span>read<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    b<span class="token punctuation">,</span> _ <span class="token operator">=</span> Manifest<span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>root_clean<span class="token punctuation">}</span></span><span class="token string">/manifest.jsonl"</span></span><span class="token punctuation">)</span><span class="token punctuation">.</span>read<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    only_a <span class="token operator">=</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span><span class="token builtin">set</span><span class="token punctuation">(</span>a<span class="token punctuation">)</span> <span class="token operator">-</span> <span class="token builtin">set</span><span class="token punctuation">(</span>b<span class="token punctuation">)</span><span class="token punctuation">)</span>
+    only_b <span class="token operator">=</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span><span class="token builtin">set</span><span class="token punctuation">(</span>b<span class="token punctuation">)</span> <span class="token operator">-</span> <span class="token builtin">set</span><span class="token punctuation">(</span>a<span class="token punctuation">)</span><span class="token punctuation">)</span>
+    mismatched <span class="token operator">=</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span>s <span class="token keyword">for</span> s <span class="token keyword">in</span> <span class="token builtin">set</span><span class="token punctuation">(</span>a<span class="token punctuation">)</span> <span class="token operator">&amp;</span> <span class="token builtin">set</span><span class="token punctuation">(</span>b<span class="token punctuation">)</span>
+                        <span class="token keyword">if</span> a<span class="token punctuation">[</span>s<span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token string">"content_hash"</span><span class="token punctuation">]</span> <span class="token operator">!=</span> b<span class="token punctuation">[</span>s<span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token string">"content_hash"</span><span class="token punctuation">]</span>
+                        <span class="token keyword">and</span> a<span class="token punctuation">[</span>s<span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token string">"provenance_hash"</span><span class="token punctuation">]</span> <span class="token operator">!=</span> <span class="token string">"unknown"</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"shards"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>b<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"only_in_resumed"</span><span class="token punctuation">:</span> only_a<span class="token punctuation">,</span> <span class="token string">"only_in_clean"</span><span class="token punctuation">:</span> only_b<span class="token punctuation">,</span>
+            <span class="token string">"content_mismatches"</span><span class="token punctuation">:</span> mismatched<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token number">5</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token string">"equivalent"</span><span class="token punctuation">:</span> <span class="token keyword">not</span> <span class="token punctuation">(</span>only_a <span class="token keyword">or</span> only_b <span class="token keyword">or</span> mismatched<span class="token punctuation">)</span><span class="token punctuation">}</span>
+
+<span class="token keyword">print</span><span class="token punctuation">(</span>resume_equivalence_check<span class="token punctuation">(</span>ALL<span class="token punctuation">,</span> <span class="token string">"build/city"</span><span class="token punctuation">,</span> <span class="token string">"build/city_clean"</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>This is the test that matters, and it is worth running once on a 200-shard subset rather than the city: kill the run at a random point, resume it, and compare against a clean build. Any mismatch means either the output is not deterministic or a shard’s completion is not atomic, and both are worth finding on a subset rather than in production.</p>
+<p>Also verify that changing a parameter invalidates the right shards:</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">staleness_check</span><span class="token punctuation">(</span>all_shards<span class="token punctuation">,</span> manifest<span class="token punctuation">,</span> old_hash<span class="token punctuation">,</span> new_hash<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    p_same <span class="token operator">=</span> plan_run<span class="token punctuation">(</span>all_shards<span class="token punctuation">,</span> manifest<span class="token punctuation">,</span> old_hash<span class="token punctuation">)</span>
+    p_changed <span class="token operator">=</span> plan_run<span class="token punctuation">(</span>all_shards<span class="token punctuation">,</span> manifest<span class="token punctuation">,</span> new_hash<span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"skipped_when_unchanged"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>p_same<span class="token punctuation">[</span><span class="token string">"skip"</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"rebuilt_when_changed"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>p_changed<span class="token punctuation">[</span><span class="token string">"stale"</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token operator">+</span> <span class="token builtin">len</span><span class="token punctuation">(</span>p_changed<span class="token punctuation">[</span><span class="token string">"new"</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"correct"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>p_same<span class="token punctuation">[</span><span class="token string">"todo"</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token number">0</span> <span class="token keyword">and</span> <span class="token builtin">len</span><span class="token punctuation">(</span>p_changed<span class="token punctuation">[</span><span class="token string">"skip"</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token number">0</span><span class="token punctuation">}</span>
+
+<span class="token keyword">print</span><span class="token punctuation">(</span>staleness_check<span class="token punctuation">(</span>ALL<span class="token punctuation">,</span> manifest<span class="token punctuation">,</span> <span class="token string">"c41d9f8a2b703e55"</span><span class="token punctuation">,</span> <span class="token string">"9e71b04c3d8a2f16"</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>A resume that skips everything after a parameter change is the dangerous failure, because it succeeds quickly and ships the old tiles. This check asserts the two ends of the behaviour: nothing rebuilt when nothing changed, everything rebuilt when the provenance changed.</p>
+<h2 id="performance-notes" tabindex="-1"><a class="heading-link" href="#performance-notes"><span>Performance Notes</span></a></h2>
+<ul>
+<li><strong>Manifest reads are trivial</strong> — 6,000 JSON Lines records parse in well under a second, so re-reading on every resume costs nothing.</li>
+<li><strong><code>fsync</code> per record costs about a millisecond</strong> on SSD, against seconds to minutes per shard. Never batch it away; batching is how you lose the last minutes of a run.</li>
+<li><strong>Re-hashing on adoption is I/O-bound</strong> and only touches the handful of shards in the gap, typically fewer than the worker count.</li>
+<li><strong>Reconciliation lists a directory with thousands of entries.</strong> On object storage that is a paginated <code>LIST</code> costing a second or two; cache the result for the run rather than calling it per shard.</li>
+<li><strong>Put staging on the same filesystem as the output</strong>, otherwise <code>os.replace</code> falls back to a copy and the commit stops being atomic and starts being slow.</li>
+</ul>
+<h2 id="common-errors" tabindex="-1"><a class="heading-link" href="#common-errors"><span>Common Errors</span></a></h2>
+<p><strong><code>OSError: [Errno 18] Invalid cross-device link</code>.</strong> Staging and output are on different mounts, so the rename cannot be atomic. Move staging under the output root.</p>
+<p><strong>The resume rebuilds everything.</strong> The provenance hash is not stable between runs — usually because it includes a timestamp, a temporary path or a run identifier. It must contain only inputs, parameters and tool versions.</p>
+<p><strong>The resume skips a shard whose source data changed.</strong> The provenance hash does not include the input file digests, only the parameters. Add the digests.</p>
+<p><strong>Manifest has two records for one shard with different hashes.</strong> Expected after a rebuild; the last line wins. If it happens within a single run, two workers were assigned the same shard — check the work-splitting.</p>
+<p><strong><code>json.JSONDecodeError</code> on a line that is not the last.</strong> Something other than the append path wrote to the manifest, or two processes appended without <code>O_APPEND</code>. Opening in <code>&quot;a&quot;</code> mode gives atomic appends for lines below the pipe buffer size; larger records need a lock.</p>
+<p><strong>Tileset references a shard that is not on disk.</strong> The tileset was written from the shard list rather than from the manifest. Build it from the manifest, after the loop.</p>
+<h2 id="frequently-asked-questions" tabindex="-1"><a class="heading-link" href="#frequently-asked-questions"><span>Frequently Asked Questions</span></a></h2>
+<h3 id="why-not-use-a-database-for-the-manifest" tabindex="-1"><a class="heading-link" href="#why-not-use-a-database-for-the-manifest"><span>Why not use a database for the manifest?</span></a></h3>
+<p>A database is a better answer once several machines write concurrently, and Postgres with a unique key on the shard is a five-line change. For a single driver process, a JSON Lines file has no service to run, no connection to lose and a recovery story you can read with <code>tail</code>.</p>
+<h3 id="should-the-failures-file-be-part-of-the-resume-plan-automatically" tabindex="-1"><a class="heading-link" href="#should-the-failures-file-be-part-of-the-resume-plan-automatically"><span>Should the failures file be part of the resume plan automatically?</span></a></h3>
+<p>No. Retrying a failed shard automatically on the next run hides a persistent bug behind a growing runtime. Surface it, fix it, then force those shards.</p>
+<h3 id="how-does-this-interact-with-a-distributed-scheduler" tabindex="-1"><a class="heading-link" href="#how-does-this-interact-with-a-distributed-scheduler"><span>How does this interact with a distributed scheduler?</span></a></h3>
+<p>The manifest and reconciliation stay in the driver; the workers only ever stage and return a record. That keeps the durable state in one place, which is what makes the resume reasoning simple.</p>
+<h2 id="related-guides" tabindex="-1"><a class="heading-link" href="#related-guides"><span>Related Guides</span></a></h2>
+<ul>
+<li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/orchestrating-tiling-jobs-with-dask/">Orchestrating Tiling Jobs with Dask</a> — the run this checkpoints</li>
+<li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/making-tile-output-deterministic/">Making Tile Output Deterministic</a> — the property a resume depends on</li>
+<li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/choosing-shard-sizes-for-city-scale-tiling/">Choosing Shard Sizes for City-Scale Tiling</a> — the unit of work being checkpointed</li>
+</ul>
+<p>Back to <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a>.</p>
+
+
+      
+      
+
+      <div class="related-nav">
+        
+
+        
+          <div>
+            <h3>Related</h3>
+            <div class="related-grid">
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/choosing-shard-sizes-for-city-scale-tiling/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Choosing Shard Sizes for City-Scale Tiling</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/making-tile-output-deterministic/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Making Tile Output Deterministic</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/merging-shard-tilesets-into-a-root-tileset/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Merging Shard Tilesets into a Root Tileset</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/orchestrating-tiling-jobs-with-dask/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Orchestrating Tiling Jobs with Dask</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/parallel-b3dm-encoding-with-process-pools/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Parallel b3dm Encoding with Process Pools</span>
+                </a>
+              
+            </div>
+          </div>
+        
+      </div>
+    </article>
+
+    
+    <aside class="toc" aria-label="On this page" data-toc hidden>
+      <h4>On this page</h4>
+      <ul></ul>
+    </aside>
+  </div>
+</div>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+  <div class="container site-footer__inner">
+    <div class="site-footer__brand">
+      <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+        <img src="/assets/img/logo-mark.svg" alt="" class="brand__mark" width="36" height="36">
+        <span class="brand__name">
+          3D Geospatial
+          <small>Digital Twin Automation</small>
+        </span>
+      </a>
+      <p>Engineering-grade guides on point cloud processing, mesh pipelines, LOD strategies, and CI/CD automation for digital twin platforms.</p>
+      <a class="footer-social" href="https://github.com/3d-geospatial" aria-label="3D Geospatial on GitHub" rel="noopener" target="_blank">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+          <path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.53-1.34-1.3-1.7-1.3-1.7-1.06-.72.08-.71.08-.71 1.17.08 1.79 1.2 1.79 1.2 1.04 1.79 2.73 1.27 3.4.97.1-.75.4-1.27.73-1.56-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.19-3.08-.12-.3-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.75.11 3.05.74.8 1.19 1.83 1.19 3.08 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.07.78 2.15v3.18c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5Z"/>
+        </svg>
+        <span>GitHub</span>
+      </a>
+    </div>
+
+    <div class="site-footer__col">
+      <h4>Sections</h4>
+      <ul>
+        <li><a href="https://www.3d-geospatial.com/">Home</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management &amp; Optimization</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/">Point Cloud &amp; Mesh Pipelines</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/">Troubleshooting &amp; Reliability</a></li>
+        
+      </ul>
+    </div>
+
+    
+      <div class="site-footer__col">
+        <h4>3D Geospatial Fundamentals</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/">3D Format Standards Comparison</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/">BIM and IFC Georeferencing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/">CityGML and CityJSON Processing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems for 3D Assets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/">Digital Elevation Model Workflows</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/">Spatial Indexing and Tiling Schemes for 3D Data</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>LOD Management &amp; Optimization</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/">Automated Tile Generation for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/">Cesium ion Upload Automation for 3D Tilesets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/">glTF LOD Generation With Draco Compression</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/">Streaming Sync Patterns for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/">Tileset Metadata and 3D Tiles Next</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/">Vector Overlays on 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Point Cloud &amp; Mesh Pipelines</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/">Automated Mesh Decimation for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/">Change Detection Between LiDAR Scan Epochs</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/">CI/CD Automation for Spatial Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">LiDAR Classification and Ground Extraction</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/photogrammetry-processing-pipelines/">Photogrammetry Processing Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/">Point Cloud Filtering Techniques</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/">Surface Reconstruction for Geospatial Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/">Texture Mapping Workflows for Digital Twins</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Troubleshooting &amp; Reliability</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/">Cross-Section Failure Modes in Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/">Data Validation &amp; QA Gates for 3D Tiles</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/">Performance Profiling and Benchmarking</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/">Pipeline Observability and Monitoring</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/">Streaming &amp; Runtime Diagnostics for 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+  </div>
+  <div class="container site-footer__bottom">
+    <span>© 2026 3D Geospatial &amp; Digital Twin Automation</span>
+    <span>Built with Eleventy · PWA-enabled</span>
+  </div>
+</footer>
+
+
+  <script src="/assets/js/site.js?v=b99aa9f971" defer></script>
+  
+</body>
+</html>

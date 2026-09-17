@@ -1,0 +1,775 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <title>Aggregating Sensor Data with H3 Cells — 3D Geospatial</title>
+  <meta name="description" content="Bin twin sensor readings into H3 hexagons: choose a resolution, aggregate per cell and hour, handle the non-nesting hierarchy and render the result over 3D">
+  <meta name="keywords" content="3D geospatial, digital twin, point cloud, mesh pipeline, LOD, 3D Tiles, Cesium, PDAL, Open3D, Python, CI/CD">
+  <meta name="author" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta name="theme-color" content="#1f6b8a" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f171d" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+
+  
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem("theme");
+        var theme = (stored === "dark" || stored === "light") ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    })();
+  </script>
+  <meta name="generator" content="Eleventy">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="googlebot" content="index,follow,max-image-preview:large">
+
+  
+  <link rel="canonical" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/aggregating-sensor-data-with-h3-cells/">
+  <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">
+
+  
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/icon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+
+  
+  <link rel="apple-touch-icon" href="/assets/img/icon-180.png">
+  <link rel="mask-icon" href="/assets/img/logo.svg" color="#1f6b8a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="3D Geospatial">
+  <meta name="application-name" content="3D Geospatial">
+
+  
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Aggregating Sensor Data with H3 Cells — 3D Geospatial">
+  <meta property="og:description" content="Bin twin sensor readings into H3 hexagons: choose a resolution, aggregate per cell and hour, handle the non-nesting hierarchy and render the result over 3D">
+  <meta property="og:url" content="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/aggregating-sensor-data-with-h3-cells/">
+  <meta property="og:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+  <meta property="og:site_name" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta property="og:locale" content="en_US">
+  
+  <meta property="article:published_time" content="2026-09-17T23:36:56.450Z">
+  <meta property="article:modified_time" content="2026-09-17T23:36:56.450Z">
+  <meta property="article:publisher" content="https://www.3d-geospatial.com/">
+  
+
+  
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Aggregating Sensor Data with H3 Cells — 3D Geospatial">
+  <meta name="twitter:description" content="Bin twin sensor readings into H3 hexagons: choose a resolution, aggregate per cell and hour, handle the non-nesting hierarchy and render the result over 3D">
+  <meta name="twitter:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta name="twitter:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+
+  
+  <link rel="preload" href="/assets/css/styles.css?v=8c46394d6c" as="style">
+  
+
+  <link rel="stylesheet" href="/assets/css/styles.css?v=8c46394d6c">
+
+  
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.3d-geospatial.com/#organization",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "url": "https://www.3d-geospatial.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/icon-512.png",
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://www.3d-geospatial.com/#website",
+      "url": "https://www.3d-geospatial.com/",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "description": "Build reliable 3D spatial data pipelines for digital twins — point clouds, meshes, LOD strategies, Python processing, and CI/CD automation.",
+      "inLanguage": "en",
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      }
+    },
+    {
+      "@type": "TechArticle",
+      "@id": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/aggregating-sensor-data-with-h3-cells/#article",
+      "isPartOf": {
+        "@id": "https://www.3d-geospatial.com/#website"
+      },
+      "headline": "Aggregating Sensor Data with H3 Cells",
+      "name": "Aggregating Sensor Data with H3 Cells",
+      "description": "Bin twin sensor readings into H3 hexagons: choose a resolution, aggregate per cell and hour, handle the non-nesting hierarchy and render the result over 3D",
+      "url": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/aggregating-sensor-data-with-h3-cells/",
+      "mainEntityOfPage": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/aggregating-sensor-data-with-h3-cells/",
+      "inLanguage": "en",
+      "datePublished": "2026-09-17T23:36:56.450Z",
+      "dateModified": "2026-09-17T23:36:56.450Z",
+      "author": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "image": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/og-cover.png",
+        "width": 1200,
+        "height": 630
+      },
+      "breadcrumb": {
+        "@id": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/aggregating-sensor-data-with-h3-cells/#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/aggregating-sensor-data-with-h3-cells/#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://www.3d-geospatial.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "3D Geospatial Fundamentals For Digital Twins",
+          "item": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Spatial Indexing And Tiling Schemes",
+          "item": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "name": "Aggregating Sensor Data With H3 Cells",
+          "item": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/aggregating-sensor-data-with-h3-cells/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  
+<header class="site-header" role="banner">
+  <div class="container site-header__inner">
+    <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+      <img src="/assets/img/logo.svg" alt="" class="brand__mark" width="36" height="36">
+      <span class="brand__name">
+        3D Geospatial
+        <small>Digital Twin Automation</small>
+      </span>
+    </a>
+
+    <button class="theme-toggle" type="button" data-theme-toggle
+            aria-label="Switch to dark theme" title="Switch to dark theme">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4.2"/>
+        <path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/>
+      </svg>
+    </button>
+
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>
+      <span class="nav-toggle__icon" aria-hidden="true"><span></span></span>
+      Menu
+    </button>
+
+    <nav class="primary-nav" id="primary-nav" aria-label="Primary">
+      
+      <a href="https://www.3d-geospatial.com/" >
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/>
+        </svg>
+        Home
+      </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/" aria-current="page">
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2 3 7l9 5 9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 17l9 5 9-5"/>
+            </svg>
+          
+          3D Geospatial Fundamentals
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+          
+          LOD Management &amp; Optimization
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="6" cy="6" r="1.5"/><circle cx="12" cy="6" r="1.5"/><circle cx="18" cy="6" r="1.5"/>
+              <circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/>
+              <circle cx="6" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="18" cy="18" r="1.5"/>
+            </svg>
+          
+          Point Cloud &amp; Mesh Pipelines
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <path d="M12 9v4"/><path d="M12 17h.01"/>
+            </svg>
+          
+          Troubleshooting &amp; Reliability
+        </a>
+      
+    </nav>
+  </div>
+</header>
+
+
+  <main id="main">
+    
+
+
+<div class="container">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    
+      
+        <a href="https://www.3d-geospatial.com/">Home</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals For Digital Twins</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/">Spatial Indexing And Tiling Schemes</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <span class="current">Aggregating Sensor Data With H3 Cells</span>
+      
+    
+  </nav>
+
+  <div class="content-page">
+    <article class="article">
+      <h1 id="aggregating-sensor-data-with-h3-cells" tabindex="-1"><a class="heading-link" href="#aggregating-sensor-data-with-h3-cells"><span>Aggregating Sensor Data with H3 Cells</span></a></h1>
+<p>This page aggregates a digital twin’s sensor readings into H3 hexagonal cells — choosing a resolution from the sensor spacing rather than by habit, binning and aggregating per cell and time bucket, coarsening through the hierarchy for zoomed-out views, and rendering the result as an overlay on the tiled city, with source coordinates in EPSG:25832 converted to WGS84 for indexing.</p>
+<h2 id="why-you-hit-this" tabindex="-1"><a class="heading-link" href="#why-you-hit-this"><span>Why you hit this</span></a></h2>
+<p>A twin with ten thousand sensors — traffic counters, air quality, noise, occupancy, temperature — cannot show them as ten thousand markers, and their raw positions are not what anybody asks about. The questions are aggregate and spatial: which streets are loudest between seven and nine, where does particulate matter exceed a threshold, how does occupancy vary by district. Binning into a fixed cell system answers all of them with one aggregation, and H3’s hexagons have the property that matters for this: every neighbour is the same distance away, so a diffusion, a gradient or a neighbourhood average behaves consistently in all directions. The alternatives are compared in <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/choosing-between-s2-h3-and-geohash-for-3d-data/">choosing between S2, H3 and geohash for 3D data</a>.</p>
+<h2 id="prerequisites" tabindex="-1"><a class="heading-link" href="#prerequisites"><span>Prerequisites</span></a></h2>
+<ul>
+<li>Python 3.10+ with <code>h3&gt;=4.0</code>, <code>pandas&gt;=2.0</code>, <code>geopandas&gt;=0.14</code>, <code>pyproj&gt;=3.6</code>, <code>shapely&gt;=2.0</code>.</li>
+<li>Sensor readings with a position, a timestamp and a value. Positions in a projected CRS need converting to WGS84, because H3 indexes latitude and longitude.</li>
+<li>A sense of the sensor spacing and of the smallest area a reading should be attributed to — both feed the resolution choice.</li>
+</ul>
+<h2 id="step-by-step" tabindex="-1"><a class="heading-link" href="#step-by-step"><span>Step-by-Step</span></a></h2>
+<h3 id="1-choose-the-resolution-from-the-sensor-spacing" tabindex="-1"><a class="heading-link" href="#1-choose-the-resolution-from-the-sensor-spacing"><span>1. Choose the resolution from the sensor spacing</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> h3
+
+<span class="token keyword">def</span> <span class="token function">resolution_table</span><span class="token punctuation">(</span>resolutions<span class="token operator">=</span><span class="token builtin">range</span><span class="token punctuation">(</span><span class="token number">7</span><span class="token punctuation">,</span> <span class="token number">14</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    rows <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    <span class="token keyword">for</span> r <span class="token keyword">in</span> resolutions<span class="token punctuation">:</span>
+        area_m2 <span class="token operator">=</span> h3<span class="token punctuation">.</span>average_hexagon_area<span class="token punctuation">(</span>r<span class="token punctuation">,</span> unit<span class="token operator">=</span><span class="token string">"m^2"</span><span class="token punctuation">)</span>
+        edge_m <span class="token operator">=</span> h3<span class="token punctuation">.</span>average_hexagon_edge_length<span class="token punctuation">(</span>r<span class="token punctuation">,</span> unit<span class="token operator">=</span><span class="token string">"m"</span><span class="token punctuation">)</span>
+        rows<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"resolution"</span><span class="token punctuation">:</span> r<span class="token punctuation">,</span>
+                     <span class="token string">"avg_area_m2"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>area_m2<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                     <span class="token string">"avg_edge_m"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>edge_m<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                     <span class="token string">"cells_per_km2"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token number">1e6</span> <span class="token operator">/</span> area_m2<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> rows
+
+<span class="token keyword">for</span> row <span class="token keyword">in</span> resolution_table<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"res </span><span class="token interpolation"><span class="token punctuation">{</span>row<span class="token punctuation">[</span><span class="token string">'resolution'</span><span class="token punctuation">]</span><span class="token punctuation">:</span><span class="token format-spec">>2</span><span class="token punctuation">}</span></span><span class="token string">  area </span><span class="token interpolation"><span class="token punctuation">{</span>row<span class="token punctuation">[</span><span class="token string">'avg_area_m2'</span><span class="token punctuation">]</span><span class="token punctuation">:</span><span class="token format-spec">>12,.1f</span><span class="token punctuation">}</span></span><span class="token string"> m²  "</span></span>
+          <span class="token string-interpolation"><span class="token string">f"edge </span><span class="token interpolation"><span class="token punctuation">{</span>row<span class="token punctuation">[</span><span class="token string">'avg_edge_m'</span><span class="token punctuation">]</span><span class="token punctuation">:</span><span class="token format-spec">>8.1f</span><span class="token punctuation">}</span></span><span class="token string"> m  </span><span class="token interpolation"><span class="token punctuation">{</span>row<span class="token punctuation">[</span><span class="token string">'cells_per_km2'</span><span class="token punctuation">]</span><span class="token punctuation">:</span><span class="token format-spec">>8.1f</span><span class="token punctuation">}</span></span><span class="token string"> cells/km²"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>The rule that works is to pick the resolution whose edge length is close to the sensor spacing. Cells much smaller than the spacing are mostly empty, so the map becomes a scatter of isolated hexagons; cells much larger average away the variation the sensors were installed to measure. For traffic counters every 200–400 m along streets, resolution 9 or 10 is right; for air quality stations several kilometres apart, resolution 7; for indoor occupancy sensors, resolution 13 or finer.</p>
+<h3 id="2-index-the-readings" tabindex="-1"><a class="heading-link" href="#2-index-the-readings"><span>2. Index the readings</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> pandas <span class="token keyword">as</span> pd
+<span class="token keyword">from</span> pyproj <span class="token keyword">import</span> Transformer
+
+to_wgs84 <span class="token operator">=</span> Transformer<span class="token punctuation">.</span>from_crs<span class="token punctuation">(</span><span class="token number">25832</span><span class="token punctuation">,</span> <span class="token number">4326</span><span class="token punctuation">,</span> always_xy<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+RES <span class="token operator">=</span> <span class="token number">10</span>
+
+<span class="token keyword">def</span> <span class="token function">index_readings</span><span class="token punctuation">(</span>df<span class="token punctuation">,</span> res<span class="token operator">=</span>RES<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    lon<span class="token punctuation">,</span> lat <span class="token operator">=</span> to_wgs84<span class="token punctuation">.</span>transform<span class="token punctuation">(</span>df<span class="token punctuation">[</span><span class="token string">"easting"</span><span class="token punctuation">]</span><span class="token punctuation">.</span>to_numpy<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> df<span class="token punctuation">[</span><span class="token string">"northing"</span><span class="token punctuation">]</span><span class="token punctuation">.</span>to_numpy<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    df <span class="token operator">=</span> df<span class="token punctuation">.</span>assign<span class="token punctuation">(</span>lon<span class="token operator">=</span>lon<span class="token punctuation">,</span> lat<span class="token operator">=</span>lat<span class="token punctuation">)</span>
+    df<span class="token punctuation">[</span><span class="token string">"cell"</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token punctuation">[</span>h3<span class="token punctuation">.</span>latlng_to_cell<span class="token punctuation">(</span>la<span class="token punctuation">,</span> lo<span class="token punctuation">,</span> res<span class="token punctuation">)</span> <span class="token keyword">for</span> la<span class="token punctuation">,</span> lo <span class="token keyword">in</span> <span class="token builtin">zip</span><span class="token punctuation">(</span>lat<span class="token punctuation">,</span> lon<span class="token punctuation">)</span><span class="token punctuation">]</span>
+    <span class="token keyword">return</span> df
+
+readings <span class="token operator">=</span> pd<span class="token punctuation">.</span>read_parquet<span class="token punctuation">(</span><span class="token string">"data/noise_readings_2026-09.parquet"</span><span class="token punctuation">)</span>
+readings <span class="token operator">=</span> index_readings<span class="token punctuation">(</span>readings<span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span><span class="token builtin">len</span><span class="token punctuation">(</span>readings<span class="token punctuation">)</span><span class="token punctuation">:</span><span class="token format-spec">,</span><span class="token punctuation">}</span></span><span class="token string"> readings, </span><span class="token interpolation"><span class="token punctuation">{</span>readings<span class="token punctuation">[</span><span class="token string">'cell'</span><span class="token punctuation">]</span><span class="token punctuation">.</span>nunique<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span><span class="token format-spec">,</span><span class="token punctuation">}</span></span><span class="token string"> distinct cells at res </span><span class="token interpolation"><span class="token punctuation">{</span>RES<span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span>readings<span class="token punctuation">.</span>head<span class="token punctuation">(</span><span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token punctuation">[</span><span class="token string">"sensor_id"</span><span class="token punctuation">,</span> <span class="token string">"timestamp"</span><span class="token punctuation">,</span> <span class="token string">"value_db"</span><span class="token punctuation">,</span> <span class="token string">"cell"</span><span class="token punctuation">]</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>H3 takes latitude first and longitude second, which is the opposite order from most projected-coordinate code and the source of a good share of H3 bugs: swap them and every reading lands in the Indian Ocean or the Sahara, both of which are conveniently far from any plausible city and therefore obvious. Less obvious is a partial swap in one code path, which puts a subset of readings somewhere implausible while the rest are fine.</p>
+<h3 id="3-aggregate-per-cell-and-time-bucket" tabindex="-1"><a class="heading-link" href="#3-aggregate-per-cell-and-time-bucket"><span>3. Aggregate per cell and time bucket</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">aggregate</span><span class="token punctuation">(</span>df<span class="token punctuation">,</span> freq<span class="token operator">=</span><span class="token string">"1h"</span><span class="token punctuation">,</span> value<span class="token operator">=</span><span class="token string">"value_db"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    df <span class="token operator">=</span> df<span class="token punctuation">.</span>copy<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    df<span class="token punctuation">[</span><span class="token string">"bucket"</span><span class="token punctuation">]</span> <span class="token operator">=</span> pd<span class="token punctuation">.</span>to_datetime<span class="token punctuation">(</span>df<span class="token punctuation">[</span><span class="token string">"timestamp"</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">.</span>dt<span class="token punctuation">.</span>floor<span class="token punctuation">(</span>freq<span class="token punctuation">)</span>
+    grouped <span class="token operator">=</span> df<span class="token punctuation">.</span>groupby<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token string">"cell"</span><span class="token punctuation">,</span> <span class="token string">"bucket"</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">.</span>agg<span class="token punctuation">(</span>
+        n<span class="token operator">=</span><span class="token punctuation">(</span>value<span class="token punctuation">,</span> <span class="token string">"size"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        mean<span class="token operator">=</span><span class="token punctuation">(</span>value<span class="token punctuation">,</span> <span class="token string">"mean"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        p95<span class="token operator">=</span><span class="token punctuation">(</span>value<span class="token punctuation">,</span> <span class="token keyword">lambda</span> s<span class="token punctuation">:</span> s<span class="token punctuation">.</span>quantile<span class="token punctuation">(</span><span class="token number">0.95</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token builtin">max</span><span class="token operator">=</span><span class="token punctuation">(</span>value<span class="token punctuation">,</span> <span class="token string">"max"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        sensors<span class="token operator">=</span><span class="token punctuation">(</span><span class="token string">"sensor_id"</span><span class="token punctuation">,</span> <span class="token string">"nunique"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token punctuation">)</span><span class="token punctuation">.</span>reset_index<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    grouped<span class="token punctuation">[</span><span class="token string">"mean"</span><span class="token punctuation">]</span> <span class="token operator">=</span> grouped<span class="token punctuation">[</span><span class="token string">"mean"</span><span class="token punctuation">]</span><span class="token punctuation">.</span><span class="token builtin">round</span><span class="token punctuation">(</span><span class="token number">2</span><span class="token punctuation">)</span>
+    grouped<span class="token punctuation">[</span><span class="token string">"p95"</span><span class="token punctuation">]</span> <span class="token operator">=</span> grouped<span class="token punctuation">[</span><span class="token string">"p95"</span><span class="token punctuation">]</span><span class="token punctuation">.</span><span class="token builtin">round</span><span class="token punctuation">(</span><span class="token number">2</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> grouped
+
+agg <span class="token operator">=</span> aggregate<span class="token punctuation">(</span>readings<span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span>agg<span class="token punctuation">.</span>sort_values<span class="token punctuation">(</span><span class="token string">"p95"</span><span class="token punctuation">,</span> ascending<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">)</span><span class="token punctuation">.</span>head<span class="token punctuation">(</span><span class="token number">5</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span><span class="token builtin">len</span><span class="token punctuation">(</span>agg<span class="token punctuation">)</span><span class="token punctuation">:</span><span class="token format-spec">,</span><span class="token punctuation">}</span></span><span class="token string"> cell-hour rows"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Keeping the sensor count per cell alongside the statistics is what makes the result honest. A cell with one sensor and a mean of 71 dB reports that sensor; a cell with six sensors and the same mean reports a neighbourhood. Rendering both identically invites a reader to over-interpret the first, and a map that greys out single-sensor cells at coarse resolutions is usually the right presentation.</p>
+<h3 id="4-coarsen-carefully-the-hierarchy-does-not-nest-exactly" tabindex="-1"><a class="heading-link" href="#4-coarsen-carefully-the-hierarchy-does-not-nest-exactly"><span>4. Coarsen carefully: the hierarchy does not nest exactly</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">coarsen</span><span class="token punctuation">(</span>agg<span class="token punctuation">,</span> from_res<span class="token operator">=</span>RES<span class="token punctuation">,</span> to_res<span class="token operator">=</span><span class="token number">8</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    a <span class="token operator">=</span> agg<span class="token punctuation">.</span>copy<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    a<span class="token punctuation">[</span><span class="token string">"parent"</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token punctuation">[</span>h3<span class="token punctuation">.</span>cell_to_parent<span class="token punctuation">(</span>c<span class="token punctuation">,</span> to_res<span class="token punctuation">)</span> <span class="token keyword">for</span> c <span class="token keyword">in</span> a<span class="token punctuation">[</span><span class="token string">"cell"</span><span class="token punctuation">]</span><span class="token punctuation">]</span>
+    out <span class="token operator">=</span> a<span class="token punctuation">.</span>groupby<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token string">"parent"</span><span class="token punctuation">,</span> <span class="token string">"bucket"</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">.</span>agg<span class="token punctuation">(</span>
+        n<span class="token operator">=</span><span class="token punctuation">(</span><span class="token string">"n"</span><span class="token punctuation">,</span> <span class="token string">"sum"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        mean<span class="token operator">=</span><span class="token punctuation">(</span><span class="token string">"mean"</span><span class="token punctuation">,</span> <span class="token string">"mean"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>               <span class="token comment"># unweighted: see the caveat below</span>
+        weighted_mean<span class="token operator">=</span><span class="token punctuation">(</span><span class="token string">"mean"</span><span class="token punctuation">,</span> <span class="token keyword">lambda</span> s<span class="token punctuation">:</span> <span class="token boolean">None</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        p95<span class="token operator">=</span><span class="token punctuation">(</span><span class="token string">"p95"</span><span class="token punctuation">,</span> <span class="token string">"max"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        child_cells<span class="token operator">=</span><span class="token punctuation">(</span><span class="token string">"cell"</span><span class="token punctuation">,</span> <span class="token string">"nunique"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token punctuation">)</span><span class="token punctuation">.</span>reset_index<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    <span class="token comment"># weight the mean by reading count, which the naive mean of means does not</span>
+    wm <span class="token operator">=</span> <span class="token punctuation">(</span>a<span class="token punctuation">.</span>assign<span class="token punctuation">(</span>prod<span class="token operator">=</span>a<span class="token punctuation">[</span><span class="token string">"mean"</span><span class="token punctuation">]</span> <span class="token operator">*</span> a<span class="token punctuation">[</span><span class="token string">"n"</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">.</span>groupby<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token string">"parent"</span><span class="token punctuation">,</span> <span class="token string">"bucket"</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+            <span class="token punctuation">.</span>agg<span class="token punctuation">(</span>num<span class="token operator">=</span><span class="token punctuation">(</span><span class="token string">"prod"</span><span class="token punctuation">,</span> <span class="token string">"sum"</span><span class="token punctuation">)</span><span class="token punctuation">,</span> den<span class="token operator">=</span><span class="token punctuation">(</span><span class="token string">"n"</span><span class="token punctuation">,</span> <span class="token string">"sum"</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">.</span>reset_index<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    out <span class="token operator">=</span> out<span class="token punctuation">.</span>merge<span class="token punctuation">(</span>wm<span class="token punctuation">,</span> on<span class="token operator">=</span><span class="token punctuation">[</span><span class="token string">"parent"</span><span class="token punctuation">,</span> <span class="token string">"bucket"</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    out<span class="token punctuation">[</span><span class="token string">"weighted_mean"</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token punctuation">(</span>out<span class="token punctuation">[</span><span class="token string">"num"</span><span class="token punctuation">]</span> <span class="token operator">/</span> out<span class="token punctuation">[</span><span class="token string">"den"</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">round</span><span class="token punctuation">(</span><span class="token number">2</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> out<span class="token punctuation">.</span>drop<span class="token punctuation">(</span>columns<span class="token operator">=</span><span class="token punctuation">[</span><span class="token string">"num"</span><span class="token punctuation">,</span> <span class="token string">"den"</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+
+coarse <span class="token operator">=</span> coarsen<span class="token punctuation">(</span>agg<span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span>coarse<span class="token punctuation">.</span>sort_values<span class="token punctuation">(</span><span class="token string">"n"</span><span class="token punctuation">,</span> ascending<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">)</span><span class="token punctuation">.</span>head<span class="token punctuation">(</span><span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Two traps live in that function. The first is the mean of means, which is wrong whenever cells have different reading counts — the weighted version is one extra group-by and is the number to publish. The second is H3’s hierarchy itself: hexagons cannot tile a hexagon, so a resolution-9 cell is <em>not</em> exactly the union of seven resolution-10 cells. <code>cell_to_parent</code> gives the cell whose centre contains the child’s centre, and a child straddling a parent boundary is assigned wholly to one parent. For aggregation of point readings that is harmless; for aggregating <em>areas</em> — a land-cover share, a footprint total — it introduces an error of a few percent per level, and the right approach there is to re-aggregate from the source rather than to roll up.</p>
+<figure class="diagram">
+<svg viewBox="110 23 574 233" role="img" aria-labelledby="h3-nest-t h3-nest-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="h3-nest-t">Why H3 parents and children do not nest exactly</title>
+  <desc id="h3-nest-d">A coarse hexagon overlaid with the seven finer hexagons whose centres fall inside it. The finer cells cover most of the parent and spill over its edges, and slivers of the parent are covered by cells assigned to neighbouring parents. Point readings are unaffected because each point has one cell at each resolution, while area quantities acquire a few percent of error per level.</desc>
+  <rect class="svg-bg" x="110" y="23" width="574" height="233" fill="#ffffff"/>
+  <path d="M250 40 L370 40 L430 125 L370 210 L250 210 L190 125 Z" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2.5"/>
+  <g fill="none" stroke="#4f7a4d" stroke-width="1.6">
+    <path d="M292 95 L328 95 L346 125 L328 155 L292 155 L274 125 Z"/>
+    <path d="M292 37 L328 37 L346 67 L328 97 L292 97 L274 67 Z"/>
+    <path d="M292 153 L328 153 L346 183 L328 213 L292 213 L274 183 Z"/>
+    <path d="M232 66 L268 66 L286 96 L268 126 L232 126 L214 96 Z"/>
+    <path d="M232 124 L268 124 L286 154 L268 184 L232 184 L214 154 Z"/>
+    <path d="M352 66 L388 66 L406 96 L388 126 L352 126 L334 96 Z"/>
+    <path d="M352 124 L388 124 L406 154 L388 184 L352 184 L334 154 Z"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="start">
+    <text x="470" y="70">a parent hexagon and the seven</text>
+    <text x="470" y="92">children whose centres it contains</text>
+    <text x="470" y="126">children spill outside the parent;</text>
+    <text x="470" y="148">slivers belong to neighbours</text>
+    <text x="470" y="182">points: exact at every resolution</text>
+    <text x="470" y="204">areas: a few percent per level</text>
+  </g>
+  <text x="310" y="238" fill="#15384a" font-size="12.5" text-anchor="middle">Roll up point counts freely; re-aggregate areas from the source.</text>
+</svg>
+<figcaption>The hierarchy is approximate by construction, which is a property to plan around rather than a bug to work around.</figcaption>
+</figure>
+<figure class="diagram">
+<svg viewBox="-4 56 768 162" role="img" aria-labelledby="h3-flow-t h3-flow-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="h3-flow-t">From readings to an overlay</title>
+  <desc id="h3-flow-d">Readings with projected coordinates are transformed to longitude and latitude, indexed to cells at the working resolution, aggregated per cell and hour with a sensor count, optionally coarsened for zoomed-out views, converted to hexagon polygons and rendered as an extruded overlay on the tiled city. Area quantities are re-aggregated from the readings rather than rolled up.</desc>
+  <rect class="svg-bg" x="-4" y="56" width="768" height="162" fill="#ffffff"/>
+  <defs>
+    <marker id="h3-flow-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
+    </marker>
+  </defs>
+  <rect x="10" y="70" width="110" height="56" rx="8" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <rect x="150" y="70" width="120" height="56" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="300" y="70" width="140" height="56" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="470" y="70" width="120" height="56" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="620" y="70" width="130" height="56" rx="8" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <rect x="300" y="160" width="290" height="44" rx="8" fill="#ffffff" stroke="#5b6471" stroke-width="1.5"/>
+  <g stroke="#5b6471" stroke-width="2" fill="none" marker-end="url(#h3-flow-arrow)">
+    <path d="M120 98 H148"/><path d="M270 98 H298"/><path d="M440 98 H468"/><path d="M590 98 H618"/>
+    <path d="M370 158 V128"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="65" y="94">readings</text><text x="65" y="112">E, N, value</text>
+    <text x="210" y="94">to lat/lon,</text><text x="210" y="112">index at res 10</text>
+    <text x="370" y="94">aggregate per</text><text x="370" y="112">cell and hour</text>
+    <text x="530" y="94">coarsen for</text><text x="530" y="112">zoomed views</text>
+    <text x="685" y="94">hexagon</text><text x="685" y="112">overlay</text>
+    <text x="445" y="180">area quantities: re-aggregate from readings,</text>
+    <text x="445" y="198">never roll up through the hierarchy</text>
+  </g>
+</svg>
+<figcaption>One indexing pass serves every later view; the only branch is whether a quantity may be rolled up or must be recomputed.</figcaption>
+</figure>
+<h3 id="5-turn-cells-into-geometry-for-the-overlay" tabindex="-1"><a class="heading-link" href="#5-turn-cells-into-geometry-for-the-overlay"><span>5. Turn cells into geometry for the overlay</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> geopandas <span class="token keyword">as</span> gpd
+<span class="token keyword">from</span> shapely<span class="token punctuation">.</span>geometry <span class="token keyword">import</span> Polygon
+
+<span class="token keyword">def</span> <span class="token function">cells_to_gdf</span><span class="token punctuation">(</span>rows<span class="token punctuation">,</span> cell_col<span class="token operator">=</span><span class="token string">"cell"</span><span class="token punctuation">,</span> crs<span class="token operator">=</span><span class="token number">4326</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    geoms<span class="token punctuation">,</span> records <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    <span class="token keyword">for</span> row <span class="token keyword">in</span> rows<span class="token punctuation">.</span>itertuples<span class="token punctuation">(</span>index<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        cell <span class="token operator">=</span> <span class="token builtin">getattr</span><span class="token punctuation">(</span>row<span class="token punctuation">,</span> cell_col<span class="token punctuation">)</span>
+        boundary <span class="token operator">=</span> h3<span class="token punctuation">.</span>cell_to_boundary<span class="token punctuation">(</span>cell<span class="token punctuation">)</span>             <span class="token comment"># [(lat, lon), …]</span>
+        geoms<span class="token punctuation">.</span>append<span class="token punctuation">(</span>Polygon<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token punctuation">(</span>lon<span class="token punctuation">,</span> lat<span class="token punctuation">)</span> <span class="token keyword">for</span> lat<span class="token punctuation">,</span> lon <span class="token keyword">in</span> boundary<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+        records<span class="token punctuation">.</span>append<span class="token punctuation">(</span>row<span class="token punctuation">.</span>_asdict<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    gdf <span class="token operator">=</span> gpd<span class="token punctuation">.</span>GeoDataFrame<span class="token punctuation">(</span>records<span class="token punctuation">,</span> geometry<span class="token operator">=</span>geoms<span class="token punctuation">,</span> crs<span class="token operator">=</span>crs<span class="token punctuation">)</span>
+    gdf<span class="token punctuation">[</span><span class="token string">"area_m2"</span><span class="token punctuation">]</span> <span class="token operator">=</span> gdf<span class="token punctuation">.</span>to_crs<span class="token punctuation">(</span><span class="token number">25832</span><span class="token punctuation">)</span><span class="token punctuation">.</span>geometry<span class="token punctuation">.</span>area<span class="token punctuation">.</span><span class="token builtin">round</span><span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> gdf
+
+peak <span class="token operator">=</span> agg<span class="token punctuation">[</span>agg<span class="token punctuation">[</span><span class="token string">"bucket"</span><span class="token punctuation">]</span> <span class="token operator">==</span> agg<span class="token punctuation">[</span><span class="token string">"bucket"</span><span class="token punctuation">]</span><span class="token punctuation">.</span><span class="token builtin">max</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">]</span>
+hexes <span class="token operator">=</span> cells_to_gdf<span class="token punctuation">(</span>peak<span class="token punctuation">)</span>
+hexes<span class="token punctuation">.</span>to_file<span class="token punctuation">(</span><span class="token string">"web/noise_hex_res10.geojson"</span><span class="token punctuation">,</span> driver<span class="token operator">=</span><span class="token string">"GeoJSON"</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span>hexes<span class="token punctuation">[</span><span class="token punctuation">[</span><span class="token string">"cell"</span><span class="token punctuation">,</span> <span class="token string">"n"</span><span class="token punctuation">,</span> <span class="token string">"mean"</span><span class="token punctuation">,</span> <span class="token string">"p95"</span><span class="token punctuation">,</span> <span class="token string">"area_m2"</span><span class="token punctuation">]</span><span class="token punctuation">]</span><span class="token punctuation">.</span>head<span class="token punctuation">(</span><span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"area range </span><span class="token interpolation"><span class="token punctuation">{</span>hexes<span class="token punctuation">[</span><span class="token string">'area_m2'</span><span class="token punctuation">]</span><span class="token punctuation">.</span><span class="token builtin">min</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span><span class="token format-spec">,.0f</span><span class="token punctuation">}</span></span><span class="token string">–</span><span class="token interpolation"><span class="token punctuation">{</span>hexes<span class="token punctuation">[</span><span class="token string">'area_m2'</span><span class="token punctuation">]</span><span class="token punctuation">.</span><span class="token builtin">max</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span><span class="token format-spec">,.0f</span><span class="token punctuation">}</span></span><span class="token string"> m²"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p><code>cell_to_boundary</code> returns latitude-longitude pairs, so building a Shapely polygon needs them reversed — the same order trap as indexing, in the opposite direction. The area range printed at the end is worth looking at once: H3 cells vary in area with latitude and position within the icosahedral face, typically by a few percent within a city and much more across a country. Any per-area quantity — a density, a rate per hectare — has to divide by each cell’s own area rather than by the resolution’s average.</p>
+<h3 id="6-render-it-over-the-tiled-city" tabindex="-1"><a class="heading-link" href="#6-render-it-over-the-tiled-city"><span>6. Render it over the tiled city</span></a></h3>
+<div class="codeblock" data-lang="javascript"><div class="codeblock__bar"><span class="codeblock__lang">javascript</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-javascript" tabindex="0" role="group" aria-label="javascript code sample"><code class="language-javascript"><span class="token keyword">const</span> hexes <span class="token operator">=</span> <span class="token keyword">await</span> Cesium<span class="token punctuation">.</span>GeoJsonDataSource<span class="token punctuation">.</span><span class="token function">load</span><span class="token punctuation">(</span><span class="token string">"/web/noise_hex_res10.geojson"</span><span class="token punctuation">,</span> <span class="token punctuation">{</span>
+  <span class="token literal-property property">clampToGround</span><span class="token operator">:</span> <span class="token boolean">false</span><span class="token punctuation">,</span>
+<span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+viewer<span class="token punctuation">.</span>dataSources<span class="token punctuation">.</span><span class="token function">add</span><span class="token punctuation">(</span>hexes<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token keyword">const</span> ramp <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">[</span><span class="token number">55</span><span class="token punctuation">,</span> <span class="token string">"#1f6b8a"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token number">60</span><span class="token punctuation">,</span> <span class="token string">"#4f7a4d"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token number">65</span><span class="token punctuation">,</span> <span class="token string">"#c46a3d"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token number">70</span><span class="token punctuation">,</span> <span class="token string">"#b0413e"</span><span class="token punctuation">]</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+<span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">const</span> entity <span class="token keyword">of</span> hexes<span class="token punctuation">.</span>entities<span class="token punctuation">.</span>values<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+  <span class="token keyword">const</span> p95 <span class="token operator">=</span> entity<span class="token punctuation">.</span>properties<span class="token punctuation">.</span>p95<span class="token punctuation">.</span><span class="token function">getValue</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">const</span> stop <span class="token operator">=</span> ramp<span class="token punctuation">.</span><span class="token function">findLast</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter"><span class="token punctuation">[</span>threshold<span class="token punctuation">]</span></span><span class="token punctuation">)</span> <span class="token operator">=></span> p95 <span class="token operator">>=</span> threshold<span class="token punctuation">)</span> <span class="token operator">??</span> ramp<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+  entity<span class="token punctuation">.</span>polygon<span class="token punctuation">.</span>material <span class="token operator">=</span> Cesium<span class="token punctuation">.</span>Color<span class="token punctuation">.</span><span class="token function">fromCssColorString</span><span class="token punctuation">(</span>stop<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">withAlpha</span><span class="token punctuation">(</span><span class="token number">0.55</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  entity<span class="token punctuation">.</span>polygon<span class="token punctuation">.</span>extrudedHeight <span class="token operator">=</span> <span class="token number">4</span> <span class="token operator">+</span> <span class="token punctuation">(</span>p95 <span class="token operator">-</span> <span class="token number">50</span><span class="token punctuation">)</span> <span class="token operator">*</span> <span class="token number">2.5</span><span class="token punctuation">;</span>      <span class="token comment">// exaggerate for readability</span>
+  entity<span class="token punctuation">.</span>polygon<span class="token punctuation">.</span>height <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+  entity<span class="token punctuation">.</span>polygon<span class="token punctuation">.</span>outline <span class="token operator">=</span> <span class="token boolean">false</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+</code></pre></div>
+<p>Extruding the hexagons by the value turns the overlay into a readable surface over the city rather than a flat choropleth competing with the buildings for attention. Stating the exaggeration in the legend matters, because a 60 m tall hexagon representing 68 dB will otherwise be read as a building.</p>
+<p>For a layer that changes continuously — live sensor feeds rather than an hourly aggregate — the geometry should be built once and only the values updated, as in <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/streaming-live-sensor-updates-onto-tilesets/">streaming live sensor updates onto tilesets</a>.</p>
+<figure class="diagram">
+<svg viewBox="16 26 728 232" role="img" aria-labelledby="h3-res-t h3-res-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="h3-res-t">Matching resolution to sensor spacing</title>
+  <desc id="h3-res-d">Three panels of the same street network. At resolution 8, with cells about 1.2 kilometres across, all sensors fall into two cells and the variation is averaged away. At resolution 10, with cells about 130 metres across, each cell holds one to three sensors and street-level variation is visible. At resolution 13, with cells nine metres across, almost every cell is empty and the map is a scatter of dots.</desc>
+  <rect class="svg-bg" x="16" y="26" width="728" height="232" fill="#ffffff"/>
+  <g stroke="#5b6471" stroke-width="1" fill="none">
+    <path d="M30 60 H230 M30 110 H230 M30 160 H230 M80 40 V190 M150 40 V190"/>
+    <path d="M280 60 H480 M280 110 H480 M280 160 H480 M330 40 V190 M400 40 V190"/>
+    <path d="M530 60 H730 M530 110 H730 M530 160 H730 M580 40 V190 M650 40 V190"/>
+  </g>
+  <path d="M60 60 L170 60 L200 115 L170 170 L60 170 L30 115 Z" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2" fill-opacity="0.5"/>
+  <g fill="none" stroke="#4f7a4d" stroke-width="1.6">
+    <path d="M300 70 L330 70 L345 95 L330 120 L300 120 L285 95 Z"/>
+    <path d="M345 70 L375 70 L390 95 L375 120 L345 120 L330 95 Z"/>
+    <path d="M322 120 L352 120 L367 145 L352 170 L322 170 L307 145 Z"/>
+    <path d="M390 95 L420 95 L435 120 L420 145 L390 145 L375 120 Z"/>
+  </g>
+  <g fill="#c46a3d">
+    <circle cx="560" cy="62" r="3"/><circle cx="600" cy="110" r="3"/><circle cx="660" cy="86" r="3"/><circle cx="700" cy="158" r="3"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="130" y="212">res 8: one cell, no variation</text>
+    <text x="380" y="212">res 10: street-level variation</text>
+    <text x="630" y="212">res 13: mostly empty</text>
+  </g>
+  <text x="380" y="240" fill="#15384a" font-size="12.5" text-anchor="middle">The useful resolution has an edge length close to the sensor spacing.</text>
+</svg>
+<figcaption>Resolution is not a quality setting: too fine is as unreadable as too coarse, and the sensor spacing decides which is which.</figcaption>
+</figure>
+<h2 id="expected-output-verification" tabindex="-1"><a class="heading-link" href="#expected-output-verification"><span>Expected Output &amp; Verification</span></a></h2>
+<div class="codeblock" data-lang="text"><div class="codeblock__bar"><span class="codeblock__lang">text</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-text" tabindex="0" role="group" aria-label="text code sample"><code class="language-text">res  7  area    5,161,293.4 m²  edge  1406.5 m       0.2 cells/km²
+res  8  area      737,327.6 m²  edge   531.4 m       1.4 cells/km²
+res  9  area      105,332.5 m²  edge   200.8 m       9.5 cells/km²
+res 10  area       15,047.5 m²  edge    75.9 m      66.5 cells/km²
+res 11  area        2,149.6 m²  edge    28.7 m     465.2 cells/km²
+res 12  area          307.1 m²  edge    10.8 m   3,256.2 cells/km²
+res 13  area           43.9 m²  edge     4.1 m  22,793.6 cells/km²
+1,204,882 readings, 3,118 distinct cells at res 10
+        cell              bucket   n   mean    p95   max  sensors
+0  8a1fb46622dffff 2026-09-15 08:00  84  71.42  78.10  81.2        3
+3,118 distinct cells at res 10
+104,204 cell-hour rows
+area range 14,802–15,244 m²
+</code></pre></div>
+<p>Verify the indexing before trusting any aggregate, because a coordinate-order error produces a perfectly consistent map of the wrong place:</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">verify_indexing</span><span class="token punctuation">(</span>df<span class="token punctuation">,</span> res<span class="token operator">=</span>RES<span class="token punctuation">,</span> sample<span class="token operator">=</span><span class="token number">2000</span><span class="token punctuation">,</span> tolerance_m<span class="token operator">=</span><span class="token number">200.0</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">from</span> pyproj <span class="token keyword">import</span> Geod
+    geod <span class="token operator">=</span> Geod<span class="token punctuation">(</span>ellps<span class="token operator">=</span><span class="token string">"WGS84"</span><span class="token punctuation">)</span>
+    s <span class="token operator">=</span> df<span class="token punctuation">.</span>sample<span class="token punctuation">(</span><span class="token builtin">min</span><span class="token punctuation">(</span>sample<span class="token punctuation">,</span> <span class="token builtin">len</span><span class="token punctuation">(</span>df<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> random_state<span class="token operator">=</span><span class="token number">7</span><span class="token punctuation">)</span>
+    dists <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    <span class="token keyword">for</span> row <span class="token keyword">in</span> s<span class="token punctuation">.</span>itertuples<span class="token punctuation">(</span>index<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        lat_c<span class="token punctuation">,</span> lon_c <span class="token operator">=</span> h3<span class="token punctuation">.</span>cell_to_latlng<span class="token punctuation">(</span>row<span class="token punctuation">.</span>cell<span class="token punctuation">)</span>
+        _<span class="token punctuation">,</span> _<span class="token punctuation">,</span> d <span class="token operator">=</span> geod<span class="token punctuation">.</span>inv<span class="token punctuation">(</span>row<span class="token punctuation">.</span>lon<span class="token punctuation">,</span> row<span class="token punctuation">.</span>lat<span class="token punctuation">,</span> lon_c<span class="token punctuation">,</span> lat_c<span class="token punctuation">)</span>
+        dists<span class="token punctuation">.</span>append<span class="token punctuation">(</span>d<span class="token punctuation">)</span>
+    dists <span class="token operator">=</span> pd<span class="token punctuation">.</span>Series<span class="token punctuation">(</span>dists<span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"checked"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>dists<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"max_offset_m"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>dists<span class="token punctuation">.</span><span class="token builtin">max</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+             <span class="token string">"median_offset_m"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>dists<span class="token punctuation">.</span>median<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+             <span class="token string">"within_cell"</span><span class="token punctuation">:</span> <span class="token builtin">bool</span><span class="token punctuation">(</span>dists<span class="token punctuation">.</span><span class="token builtin">max</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">&lt;</span> tolerance_m<span class="token punctuation">)</span><span class="token punctuation">}</span>
+
+check <span class="token operator">=</span> verify_indexing<span class="token punctuation">(</span>readings<span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span>check<span class="token punctuation">)</span>
+<span class="token keyword">assert</span> check<span class="token punctuation">[</span><span class="token string">"within_cell"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token string">"readings are not inside their cells: latitude/longitude swapped?"</span>
+</code></pre></div>
+<p>Every reading must lie within its own cell, so the distance from the reading to its cell centre cannot exceed the cell’s circumradius — about 76 m at resolution 10. A median offset of thousands of kilometres is the swapped-order bug; an offset of a few hundred metres on some readings means those were indexed at a different resolution.</p>
+<p>Then verify the aggregation preserves the data:</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">assert</span> <span class="token builtin">int</span><span class="token punctuation">(</span>agg<span class="token punctuation">[</span><span class="token string">"n"</span><span class="token punctuation">]</span><span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token builtin">len</span><span class="token punctuation">(</span>readings<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"readings lost in aggregation"</span>
+recomputed <span class="token operator">=</span> <span class="token punctuation">(</span>readings<span class="token punctuation">.</span>assign<span class="token punctuation">(</span>bucket<span class="token operator">=</span>pd<span class="token punctuation">.</span>to_datetime<span class="token punctuation">(</span>readings<span class="token punctuation">[</span><span class="token string">"timestamp"</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">.</span>dt<span class="token punctuation">.</span>floor<span class="token punctuation">(</span><span class="token string">"1h"</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+              <span class="token punctuation">.</span>groupby<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token string">"cell"</span><span class="token punctuation">,</span> <span class="token string">"bucket"</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token string">"value_db"</span><span class="token punctuation">]</span><span class="token punctuation">.</span>mean<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">round</span><span class="token punctuation">(</span><span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+merged <span class="token operator">=</span> agg<span class="token punctuation">.</span>set_index<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token string">"cell"</span><span class="token punctuation">,</span> <span class="token string">"bucket"</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token string">"mean"</span><span class="token punctuation">]</span>
+<span class="token keyword">assert</span> merged<span class="token punctuation">.</span>sub<span class="token punctuation">(</span>recomputed<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">abs</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">max</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">&lt;</span> <span class="token number">0.011</span><span class="token punctuation">,</span> <span class="token string">"aggregated means do not reproduce"</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"aggregation reproduces the source readings"</span><span class="token punctuation">)</span>
+</code></pre></div>
+<h2 id="performance-notes" tabindex="-1"><a class="heading-link" href="#performance-notes"><span>Performance Notes</span></a></h2>
+<ul>
+<li><strong>Indexing is about a microsecond per point</strong> in the C-backed library, so a million readings index in a second or two. Vectorise by list comprehension rather than <code>apply</code>, which is several times slower.</li>
+<li><strong>Aggregate in the database when the data lives there.</strong> DuckDB and PostGIS both have H3 extensions, and grouping ten million rows in SQL beats moving them into pandas.</li>
+<li><strong>Store the cell as a string or a 64-bit integer, not both.</strong> The integer form is half the size and sorts usefully; the string form is what most APIs expect. Pick one for storage and convert at the edges.</li>
+<li><strong>Pre-compute the boundary geometry per cell once</strong> and cache it: it is fixed for a given cell, and re-deriving it per render is wasted work.</li>
+<li><strong>Coarsen from the source for area quantities</strong>, from the aggregate for counts and means. The first is correct and slower; the second is fast and approximate.</li>
+</ul>
+<h2 id="common-errors" tabindex="-1"><a class="heading-link" href="#common-errors"><span>Common Errors</span></a></h2>
+<p><strong>Every reading lands in the ocean.</strong> Latitude and longitude were passed in the wrong order. H3 takes latitude first.</p>
+<p><strong>Cell areas differ from the resolution’s average.</strong> Expected: H3 cells vary in area. Divide by each cell’s own area for any per-area statistic.</p>
+<p><strong>A coarse view shows higher values than any fine cell.</strong> The coarse layer used <code>max</code> of the children’s <code>p95</code>, which is a legitimate choice and not the same statistic as the parent’s own p95. Name the statistic in the legend.</p>
+<p><strong>Twelve pentagons behave oddly.</strong> H3 has twelve pentagonal cells per resolution, inherited from the icosahedron, and they have five neighbours instead of six. Any neighbourhood computation has to tolerate that; <code>grid_disk</code> does it correctly, and hand-rolled neighbour arithmetic does not.</p>
+<p><strong>Counts do not add up after a roll-up.</strong> Cells were rolled up twice, or a cell straddling a parent boundary was double-counted by a manual containment test. Use <code>cell_to_parent</code>, which assigns each child to exactly one parent.</p>
+<h2 id="frequently-asked-questions" tabindex="-1"><a class="heading-link" href="#frequently-asked-questions"><span>Frequently Asked Questions</span></a></h2>
+<h3 id="h3-or-a-square-grid" tabindex="-1"><a class="heading-link" href="#h3-or-a-square-grid"><span>H3 or a square grid?</span></a></h3>
+<p>H3 for anything involving neighbourhoods, flow or diffusion, because all six neighbours are equidistant. A square grid — or the quadkey scheme the tiling already uses — for anything that has to align with tiles, imagery or existing raster products. Mixing them in one twin is normal: hexagons for analysis, quadkeys for delivery.</p>
+<h3 id="can-h3-index-three-dimensions" tabindex="-1"><a class="heading-link" href="#can-h3-index-three-dimensions"><span>Can H3 index three dimensions?</span></a></h3>
+<p>No. It is a surface tessellation, so a sensor at street level and one on a roof in the same hexagon share a cell. Where the vertical matters, carry the height as an attribute and bin it separately, or use a 3D scheme as discussed in <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/octree-indexing-point-clouds-with-morton-codes/">octree indexing point clouds with Morton codes</a>.</p>
+<h3 id="how-do-i-join-hexagon-aggregates-to-buildings" tabindex="-1"><a class="heading-link" href="#how-do-i-join-hexagon-aggregates-to-buildings"><span>How do I join hexagon aggregates to buildings?</span></a></h3>
+<p>By spatial join, not by cell arithmetic: a building can overlap several cells, and attributing it to the cell containing its centroid is a choice worth stating. For per-building values, aggregate to buildings directly and use hexagons only for the area view.</p>
+<h2 id="related-guides" tabindex="-1"><a class="heading-link" href="#related-guides"><span>Related Guides</span></a></h2>
+<ul>
+<li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/choosing-between-s2-h3-and-geohash-for-3d-data/">Choosing Between S2, H3 and Geohash for 3D Data</a> — why hexagons, and when not</li>
+<li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/serving-tile-lookups-from-postgis/">Serving Tile Lookups from PostGIS</a> — doing the aggregation in the database</li>
+<li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/rendering-thousands-of-labels-and-billboards/">Rendering Thousands of Labels and Billboards</a> — the alternative when individual sensors must be shown</li>
+</ul>
+<p>Back to <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/">Spatial Indexing and Tiling Schemes for 3D Data</a>.</p>
+
+
+      
+      
+
+      <div class="related-nav">
+        
+
+        
+          <div>
+            <h3>Related</h3>
+            <div class="related-grid">
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/building-an-r-tree-index-for-3d-tile-lookup/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Building an R-tree Index for 3D Tile Lookup</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/choosing-between-s2-h3-and-geohash-for-3d-data/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Choosing Between S2, H3 and Geohash for 3D Data</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/computing-quadkeys-and-tile-bounds-in-python/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Computing Quadkeys and Tile Bounds in Python</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/octree-indexing-point-clouds-with-morton-codes/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Octree Indexing Point Clouds with Morton Codes</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/serving-tile-lookups-from-postgis/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Serving Tile Lookups from PostGIS</span>
+                </a>
+              
+            </div>
+          </div>
+        
+      </div>
+    </article>
+
+    
+    <aside class="toc" aria-label="On this page" data-toc hidden>
+      <h4>On this page</h4>
+      <ul></ul>
+    </aside>
+  </div>
+</div>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+  <div class="container site-footer__inner">
+    <div class="site-footer__brand">
+      <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+        <img src="/assets/img/logo-mark.svg" alt="" class="brand__mark" width="36" height="36">
+        <span class="brand__name">
+          3D Geospatial
+          <small>Digital Twin Automation</small>
+        </span>
+      </a>
+      <p>Engineering-grade guides on point cloud processing, mesh pipelines, LOD strategies, and CI/CD automation for digital twin platforms.</p>
+      <a class="footer-social" href="https://github.com/3d-geospatial" aria-label="3D Geospatial on GitHub" rel="noopener" target="_blank">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+          <path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.53-1.34-1.3-1.7-1.3-1.7-1.06-.72.08-.71.08-.71 1.17.08 1.79 1.2 1.79 1.2 1.04 1.79 2.73 1.27 3.4.97.1-.75.4-1.27.73-1.56-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.19-3.08-.12-.3-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.75.11 3.05.74.8 1.19 1.83 1.19 3.08 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.07.78 2.15v3.18c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5Z"/>
+        </svg>
+        <span>GitHub</span>
+      </a>
+    </div>
+
+    <div class="site-footer__col">
+      <h4>Sections</h4>
+      <ul>
+        <li><a href="https://www.3d-geospatial.com/">Home</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management &amp; Optimization</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/">Point Cloud &amp; Mesh Pipelines</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/">Troubleshooting &amp; Reliability</a></li>
+        
+      </ul>
+    </div>
+
+    
+      <div class="site-footer__col">
+        <h4>3D Geospatial Fundamentals</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/">3D Format Standards Comparison</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/">BIM and IFC Georeferencing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/">CityGML and CityJSON Processing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems for 3D Assets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/">Digital Elevation Model Workflows</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/">Spatial Indexing and Tiling Schemes for 3D Data</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>LOD Management &amp; Optimization</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/">Automated Tile Generation for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/">Cesium ion Upload Automation for 3D Tilesets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/">glTF LOD Generation With Draco Compression</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/">Streaming Sync Patterns for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/">Tileset Metadata and 3D Tiles Next</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/">Vector Overlays on 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Point Cloud &amp; Mesh Pipelines</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/">Automated Mesh Decimation for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/">Change Detection Between LiDAR Scan Epochs</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/">CI/CD Automation for Spatial Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">LiDAR Classification and Ground Extraction</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/photogrammetry-processing-pipelines/">Photogrammetry Processing Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/">Point Cloud Filtering Techniques</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/">Surface Reconstruction for Geospatial Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/">Texture Mapping Workflows for Digital Twins</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Troubleshooting &amp; Reliability</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/">Cross-Section Failure Modes in Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/">Data Validation &amp; QA Gates for 3D Tiles</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/">Performance Profiling and Benchmarking</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/">Pipeline Observability and Monitoring</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/">Streaming &amp; Runtime Diagnostics for 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+  </div>
+  <div class="container site-footer__bottom">
+    <span>© 2026 3D Geospatial &amp; Digital Twin Automation</span>
+    <span>Built with Eleventy · PWA-enabled</span>
+  </div>
+</footer>
+
+
+  <script src="/assets/js/site.js?v=b99aa9f971" defer></script>
+  
+</body>
+</html>

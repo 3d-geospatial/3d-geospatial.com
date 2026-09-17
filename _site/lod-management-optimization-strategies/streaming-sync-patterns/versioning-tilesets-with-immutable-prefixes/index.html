@@ -1,0 +1,926 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <title>Versioning Tilesets with Immutable Prefixes — 3D Geospatial</title>
+  <meta name="description" content="Deploy tileset updates without cache invalidation: content-addressed prefixes, a short-lived pointer document, atomic switchover">
+  <meta name="keywords" content="3D geospatial, digital twin, point cloud, mesh pipeline, LOD, 3D Tiles, Cesium, PDAL, Open3D, Python, CI/CD">
+  <meta name="author" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta name="theme-color" content="#1f6b8a" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f171d" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+
+  
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem("theme");
+        var theme = (stored === "dark" || stored === "light") ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    })();
+  </script>
+  <meta name="generator" content="Eleventy">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="googlebot" content="index,follow,max-image-preview:large">
+
+  
+  <link rel="canonical" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/versioning-tilesets-with-immutable-prefixes/">
+  <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">
+
+  
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/icon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+
+  
+  <link rel="apple-touch-icon" href="/assets/img/icon-180.png">
+  <link rel="mask-icon" href="/assets/img/logo.svg" color="#1f6b8a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="3D Geospatial">
+  <meta name="application-name" content="3D Geospatial">
+
+  
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Versioning Tilesets with Immutable Prefixes — 3D Geospatial">
+  <meta property="og:description" content="Deploy tileset updates without cache invalidation: content-addressed prefixes, a short-lived pointer document, atomic switchover">
+  <meta property="og:url" content="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/versioning-tilesets-with-immutable-prefixes/">
+  <meta property="og:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+  <meta property="og:site_name" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta property="og:locale" content="en_US">
+  
+  <meta property="article:published_time" content="2026-09-17T23:36:56.454Z">
+  <meta property="article:modified_time" content="2026-09-17T23:36:56.454Z">
+  <meta property="article:publisher" content="https://www.3d-geospatial.com/">
+  
+
+  
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Versioning Tilesets with Immutable Prefixes — 3D Geospatial">
+  <meta name="twitter:description" content="Deploy tileset updates without cache invalidation: content-addressed prefixes, a short-lived pointer document, atomic switchover">
+  <meta name="twitter:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta name="twitter:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+
+  
+  <link rel="preload" href="/assets/css/styles.css?v=8c46394d6c" as="style">
+  
+
+  <link rel="stylesheet" href="/assets/css/styles.css?v=8c46394d6c">
+
+  
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.3d-geospatial.com/#organization",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "url": "https://www.3d-geospatial.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/icon-512.png",
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://www.3d-geospatial.com/#website",
+      "url": "https://www.3d-geospatial.com/",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "description": "Build reliable 3D spatial data pipelines for digital twins — point clouds, meshes, LOD strategies, Python processing, and CI/CD automation.",
+      "inLanguage": "en",
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      }
+    },
+    {
+      "@type": "TechArticle",
+      "@id": "https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/versioning-tilesets-with-immutable-prefixes/#article",
+      "isPartOf": {
+        "@id": "https://www.3d-geospatial.com/#website"
+      },
+      "headline": "Versioning Tilesets with Immutable Prefixes",
+      "name": "Versioning Tilesets with Immutable Prefixes",
+      "description": "Deploy tileset updates without cache invalidation: content-addressed prefixes, a short-lived pointer document, atomic switchover",
+      "url": "https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/versioning-tilesets-with-immutable-prefixes/",
+      "mainEntityOfPage": "https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/versioning-tilesets-with-immutable-prefixes/",
+      "inLanguage": "en",
+      "datePublished": "2026-09-17T23:36:56.454Z",
+      "dateModified": "2026-09-17T23:36:56.454Z",
+      "author": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "image": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/og-cover.png",
+        "width": 1200,
+        "height": 630
+      },
+      "breadcrumb": {
+        "@id": "https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/versioning-tilesets-with-immutable-prefixes/#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/versioning-tilesets-with-immutable-prefixes/#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://www.3d-geospatial.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "LOD Management Optimization Strategies",
+          "item": "https://www.3d-geospatial.com/lod-management-optimization-strategies/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Streaming Sync Patterns",
+          "item": "https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "name": "Versioning Tilesets With Immutable Prefixes",
+          "item": "https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/versioning-tilesets-with-immutable-prefixes/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  
+<header class="site-header" role="banner">
+  <div class="container site-header__inner">
+    <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+      <img src="/assets/img/logo.svg" alt="" class="brand__mark" width="36" height="36">
+      <span class="brand__name">
+        3D Geospatial
+        <small>Digital Twin Automation</small>
+      </span>
+    </a>
+
+    <button class="theme-toggle" type="button" data-theme-toggle
+            aria-label="Switch to dark theme" title="Switch to dark theme">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4.2"/>
+        <path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/>
+      </svg>
+    </button>
+
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>
+      <span class="nav-toggle__icon" aria-hidden="true"><span></span></span>
+      Menu
+    </button>
+
+    <nav class="primary-nav" id="primary-nav" aria-label="Primary">
+      
+      <a href="https://www.3d-geospatial.com/" >
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/>
+        </svg>
+        Home
+      </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2 3 7l9 5 9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 17l9 5 9-5"/>
+            </svg>
+          
+          3D Geospatial Fundamentals
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/" aria-current="page">
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+          
+          LOD Management &amp; Optimization
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="6" cy="6" r="1.5"/><circle cx="12" cy="6" r="1.5"/><circle cx="18" cy="6" r="1.5"/>
+              <circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/>
+              <circle cx="6" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="18" cy="18" r="1.5"/>
+            </svg>
+          
+          Point Cloud &amp; Mesh Pipelines
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <path d="M12 9v4"/><path d="M12 17h.01"/>
+            </svg>
+          
+          Troubleshooting &amp; Reliability
+        </a>
+      
+    </nav>
+  </div>
+</header>
+
+
+  <main id="main">
+    
+
+
+<div class="container">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    
+      
+        <a href="https://www.3d-geospatial.com/">Home</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management Optimization Strategies</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/">Streaming Sync Patterns</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <span class="current">Versioning Tilesets With Immutable Prefixes</span>
+      
+    
+  </nav>
+
+  <div class="content-page">
+    <article class="article">
+      <h1 id="versioning-tilesets-with-immutable-prefixes" tabindex="-1"><a class="heading-link" href="#versioning-tilesets-with-immutable-prefixes"><span>Versioning Tilesets with Immutable Prefixes</span></a></h1>
+<p>This page deploys tileset updates by never modifying a published file — each build lands under its own immutable prefix with a one-year cache lifetime, a tiny pointer document with a short lifetime tells clients which build is current, switchover is a single write, and rollback is the same write in reverse.</p>
+<h2 id="why-you-hit-this" tabindex="-1"><a class="heading-link" href="#why-you-hit-this"><span>Why you hit this</span></a></h2>
+<p>A tileset is thousands of files fetched by URL. If a rebuild overwrites them in place, every cache between the origin and the viewer holds a mixture: some tiles from the old build, some from the new. The visible result is geometry from two builds in one scene — a building that was demolished still standing next to its replacement, or tiles whose bounding volumes no longer match their content. CDN invalidation is the usual answer and it is slow, rate-limited, expensive at this file count, and does nothing about the browser’s own cache.</p>
+<p>The alternative is to make every published file immutable. A file that never changes can be cached forever, and an update is not a modification but a new set of files at new URLs. All the coordination then happens in one small document.</p>
+<h2 id="prerequisites" tabindex="-1"><a class="heading-link" href="#prerequisites"><span>Prerequisites</span></a></h2>
+<ul>
+<li>Object storage behind a CDN — S3, R2, GCS, or similar — with control over <code>Cache-Control</code>.</li>
+<li>A tileset build that produces a complete output tree, as in <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles batch tiling pipelines</a>.</li>
+<li>Deterministic output, from <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/making-tile-output-deterministic/">making tile output deterministic</a> — without it, every rebuild is a new build even when nothing changed.</li>
+<li>Python 3.10+ with <code>boto3</code>.</li>
+</ul>
+<h2 id="step-by-step" tabindex="-1"><a class="heading-link" href="#step-by-step"><span>Step-by-Step</span></a></h2>
+<h3 id="1-give-the-build-an-identity-derived-from-its-inputs" tabindex="-1"><a class="heading-link" href="#1-give-the-build-an-identity-derived-from-its-inputs"><span>1. Give the build an identity derived from its inputs</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> hashlib
+<span class="token keyword">import</span> json
+<span class="token keyword">import</span> os
+<span class="token keyword">import</span> time
+<span class="token keyword">from</span> dataclasses <span class="token keyword">import</span> dataclass<span class="token punctuation">,</span> asdict
+<span class="token keyword">from</span> datetime <span class="token keyword">import</span> datetime<span class="token punctuation">,</span> timezone
+<span class="token keyword">from</span> pathlib <span class="token keyword">import</span> Path
+
+<span class="token keyword">import</span> boto3
+
+<span class="token decorator annotation punctuation">@dataclass</span><span class="token punctuation">(</span>frozen<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+<span class="token keyword">class</span> <span class="token class-name">BuildId</span><span class="token punctuation">:</span>
+    version<span class="token punctuation">:</span> <span class="token builtin">str</span>          <span class="token comment"># the prefix segment, e.g. "b-7f3a9c21"</span>
+    provenance_hash<span class="token punctuation">:</span> <span class="token builtin">str</span>  <span class="token comment"># inputs + params + tool versions</span>
+    built_at<span class="token punctuation">:</span> <span class="token builtin">str</span>
+    label<span class="token punctuation">:</span> <span class="token builtin">str</span>            <span class="token comment"># human-readable, e.g. "2026-09-17 nightly"</span>
+
+<span class="token keyword">def</span> <span class="token function">build_id</span><span class="token punctuation">(</span>provenance_hash<span class="token punctuation">,</span> label<span class="token operator">=</span><span class="token boolean">None</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    short <span class="token operator">=</span> provenance_hash<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token number">8</span><span class="token punctuation">]</span>
+    <span class="token keyword">return</span> BuildId<span class="token punctuation">(</span>version<span class="token operator">=</span><span class="token string-interpolation"><span class="token string">f"b-</span><span class="token interpolation"><span class="token punctuation">{</span>short<span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">,</span>
+                   provenance_hash<span class="token operator">=</span>provenance_hash<span class="token punctuation">,</span>
+                   built_at<span class="token operator">=</span>datetime<span class="token punctuation">.</span>now<span class="token punctuation">(</span>timezone<span class="token punctuation">.</span>utc<span class="token punctuation">)</span><span class="token punctuation">.</span>isoformat<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                   label<span class="token operator">=</span>label <span class="token keyword">or</span> datetime<span class="token punctuation">.</span>now<span class="token punctuation">(</span>timezone<span class="token punctuation">.</span>utc<span class="token punctuation">)</span><span class="token punctuation">.</span>strftime<span class="token punctuation">(</span><span class="token string">"%Y-%m-%d build"</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+
+<span class="token keyword">def</span> <span class="token function">provenance</span><span class="token punctuation">(</span>inputs<span class="token punctuation">,</span> params<span class="token punctuation">,</span> tools<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    payload <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token string">"inputs"</span><span class="token punctuation">:</span> <span class="token punctuation">{</span>k<span class="token punctuation">:</span> v <span class="token keyword">for</span> k<span class="token punctuation">,</span> v <span class="token keyword">in</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span>inputs<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+               <span class="token string">"params"</span><span class="token punctuation">:</span> params<span class="token punctuation">,</span> <span class="token string">"tools"</span><span class="token punctuation">:</span> tools<span class="token punctuation">}</span>
+    canonical <span class="token operator">=</span> json<span class="token punctuation">.</span>dumps<span class="token punctuation">(</span>payload<span class="token punctuation">,</span> sort_keys<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> separators<span class="token operator">=</span><span class="token punctuation">(</span><span class="token string">","</span><span class="token punctuation">,</span> <span class="token string">":"</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> hashlib<span class="token punctuation">.</span>sha256<span class="token punctuation">(</span>canonical<span class="token punctuation">.</span>encode<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">.</span>hexdigest<span class="token punctuation">(</span><span class="token punctuation">)</span>
+
+bid <span class="token operator">=</span> build_id<span class="token punctuation">(</span>provenance<span class="token punctuation">(</span>
+    <span class="token punctuation">{</span><span class="token string">"footprints"</span><span class="token punctuation">:</span> <span class="token string">"sha256:9a1f…"</span><span class="token punctuation">,</span> <span class="token string">"dtm"</span><span class="token punctuation">:</span> <span class="token string">"sha256:41c0…"</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+    <span class="token punctuation">{</span><span class="token string">"max_per_tile"</span><span class="token punctuation">:</span> <span class="token number">2000</span><span class="token punctuation">,</span> <span class="token string">"quantize_position"</span><span class="token punctuation">:</span> <span class="token number">14</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+    <span class="token punctuation">{</span><span class="token string">"tiler"</span><span class="token punctuation">:</span> <span class="token string">"twin-tiler 4.2.1"</span><span class="token punctuation">,</span> <span class="token string">"gltfpack"</span><span class="token punctuation">:</span> <span class="token string">"0.20"</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+<span class="token punctuation">)</span><span class="token punctuation">,</span> label<span class="token operator">=</span><span class="token string">"2026-09-17 nightly"</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span>asdict<span class="token punctuation">(</span>bid<span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Deriving the prefix from the provenance hash rather than from a timestamp or a counter gives one useful property for free: a rebuild that changes nothing produces the same prefix, so it uploads nothing and the pointer does not move. That turns “did anything actually change?” into a string comparison, and it stops a nightly job from publishing 6,000 identical files every night.</p>
+<p>The short hash is the prefix segment because URLs are read by humans during incidents. Eight hex characters is 4 billion values, which is ample for build identity within a project.</p>
+<h3 id="2-publish-under-the-prefix-with-a-one-year-cache-lifetime" tabindex="-1"><a class="heading-link" href="#2-publish-under-the-prefix-with-a-one-year-cache-lifetime"><span>2. Publish under the prefix, with a one-year cache lifetime</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python">CACHE_IMMUTABLE <span class="token operator">=</span> <span class="token string">"public, max-age=31536000, immutable"</span>
+CACHE_POINTER <span class="token operator">=</span> <span class="token string">"public, max-age=30, stale-while-revalidate=60"</span>
+
+CONTENT_TYPES <span class="token operator">=</span> <span class="token punctuation">{</span>
+    <span class="token string">".json"</span><span class="token punctuation">:</span> <span class="token string">"application/json"</span><span class="token punctuation">,</span>
+    <span class="token string">".glb"</span><span class="token punctuation">:</span> <span class="token string">"model/gltf-binary"</span><span class="token punctuation">,</span>
+    <span class="token string">".b3dm"</span><span class="token punctuation">:</span> <span class="token string">"application/octet-stream"</span><span class="token punctuation">,</span>
+    <span class="token string">".subtree"</span><span class="token punctuation">:</span> <span class="token string">"application/octet-stream"</span><span class="token punctuation">,</span>
+    <span class="token string">".ktx2"</span><span class="token punctuation">:</span> <span class="token string">"image/ktx2"</span><span class="token punctuation">,</span>
+    <span class="token string">".webp"</span><span class="token punctuation">:</span> <span class="token string">"image/webp"</span><span class="token punctuation">,</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">def</span> <span class="token function">publish_build</span><span class="token punctuation">(</span>local_root<span class="token punctuation">,</span> bucket<span class="token punctuation">,</span> base_prefix<span class="token punctuation">,</span> bid<span class="token punctuation">,</span> s3<span class="token operator">=</span><span class="token boolean">None</span><span class="token punctuation">,</span> dry_run<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    s3 <span class="token operator">=</span> s3 <span class="token keyword">or</span> boto3<span class="token punctuation">.</span>client<span class="token punctuation">(</span><span class="token string">"s3"</span><span class="token punctuation">)</span>
+    prefix <span class="token operator">=</span> <span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>base_prefix<span class="token punctuation">.</span>rstrip<span class="token punctuation">(</span><span class="token string">'/'</span><span class="token punctuation">)</span><span class="token punctuation">}</span></span><span class="token string">/</span><span class="token interpolation"><span class="token punctuation">{</span>bid<span class="token punctuation">.</span>version<span class="token punctuation">}</span></span><span class="token string">/"</span></span>
+    uploaded<span class="token punctuation">,</span> skipped<span class="token punctuation">,</span> total_bytes <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">0</span>
+    <span class="token keyword">for</span> path <span class="token keyword">in</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span>Path<span class="token punctuation">(</span>local_root<span class="token punctuation">)</span><span class="token punctuation">.</span>rglob<span class="token punctuation">(</span><span class="token string">"*"</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">if</span> <span class="token keyword">not</span> path<span class="token punctuation">.</span>is_file<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+            <span class="token keyword">continue</span>
+        rel <span class="token operator">=</span> path<span class="token punctuation">.</span>relative_to<span class="token punctuation">(</span>local_root<span class="token punctuation">)</span><span class="token punctuation">.</span>as_posix<span class="token punctuation">(</span><span class="token punctuation">)</span>
+        key <span class="token operator">=</span> <span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>prefix<span class="token punctuation">}</span></span><span class="token interpolation"><span class="token punctuation">{</span>rel<span class="token punctuation">}</span></span><span class="token string">"</span></span>
+        ctype <span class="token operator">=</span> CONTENT_TYPES<span class="token punctuation">.</span>get<span class="token punctuation">(</span>path<span class="token punctuation">.</span>suffix<span class="token punctuation">,</span> <span class="token string">"application/octet-stream"</span><span class="token punctuation">)</span>
+        size <span class="token operator">=</span> path<span class="token punctuation">.</span>stat<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span>st_size
+        <span class="token keyword">if</span> <span class="token keyword">not</span> dry_run<span class="token punctuation">:</span>
+            s3<span class="token punctuation">.</span>upload_file<span class="token punctuation">(</span><span class="token builtin">str</span><span class="token punctuation">(</span>path<span class="token punctuation">)</span><span class="token punctuation">,</span> bucket<span class="token punctuation">,</span> key<span class="token punctuation">,</span>
+                           ExtraArgs<span class="token operator">=</span><span class="token punctuation">{</span><span class="token string">"CacheControl"</span><span class="token punctuation">:</span> CACHE_IMMUTABLE<span class="token punctuation">,</span>
+                                      <span class="token string">"ContentType"</span><span class="token punctuation">:</span> ctype<span class="token punctuation">,</span>
+                                      <span class="token string">"ContentEncoding"</span><span class="token punctuation">:</span> <span class="token string">"gzip"</span>
+                                      <span class="token keyword">if</span> path<span class="token punctuation">.</span>suffix <span class="token operator">==</span> <span class="token string">".json"</span> <span class="token keyword">else</span> <span class="token boolean">None</span><span class="token punctuation">}</span>
+                           <span class="token keyword">if</span> path<span class="token punctuation">.</span>suffix <span class="token operator">==</span> <span class="token string">".json"</span> <span class="token keyword">else</span>
+                           <span class="token punctuation">{</span><span class="token string">"CacheControl"</span><span class="token punctuation">:</span> CACHE_IMMUTABLE<span class="token punctuation">,</span> <span class="token string">"ContentType"</span><span class="token punctuation">:</span> ctype<span class="token punctuation">}</span><span class="token punctuation">)</span>
+        uploaded <span class="token operator">+=</span> <span class="token number">1</span>
+        total_bytes <span class="token operator">+=</span> size
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"prefix"</span><span class="token punctuation">:</span> prefix<span class="token punctuation">,</span> <span class="token string">"files"</span><span class="token punctuation">:</span> uploaded<span class="token punctuation">,</span> <span class="token string">"skipped"</span><span class="token punctuation">:</span> skipped<span class="token punctuation">,</span>
+            <span class="token string">"gb"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>total_bytes <span class="token operator">/</span> <span class="token number">1e9</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">}</span>
+
+<span class="token keyword">print</span><span class="token punctuation">(</span>publish_build<span class="token punctuation">(</span><span class="token string">"build/city/output"</span><span class="token punctuation">,</span> <span class="token string">"tiles.example.com"</span><span class="token punctuation">,</span> <span class="token string">"city"</span><span class="token punctuation">,</span> bid<span class="token punctuation">,</span> dry_run<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p><code>immutable</code> in the <code>Cache-Control</code> header is the directive that matters. Without it, a browser with a <code>max-age=31536000</code> response still revalidates on a reload; with it, the browser will not issue a conditional request at all, which removes a round trip per tile on every repeat visit.</p>
+<p>The header is a promise, and immutable prefixes are what make the promise true. Serving <code>immutable</code> on a path you later overwrite produces the worst of both worlds: clients that hold the old content for a year with no way to be told otherwise.</p>
+<h3 id="3-write-the-pointer-document-last" tabindex="-1"><a class="heading-link" href="#3-write-the-pointer-document-last"><span>3. Write the pointer document last</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python">POINTER_KEY_TEMPLATE <span class="token operator">=</span> <span class="token string">"{base}/current.json"</span>
+
+<span class="token keyword">def</span> <span class="token function">write_pointer</span><span class="token punctuation">(</span>bucket<span class="token punctuation">,</span> base_prefix<span class="token punctuation">,</span> bid<span class="token punctuation">,</span> extra<span class="token operator">=</span><span class="token boolean">None</span><span class="token punctuation">,</span> s3<span class="token operator">=</span><span class="token boolean">None</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    s3 <span class="token operator">=</span> s3 <span class="token keyword">or</span> boto3<span class="token punctuation">.</span>client<span class="token punctuation">(</span><span class="token string">"s3"</span><span class="token punctuation">)</span>
+    doc <span class="token operator">=</span> <span class="token punctuation">{</span>
+        <span class="token string">"schema"</span><span class="token punctuation">:</span> <span class="token number">1</span><span class="token punctuation">,</span>
+        <span class="token string">"version"</span><span class="token punctuation">:</span> bid<span class="token punctuation">.</span>version<span class="token punctuation">,</span>
+        <span class="token string">"tilesetUrl"</span><span class="token punctuation">:</span> <span class="token string-interpolation"><span class="token string">f"/</span><span class="token interpolation"><span class="token punctuation">{</span>base_prefix<span class="token punctuation">.</span>strip<span class="token punctuation">(</span><span class="token string">'/'</span><span class="token punctuation">)</span><span class="token punctuation">}</span></span><span class="token string">/</span><span class="token interpolation"><span class="token punctuation">{</span>bid<span class="token punctuation">.</span>version<span class="token punctuation">}</span></span><span class="token string">/tileset.json"</span></span><span class="token punctuation">,</span>
+        <span class="token string">"provenanceHash"</span><span class="token punctuation">:</span> bid<span class="token punctuation">.</span>provenance_hash<span class="token punctuation">,</span>
+        <span class="token string">"builtAt"</span><span class="token punctuation">:</span> bid<span class="token punctuation">.</span>built_at<span class="token punctuation">,</span>
+        <span class="token string">"label"</span><span class="token punctuation">:</span> bid<span class="token punctuation">.</span>label<span class="token punctuation">,</span>
+        <span class="token string">"publishedAt"</span><span class="token punctuation">:</span> datetime<span class="token punctuation">.</span>now<span class="token punctuation">(</span>timezone<span class="token punctuation">.</span>utc<span class="token punctuation">)</span><span class="token punctuation">.</span>isoformat<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token operator">**</span><span class="token punctuation">(</span>extra <span class="token keyword">or</span> <span class="token punctuation">{</span><span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+    body <span class="token operator">=</span> json<span class="token punctuation">.</span>dumps<span class="token punctuation">(</span>doc<span class="token punctuation">,</span> sort_keys<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> separators<span class="token operator">=</span><span class="token punctuation">(</span><span class="token string">","</span><span class="token punctuation">,</span> <span class="token string">":"</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">.</span>encode<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    key <span class="token operator">=</span> POINTER_KEY_TEMPLATE<span class="token punctuation">.</span><span class="token builtin">format</span><span class="token punctuation">(</span>base<span class="token operator">=</span>base_prefix<span class="token punctuation">.</span>strip<span class="token punctuation">(</span><span class="token string">"/"</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    s3<span class="token punctuation">.</span>put_object<span class="token punctuation">(</span>Bucket<span class="token operator">=</span>bucket<span class="token punctuation">,</span> Key<span class="token operator">=</span>key<span class="token punctuation">,</span> Body<span class="token operator">=</span>body<span class="token punctuation">,</span>
+                  CacheControl<span class="token operator">=</span>CACHE_POINTER<span class="token punctuation">,</span> ContentType<span class="token operator">=</span><span class="token string">"application/json"</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"key"</span><span class="token punctuation">:</span> key<span class="token punctuation">,</span> <span class="token string">"bytes"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>body<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"doc"</span><span class="token punctuation">:</span> doc<span class="token punctuation">}</span>
+
+<span class="token keyword">print</span><span class="token punctuation">(</span>json<span class="token punctuation">.</span>dumps<span class="token punctuation">(</span>write_pointer<span class="token punctuation">(</span><span class="token string">"tiles.example.com"</span><span class="token punctuation">,</span> <span class="token string">"city"</span><span class="token punctuation">,</span> bid<span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token string">"doc"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> indent<span class="token operator">=</span><span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>The pointer is the only mutable object in the system, and everything about it is chosen to make that safe: it is a few hundred bytes, it has a 30-second cache lifetime, and <code>stale-while-revalidate</code> means a client never blocks on fetching it. A viewer reads the pointer at start-up and then uses immutable URLs for everything else.</p>
+<p>Writing it <strong>after</strong> every tile is uploaded is the ordering that makes switchover atomic in practice. Until the pointer moves, the new build is invisible; once it moves, every file it references is already in place. There is no window in which a client can resolve a URL that does not exist.</p>
+<figure class="diagram">
+<svg viewBox="4 16 732 242" role="img" aria-labelledby="ver-layout-t ver-layout-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="ver-layout-t">Immutable prefixes with one mutable pointer</title>
+  <desc id="ver-layout-d">A storage layout. Three build prefixes each hold a complete tileset with a one-year immutable cache lifetime: an older build, the current build, and a newly uploaded build. A single small pointer document at the base of the path has a thirty-second cache lifetime and names which build is current. The viewer fetches the pointer once, then fetches tiles from the named prefix using URLs that never change.</desc>
+  <rect class="svg-bg" x="4" y="16" width="732" height="242" fill="#ffffff"/>
+  <defs>
+    <marker id="ver-layout-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
+    </marker>
+  </defs>
+  <rect x="18" y="30" width="196" height="56" rx="7" fill="#ffffff" stroke="#5b6471" stroke-width="1.6"/>
+  <rect x="18" y="96" width="196" height="56" rx="7" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2.4"/>
+  <rect x="18" y="162" width="196" height="56" rx="7" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="1.6"/>
+  <rect x="290" y="96" width="166" height="56" rx="7" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2.4"/>
+  <rect x="532" y="84" width="190" height="80" rx="7" fill="#ffffff" stroke="#5b6471" stroke-width="1.6"/>
+  <g stroke="#5b6471" stroke-width="2" fill="none" marker-end="url(#ver-layout-arrow)">
+    <path d="M456 112 H530"/>
+    <path d="M596 164 V196 H214 V132" stroke-dasharray="6 4"/>
+  </g>
+  <path d="M214 124 H288" stroke="#4f7a4d" stroke-width="2" fill="none" marker-end="url(#ver-layout-arrow)"/>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="116" y="52">city/b-2c81f0aa/</text><text x="116" y="70">previous — kept for rollback</text>
+    <text x="116" y="118">city/b-7f3a9c21/</text><text x="116" y="136">current</text>
+    <text x="116" y="184">city/b-91de4c07/</text><text x="116" y="202">uploaded, not yet pointed at</text>
+    <text x="373" y="118">city/current.json</text><text x="373" y="136">max-age 30 s</text>
+    <text x="627" y="108">viewer: read pointer</text><text x="627" y="126">once, then fetch tiles</text>
+    <text x="627" y="144">from that prefix only</text>
+  </g>
+  <text x="20" y="240" fill="#5b6471" font-size="12">every file under a b- prefix: max-age 1 year, immutable</text>
+  <text x="720" y="240" fill="#5b6471" font-size="12" text-anchor="end">switchover = one 300-byte write; rollback = the same write</text>
+</svg>
+<figcaption>Thousands of immutable files, one mutable pointer, and a switchover that is a single small object write.</figcaption>
+</figure>
+<h3 id="4-resolve-the-pointer-in-the-client" tabindex="-1"><a class="heading-link" href="#4-resolve-the-pointer-in-the-client"><span>4. Resolve the pointer in the client</span></a></h3>
+<div class="codeblock" data-lang="javascript"><div class="codeblock__bar"><span class="codeblock__lang">javascript</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-javascript" tabindex="0" role="group" aria-label="javascript code sample"><code class="language-javascript"><span class="token keyword">const</span> <span class="token constant">POINTER_URL</span> <span class="token operator">=</span> <span class="token string">'https://tiles.example.com/city/current.json'</span><span class="token punctuation">;</span>
+
+<span class="token keyword">export</span> <span class="token keyword">async</span> <span class="token keyword">function</span> <span class="token function">resolveTileset</span><span class="token punctuation">(</span><span class="token parameter"><span class="token punctuation">{</span> pinnedVersion <span class="token operator">=</span> <span class="token keyword">null</span> <span class="token punctuation">}</span> <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token punctuation">}</span></span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+  <span class="token keyword">if</span> <span class="token punctuation">(</span>pinnedVersion<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span> <span class="token literal-property property">tilesetUrl</span><span class="token operator">:</span> <span class="token template-string"><span class="token template-punctuation string">`</span><span class="token string">https://tiles.example.com/city/</span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>pinnedVersion<span class="token interpolation-punctuation punctuation">}</span></span><span class="token string">/tileset.json</span><span class="token template-punctuation string">`</span></span><span class="token punctuation">,</span>
+             <span class="token literal-property property">version</span><span class="token operator">:</span> pinnedVersion<span class="token punctuation">,</span> <span class="token literal-property property">pinned</span><span class="token operator">:</span> <span class="token boolean">true</span> <span class="token punctuation">}</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  <span class="token keyword">const</span> res <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token function">fetch</span><span class="token punctuation">(</span><span class="token constant">POINTER_URL</span><span class="token punctuation">,</span> <span class="token punctuation">{</span> <span class="token literal-property property">cache</span><span class="token operator">:</span> <span class="token string">'no-cache'</span> <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>res<span class="token punctuation">.</span>ok<span class="token punctuation">)</span> <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">Error</span><span class="token punctuation">(</span><span class="token template-string"><span class="token template-punctuation string">`</span><span class="token string">pointer fetch failed: </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>res<span class="token punctuation">.</span>status<span class="token interpolation-punctuation punctuation">}</span></span><span class="token template-punctuation string">`</span></span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">const</span> doc <span class="token operator">=</span> <span class="token keyword">await</span> res<span class="token punctuation">.</span><span class="token function">json</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">if</span> <span class="token punctuation">(</span>doc<span class="token punctuation">.</span>schema <span class="token operator">!==</span> <span class="token number">1</span><span class="token punctuation">)</span> <span class="token keyword">throw</span> <span class="token keyword">new</span> <span class="token class-name">Error</span><span class="token punctuation">(</span><span class="token template-string"><span class="token template-punctuation string">`</span><span class="token string">unsupported pointer schema </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>doc<span class="token punctuation">.</span>schema<span class="token interpolation-punctuation punctuation">}</span></span><span class="token template-punctuation string">`</span></span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">return</span> <span class="token punctuation">{</span>
+    <span class="token literal-property property">tilesetUrl</span><span class="token operator">:</span> <span class="token keyword">new</span> <span class="token class-name">URL</span><span class="token punctuation">(</span>doc<span class="token punctuation">.</span>tilesetUrl<span class="token punctuation">,</span> <span class="token string">'https://tiles.example.com'</span><span class="token punctuation">)</span><span class="token punctuation">.</span>href<span class="token punctuation">,</span>
+    <span class="token literal-property property">version</span><span class="token operator">:</span> doc<span class="token punctuation">.</span>version<span class="token punctuation">,</span>
+    <span class="token literal-property property">label</span><span class="token operator">:</span> doc<span class="token punctuation">.</span>label<span class="token punctuation">,</span>
+    <span class="token literal-property property">pinned</span><span class="token operator">:</span> <span class="token boolean">false</span><span class="token punctuation">,</span>
+  <span class="token punctuation">}</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">export</span> <span class="token keyword">async</span> <span class="token keyword">function</span> <span class="token function">loadTileset</span><span class="token punctuation">(</span><span class="token parameter">viewer</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+  <span class="token keyword">const</span> <span class="token punctuation">{</span> tilesetUrl<span class="token punctuation">,</span> version <span class="token punctuation">}</span> <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token function">resolveTileset</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">const</span> tileset <span class="token operator">=</span> <span class="token keyword">await</span> Cesium<span class="token punctuation">.</span>Cesium3DTileset<span class="token punctuation">.</span><span class="token function">fromUrl</span><span class="token punctuation">(</span>tilesetUrl<span class="token punctuation">,</span> <span class="token punctuation">{</span>
+    <span class="token literal-property property">cacheBytes</span><span class="token operator">:</span> <span class="token number">536_870_912</span><span class="token punctuation">,</span>
+    <span class="token literal-property property">maximumScreenSpaceError</span><span class="token operator">:</span> <span class="token number">16</span><span class="token punctuation">,</span>
+  <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  viewer<span class="token punctuation">.</span>scene<span class="token punctuation">.</span>primitives<span class="token punctuation">.</span><span class="token function">add</span><span class="token punctuation">(</span>tileset<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">return</span> <span class="token punctuation">{</span> tileset<span class="token punctuation">,</span> version <span class="token punctuation">}</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+</code></pre></div>
+<p>Resolving the pointer once per session, not per tile, is the point: after that one request every URL the client touches is immutable, so the CDN serves everything from edge cache and the browser serves repeat visits from disk.</p>
+<p><code>pinnedVersion</code> is the feature that makes this layout valuable beyond caching. A support engineer investigating a report can pin the session to the build the reporter saw; a QA environment can pin to a build under review while production moves on. Both are impossible when the tileset lives at a single mutable URL.</p>
+<p>A running session keeps its version for its lifetime. Switching builds mid-session would mix geometry across two prefixes, which is exactly the problem this design exists to prevent — so a new build is picked up on the next page load, and a “new data available” prompt is the right way to surface it sooner.</p>
+<h3 id="5-make-switchover-and-rollback-the-same-operation" tabindex="-1"><a class="heading-link" href="#5-make-switchover-and-rollback-the-same-operation"><span>5. Make switchover and rollback the same operation</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">current_pointer</span><span class="token punctuation">(</span>bucket<span class="token punctuation">,</span> base_prefix<span class="token punctuation">,</span> s3<span class="token operator">=</span><span class="token boolean">None</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    s3 <span class="token operator">=</span> s3 <span class="token keyword">or</span> boto3<span class="token punctuation">.</span>client<span class="token punctuation">(</span><span class="token string">"s3"</span><span class="token punctuation">)</span>
+    key <span class="token operator">=</span> POINTER_KEY_TEMPLATE<span class="token punctuation">.</span><span class="token builtin">format</span><span class="token punctuation">(</span>base<span class="token operator">=</span>base_prefix<span class="token punctuation">.</span>strip<span class="token punctuation">(</span><span class="token string">"/"</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token keyword">try</span><span class="token punctuation">:</span>
+        obj <span class="token operator">=</span> s3<span class="token punctuation">.</span>get_object<span class="token punctuation">(</span>Bucket<span class="token operator">=</span>bucket<span class="token punctuation">,</span> Key<span class="token operator">=</span>key<span class="token punctuation">)</span>
+    <span class="token keyword">except</span> s3<span class="token punctuation">.</span>exceptions<span class="token punctuation">.</span>NoSuchKey<span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token boolean">None</span>
+    <span class="token keyword">return</span> json<span class="token punctuation">.</span>loads<span class="token punctuation">(</span>obj<span class="token punctuation">[</span><span class="token string">"Body"</span><span class="token punctuation">]</span><span class="token punctuation">.</span>read<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+
+<span class="token keyword">def</span> <span class="token function">switch_to</span><span class="token punctuation">(</span>bucket<span class="token punctuation">,</span> base_prefix<span class="token punctuation">,</span> target_version<span class="token punctuation">,</span> s3<span class="token operator">=</span><span class="token boolean">None</span><span class="token punctuation">,</span> history_key<span class="token operator">=</span><span class="token boolean">None</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Point at an already-published build. This is both deploy and rollback."""</span>
+    s3 <span class="token operator">=</span> s3 <span class="token keyword">or</span> boto3<span class="token punctuation">.</span>client<span class="token punctuation">(</span><span class="token string">"s3"</span><span class="token punctuation">)</span>
+    base <span class="token operator">=</span> base_prefix<span class="token punctuation">.</span>strip<span class="token punctuation">(</span><span class="token string">"/"</span><span class="token punctuation">)</span>
+    probe <span class="token operator">=</span> <span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>base<span class="token punctuation">}</span></span><span class="token string">/</span><span class="token interpolation"><span class="token punctuation">{</span>target_version<span class="token punctuation">}</span></span><span class="token string">/tileset.json"</span></span>
+    <span class="token keyword">try</span><span class="token punctuation">:</span>
+        s3<span class="token punctuation">.</span>head_object<span class="token punctuation">(</span>Bucket<span class="token operator">=</span>bucket<span class="token punctuation">,</span> Key<span class="token operator">=</span>probe<span class="token punctuation">)</span>
+    <span class="token keyword">except</span> Exception <span class="token keyword">as</span> exc<span class="token punctuation">:</span>
+        <span class="token keyword">raise</span> RuntimeError<span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"refusing to point at </span><span class="token interpolation"><span class="token punctuation">{</span>target_version<span class="token punctuation">}</span></span><span class="token string">: </span><span class="token interpolation"><span class="token punctuation">{</span>probe<span class="token punctuation">}</span></span><span class="token string"> missing (</span><span class="token interpolation"><span class="token punctuation">{</span>exc<span class="token punctuation">}</span></span><span class="token string">)"</span></span><span class="token punctuation">)</span>
+
+    previous <span class="token operator">=</span> current_pointer<span class="token punctuation">(</span>bucket<span class="token punctuation">,</span> base_prefix<span class="token punctuation">,</span> s3<span class="token operator">=</span>s3<span class="token punctuation">)</span>
+    doc <span class="token operator">=</span> <span class="token punctuation">{</span>
+        <span class="token string">"schema"</span><span class="token punctuation">:</span> <span class="token number">1</span><span class="token punctuation">,</span>
+        <span class="token string">"version"</span><span class="token punctuation">:</span> target_version<span class="token punctuation">,</span>
+        <span class="token string">"tilesetUrl"</span><span class="token punctuation">:</span> <span class="token string-interpolation"><span class="token string">f"/</span><span class="token interpolation"><span class="token punctuation">{</span>base<span class="token punctuation">}</span></span><span class="token string">/</span><span class="token interpolation"><span class="token punctuation">{</span>target_version<span class="token punctuation">}</span></span><span class="token string">/tileset.json"</span></span><span class="token punctuation">,</span>
+        <span class="token string">"publishedAt"</span><span class="token punctuation">:</span> datetime<span class="token punctuation">.</span>now<span class="token punctuation">(</span>timezone<span class="token punctuation">.</span>utc<span class="token punctuation">)</span><span class="token punctuation">.</span>isoformat<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"previousVersion"</span><span class="token punctuation">:</span> <span class="token punctuation">(</span>previous <span class="token keyword">or</span> <span class="token punctuation">{</span><span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"version"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+    s3<span class="token punctuation">.</span>put_object<span class="token punctuation">(</span>Bucket<span class="token operator">=</span>bucket<span class="token punctuation">,</span>
+                  Key<span class="token operator">=</span>POINTER_KEY_TEMPLATE<span class="token punctuation">.</span><span class="token builtin">format</span><span class="token punctuation">(</span>base<span class="token operator">=</span>base<span class="token punctuation">)</span><span class="token punctuation">,</span>
+                  Body<span class="token operator">=</span>json<span class="token punctuation">.</span>dumps<span class="token punctuation">(</span>doc<span class="token punctuation">,</span> sort_keys<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> separators<span class="token operator">=</span><span class="token punctuation">(</span><span class="token string">","</span><span class="token punctuation">,</span> <span class="token string">":"</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">.</span>encode<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                  CacheControl<span class="token operator">=</span>CACHE_POINTER<span class="token punctuation">,</span> ContentType<span class="token operator">=</span><span class="token string">"application/json"</span><span class="token punctuation">)</span>
+    <span class="token keyword">if</span> history_key<span class="token punctuation">:</span>
+        s3<span class="token punctuation">.</span>put_object<span class="token punctuation">(</span>Bucket<span class="token operator">=</span>bucket<span class="token punctuation">,</span> Key<span class="token operator">=</span>history_key<span class="token punctuation">,</span>
+                      Body<span class="token operator">=</span><span class="token punctuation">(</span>json<span class="token punctuation">.</span>dumps<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"at"</span><span class="token punctuation">:</span> doc<span class="token punctuation">[</span><span class="token string">"publishedAt"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token operator">**</span>doc<span class="token punctuation">}</span><span class="token punctuation">)</span> <span class="token operator">+</span> <span class="token string">"\n"</span><span class="token punctuation">)</span><span class="token punctuation">.</span>encode<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                      CacheControl<span class="token operator">=</span><span class="token string">"no-store"</span><span class="token punctuation">,</span> ContentType<span class="token operator">=</span><span class="token string">"application/x-ndjson"</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"now"</span><span class="token punctuation">:</span> target_version<span class="token punctuation">,</span> <span class="token string">"was"</span><span class="token punctuation">:</span> doc<span class="token punctuation">[</span><span class="token string">"previousVersion"</span><span class="token punctuation">]</span><span class="token punctuation">}</span>
+
+<span class="token keyword">print</span><span class="token punctuation">(</span>switch_to<span class="token punctuation">(</span><span class="token string">"tiles.example.com"</span><span class="token punctuation">,</span> <span class="token string">"city"</span><span class="token punctuation">,</span> <span class="token string">"b-7f3a9c21"</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>The <code>head_object</code> probe before writing the pointer is the guard that prevents the one catastrophic mistake available here: pointing at a prefix that was never uploaded, or was pruned, which takes the tileset offline for everyone within 30 seconds.</p>
+<p>Rollback being identical to deploy is the property that makes this design worth the effort. There is no reverse migration, no re-upload and no invalidation — the previous build’s files are still there, still cached at the edge, and a 300-byte write brings them back. Recovery time is the pointer’s cache lifetime, which is why 30 seconds is a good value for it.</p>
+<figure class="diagram">
+<svg viewBox="4 6 735 210" role="img" aria-labelledby="ver-headers-t ver-headers-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="ver-headers-t">The two cache policies that make this work</title>
+  <desc id="ver-headers-d">A table contrasting the cache headers on tile content and on the pointer document. Tile content gets a one-year max-age with the immutable directive, so a browser never revalidates and a CDN edge holds it indefinitely. The pointer gets a thirty-second max-age with stale-while-revalidate, so switchover and rollback both take effect within half a minute without ever blocking a client.</desc>
+  <rect class="svg-bg" x="4" y="6" width="735" height="210" fill="#ffffff"/>
+  <g stroke-width="1.5">
+    <rect x="18" y="20" width="196" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="214" y="20" width="314" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="528" y="20" width="194" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="18" y="54" width="196" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="214" y="54" width="314" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="528" y="54" width="194" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="18" y="88" width="196" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="214" y="88" width="314" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="528" y="88" width="194" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="18" y="122" width="196" height="34" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="214" y="122" width="314" height="34" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="528" y="122" width="194" height="34" fill="#f7dfdc" stroke="#b0413e"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="116" y="42">object</text><text x="371" y="42">Cache-Control</text><text x="625" y="42">consequence</text>
+    <text x="116" y="76">every tile and subtree</text><text x="371" y="76">max-age=31536000, immutable</text><text x="625" y="76">no revalidation, ever</text>
+    <text x="116" y="110">current.json pointer</text><text x="371" y="110">max-age=30, stale-while-revalidate=60</text><text x="625" y="110">switchover in 30 s</text>
+    <text x="116" y="144">the mistake</text><text x="371" y="144">immutable on an overwritten path</text><text x="625" y="144">clients hold wrong data for a year</text>
+  </g>
+  <text x="20" y="176" fill="#1f2937" font-size="12.5">The immutable directive is a promise; only never overwriting a path makes the promise true.</text>
+  <text x="20" y="198" fill="#5b6471" font-size="12">A long-lived pointer is the one misconfiguration that makes this scheme worse than doing nothing.</text>
+</svg>
+<figcaption>One long-lived policy, one short-lived one, and the third row is what happens when they are confused.</figcaption>
+</figure>
+<h3 id="6-retain-and-prune-old-builds" tabindex="-1"><a class="heading-link" href="#6-retain-and-prune-old-builds"><span>6. Retain and prune old builds</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python">RETENTION <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token string">"keep_versions"</span><span class="token punctuation">:</span> <span class="token number">5</span><span class="token punctuation">,</span> <span class="token string">"keep_days"</span><span class="token punctuation">:</span> <span class="token number">30</span><span class="token punctuation">,</span> <span class="token string">"never_prune"</span><span class="token punctuation">:</span> <span class="token builtin">set</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">}</span>
+
+<span class="token keyword">def</span> <span class="token function">list_versions</span><span class="token punctuation">(</span>bucket<span class="token punctuation">,</span> base_prefix<span class="token punctuation">,</span> s3<span class="token operator">=</span><span class="token boolean">None</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    s3 <span class="token operator">=</span> s3 <span class="token keyword">or</span> boto3<span class="token punctuation">.</span>client<span class="token punctuation">(</span><span class="token string">"s3"</span><span class="token punctuation">)</span>
+    base <span class="token operator">=</span> base_prefix<span class="token punctuation">.</span>strip<span class="token punctuation">(</span><span class="token string">"/"</span><span class="token punctuation">)</span>
+    paginator <span class="token operator">=</span> s3<span class="token punctuation">.</span>get_paginator<span class="token punctuation">(</span><span class="token string">"list_objects_v2"</span><span class="token punctuation">)</span>
+    versions <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token punctuation">}</span>
+    <span class="token keyword">for</span> page <span class="token keyword">in</span> paginator<span class="token punctuation">.</span>paginate<span class="token punctuation">(</span>Bucket<span class="token operator">=</span>bucket<span class="token punctuation">,</span> Prefix<span class="token operator">=</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>base<span class="token punctuation">}</span></span><span class="token string">/"</span></span><span class="token punctuation">,</span>
+                                   Delimiter<span class="token operator">=</span><span class="token string">"/"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">for</span> cp <span class="token keyword">in</span> page<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"CommonPrefixes"</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+            seg <span class="token operator">=</span> cp<span class="token punctuation">[</span><span class="token string">"Prefix"</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token builtin">len</span><span class="token punctuation">(</span>base<span class="token punctuation">)</span> <span class="token operator">+</span> <span class="token number">1</span><span class="token punctuation">:</span><span class="token punctuation">]</span><span class="token punctuation">.</span>strip<span class="token punctuation">(</span><span class="token string">"/"</span><span class="token punctuation">)</span>
+            <span class="token keyword">if</span> seg<span class="token punctuation">.</span>startswith<span class="token punctuation">(</span><span class="token string">"b-"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+                versions<span class="token punctuation">[</span>seg<span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token string">"prefix"</span><span class="token punctuation">:</span> cp<span class="token punctuation">[</span><span class="token string">"Prefix"</span><span class="token punctuation">]</span><span class="token punctuation">}</span>
+    <span class="token keyword">for</span> version<span class="token punctuation">,</span> info <span class="token keyword">in</span> versions<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        head <span class="token operator">=</span> s3<span class="token punctuation">.</span>list_objects_v2<span class="token punctuation">(</span>Bucket<span class="token operator">=</span>bucket<span class="token punctuation">,</span>
+                                  Prefix<span class="token operator">=</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>info<span class="token punctuation">[</span><span class="token string">'prefix'</span><span class="token punctuation">]</span><span class="token punctuation">}</span></span><span class="token string">tileset.json"</span></span><span class="token punctuation">,</span> MaxKeys<span class="token operator">=</span><span class="token number">1</span><span class="token punctuation">)</span>
+        contents <span class="token operator">=</span> head<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"Contents"</span><span class="token punctuation">)</span> <span class="token keyword">or</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+        info<span class="token punctuation">[</span><span class="token string">"published"</span><span class="token punctuation">]</span> <span class="token operator">=</span> contents<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token string">"LastModified"</span><span class="token punctuation">]</span><span class="token punctuation">.</span>isoformat<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">if</span> contents <span class="token keyword">else</span> <span class="token boolean">None</span>
+        info<span class="token punctuation">[</span><span class="token string">"bytes"</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token boolean">None</span>
+    <span class="token keyword">return</span> <span class="token builtin">dict</span><span class="token punctuation">(</span><span class="token builtin">sorted</span><span class="token punctuation">(</span>versions<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                       key<span class="token operator">=</span><span class="token keyword">lambda</span> kv<span class="token punctuation">:</span> kv<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token string">"published"</span><span class="token punctuation">]</span> <span class="token keyword">or</span> <span class="token string">""</span><span class="token punctuation">,</span> reverse<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+
+<span class="token keyword">def</span> <span class="token function">prune_plan</span><span class="token punctuation">(</span>bucket<span class="token punctuation">,</span> base_prefix<span class="token punctuation">,</span> s3<span class="token operator">=</span><span class="token boolean">None</span><span class="token punctuation">,</span> policy<span class="token operator">=</span>RETENTION<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    versions <span class="token operator">=</span> list_versions<span class="token punctuation">(</span>bucket<span class="token punctuation">,</span> base_prefix<span class="token punctuation">,</span> s3<span class="token operator">=</span>s3<span class="token punctuation">)</span>
+    pointer <span class="token operator">=</span> current_pointer<span class="token punctuation">(</span>bucket<span class="token punctuation">,</span> base_prefix<span class="token punctuation">,</span> s3<span class="token operator">=</span>s3<span class="token punctuation">)</span> <span class="token keyword">or</span> <span class="token punctuation">{</span><span class="token punctuation">}</span>
+    protected <span class="token operator">=</span> <span class="token punctuation">{</span>pointer<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"version"</span><span class="token punctuation">)</span><span class="token punctuation">,</span> pointer<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"previousVersion"</span><span class="token punctuation">)</span><span class="token punctuation">}</span> <span class="token operator">|</span> policy<span class="token punctuation">[</span><span class="token string">"never_prune"</span><span class="token punctuation">]</span>
+    protected<span class="token punctuation">.</span>discard<span class="token punctuation">(</span><span class="token boolean">None</span><span class="token punctuation">)</span>
+    now <span class="token operator">=</span> datetime<span class="token punctuation">.</span>now<span class="token punctuation">(</span>timezone<span class="token punctuation">.</span>utc<span class="token punctuation">)</span>
+    plan <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    <span class="token keyword">for</span> rank<span class="token punctuation">,</span> <span class="token punctuation">(</span>version<span class="token punctuation">,</span> info<span class="token punctuation">)</span> <span class="token keyword">in</span> <span class="token builtin">enumerate</span><span class="token punctuation">(</span>versions<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        age_days <span class="token operator">=</span> <span class="token boolean">None</span>
+        <span class="token keyword">if</span> info<span class="token punctuation">[</span><span class="token string">"published"</span><span class="token punctuation">]</span><span class="token punctuation">:</span>
+            age_days <span class="token operator">=</span> <span class="token punctuation">(</span>now <span class="token operator">-</span> datetime<span class="token punctuation">.</span>fromisoformat<span class="token punctuation">(</span>info<span class="token punctuation">[</span><span class="token string">"published"</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">.</span>days
+        <span class="token keyword">if</span> version <span class="token keyword">in</span> protected<span class="token punctuation">:</span>
+            plan<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"version"</span><span class="token punctuation">:</span> version<span class="token punctuation">,</span> <span class="token string">"action"</span><span class="token punctuation">:</span> <span class="token string">"keep"</span><span class="token punctuation">,</span> <span class="token string">"why"</span><span class="token punctuation">:</span> <span class="token string">"referenced"</span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+        <span class="token keyword">elif</span> rank <span class="token operator">&lt;</span> policy<span class="token punctuation">[</span><span class="token string">"keep_versions"</span><span class="token punctuation">]</span><span class="token punctuation">:</span>
+            plan<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"version"</span><span class="token punctuation">:</span> version<span class="token punctuation">,</span> <span class="token string">"action"</span><span class="token punctuation">:</span> <span class="token string">"keep"</span><span class="token punctuation">,</span>
+                         <span class="token string">"why"</span><span class="token punctuation">:</span> <span class="token string-interpolation"><span class="token string">f"newest </span><span class="token interpolation"><span class="token punctuation">{</span>rank <span class="token operator">+</span> <span class="token number">1</span><span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+        <span class="token keyword">elif</span> age_days <span class="token keyword">is</span> <span class="token keyword">not</span> <span class="token boolean">None</span> <span class="token keyword">and</span> age_days <span class="token operator">&lt;</span> policy<span class="token punctuation">[</span><span class="token string">"keep_days"</span><span class="token punctuation">]</span><span class="token punctuation">:</span>
+            plan<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"version"</span><span class="token punctuation">:</span> version<span class="token punctuation">,</span> <span class="token string">"action"</span><span class="token punctuation">:</span> <span class="token string">"keep"</span><span class="token punctuation">,</span>
+                         <span class="token string">"why"</span><span class="token punctuation">:</span> <span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>age_days<span class="token punctuation">}</span></span><span class="token string">d old, inside window"</span></span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+        <span class="token keyword">else</span><span class="token punctuation">:</span>
+            plan<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"version"</span><span class="token punctuation">:</span> version<span class="token punctuation">,</span> <span class="token string">"action"</span><span class="token punctuation">:</span> <span class="token string">"delete"</span><span class="token punctuation">,</span>
+                         <span class="token string">"why"</span><span class="token punctuation">:</span> <span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>age_days<span class="token punctuation">}</span></span><span class="token string">d old, rank </span><span class="token interpolation"><span class="token punctuation">{</span>rank<span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> plan
+
+<span class="token keyword">for</span> row <span class="token keyword">in</span> prune_plan<span class="token punctuation">(</span><span class="token string">"tiles.example.com"</span><span class="token punctuation">,</span> <span class="token string">"city"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"  </span><span class="token interpolation"><span class="token punctuation">{</span>row<span class="token punctuation">[</span><span class="token string">'version'</span><span class="token punctuation">]</span><span class="token punctuation">:</span><span class="token format-spec">&lt;14</span><span class="token punctuation">}</span></span><span class="token interpolation"><span class="token punctuation">{</span>row<span class="token punctuation">[</span><span class="token string">'action'</span><span class="token punctuation">]</span><span class="token punctuation">:</span><span class="token format-spec">&lt;8</span><span class="token punctuation">}</span></span><span class="token interpolation"><span class="token punctuation">{</span>row<span class="token punctuation">[</span><span class="token string">'why'</span><span class="token punctuation">]</span><span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Protecting both the current and the <em>previous</em> version explicitly is what keeps rollback available. A retention policy that keeps only the current build makes the rollback path a lie, and the moment it matters is the moment it will be discovered.</p>
+<p>Old builds are cheap to keep — a city tileset is tens of gigabytes and object storage is inexpensive — so five versions and thirty days is a comfortable default that costs a few hundred gigabytes.</p>
+<figure class="diagram">
+<svg viewBox="26 3 688 227" role="img" aria-labelledby="ver-time-t ver-time-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="ver-time-t">Deploy, incident, rollback</title>
+  <desc id="ver-time-d">A timeline. A new build is uploaded over twenty minutes while the old build continues to serve, since nothing references the new prefix yet. The pointer is written, and within thirty seconds new sessions start on the new build. A defect is reported eight minutes later. The pointer is written back to the previous version, and within thirty seconds new sessions are on the old build again, served from edge cache that was never invalidated.</desc>
+  <rect class="svg-bg" x="26" y="3" width="688" height="227" fill="#ffffff"/>
+  <path d="M40 176 H700" stroke="#5b6471" stroke-width="1.5" fill="none"/>
+  <g stroke-width="1.5">
+    <rect x="40" y="46" width="230" height="30" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="270" y="86" width="210" height="30" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="480" y="46" width="220" height="30" fill="#e3f0f4" stroke="#1f6b8a"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="155" y="66">old build serving</text>
+    <text x="375" y="106">new build serving</text>
+    <text x="590" y="66">old build serving again</text>
+  </g>
+  <g stroke="#c46a3d" stroke-width="1.8" stroke-dasharray="5 4" fill="none">
+    <path d="M270 36 V176"/><path d="M480 36 V176"/>
+  </g>
+  <g fill="#9a4f26" font-size="12" text-anchor="middle">
+    <text x="270" y="30">pointer → new</text>
+    <text x="480" y="30">pointer → previous</text>
+  </g>
+  <g fill="#5b6471" font-size="12" text-anchor="middle">
+    <text x="155" y="196">upload 20 min:</text><text x="155" y="212">nothing references it yet</text>
+    <text x="375" y="196">defect reported</text><text x="375" y="212">after 8 min</text>
+    <text x="590" y="196">recovery = 30 s,</text><text x="590" y="212">no invalidation, cache warm</text>
+  </g>
+</svg>
+<figcaption>Upload is not a deploy, the deploy is one write, and rollback is the same write with the previous version.</figcaption>
+</figure>
+<h2 id="expected-output-verification" tabindex="-1"><a class="heading-link" href="#expected-output-verification"><span>Expected Output &amp; Verification</span></a></h2>
+<div class="codeblock" data-lang="text"><div class="codeblock__bar"><span class="codeblock__lang">text</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-text" tabindex="0" role="group" aria-label="text code sample"><code class="language-text">{'version': 'b-7f3a9c21', 'provenance_hash': '7f3a9c21e4b0…',
+ 'built_at': '2026-09-17T02:14:08.331Z', 'label': '2026-09-17 nightly'}
+{'prefix': 'city/b-7f3a9c21/', 'files': 6147, 'skipped': 0, 'gb': 18.42}
+{
+  "schema": 1,
+  "version": "b-7f3a9c21",
+  "tilesetUrl": "/city/b-7f3a9c21/tileset.json",
+  "provenanceHash": "7f3a9c21e4b0…",
+  "label": "2026-09-17 nightly"
+}
+{'now': 'b-7f3a9c21', 'was': 'b-2c81f0aa'}
+  b-7f3a9c21    keep    referenced
+  b-2c81f0aa    keep    referenced
+  b-91de4c07    keep    newest 3
+  b-4408ab12    keep    12d old, inside window
+  b-1f70cc93    delete  47d old, rank 5
+</code></pre></div>
+<p>Two versions kept as referenced — current and previous — is the shape that keeps rollback honest. One deletion of a 47-day-old build is the routine outcome once the policy has been running.</p>
+<p>Verify the cache headers are actually what was intended, since a misconfigured bucket policy or CDN rule silently overrides them:</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> requests
+
+<span class="token keyword">def</span> <span class="token function">header_check</span><span class="token punctuation">(</span>base_url<span class="token punctuation">,</span> version<span class="token punctuation">,</span> sample_tiles<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    rows <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    <span class="token keyword">for</span> path <span class="token keyword">in</span> <span class="token punctuation">[</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>version<span class="token punctuation">}</span></span><span class="token string">/tileset.json"</span></span><span class="token punctuation">,</span> <span class="token operator">*</span><span class="token punctuation">[</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>version<span class="token punctuation">}</span></span><span class="token string">/</span><span class="token interpolation"><span class="token punctuation">{</span>t<span class="token punctuation">}</span></span><span class="token string">"</span></span> <span class="token keyword">for</span> t <span class="token keyword">in</span> sample_tiles<span class="token punctuation">]</span><span class="token punctuation">]</span><span class="token punctuation">:</span>
+        r <span class="token operator">=</span> requests<span class="token punctuation">.</span>head<span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>base_url<span class="token punctuation">}</span></span><span class="token string">/</span><span class="token interpolation"><span class="token punctuation">{</span>path<span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">,</span> timeout<span class="token operator">=</span><span class="token number">20</span><span class="token punctuation">)</span>
+        cc <span class="token operator">=</span> r<span class="token punctuation">.</span>headers<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"Cache-Control"</span><span class="token punctuation">,</span> <span class="token string">""</span><span class="token punctuation">)</span>
+        rows<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"path"</span><span class="token punctuation">:</span> path<span class="token punctuation">,</span> <span class="token string">"status"</span><span class="token punctuation">:</span> r<span class="token punctuation">.</span>status_code<span class="token punctuation">,</span> <span class="token string">"cache_control"</span><span class="token punctuation">:</span> cc<span class="token punctuation">,</span>
+                     <span class="token string">"immutable"</span><span class="token punctuation">:</span> <span class="token string">"immutable"</span> <span class="token keyword">in</span> cc<span class="token punctuation">,</span>
+                     <span class="token string">"long_lived"</span><span class="token punctuation">:</span> <span class="token string">"max-age=31536000"</span> <span class="token keyword">in</span> cc<span class="token punctuation">,</span>
+                     <span class="token string">"age"</span><span class="token punctuation">:</span> r<span class="token punctuation">.</span>headers<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"Age"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                     <span class="token string">"cdn"</span><span class="token punctuation">:</span> r<span class="token punctuation">.</span>headers<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"CF-Cache-Status"</span><span class="token punctuation">)</span> <span class="token keyword">or</span> r<span class="token punctuation">.</span>headers<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"X-Cache"</span><span class="token punctuation">)</span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+    p <span class="token operator">=</span> requests<span class="token punctuation">.</span>head<span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>base_url<span class="token punctuation">}</span></span><span class="token string">/current.json"</span></span><span class="token punctuation">,</span> timeout<span class="token operator">=</span><span class="token number">20</span><span class="token punctuation">)</span>
+    pointer_cc <span class="token operator">=</span> p<span class="token punctuation">.</span>headers<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"Cache-Control"</span><span class="token punctuation">,</span> <span class="token string">""</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token string">"tiles_ok"</span><span class="token punctuation">:</span> <span class="token builtin">all</span><span class="token punctuation">(</span>x<span class="token punctuation">[</span><span class="token string">"immutable"</span><span class="token punctuation">]</span> <span class="token keyword">and</span> x<span class="token punctuation">[</span><span class="token string">"long_lived"</span><span class="token punctuation">]</span> <span class="token keyword">and</span> x<span class="token punctuation">[</span><span class="token string">"status"</span><span class="token punctuation">]</span> <span class="token operator">==</span> <span class="token number">200</span>
+                        <span class="token keyword">for</span> x <span class="token keyword">in</span> rows<span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"pointer_short_lived"</span><span class="token punctuation">:</span> <span class="token string">"max-age=30"</span> <span class="token keyword">in</span> pointer_cc <span class="token keyword">or</span> <span class="token string">"max-age=60"</span> <span class="token keyword">in</span> pointer_cc<span class="token punctuation">,</span>
+        <span class="token string">"pointer_cache_control"</span><span class="token punctuation">:</span> pointer_cc<span class="token punctuation">,</span>
+        <span class="token string">"sample"</span><span class="token punctuation">:</span> rows<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token number">3</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+
+<span class="token keyword">print</span><span class="token punctuation">(</span>json<span class="token punctuation">.</span>dumps<span class="token punctuation">(</span>header_check<span class="token punctuation">(</span><span class="token string">"https://tiles.example.com/city"</span><span class="token punctuation">,</span> <span class="token string">"b-7f3a9c21"</span><span class="token punctuation">,</span>
+                              <span class="token punctuation">[</span><span class="token string">"content/0/0/0.glb"</span><span class="token punctuation">,</span> <span class="token string">"content/1/2/3.glb"</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">,</span> indent<span class="token operator">=</span><span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>The pointer having a long cache lifetime is the failure that makes this design worse than doing nothing: switchover and rollback both stop working, silently, and the symptom is a deploy that “did not take” for some users.</p>
+<p>Then verify that no client can end up mixing builds, by asserting that the tileset under a prefix references only relative paths:</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">self_containment_check</span><span class="token punctuation">(</span>base_url<span class="token punctuation">,</span> version<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    r <span class="token operator">=</span> requests<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>base_url<span class="token punctuation">}</span></span><span class="token string">/</span><span class="token interpolation"><span class="token punctuation">{</span>version<span class="token punctuation">}</span></span><span class="token string">/tileset.json"</span></span><span class="token punctuation">,</span> timeout<span class="token operator">=</span><span class="token number">30</span><span class="token punctuation">)</span>
+    r<span class="token punctuation">.</span>raise_for_status<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    doc <span class="token operator">=</span> r<span class="token punctuation">.</span>json<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    absolute<span class="token punctuation">,</span> external <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    <span class="token keyword">def</span> <span class="token function">walk</span><span class="token punctuation">(</span>tile<span class="token punctuation">,</span> path<span class="token operator">=</span><span class="token string">"root"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        uri <span class="token operator">=</span> <span class="token punctuation">(</span>tile<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"content"</span><span class="token punctuation">)</span> <span class="token keyword">or</span> <span class="token punctuation">{</span><span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"uri"</span><span class="token punctuation">)</span>
+        <span class="token keyword">if</span> uri<span class="token punctuation">:</span>
+            <span class="token keyword">if</span> uri<span class="token punctuation">.</span>startswith<span class="token punctuation">(</span><span class="token string">"http"</span><span class="token punctuation">)</span> <span class="token keyword">or</span> uri<span class="token punctuation">.</span>startswith<span class="token punctuation">(</span><span class="token string">"/"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+                absolute<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"at"</span><span class="token punctuation">:</span> path<span class="token punctuation">,</span> <span class="token string">"uri"</span><span class="token punctuation">:</span> uri<span class="token punctuation">}</span><span class="token punctuation">)</span>
+            <span class="token keyword">if</span> uri<span class="token punctuation">.</span>endswith<span class="token punctuation">(</span><span class="token string">".json"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+                external<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"at"</span><span class="token punctuation">:</span> path<span class="token punctuation">,</span> <span class="token string">"uri"</span><span class="token punctuation">:</span> uri<span class="token punctuation">}</span><span class="token punctuation">)</span>
+        <span class="token keyword">for</span> i<span class="token punctuation">,</span> c <span class="token keyword">in</span> <span class="token builtin">enumerate</span><span class="token punctuation">(</span>tile<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"children"</span><span class="token punctuation">)</span> <span class="token keyword">or</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+            walk<span class="token punctuation">(</span>c<span class="token punctuation">,</span> <span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>path<span class="token punctuation">}</span></span><span class="token string">/</span><span class="token interpolation"><span class="token punctuation">{</span>i<span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+    walk<span class="token punctuation">(</span>doc<span class="token punctuation">[</span><span class="token string">"root"</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    other_versions <span class="token operator">=</span> <span class="token punctuation">[</span>a <span class="token keyword">for</span> a <span class="token keyword">in</span> absolute <span class="token keyword">if</span> <span class="token string">"/b-"</span> <span class="token keyword">in</span> a<span class="token punctuation">[</span><span class="token string">"uri"</span><span class="token punctuation">]</span> <span class="token keyword">and</span> version <span class="token keyword">not</span> <span class="token keyword">in</span> a<span class="token punctuation">[</span><span class="token string">"uri"</span><span class="token punctuation">]</span><span class="token punctuation">]</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"absolute_uris"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>absolute<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"external_tilesets"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>external<span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"references_other_versions"</span><span class="token punctuation">:</span> other_versions<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token number">3</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+            <span class="token string">"self_contained"</span><span class="token punctuation">:</span> <span class="token keyword">not</span> other_versions <span class="token keyword">and</span> <span class="token keyword">not</span> absolute<span class="token punctuation">}</span>
+
+<span class="token keyword">print</span><span class="token punctuation">(</span>self_containment_check<span class="token punctuation">(</span><span class="token string">"https://tiles.example.com/city"</span><span class="token punctuation">,</span> <span class="token string">"b-7f3a9c21"</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>An absolute URI anywhere in the tileset is how a build ends up referencing another build’s content — usually because a generator was given a full base URL. Relative URIs make the whole prefix self-contained by construction, which is the property that guarantees no client mixes builds.</p>
+<h2 id="performance-notes" tabindex="-1"><a class="heading-link" href="#performance-notes"><span>Performance Notes</span></a></h2>
+<ul>
+<li><strong>Uploading 6,147 files takes 8–20 minutes</strong> at typical concurrency. Parallelise at 16–32 connections; it is the slowest part of a deploy and it happens while the old build serves.</li>
+<li><strong>Skip unchanged files</strong> by comparing content hashes against the previous prefix and using a server-side copy. On an incremental rebuild, 95% of tiles are unchanged and copying is far cheaper than uploading.</li>
+<li><strong><code>immutable</code> saves one conditional request per tile</strong> on repeat visits, which on a 400-tile session is 400 round trips.</li>
+<li><strong>The pointer costs one request per session.</strong> With <code>stale-while-revalidate</code> it is never on the critical path after the first load.</li>
+<li><strong>Storage for five builds of a city tileset is about 90 GB.</strong> At commodity object-storage prices that is a rounding error against the cost of a bad deploy.</li>
+<li><strong>No invalidation calls at all</strong>, which matters because CDN invalidation at 6,000 paths is both slow and, on some providers, billed per path.</li>
+</ul>
+<h2 id="common-errors" tabindex="-1"><a class="heading-link" href="#common-errors"><span>Common Errors</span></a></h2>
+<p><strong>Clients still see the old build minutes after switchover.</strong> The pointer has a long <code>Cache-Control</code>. It must be seconds.</p>
+<p><strong>A tile 404s after deploy.</strong> The pointer was written before the upload finished. Always write it last, and probe the tileset before writing it.</p>
+<p><strong>Mixed geometry in one scene.</strong> The tileset uses absolute URIs pointing outside its own prefix. Make every content URI relative.</p>
+<p><strong>Every nightly build creates a new prefix even though nothing changed.</strong> The provenance hash includes a timestamp or a temporary path. It must contain only inputs, parameters and tool versions.</p>
+<p><strong>Rollback failed: prefix not found.</strong> Retention pruned the previous build. Protect current and previous explicitly.</p>
+<p><strong>The viewer reloads the pointer constantly.</strong> <code>cache: 'no-cache'</code> on every tile request rather than only on the pointer. Only the pointer needs it.</p>
+<p><strong>Storage costs climbing fast.</strong> Retention is not running, or an incremental build is re-uploading unchanged tiles under each new prefix instead of server-side copying them.</p>
+<h2 id="frequently-asked-questions" tabindex="-1"><a class="heading-link" href="#frequently-asked-questions"><span>Frequently Asked Questions</span></a></h2>
+<h3 id="why-not-use-query-strings-for-versioning" tabindex="-1"><a class="heading-link" href="#why-not-use-query-strings-for-versioning"><span>Why not use query strings for versioning?</span></a></h3>
+<p>Some CDNs ignore query strings in the cache key by default, and some proxies strip them. A path segment is unambiguous everywhere and is visible in logs.</p>
+<h3 id="can-the-pointer-be-a-dns-or-cdn-rule-instead" tabindex="-1"><a class="heading-link" href="#can-the-pointer-be-a-dns-or-cdn-rule-instead"><span>Can the pointer be a DNS or CDN rule instead?</span></a></h3>
+<p>It can — a CDN edge rule rewriting <code>/city/tileset.json</code> to the current prefix works and keeps the client simpler. The trade is that the rule lives in CDN configuration rather than in an object you can write from the deploy job, which makes rollback a configuration change instead of a file write.</p>
+<h3 id="what-about-implicit-tiling-subtree-files" tabindex="-1"><a class="heading-link" href="#what-about-implicit-tiling-subtree-files"><span>What about implicit tiling subtree files?</span></a></h3>
+<p>They are content like anything else and live under the same prefix with the same headers. Nothing changes.</p>
+<h2 id="related-guides" tabindex="-1"><a class="heading-link" href="#related-guides"><span>Related Guides</span></a></h2>
+<ul>
+<li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/making-tile-output-deterministic/">Making Tile Output Deterministic</a> — what makes the provenance-derived prefix meaningful</li>
+<li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/detecting-stale-tiles-after-deploy/">Detecting Stale Tiles After Deploy</a> — catching the failure this design prevents</li>
+<li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/http2-and-connection-limits-for-tile-streaming/">HTTP/2 and Connection Limits for Tile Streaming</a> — the transport that serves these immutable URLs</li>
+</ul>
+<p>Back to <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/">Streaming Sync Patterns</a>.</p>
+
+
+      
+      
+
+      <div class="related-nav">
+        
+
+        
+          <div>
+            <h3>Related</h3>
+            <div class="related-grid">
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/cache-invalidation-for-versioned-tilesets/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Cache Invalidation for Versioned Tilesets</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/http2-and-connection-limits-for-tile-streaming/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">HTTP/2 and Connection Limits for Tile Streaming</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/prefetching-tiles-along-a-camera-path/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Prefetching Tiles Along a Camera Path</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/streaming-live-sensor-updates-onto-tilesets/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Streaming Live Sensor Updates onto Tilesets</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/tuning-tileset-cache-bytes-for-memory-constrained-clients/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Tuning Tileset Cache Bytes for Memory-Constrained Clients</span>
+                </a>
+              
+            </div>
+          </div>
+        
+      </div>
+    </article>
+
+    
+    <aside class="toc" aria-label="On this page" data-toc hidden>
+      <h4>On this page</h4>
+      <ul></ul>
+    </aside>
+  </div>
+</div>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+  <div class="container site-footer__inner">
+    <div class="site-footer__brand">
+      <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+        <img src="/assets/img/logo-mark.svg" alt="" class="brand__mark" width="36" height="36">
+        <span class="brand__name">
+          3D Geospatial
+          <small>Digital Twin Automation</small>
+        </span>
+      </a>
+      <p>Engineering-grade guides on point cloud processing, mesh pipelines, LOD strategies, and CI/CD automation for digital twin platforms.</p>
+      <a class="footer-social" href="https://github.com/3d-geospatial" aria-label="3D Geospatial on GitHub" rel="noopener" target="_blank">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+          <path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.53-1.34-1.3-1.7-1.3-1.7-1.06-.72.08-.71.08-.71 1.17.08 1.79 1.2 1.79 1.2 1.04 1.79 2.73 1.27 3.4.97.1-.75.4-1.27.73-1.56-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.19-3.08-.12-.3-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.75.11 3.05.74.8 1.19 1.83 1.19 3.08 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.07.78 2.15v3.18c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5Z"/>
+        </svg>
+        <span>GitHub</span>
+      </a>
+    </div>
+
+    <div class="site-footer__col">
+      <h4>Sections</h4>
+      <ul>
+        <li><a href="https://www.3d-geospatial.com/">Home</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management &amp; Optimization</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/">Point Cloud &amp; Mesh Pipelines</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/">Troubleshooting &amp; Reliability</a></li>
+        
+      </ul>
+    </div>
+
+    
+      <div class="site-footer__col">
+        <h4>3D Geospatial Fundamentals</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/">3D Format Standards Comparison</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/">BIM and IFC Georeferencing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/">CityGML and CityJSON Processing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems for 3D Assets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/">Digital Elevation Model Workflows</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/">Spatial Indexing and Tiling Schemes for 3D Data</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>LOD Management &amp; Optimization</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/">Automated Tile Generation for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/">Cesium ion Upload Automation for 3D Tilesets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/">glTF LOD Generation With Draco Compression</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/">Streaming Sync Patterns for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/">Tileset Metadata and 3D Tiles Next</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/">Vector Overlays on 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Point Cloud &amp; Mesh Pipelines</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/">Automated Mesh Decimation for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/">Change Detection Between LiDAR Scan Epochs</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/">CI/CD Automation for Spatial Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">LiDAR Classification and Ground Extraction</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/photogrammetry-processing-pipelines/">Photogrammetry Processing Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/">Point Cloud Filtering Techniques</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/">Surface Reconstruction for Geospatial Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/">Texture Mapping Workflows for Digital Twins</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Troubleshooting &amp; Reliability</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/">Cross-Section Failure Modes in Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/">Data Validation &amp; QA Gates for 3D Tiles</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/">Performance Profiling and Benchmarking</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/">Pipeline Observability and Monitoring</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/">Streaming &amp; Runtime Diagnostics for 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+  </div>
+  <div class="container site-footer__bottom">
+    <span>© 2026 3D Geospatial &amp; Digital Twin Automation</span>
+    <span>Built with Eleventy · PWA-enabled</span>
+  </div>
+</footer>
+
+
+  <script src="/assets/js/site.js?v=b99aa9f971" defer></script>
+  
+</body>
+</html>

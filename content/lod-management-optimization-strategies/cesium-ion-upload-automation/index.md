@@ -380,5 +380,9 @@ The hosted asset is always in EPSG:4978, geocentric WGS84 ECEF, because that is 
 - [Automating ion Tileset Uploads with the REST API](https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/automating-ion-tileset-uploads-with-the-rest-api/) — the full runnable script behind this workflow
 - [CI/CD Automation for Spatial Pipelines](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/) — wire this publish step into a build with GDAL/PDAL jobs
 - [Cesium ion platform](https://cesium.com/platform/cesium-ion/) — the managed tiling and hosting service this API drives
+- [Choosing ion Source Types and Options](https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/choosing-ion-source-types-and-options/) — pick the right Cesium ion source type and tiling options for buildings, point clouds, photogrammetry, terrain
+- [Listing and Pruning Old ion Assets](https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/listing-and-pruning-old-ion-assets/) — inventory a Cesium ion account from the REST API, find the archived and superseded assets nobody references, a
+- [Managing ion Access Tokens and Scopes](https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/managing-ion-access-tokens-and-scopes/) — issue, scope, rotate and revoke Cesium ion tokens from the REST API
+- [Uploading Terrain Rasters to ion](https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/uploading-terrain-rasters-to-ion/) — prepare and upload elevation rasters as ion terrain
 
 Back to [LOD Management & Optimization Strategies](https://www.3d-geospatial.com/lod-management-optimization-strategies/).

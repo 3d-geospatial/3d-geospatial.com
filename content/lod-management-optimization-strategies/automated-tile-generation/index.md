@@ -429,5 +429,9 @@ Aim for a few hundred thousand triangles or points per leaf tile after Draco —
 - [Streaming Sync Patterns for 3D Geospatial](https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/) — how clients request tiles by screen-space error
 - [Automated Mesh Decimation for Digital Twins](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/) — generating the simplified geometry each LOD level needs
 - [glTF vs 3D Tiles vs OBJ for Spatial Data](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/gltf-vs-3dtiles-vs-obj-for-spatial-data/) — why glTF is the payload inside b3dm tiles
+- [Converting GLB to 3D Tiles with 3d-tiles-tools](https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/converting-glb-to-3d-tiles-with-3d-tiles-tools/) — turn a folder of GLB files into a valid 3D Tiles 1.1 tileset with 3d-tiles-tools
+- [Generating Instanced Tiles for Trees](https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/generating-instanced-tiles-for-trees/) — stream a million street trees as GPU instances
+- [Tiling Photogrammetry OBJ Meshes](https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/tiling-photogrammetry-obj-meshes/) — turn a multi-gigabyte textured OBJ from a photogrammetry run into streamable 3D Tiles
+- [Writing Tileset JSON from Python](https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/writing-tileset-json-from-python/) — generate 3D Tiles 1.1 tileset.json in Python
 
 Back to [LOD Management & Optimization Strategies](https://www.3d-geospatial.com/lod-management-optimization-strategies/).

@@ -348,5 +348,7 @@ In the database if the data lives there and queries are ad hoc; in the applicati
 - [Building an R-tree Index for 3D Tile Lookup](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/building-an-r-tree-index-for-3d-tile-lookup/) — bulk loading, capacity tuning and staleness
 - [Hierarchical LOD Structuring](https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/) — where the partition becomes a tile tree
 - [3D Tiles Batch Tiling Pipelines](https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/) — sharding and incremental rebuilds against these keys
+- [Aggregating Sensor Data with H3 Cells](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/aggregating-sensor-data-with-h3-cells/) — bin twin sensor readings into H3 hexagons
+- [Serving Tile Lookups from PostGIS](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/serving-tile-lookups-from-postgis/) — answer viewport and tile queries from PostGIS
 
 Back to [3D Geospatial Fundamentals for Digital Twins](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/).

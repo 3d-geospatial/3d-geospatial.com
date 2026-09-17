@@ -1,0 +1,802 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <title>Detecting Swapped Axis Order in Pipeline Data — 3D Geospatial</title>
+  <meta name="description" content="Catch latitude/longitude and easting/northing swaps automatically: plausibility bounds, extent tests">
+  <meta name="keywords" content="3D geospatial, digital twin, point cloud, mesh pipeline, LOD, 3D Tiles, Cesium, PDAL, Open3D, Python, CI/CD">
+  <meta name="author" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta name="theme-color" content="#1f6b8a" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f171d" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+
+  
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem("theme");
+        var theme = (stored === "dark" || stored === "light") ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    })();
+  </script>
+  <meta name="generator" content="Eleventy">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="googlebot" content="index,follow,max-image-preview:large">
+
+  
+  <link rel="canonical" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/detecting-swapped-axis-order-in-pipeline-data/">
+  <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">
+
+  
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/icon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+
+  
+  <link rel="apple-touch-icon" href="/assets/img/icon-180.png">
+  <link rel="mask-icon" href="/assets/img/logo.svg" color="#1f6b8a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="3D Geospatial">
+  <meta name="application-name" content="3D Geospatial">
+
+  
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Detecting Swapped Axis Order in Pipeline Data — 3D Geospatial">
+  <meta property="og:description" content="Catch latitude/longitude and easting/northing swaps automatically: plausibility bounds, extent tests">
+  <meta property="og:url" content="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/detecting-swapped-axis-order-in-pipeline-data/">
+  <meta property="og:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+  <meta property="og:site_name" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta property="og:locale" content="en_US">
+  
+  <meta property="article:published_time" content="2026-09-17T23:36:56.449Z">
+  <meta property="article:modified_time" content="2026-09-17T23:36:56.449Z">
+  <meta property="article:publisher" content="https://www.3d-geospatial.com/">
+  
+
+  
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Detecting Swapped Axis Order in Pipeline Data — 3D Geospatial">
+  <meta name="twitter:description" content="Catch latitude/longitude and easting/northing swaps automatically: plausibility bounds, extent tests">
+  <meta name="twitter:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta name="twitter:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+
+  
+  <link rel="preload" href="/assets/css/styles.css?v=8c46394d6c" as="style">
+  
+
+  <link rel="stylesheet" href="/assets/css/styles.css?v=8c46394d6c">
+
+  
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.3d-geospatial.com/#organization",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "url": "https://www.3d-geospatial.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/icon-512.png",
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://www.3d-geospatial.com/#website",
+      "url": "https://www.3d-geospatial.com/",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "description": "Build reliable 3D spatial data pipelines for digital twins — point clouds, meshes, LOD strategies, Python processing, and CI/CD automation.",
+      "inLanguage": "en",
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      }
+    },
+    {
+      "@type": "TechArticle",
+      "@id": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/detecting-swapped-axis-order-in-pipeline-data/#article",
+      "isPartOf": {
+        "@id": "https://www.3d-geospatial.com/#website"
+      },
+      "headline": "Detecting Swapped Axis Order in Pipeline Data",
+      "name": "Detecting Swapped Axis Order in Pipeline Data",
+      "description": "Catch latitude/longitude and easting/northing swaps automatically: plausibility bounds, extent tests",
+      "url": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/detecting-swapped-axis-order-in-pipeline-data/",
+      "mainEntityOfPage": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/detecting-swapped-axis-order-in-pipeline-data/",
+      "inLanguage": "en",
+      "datePublished": "2026-09-17T23:36:56.449Z",
+      "dateModified": "2026-09-17T23:36:56.449Z",
+      "author": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "image": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/og-cover.png",
+        "width": 1200,
+        "height": 630
+      },
+      "breadcrumb": {
+        "@id": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/detecting-swapped-axis-order-in-pipeline-data/#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/detecting-swapped-axis-order-in-pipeline-data/#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://www.3d-geospatial.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "3D Geospatial Fundamentals For Digital Twins",
+          "item": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Coordinate Reference Systems For 3D Assets",
+          "item": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "name": "Detecting Swapped Axis Order In Pipeline Data",
+          "item": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/detecting-swapped-axis-order-in-pipeline-data/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  
+<header class="site-header" role="banner">
+  <div class="container site-header__inner">
+    <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+      <img src="/assets/img/logo.svg" alt="" class="brand__mark" width="36" height="36">
+      <span class="brand__name">
+        3D Geospatial
+        <small>Digital Twin Automation</small>
+      </span>
+    </a>
+
+    <button class="theme-toggle" type="button" data-theme-toggle
+            aria-label="Switch to dark theme" title="Switch to dark theme">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4.2"/>
+        <path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/>
+      </svg>
+    </button>
+
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>
+      <span class="nav-toggle__icon" aria-hidden="true"><span></span></span>
+      Menu
+    </button>
+
+    <nav class="primary-nav" id="primary-nav" aria-label="Primary">
+      
+      <a href="https://www.3d-geospatial.com/" >
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/>
+        </svg>
+        Home
+      </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/" aria-current="page">
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2 3 7l9 5 9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 17l9 5 9-5"/>
+            </svg>
+          
+          3D Geospatial Fundamentals
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+          
+          LOD Management &amp; Optimization
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="6" cy="6" r="1.5"/><circle cx="12" cy="6" r="1.5"/><circle cx="18" cy="6" r="1.5"/>
+              <circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/>
+              <circle cx="6" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="18" cy="18" r="1.5"/>
+            </svg>
+          
+          Point Cloud &amp; Mesh Pipelines
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <path d="M12 9v4"/><path d="M12 17h.01"/>
+            </svg>
+          
+          Troubleshooting &amp; Reliability
+        </a>
+      
+    </nav>
+  </div>
+</header>
+
+
+  <main id="main">
+    
+
+
+<div class="container">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    
+      
+        <a href="https://www.3d-geospatial.com/">Home</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals For Digital Twins</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems For 3D Assets</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <span class="current">Detecting Swapped Axis Order In Pipeline Data</span>
+      
+    
+  </nav>
+
+  <div class="content-page">
+    <article class="article">
+      <h1 id="detecting-swapped-axis-order-in-pipeline-data" tabindex="-1"><a class="heading-link" href="#detecting-swapped-axis-order-in-pipeline-data"><span>Detecting Swapped Axis Order in Pipeline Data</span></a></h1>
+<p>This page detects swapped coordinate axes before they propagate — the latitude-longitude swap that PROJ’s authority ordering invites, the easting-northing swap that survey exports introduce, and the y-flip that image and tile conventions produce — with plausibility bounds, extent comparisons, a land test and assertions cheap enough to put in every ingestion step, for data destined for EPSG:25832+7837.</p>
+<h2 id="why-you-hit-this" tabindex="-1"><a class="heading-link" href="#why-you-hit-this"><span>Why you hit this</span></a></h2>
+<p>A swapped pair of coordinates produces valid numbers, a valid file and a plausible-looking dataset. That is what makes it the most common silent georeferencing failure in a twin: nothing raises an error, the file passes schema validation, and the data sits in the Gulf of Guinea, in the wrong UTM zone, or mirrored about the diagonal. The <code>always_xy</code> flag in <code>pyproj</code> exists precisely because the authority definition of EPSG:4326 is latitude-first while almost every file format and API is longitude-first, and every boundary between two systems is an opportunity to get it wrong. The theory is covered in <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/converting-wgs84-to-local-projected-coordinates/">converting WGS84 to local projected coordinates</a>; this page is the detector.</p>
+<h2 id="prerequisites" tabindex="-1"><a class="heading-link" href="#prerequisites"><span>Prerequisites</span></a></h2>
+<ul>
+<li>Python 3.10+ with <code>pyproj&gt;=3.6</code>, <code>numpy&gt;=1.24</code>, <code>shapely&gt;=2.0</code>, <code>geopandas&gt;=0.14</code>.</li>
+<li>The expected CRS for each dataset, as a compound EPSG code, and ideally the expected extent — a bounding box for the project area.</li>
+<li>Optionally a coastline or administrative boundary layer for the land test.</li>
+</ul>
+<h2 id="step-by-step" tabindex="-1"><a class="heading-link" href="#step-by-step"><span>Step-by-Step</span></a></h2>
+<h3 id="1-bound-each-axis-by-what-the-crs-allows" tabindex="-1"><a class="heading-link" href="#1-bound-each-axis-by-what-the-crs-allows"><span>1. Bound each axis by what the CRS allows</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> numpy <span class="token keyword">as</span> np
+<span class="token keyword">from</span> pyproj <span class="token keyword">import</span> CRS
+
+<span class="token keyword">def</span> <span class="token function">axis_bounds</span><span class="token punctuation">(</span>epsg<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Plausible value ranges per axis for a CRS, from its own area of use."""</span>
+    crs <span class="token operator">=</span> CRS<span class="token punctuation">.</span>from_user_input<span class="token punctuation">(</span>epsg<span class="token punctuation">)</span>
+    aou <span class="token operator">=</span> crs<span class="token punctuation">.</span>area_of_use
+    <span class="token keyword">if</span> crs<span class="token punctuation">.</span>is_geographic<span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"axis_0"</span><span class="token punctuation">:</span> <span class="token punctuation">(</span><span class="token operator">-</span><span class="token number">180.0</span><span class="token punctuation">,</span> <span class="token number">180.0</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"axis_1"</span><span class="token punctuation">:</span> <span class="token punctuation">(</span><span class="token operator">-</span><span class="token number">90.0</span><span class="token punctuation">,</span> <span class="token number">90.0</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                <span class="token string">"geographic"</span><span class="token punctuation">:</span> <span class="token boolean">True</span><span class="token punctuation">,</span> <span class="token string">"aou"</span><span class="token punctuation">:</span> <span class="token punctuation">(</span>aou<span class="token punctuation">.</span>west<span class="token punctuation">,</span> aou<span class="token punctuation">.</span>south<span class="token punctuation">,</span> aou<span class="token punctuation">.</span>east<span class="token punctuation">,</span> aou<span class="token punctuation">.</span>north<span class="token punctuation">)</span> <span class="token keyword">if</span> aou <span class="token keyword">else</span> <span class="token boolean">None</span><span class="token punctuation">}</span>
+    <span class="token comment"># projected: derive from the area of use, transformed into the CRS</span>
+    <span class="token keyword">from</span> pyproj <span class="token keyword">import</span> Transformer
+    <span class="token keyword">if</span> aou<span class="token punctuation">:</span>
+        tf <span class="token operator">=</span> Transformer<span class="token punctuation">.</span>from_crs<span class="token punctuation">(</span><span class="token number">4326</span><span class="token punctuation">,</span> crs<span class="token punctuation">,</span> always_xy<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+        xs<span class="token punctuation">,</span> ys <span class="token operator">=</span> tf<span class="token punctuation">.</span>transform<span class="token punctuation">(</span><span class="token punctuation">[</span>aou<span class="token punctuation">.</span>west<span class="token punctuation">,</span> aou<span class="token punctuation">.</span>east<span class="token punctuation">,</span> aou<span class="token punctuation">.</span>west<span class="token punctuation">,</span> aou<span class="token punctuation">.</span>east<span class="token punctuation">]</span><span class="token punctuation">,</span>
+                              <span class="token punctuation">[</span>aou<span class="token punctuation">.</span>south<span class="token punctuation">,</span> aou<span class="token punctuation">.</span>south<span class="token punctuation">,</span> aou<span class="token punctuation">.</span>north<span class="token punctuation">,</span> aou<span class="token punctuation">.</span>north<span class="token punctuation">]</span><span class="token punctuation">)</span>
+        <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"axis_0"</span><span class="token punctuation">:</span> <span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span><span class="token builtin">min</span><span class="token punctuation">(</span>xs<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token builtin">float</span><span class="token punctuation">(</span><span class="token builtin">max</span><span class="token punctuation">(</span>xs<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                <span class="token string">"axis_1"</span><span class="token punctuation">:</span> <span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span><span class="token builtin">min</span><span class="token punctuation">(</span>ys<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token builtin">float</span><span class="token punctuation">(</span><span class="token builtin">max</span><span class="token punctuation">(</span>ys<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                <span class="token string">"geographic"</span><span class="token punctuation">:</span> <span class="token boolean">False</span><span class="token punctuation">,</span> <span class="token string">"aou"</span><span class="token punctuation">:</span> <span class="token punctuation">(</span>aou<span class="token punctuation">.</span>west<span class="token punctuation">,</span> aou<span class="token punctuation">.</span>south<span class="token punctuation">,</span> aou<span class="token punctuation">.</span>east<span class="token punctuation">,</span> aou<span class="token punctuation">.</span>north<span class="token punctuation">)</span><span class="token punctuation">}</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"axis_0"</span><span class="token punctuation">:</span> <span class="token punctuation">(</span><span class="token operator">-</span><span class="token number">1e7</span><span class="token punctuation">,</span> <span class="token number">1e7</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"axis_1"</span><span class="token punctuation">:</span> <span class="token punctuation">(</span><span class="token operator">-</span><span class="token number">1e7</span><span class="token punctuation">,</span> <span class="token number">1e7</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"geographic"</span><span class="token punctuation">:</span> <span class="token boolean">False</span><span class="token punctuation">,</span> <span class="token string">"aou"</span><span class="token punctuation">:</span> <span class="token boolean">None</span><span class="token punctuation">}</span>
+
+<span class="token keyword">for</span> epsg <span class="token keyword">in</span> <span class="token punctuation">(</span><span class="token string">"EPSG:4326"</span><span class="token punctuation">,</span> <span class="token string">"EPSG:25832"</span><span class="token punctuation">,</span> <span class="token string">"EPSG:32618"</span><span class="token punctuation">,</span> <span class="token string">"EPSG:2263"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    b <span class="token operator">=</span> axis_bounds<span class="token punctuation">(</span>epsg<span class="token punctuation">)</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>epsg<span class="token punctuation">:</span><span class="token format-spec">&lt;12</span><span class="token punctuation">}</span></span><span class="token string"> x/E </span><span class="token interpolation"><span class="token punctuation">{</span>b<span class="token punctuation">[</span><span class="token string">'axis_0'</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">:</span><span class="token format-spec">>12,.0f</span><span class="token punctuation">}</span></span><span class="token string"> … </span><span class="token interpolation"><span class="token punctuation">{</span>b<span class="token punctuation">[</span><span class="token string">'axis_0'</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">:</span><span class="token format-spec">>12,.0f</span><span class="token punctuation">}</span></span><span class="token string">   "</span></span>
+          <span class="token string-interpolation"><span class="token string">f"y/N </span><span class="token interpolation"><span class="token punctuation">{</span>b<span class="token punctuation">[</span><span class="token string">'axis_1'</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">:</span><span class="token format-spec">>12,.0f</span><span class="token punctuation">}</span></span><span class="token string"> … </span><span class="token interpolation"><span class="token punctuation">{</span>b<span class="token punctuation">[</span><span class="token string">'axis_1'</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">:</span><span class="token format-spec">>12,.0f</span><span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Deriving the bounds from the CRS’s own area of use, rather than hard-coding them, is what makes the detector portable across a twin that handles several systems. For a UTM zone the easting range is a few hundred thousand metres wide and the northing range is millions — so a swap is detectable from the magnitudes alone, without any knowledge of the project.</p>
+<h3 id="2-test-for-the-three-swaps-that-actually-happen" tabindex="-1"><a class="heading-link" href="#2-test-for-the-three-swaps-that-actually-happen"><span>2. Test for the three swaps that actually happen</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">swap_diagnosis</span><span class="token punctuation">(</span>x<span class="token punctuation">,</span> y<span class="token punctuation">,</span> epsg<span class="token punctuation">,</span> expected_extent<span class="token operator">=</span><span class="token boolean">None</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Return the most likely axis problem for arrays of coordinates."""</span>
+    b <span class="token operator">=</span> axis_bounds<span class="token punctuation">(</span>epsg<span class="token punctuation">)</span>
+    x<span class="token punctuation">,</span> y <span class="token operator">=</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>x<span class="token punctuation">,</span> dtype<span class="token operator">=</span><span class="token builtin">float</span><span class="token punctuation">)</span><span class="token punctuation">,</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>y<span class="token punctuation">,</span> dtype<span class="token operator">=</span><span class="token builtin">float</span><span class="token punctuation">)</span>
+    findings <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+
+    in_x <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token punctuation">(</span>x <span class="token operator">>=</span> b<span class="token punctuation">[</span><span class="token string">"axis_0"</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token operator">&amp;</span> <span class="token punctuation">(</span>x <span class="token operator">&lt;=</span> b<span class="token punctuation">[</span><span class="token string">"axis_0"</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">.</span>mean<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    in_y <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token punctuation">(</span>y <span class="token operator">>=</span> b<span class="token punctuation">[</span><span class="token string">"axis_1"</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token operator">&amp;</span> <span class="token punctuation">(</span>y <span class="token operator">&lt;=</span> b<span class="token punctuation">[</span><span class="token string">"axis_1"</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">.</span>mean<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    swapped_x <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token punctuation">(</span>y <span class="token operator">>=</span> b<span class="token punctuation">[</span><span class="token string">"axis_0"</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token operator">&amp;</span> <span class="token punctuation">(</span>y <span class="token operator">&lt;=</span> b<span class="token punctuation">[</span><span class="token string">"axis_0"</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">.</span>mean<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    swapped_y <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token punctuation">(</span>x <span class="token operator">>=</span> b<span class="token punctuation">[</span><span class="token string">"axis_1"</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token operator">&amp;</span> <span class="token punctuation">(</span>x <span class="token operator">&lt;=</span> b<span class="token punctuation">[</span><span class="token string">"axis_1"</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">.</span>mean<span class="token punctuation">(</span><span class="token punctuation">)</span>
+
+    <span class="token keyword">if</span> in_x <span class="token operator">&lt;</span> <span class="token number">0.5</span> <span class="token keyword">and</span> in_y <span class="token operator">&lt;</span> <span class="token number">0.5</span> <span class="token keyword">and</span> swapped_x <span class="token operator">></span> <span class="token number">0.9</span> <span class="token keyword">and</span> swapped_y <span class="token operator">></span> <span class="token number">0.9</span><span class="token punctuation">:</span>
+        findings<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token string">"critical"</span><span class="token punctuation">,</span> <span class="token string">"axes are swapped: the values fit the opposite axis"</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token keyword">elif</span> in_x <span class="token operator">&lt;</span> <span class="token number">0.9</span> <span class="token keyword">or</span> in_y <span class="token operator">&lt;</span> <span class="token number">0.9</span><span class="token punctuation">:</span>
+        findings<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token string">"critical"</span><span class="token punctuation">,</span> <span class="token string-interpolation"><span class="token string">f"values outside the CRS area of use "</span></span>
+                                     <span class="token string-interpolation"><span class="token string">f"(x within </span><span class="token interpolation"><span class="token punctuation">{</span>in_x<span class="token punctuation">:</span><span class="token format-spec">.0%</span><span class="token punctuation">}</span></span><span class="token string">, y within </span><span class="token interpolation"><span class="token punctuation">{</span>in_y<span class="token punctuation">:</span><span class="token format-spec">.0%</span><span class="token punctuation">}</span></span><span class="token string">)"</span></span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+
+    <span class="token keyword">if</span> b<span class="token punctuation">[</span><span class="token string">"geographic"</span><span class="token punctuation">]</span> <span class="token keyword">and</span> np<span class="token punctuation">.</span><span class="token builtin">abs</span><span class="token punctuation">(</span>x<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">max</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">&lt;=</span> <span class="token number">90</span> <span class="token keyword">and</span> np<span class="token punctuation">.</span><span class="token builtin">abs</span><span class="token punctuation">(</span>y<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">max</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">&lt;=</span> <span class="token number">90</span><span class="token punctuation">:</span>
+        findings<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token string">"warning"</span><span class="token punctuation">,</span> <span class="token string">"both axes are within ±90: a lat/lon swap cannot be "</span>
+                                    <span class="token string">"ruled out from magnitudes alone"</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+
+    <span class="token keyword">if</span> expected_extent<span class="token punctuation">:</span>
+        ew<span class="token punctuation">,</span> es<span class="token punctuation">,</span> ee<span class="token punctuation">,</span> en <span class="token operator">=</span> expected_extent
+        inside <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token punctuation">(</span>x <span class="token operator">>=</span> ew<span class="token punctuation">)</span> <span class="token operator">&amp;</span> <span class="token punctuation">(</span>x <span class="token operator">&lt;=</span> ee<span class="token punctuation">)</span> <span class="token operator">&amp;</span> <span class="token punctuation">(</span>y <span class="token operator">>=</span> es<span class="token punctuation">)</span> <span class="token operator">&amp;</span> <span class="token punctuation">(</span>y <span class="token operator">&lt;=</span> en<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">.</span>mean<span class="token punctuation">(</span><span class="token punctuation">)</span>
+        flipped <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token punctuation">(</span>y <span class="token operator">>=</span> ew<span class="token punctuation">)</span> <span class="token operator">&amp;</span> <span class="token punctuation">(</span>y <span class="token operator">&lt;=</span> ee<span class="token punctuation">)</span> <span class="token operator">&amp;</span> <span class="token punctuation">(</span>x <span class="token operator">>=</span> es<span class="token punctuation">)</span> <span class="token operator">&amp;</span> <span class="token punctuation">(</span>x <span class="token operator">&lt;=</span> en<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">.</span>mean<span class="token punctuation">(</span><span class="token punctuation">)</span>
+        <span class="token keyword">if</span> flipped <span class="token operator">></span> inside<span class="token punctuation">:</span>
+            findings<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token string">"critical"</span><span class="token punctuation">,</span> <span class="token string-interpolation"><span class="token string">f"the flipped pair fits the expected extent better "</span></span>
+                                         <span class="token string-interpolation"><span class="token string">f"(</span><span class="token interpolation"><span class="token punctuation">{</span>flipped<span class="token punctuation">:</span><span class="token format-spec">.0%</span><span class="token punctuation">}</span></span><span class="token string"> vs </span><span class="token interpolation"><span class="token punctuation">{</span>inside<span class="token punctuation">:</span><span class="token format-spec">.0%</span><span class="token punctuation">}</span></span><span class="token string">)"</span></span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+        <span class="token keyword">elif</span> inside <span class="token operator">&lt;</span> <span class="token number">0.9</span><span class="token punctuation">:</span>
+            findings<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token string">"warning"</span><span class="token punctuation">,</span> <span class="token string-interpolation"><span class="token string">f"only </span><span class="token interpolation"><span class="token punctuation">{</span>inside<span class="token punctuation">:</span><span class="token format-spec">.0%</span><span class="token punctuation">}</span></span><span class="token string"> of points are inside the expected extent"</span></span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+
+    <span class="token keyword">return</span> findings
+
+<span class="token comment"># a real case: a survey export written northing-first</span>
+E <span class="token operator">=</span> np<span class="token punctuation">.</span>array<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token number">5335818.221</span><span class="token punctuation">,</span> <span class="token number">5335836.978</span><span class="token punctuation">,</span> <span class="token number">5335887.874</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+N <span class="token operator">=</span> np<span class="token punctuation">.</span>array<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token number">691204.412</span><span class="token punctuation">,</span> <span class="token number">691286.901</span><span class="token punctuation">,</span> <span class="token number">691275.305</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+<span class="token keyword">for</span> sev<span class="token punctuation">,</span> msg <span class="token keyword">in</span> swap_diagnosis<span class="token punctuation">(</span>E<span class="token punctuation">,</span> N<span class="token punctuation">,</span> <span class="token string">"EPSG:25832"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>sev<span class="token punctuation">.</span>upper<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">}</span></span><span class="token string">: </span><span class="token interpolation"><span class="token punctuation">{</span>msg<span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>The three tests answer three different questions. Magnitude bounds catch the UTM swap outright, because eastings and northings live in different numeric ranges. The expected-extent comparison catches the swap that magnitudes cannot — a geographic dataset where both values are small numbers — by asking which assignment fits the project area. And the explicit warning for the ambiguous geographic case is deliberate: near the equator and the prime meridian, no magnitude test can distinguish the two, and a detector that stays silent there is lying by omission.</p>
+<figure class="diagram">
+<svg viewBox="6 6 748 236" role="img" aria-labelledby="axis-cases-t axis-cases-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="axis-cases-t">Three swaps and how each is detected</title>
+  <desc id="axis-cases-d">A table. A UTM easting and northing swap is detected by magnitude, because the ranges differ by an order of magnitude. A latitude and longitude swap in temperate latitudes is detected by magnitude when longitude exceeds ninety degrees, and otherwise only by the expected extent or a land test. An image y-flip is detected by comparing against the expected extent, since both values remain plausible.</desc>
+  <rect class="svg-bg" x="6" y="6" width="748" height="236" fill="#ffffff"/>
+  <g stroke-width="1.5">
+    <rect x="20" y="20" width="220" height="36" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="240" y="20" width="250" height="36" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="490" y="20" width="250" height="36" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="20" y="56" width="220" height="44" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="240" y="56" width="250" height="44" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="490" y="56" width="250" height="44" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="20" y="100" width="220" height="44" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="240" y="100" width="250" height="44" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="490" y="100" width="250" height="44" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="20" y="144" width="220" height="44" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="240" y="144" width="250" height="44" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="490" y="144" width="250" height="44" fill="#f7dfdc" stroke="#b0413e"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="130" y="43">swap</text><text x="365" y="43">how it looks</text><text x="615" y="43">detected by</text>
+    <text x="130" y="82">easting ↔ northing</text><text x="365" y="82">5.3 M where 691 k belongs</text><text x="615" y="82">magnitude bounds</text>
+    <text x="130" y="120">lat ↔ lon, |lon| &gt; 90</text><text x="365" y="120">latitude above 90</text><text x="615" y="120">magnitude bounds</text>
+    <text x="130" y="166">lat ↔ lon near 0,0</text><text x="365" y="158">both values plausible</text>
+    <text x="365" y="176">on both axes</text>
+    <text x="615" y="158">expected extent or</text><text x="615" y="176">a land test only</text>
+  </g>
+  <text x="380" y="224" fill="#15384a" font-size="12.5" text-anchor="middle">The last row is why a detector needs an expected extent and not only bounds.</text>
+</svg>
+<figcaption>Two of the three swaps are arithmetic to detect. The third needs external knowledge, which is why the project extent belongs in the ingestion contract.</figcaption>
+</figure>
+<h3 id="3-add-the-land-test-for-the-ambiguous-case" tabindex="-1"><a class="heading-link" href="#3-add-the-land-test-for-the-ambiguous-case"><span>3. Add the land test for the ambiguous case</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> geopandas <span class="token keyword">as</span> gpd
+<span class="token keyword">from</span> shapely<span class="token punctuation">.</span>geometry <span class="token keyword">import</span> MultiPoint
+
+<span class="token keyword">def</span> <span class="token function">land_test</span><span class="token punctuation">(</span>lon<span class="token punctuation">,</span> lat<span class="token punctuation">,</span> land_path<span class="token operator">=</span><span class="token string">"reference/land_polygons.gpkg"</span><span class="token punctuation">,</span> sample<span class="token operator">=</span><span class="token number">500</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Fraction of points that fall on land, for both axis assignments."""</span>
+    land <span class="token operator">=</span> gpd<span class="token punctuation">.</span>read_file<span class="token punctuation">(</span>land_path<span class="token punctuation">)</span><span class="token punctuation">.</span>to_crs<span class="token punctuation">(</span><span class="token number">4326</span><span class="token punctuation">)</span><span class="token punctuation">.</span>geometry<span class="token punctuation">.</span>union_all<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    lon<span class="token punctuation">,</span> lat <span class="token operator">=</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>lon<span class="token punctuation">,</span> dtype<span class="token operator">=</span><span class="token builtin">float</span><span class="token punctuation">)</span><span class="token punctuation">,</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>lat<span class="token punctuation">,</span> dtype<span class="token operator">=</span><span class="token builtin">float</span><span class="token punctuation">)</span>
+    idx <span class="token operator">=</span> np<span class="token punctuation">.</span>random<span class="token punctuation">.</span>default_rng<span class="token punctuation">(</span><span class="token number">11</span><span class="token punctuation">)</span><span class="token punctuation">.</span>choice<span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>lon<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token builtin">min</span><span class="token punctuation">(</span>sample<span class="token punctuation">,</span> <span class="token builtin">len</span><span class="token punctuation">(</span>lon<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> replace<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">)</span>
+
+    <span class="token keyword">def</span> <span class="token function">share_on_land</span><span class="token punctuation">(</span>a<span class="token punctuation">,</span> b<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        pts <span class="token operator">=</span> MultiPoint<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>x<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token builtin">float</span><span class="token punctuation">(</span>y<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token keyword">for</span> x<span class="token punctuation">,</span> y <span class="token keyword">in</span> <span class="token builtin">zip</span><span class="token punctuation">(</span>a<span class="token punctuation">[</span>idx<span class="token punctuation">]</span><span class="token punctuation">,</span> b<span class="token punctuation">[</span>idx<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+        <span class="token keyword">return</span> <span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token number">1</span> <span class="token keyword">for</span> p <span class="token keyword">in</span> pts<span class="token punctuation">.</span>geoms <span class="token keyword">if</span> land<span class="token punctuation">.</span>covers<span class="token punctuation">(</span>p<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token builtin">len</span><span class="token punctuation">(</span>pts<span class="token punctuation">.</span>geoms<span class="token punctuation">)</span>
+
+    as_given <span class="token operator">=</span> share_on_land<span class="token punctuation">(</span>lon<span class="token punctuation">,</span> lat<span class="token punctuation">)</span>
+    as_flipped <span class="token operator">=</span> share_on_land<span class="token punctuation">(</span>lat<span class="token punctuation">,</span> lon<span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"as_given_on_land"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>as_given<span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"as_flipped_on_land"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>as_flipped<span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"verdict"</span><span class="token punctuation">:</span> <span class="token punctuation">(</span><span class="token string">"swapped"</span> <span class="token keyword">if</span> as_flipped <span class="token operator">></span> as_given <span class="token operator">+</span> <span class="token number">0.2</span>
+                        <span class="token keyword">else</span> <span class="token string">"as given"</span> <span class="token keyword">if</span> as_given <span class="token operator">></span> as_flipped <span class="token operator">+</span> <span class="token number">0.2</span> <span class="token keyword">else</span> <span class="token string">"inconclusive"</span><span class="token punctuation">)</span><span class="token punctuation">}</span>
+
+<span class="token keyword">print</span><span class="token punctuation">(</span>land_test<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token number">11.5730</span><span class="token punctuation">,</span> <span class="token number">11.5760</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token number">48.1381</span><span class="token punctuation">,</span> <span class="token number">48.1402</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>The land test is the fallback when magnitudes and extents cannot decide, and it is decisive for terrestrial data: a city dataset read with swapped axes lands in the sea with high probability, because most of the globe at swapped coordinates is water. It is not decisive for marine or coastal data, which is why the function returns “inconclusive” rather than guessing — an honest non-answer is better than a confident coin flip.</p>
+<figure class="diagram">
+<svg viewBox="26 26 708 224" role="img" aria-labelledby="axis-land-t axis-land-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="axis-land-t">The same coordinates read both ways</title>
+  <desc id="axis-land-d">A world outline. Read as longitude 11.57 and latitude 48.14 the point lands in southern Germany, on land. Read with the axes swapped, as longitude 48.14 and latitude 11.57, it lands in the Arabian Sea, in water. The land test uses that asymmetry, and it is inconclusive for coastal and marine datasets where both assignments could be water.</desc>
+  <rect class="svg-bg" x="26" y="26" width="708" height="224" fill="#ffffff"/>
+  <rect x="40" y="40" width="680" height="150" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="1.5"/>
+  <path d="M150 60 C210 55 260 70 300 65 C340 60 380 80 420 78 C460 76 500 92 540 96 C580 100 620 120 660 116 L660 160 C600 156 540 150 480 154 C420 158 360 150 300 148 C240 146 190 140 150 132 Z"
+        fill="#eef5e9" stroke="#4f7a4d" stroke-width="1.5"/>
+  <circle cx="330" cy="92" r="7" fill="#4f7a4d"/>
+  <circle cx="560" cy="170" r="7" fill="#b0413e"/>
+  <g fill="#1f2937" font-size="12.5" text-anchor="start">
+    <text x="344" y="86">lon 11.57, lat 48.14 — on land</text>
+    <text x="440" y="200">lon 48.14, lat 11.57 — in the sea</text>
+  </g>
+  <text x="380" y="232" fill="#15384a" font-size="12.5" text-anchor="middle">Most of the globe at swapped coordinates is water, which is what makes the test decisive on land.</text>
+</svg>
+<figcaption>The land test works because the Earth is mostly ocean; for a marine survey it decides nothing and the detector says so.</figcaption>
+</figure>
+<h3 id="4-assert-at-every-boundary" tabindex="-1"><a class="heading-link" href="#4-assert-at-every-boundary"><span>4. Assert at every boundary</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">from</span> pyproj <span class="token keyword">import</span> Transformer
+
+<span class="token keyword">class</span> <span class="token class-name">AxisOrderError</span><span class="token punctuation">(</span>ValueError<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">pass</span>
+
+<span class="token keyword">def</span> <span class="token function">assert_axis_order</span><span class="token punctuation">(</span>x<span class="token punctuation">,</span> y<span class="token punctuation">,</span> epsg<span class="token punctuation">,</span> expected_extent<span class="token operator">=</span><span class="token boolean">None</span><span class="token punctuation">,</span> context<span class="token operator">=</span><span class="token string">""</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    findings <span class="token operator">=</span> swap_diagnosis<span class="token punctuation">(</span>x<span class="token punctuation">,</span> y<span class="token punctuation">,</span> epsg<span class="token punctuation">,</span> expected_extent<span class="token punctuation">)</span>
+    critical <span class="token operator">=</span> <span class="token punctuation">[</span>m <span class="token keyword">for</span> s<span class="token punctuation">,</span> m <span class="token keyword">in</span> findings <span class="token keyword">if</span> s <span class="token operator">==</span> <span class="token string">"critical"</span><span class="token punctuation">]</span>
+    <span class="token keyword">if</span> critical<span class="token punctuation">:</span>
+        <span class="token keyword">raise</span> AxisOrderError<span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>context<span class="token punctuation">}</span></span><span class="token string">: "</span></span> <span class="token operator">+</span> <span class="token string">"; "</span><span class="token punctuation">.</span>join<span class="token punctuation">(</span>critical<span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">[</span>m <span class="token keyword">for</span> s<span class="token punctuation">,</span> m <span class="token keyword">in</span> findings <span class="token keyword">if</span> s <span class="token operator">==</span> <span class="token string">"warning"</span><span class="token punctuation">]</span>
+
+<span class="token keyword">def</span> <span class="token function">transform_checked</span><span class="token punctuation">(</span>x<span class="token punctuation">,</span> y<span class="token punctuation">,</span> src_epsg<span class="token punctuation">,</span> dst_epsg<span class="token punctuation">,</span> src_extent<span class="token operator">=</span><span class="token boolean">None</span><span class="token punctuation">,</span> dst_extent<span class="token operator">=</span><span class="token boolean">None</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    assert_axis_order<span class="token punctuation">(</span>x<span class="token punctuation">,</span> y<span class="token punctuation">,</span> src_epsg<span class="token punctuation">,</span> src_extent<span class="token punctuation">,</span> context<span class="token operator">=</span><span class="token string-interpolation"><span class="token string">f"input in </span><span class="token interpolation"><span class="token punctuation">{</span>src_epsg<span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+    tf <span class="token operator">=</span> Transformer<span class="token punctuation">.</span>from_crs<span class="token punctuation">(</span>src_epsg<span class="token punctuation">,</span> dst_epsg<span class="token punctuation">,</span> always_xy<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+    out_x<span class="token punctuation">,</span> out_y <span class="token operator">=</span> tf<span class="token punctuation">.</span>transform<span class="token punctuation">(</span>np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>x<span class="token punctuation">,</span> dtype<span class="token operator">=</span><span class="token builtin">float</span><span class="token punctuation">)</span><span class="token punctuation">,</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>y<span class="token punctuation">,</span> dtype<span class="token operator">=</span><span class="token builtin">float</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    assert_axis_order<span class="token punctuation">(</span>out_x<span class="token punctuation">,</span> out_y<span class="token punctuation">,</span> dst_epsg<span class="token punctuation">,</span> dst_extent<span class="token punctuation">,</span> context<span class="token operator">=</span><span class="token string-interpolation"><span class="token string">f"output in </span><span class="token interpolation"><span class="token punctuation">{</span>dst_epsg<span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> out_x<span class="token punctuation">,</span> out_y
+
+MUNICH <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token number">11.30</span><span class="token punctuation">,</span> <span class="token number">48.00</span><span class="token punctuation">,</span> <span class="token number">11.80</span><span class="token punctuation">,</span> <span class="token number">48.30</span><span class="token punctuation">)</span>
+lon <span class="token operator">=</span> np<span class="token punctuation">.</span>array<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token number">11.5730216</span><span class="token punctuation">,</span> <span class="token number">11.5768</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+lat <span class="token operator">=</span> np<span class="token punctuation">.</span>array<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token number">48.1381190</span><span class="token punctuation">,</span> <span class="token number">48.1379</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+e<span class="token punctuation">,</span> n <span class="token operator">=</span> transform_checked<span class="token punctuation">(</span>lon<span class="token punctuation">,</span> lat<span class="token punctuation">,</span> <span class="token string">"EPSG:4326"</span><span class="token punctuation">,</span> <span class="token string">"EPSG:25832"</span><span class="token punctuation">,</span>
+                         src_extent<span class="token operator">=</span>MUNICH<span class="token punctuation">,</span> dst_extent<span class="token operator">=</span><span class="token punctuation">(</span><span class="token number">690000</span><span class="token punctuation">,</span> <span class="token number">5330000</span><span class="token punctuation">,</span> <span class="token number">700000</span><span class="token punctuation">,</span> <span class="token number">5340000</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"transformed:"</span><span class="token punctuation">,</span> np<span class="token punctuation">.</span><span class="token builtin">round</span><span class="token punctuation">(</span>e<span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">,</span> np<span class="token punctuation">.</span><span class="token builtin">round</span><span class="token punctuation">(</span>n<span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Asserting on both sides of a transformation is the pattern worth adopting everywhere. Checking the input catches a file that was already wrong; checking the output catches a transformer constructed without <code>always_xy</code>, which is the single most common way to introduce the problem rather than to inherit it. Both checks are microseconds on arrays, so there is no performance reason to skip them.</p>
+<h3 id="5-check-whole-files-at-ingestion" tabindex="-1"><a class="heading-link" href="#5-check-whole-files-at-ingestion"><span>5. Check whole files at ingestion</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> json
+<span class="token keyword">from</span> pathlib <span class="token keyword">import</span> Path
+
+<span class="token keyword">def</span> <span class="token function">check_dataset</span><span class="token punctuation">(</span>path<span class="token punctuation">,</span> epsg<span class="token punctuation">,</span> expected_extent<span class="token punctuation">,</span> kind<span class="token operator">=</span><span class="token string">"vector"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">if</span> kind <span class="token operator">==</span> <span class="token string">"vector"</span><span class="token punctuation">:</span>
+        gdf <span class="token operator">=</span> gpd<span class="token punctuation">.</span>read_file<span class="token punctuation">(</span>path<span class="token punctuation">)</span>
+        declared <span class="token operator">=</span> gdf<span class="token punctuation">.</span>crs<span class="token punctuation">.</span>to_epsg<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">if</span> gdf<span class="token punctuation">.</span>crs <span class="token keyword">else</span> <span class="token boolean">None</span>
+        xs <span class="token operator">=</span> gdf<span class="token punctuation">.</span>geometry<span class="token punctuation">.</span>representative_point<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span>x<span class="token punctuation">.</span>to_numpy<span class="token punctuation">(</span><span class="token punctuation">)</span>
+        ys <span class="token operator">=</span> gdf<span class="token punctuation">.</span>geometry<span class="token punctuation">.</span>representative_point<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span>y<span class="token punctuation">.</span>to_numpy<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    <span class="token keyword">elif</span> kind <span class="token operator">==</span> <span class="token string">"pointcloud"</span><span class="token punctuation">:</span>
+        <span class="token keyword">import</span> laspy
+        las <span class="token operator">=</span> laspy<span class="token punctuation">.</span>read<span class="token punctuation">(</span>path<span class="token punctuation">)</span>
+        crs <span class="token operator">=</span> las<span class="token punctuation">.</span>header<span class="token punctuation">.</span>parse_crs<span class="token punctuation">(</span><span class="token punctuation">)</span>
+        declared <span class="token operator">=</span> crs<span class="token punctuation">.</span>to_epsg<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">if</span> crs <span class="token keyword">else</span> <span class="token boolean">None</span>
+        xs<span class="token punctuation">,</span> ys <span class="token operator">=</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>las<span class="token punctuation">.</span>x<span class="token punctuation">)</span><span class="token punctuation">,</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>las<span class="token punctuation">.</span>y<span class="token punctuation">)</span>
+    <span class="token keyword">elif</span> kind <span class="token operator">==</span> <span class="token string">"cityjson"</span><span class="token punctuation">:</span>
+        cj <span class="token operator">=</span> json<span class="token punctuation">.</span>loads<span class="token punctuation">(</span>Path<span class="token punctuation">(</span>path<span class="token punctuation">)</span><span class="token punctuation">.</span>read_text<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+        ref <span class="token operator">=</span> <span class="token punctuation">(</span>cj<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"metadata"</span><span class="token punctuation">,</span> <span class="token punctuation">{</span><span class="token punctuation">}</span><span class="token punctuation">)</span> <span class="token keyword">or</span> <span class="token punctuation">{</span><span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"referenceSystem"</span><span class="token punctuation">,</span> <span class="token string">""</span><span class="token punctuation">)</span>
+        declared <span class="token operator">=</span> <span class="token builtin">int</span><span class="token punctuation">(</span>ref<span class="token punctuation">.</span>rstrip<span class="token punctuation">(</span><span class="token string">"/"</span><span class="token punctuation">)</span><span class="token punctuation">.</span>split<span class="token punctuation">(</span><span class="token string">"/"</span><span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token keyword">if</span> ref <span class="token keyword">else</span> <span class="token boolean">None</span>
+        v <span class="token operator">=</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>cj<span class="token punctuation">[</span><span class="token string">"vertices"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> dtype<span class="token operator">=</span><span class="token builtin">float</span><span class="token punctuation">)</span>
+        t <span class="token operator">=</span> cj<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"transform"</span><span class="token punctuation">,</span> <span class="token punctuation">{</span><span class="token string">"scale"</span><span class="token punctuation">:</span> <span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token string">"translate"</span><span class="token punctuation">:</span> <span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+        xs <span class="token operator">=</span> v<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">]</span> <span class="token operator">*</span> t<span class="token punctuation">[</span><span class="token string">"scale"</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span> <span class="token operator">+</span> t<span class="token punctuation">[</span><span class="token string">"translate"</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span>
+        ys <span class="token operator">=</span> v<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">]</span> <span class="token operator">*</span> t<span class="token punctuation">[</span><span class="token string">"scale"</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span> <span class="token operator">+</span> t<span class="token punctuation">[</span><span class="token string">"translate"</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span>
+    <span class="token keyword">else</span><span class="token punctuation">:</span>
+        <span class="token keyword">raise</span> ValueError<span class="token punctuation">(</span>kind<span class="token punctuation">)</span>
+
+    result <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token string">"path"</span><span class="token punctuation">:</span> <span class="token builtin">str</span><span class="token punctuation">(</span>path<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"declared_epsg"</span><span class="token punctuation">:</span> declared<span class="token punctuation">,</span>
+              <span class="token string">"expected_epsg"</span><span class="token punctuation">:</span> CRS<span class="token punctuation">.</span>from_user_input<span class="token punctuation">(</span>epsg<span class="token punctuation">)</span><span class="token punctuation">.</span>to_epsg<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+              <span class="token string">"findings"</span><span class="token punctuation">:</span> swap_diagnosis<span class="token punctuation">(</span>xs<span class="token punctuation">,</span> ys<span class="token punctuation">,</span> epsg<span class="token punctuation">,</span> expected_extent<span class="token punctuation">)</span><span class="token punctuation">}</span>
+    result<span class="token punctuation">[</span><span class="token string">"ok"</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token keyword">not</span> <span class="token builtin">any</span><span class="token punctuation">(</span>s <span class="token operator">==</span> <span class="token string">"critical"</span> <span class="token keyword">for</span> s<span class="token punctuation">,</span> _ <span class="token keyword">in</span> result<span class="token punctuation">[</span><span class="token string">"findings"</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> result
+
+MUNICH_25832 <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token number">690000</span><span class="token punctuation">,</span> <span class="token number">5330000</span><span class="token punctuation">,</span> <span class="token number">700000</span><span class="token punctuation">,</span> <span class="token number">5340000</span><span class="token punctuation">)</span>
+<span class="token keyword">for</span> path<span class="token punctuation">,</span> kind <span class="token keyword">in</span> <span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token string">"deliveries/footprints.gpkg"</span><span class="token punctuation">,</span> <span class="token string">"vector"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                   <span class="token punctuation">(</span><span class="token string">"deliveries/tile_691_5335.laz"</span><span class="token punctuation">,</span> <span class="token string">"pointcloud"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                   <span class="token punctuation">(</span><span class="token string">"deliveries/district.city.json"</span><span class="token punctuation">,</span> <span class="token string">"cityjson"</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    r <span class="token operator">=</span> check_dataset<span class="token punctuation">(</span>path<span class="token punctuation">,</span> <span class="token string">"EPSG:25832+7837"</span><span class="token punctuation">,</span> MUNICH_25832<span class="token punctuation">,</span> kind<span class="token operator">=</span>kind<span class="token punctuation">)</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span><span class="token string">'OK  '</span> <span class="token keyword">if</span> r<span class="token punctuation">[</span><span class="token string">'ok'</span><span class="token punctuation">]</span> <span class="token keyword">else</span> <span class="token string">'FAIL'</span><span class="token punctuation">}</span></span><span class="token string"> </span><span class="token interpolation"><span class="token punctuation">{</span>Path<span class="token punctuation">(</span>r<span class="token punctuation">[</span><span class="token string">'path'</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">.</span>name<span class="token punctuation">:</span><span class="token format-spec">&lt;28</span><span class="token punctuation">}</span></span><span class="token string"> "</span></span>
+          <span class="token string-interpolation"><span class="token string">f"declared EPSG:</span><span class="token interpolation"><span class="token punctuation">{</span>r<span class="token punctuation">[</span><span class="token string">'declared_epsg'</span><span class="token punctuation">]</span><span class="token punctuation">}</span></span><span class="token string"> — "</span></span>
+          <span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span><span class="token string">'; '</span><span class="token punctuation">.</span>join<span class="token punctuation">(</span>m <span class="token keyword">for</span> _<span class="token punctuation">,</span> m <span class="token keyword">in</span> r<span class="token punctuation">[</span><span class="token string">'findings'</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token keyword">or</span> <span class="token string">'no findings'</span><span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Running the same diagnosis over every format at ingestion is what turns a known trap into a solved problem. Using a representative point per feature rather than every vertex keeps it fast on large vector layers, and for point clouds the header’s extent alone is usually enough — a swapped cloud has a bounding box whose axes are obviously wrong.</p>
+<figure class="diagram">
+<svg viewBox="-4 46 678 194" role="img" aria-labelledby="axis-where-t axis-where-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="axis-where-t">Where to assert, and what each boundary catches</title>
+  <desc id="axis-where-d">A pipeline with four assertion points. At ingestion, the check catches a delivery that is already swapped. Before a transformation, it catches an input the pipeline itself produced wrongly. After a transformation, it catches a transformer built without the explicit axis-order flag. Before publishing, it catches anything introduced in between.</desc>
+  <rect class="svg-bg" x="-4" y="46" width="678" height="194" fill="#ffffff"/>
+  <defs>
+    <marker id="axis-where-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
+    </marker>
+  </defs>
+  <rect x="10" y="60" width="120" height="50" rx="8" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <rect x="180" y="60" width="130" height="50" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="360" y="60" width="130" height="50" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="540" y="60" width="120" height="50" rx="8" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <g stroke="#5b6471" stroke-width="2" fill="none" marker-end="url(#axis-where-arrow)">
+    <path d="M130 85 H178"/><path d="M310 85 H358"/><path d="M490 85 H538"/>
+  </g>
+  <g stroke="#b0413e" stroke-width="2" fill="none">
+    <path d="M70 118 V150"/><path d="M245 118 V150"/><path d="M425 118 V150"/><path d="M600 118 V150"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="70" y="82">delivery</text><text x="70" y="100">arrives</text>
+    <text x="245" y="82">processing</text><text x="245" y="100">stage</text>
+    <text x="425" y="82">reprojection</text><text x="425" y="100">to the twin CRS</text>
+    <text x="600" y="82">publish</text><text x="600" y="100">tiles</text>
+  </g>
+  <g fill="#b0413e" font-size="12" text-anchor="middle">
+    <text x="70" y="168">already</text><text x="70" y="184">swapped</text>
+    <text x="245" y="168">produced</text><text x="245" y="184">wrongly here</text>
+    <text x="425" y="168">no always_xy</text><text x="425" y="184">on the transformer</text>
+    <text x="600" y="168">anything</text><text x="600" y="184">in between</text>
+  </g>
+  <text x="380" y="222" fill="#15384a" font-size="12.5" text-anchor="middle">Four assertions, four distinct causes; each is microseconds on an array.</text>
+</svg>
+<figcaption>The same check at four boundaries distinguishes a bad delivery from a bug in the pipeline, which a single check at the end cannot.</figcaption>
+</figure>
+<h2 id="expected-output-verification" tabindex="-1"><a class="heading-link" href="#expected-output-verification"><span>Expected Output &amp; Verification</span></a></h2>
+<div class="codeblock" data-lang="text"><div class="codeblock__bar"><span class="codeblock__lang">text</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-text" tabindex="0" role="group" aria-label="text code sample"><code class="language-text">EPSG:4326         x/E         -180 …          180   y/N          -90 …           90
+EPSG:25832        x/E      -1,877,994 …    1,626,381   y/N    3,804,640 …   9,329,006
+EPSG:32618        x/E        166,021 …      833,978   y/N            0 …   9,329,005
+EPSG:2263         x/E        278,450 …    1,049,900   y/N       38,700 …      323,600
+CRITICAL: axes are swapped: the values fit the opposite axis
+{'as_given_on_land': 1.0, 'as_flipped_on_land': 0.0, 'verdict': 'as given'}
+transformed: [691204.41  691252.58] [5335818.22 5335795.6 ]
+OK   footprints.gpkg              declared EPSG:25832 — no findings
+FAIL tile_691_5335.laz            declared EPSG:25832 — axes are swapped: the values fit the opposite axis
+OK   district.city.json           declared EPSG:25832 — no findings
+</code></pre></div>
+<p>Verify the detector itself with fixtures, because a check that cannot fail is not a check:</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python">CASES <span class="token operator">=</span> <span class="token punctuation">[</span>
+    <span class="token punctuation">(</span><span class="token string">"correct UTM"</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token number">691204.4</span><span class="token punctuation">,</span> <span class="token number">691286.9</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token number">5335818.2</span><span class="token punctuation">,</span> <span class="token number">5335836.9</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token string">"EPSG:25832"</span><span class="token punctuation">,</span> <span class="token boolean">False</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token punctuation">(</span><span class="token string">"swapped UTM"</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token number">5335818.2</span><span class="token punctuation">,</span> <span class="token number">5335836.9</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token number">691204.4</span><span class="token punctuation">,</span> <span class="token number">691286.9</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token string">"EPSG:25832"</span><span class="token punctuation">,</span> <span class="token boolean">True</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token punctuation">(</span><span class="token string">"correct lon/lat"</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token number">11.573</span><span class="token punctuation">,</span> <span class="token number">11.576</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token number">48.138</span><span class="token punctuation">,</span> <span class="token number">48.140</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token string">"EPSG:4326"</span><span class="token punctuation">,</span> <span class="token boolean">False</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token punctuation">(</span><span class="token string">"swapped lon/lat"</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token number">48.138</span><span class="token punctuation">,</span> <span class="token number">48.140</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token number">11.573</span><span class="token punctuation">,</span> <span class="token number">11.576</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token string">"EPSG:4326"</span><span class="token punctuation">,</span> <span class="token boolean">True</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token punctuation">(</span><span class="token string">"wrong UTM zone"</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token number">291204.4</span><span class="token punctuation">,</span> <span class="token number">291286.9</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token number">5335818.2</span><span class="token punctuation">,</span> <span class="token number">5335836.9</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token string">"EPSG:25832"</span><span class="token punctuation">,</span> <span class="token boolean">True</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+<span class="token punctuation">]</span>
+<span class="token keyword">for</span> name<span class="token punctuation">,</span> x<span class="token punctuation">,</span> y<span class="token punctuation">,</span> epsg<span class="token punctuation">,</span> should_fail <span class="token keyword">in</span> CASES<span class="token punctuation">:</span>
+    extent <span class="token operator">=</span> MUNICH <span class="token keyword">if</span> epsg <span class="token operator">==</span> <span class="token string">"EPSG:4326"</span> <span class="token keyword">else</span> MUNICH_25832
+    findings <span class="token operator">=</span> swap_diagnosis<span class="token punctuation">(</span>x<span class="token punctuation">,</span> y<span class="token punctuation">,</span> epsg<span class="token punctuation">,</span> extent<span class="token punctuation">)</span>
+    failed <span class="token operator">=</span> <span class="token builtin">any</span><span class="token punctuation">(</span>s <span class="token operator">==</span> <span class="token string">"critical"</span> <span class="token keyword">for</span> s<span class="token punctuation">,</span> _ <span class="token keyword">in</span> findings<span class="token punctuation">)</span>
+    status <span class="token operator">=</span> <span class="token string">"detected"</span> <span class="token keyword">if</span> failed <span class="token operator">==</span> should_fail <span class="token keyword">else</span> <span class="token string">"MISSED"</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>status<span class="token punctuation">:</span><span class="token format-spec">&lt;9</span><span class="token punctuation">}</span></span><span class="token interpolation"><span class="token punctuation">{</span>name<span class="token punctuation">:</span><span class="token format-spec">&lt;18</span><span class="token punctuation">}</span></span><span class="token interpolation"><span class="token punctuation">{</span><span class="token string">'; '</span><span class="token punctuation">.</span>join<span class="token punctuation">(</span>m <span class="token keyword">for</span> _<span class="token punctuation">,</span> m <span class="token keyword">in</span> findings<span class="token punctuation">)</span> <span class="token keyword">or</span> <span class="token string">'—'</span><span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+    <span class="token keyword">assert</span> failed <span class="token operator">==</span> should_fail<span class="token punctuation">,</span> <span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>name<span class="token punctuation">}</span></span><span class="token string">: expected fail=</span><span class="token interpolation"><span class="token punctuation">{</span>should_fail<span class="token punctuation">}</span></span><span class="token string">"</span></span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"axis-order detector behaves correctly on all fixtures"</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>The “swapped lon/lat” case is the interesting one: 48.138 is a valid longitude and 11.573 a valid latitude, so magnitudes alone cannot reject it — the expected extent is what catches it, which is exactly why the fixture set includes it. The “wrong UTM zone” case is included because it is the failure most often mistaken for a swap: the magnitudes are plausible for the CRS and wrong for the project, and only the extent test distinguishes them.</p>
+<h2 id="performance-notes" tabindex="-1"><a class="heading-link" href="#performance-notes"><span>Performance Notes</span></a></h2>
+<ul>
+<li><strong>The magnitude and extent tests are vectorised</strong> and cost microseconds on a million coordinates, so they belong in every step rather than in a separate validation job.</li>
+<li><strong>Sample for the land test.</strong> A point-in-polygon test against a coastline is milliseconds per point; five hundred points give a decisive answer and take well under a second.</li>
+<li><strong>Use representative points for vector data</strong> rather than every vertex: one per feature is enough to detect a swap and orders of magnitude cheaper.</li>
+<li><strong>Read only the header for point clouds</strong> when possible. A swapped cloud has an obviously wrong bounding box, and reading 20 million coordinates to learn that is unnecessary.</li>
+<li><strong>Cache the area-of-use bounds</strong> per EPSG code; deriving them involves a transformation and is worth doing once per process.</li>
+</ul>
+<h2 id="common-errors" tabindex="-1"><a class="heading-link" href="#common-errors"><span>Common Errors</span></a></h2>
+<p><strong>A dataset near the equator passes every test and is still swapped.</strong> No magnitude or land test can decide there. The expected extent is the only detector, which is why an ingestion contract should always carry one.</p>
+<p><strong>The detector fires on a legitimately global dataset.</strong> Area-of-use bounds are wrong for data that genuinely spans the world. Skip the bounds test for global layers and rely on the extent and on format conventions.</p>
+<p><strong><code>always_xy=True</code> is set and the output is still swapped.</strong> The flag controls the transformer, not the file. A writer that emits latitude first will do so regardless, and GeoJSON, shapefiles and most point-cloud formats are longitude-first by specification.</p>
+<p><strong>Heights end up in the northing.</strong> A three-column export read as two columns, or a <code>(lat, lon, h)</code> tuple unpacked as <code>(x, y, z)</code>. Check the vertical range as well: a “northing” of 519.31 is a height.</p>
+<h2 id="frequently-asked-questions" tabindex="-1"><a class="heading-link" href="#frequently-asked-questions"><span>Frequently Asked Questions</span></a></h2>
+<h3 id="is-always_xy-always-the-right-setting" tabindex="-1"><a class="heading-link" href="#is-always_xy-always-the-right-setting"><span>Is <code>always_xy</code> always the right setting?</span></a></h3>
+<p>For pipeline code that works with files and APIs, yes — it makes <code>pyproj</code> agree with the longitude-first convention those use. Code that deliberately implements an authority-ordered interface should say so loudly, in one place, and convert at its boundary.</p>
+<h3 id="what-about-epsg4326-versus-ogccrs84" tabindex="-1"><a class="heading-link" href="#what-about-epsg4326-versus-ogccrs84"><span>What about EPSG:4326 versus OGC:CRS84?</span></a></h3>
+<p><code>OGC:CRS84</code> is the same datum with longitude-first axis order declared explicitly, which removes the ambiguity. Using it in metadata for longitude-first data is more honest than declaring EPSG:4326 and relying on a convention.</p>
+<h3 id="should-a-swap-be-corrected-automatically" tabindex="-1"><a class="heading-link" href="#should-a-swap-be-corrected-automatically"><span>Should a swap be corrected automatically?</span></a></h3>
+<p>No. A detected swap means the producer’s assumptions differ from the consumer’s, and silently flipping the axes hides that — the next delivery will be correct and the pipeline will flip it wrongly. Fail, report which axis assignment fits, and fix the producer or the declared CRS.</p>
+<h2 id="related-guides" tabindex="-1"><a class="heading-link" href="#related-guides"><span>Related Guides</span></a></h2>
+<ul>
+<li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/converting-wgs84-to-local-projected-coordinates/">Converting WGS84 to Local Projected Coordinates</a> — why the ambiguity exists</li>
+<li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/asserting-crs-and-units-with-pyproj/">Asserting CRS and Units with pyproj</a> — the wider set of CRS assertions</li>
+<li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/tracing-unit-errors-from-feet-to-metres/">Tracing Unit Errors from Feet to Metres</a> — the other silent coordinate failure</li>
+</ul>
+<p>Back to <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems for 3D Assets</a>.</p>
+
+
+      
+      
+
+      <div class="related-nav">
+        
+
+        
+          <div>
+            <h3>Related</h3>
+            <div class="related-grid">
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/converting-wgs84-to-local-projected-coordinates/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Converting WGS84 to Local Projected Coordinates</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/ecef-and-enu-frames-for-tileset-transforms/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">ECEF and ENU Frames for Tileset Transforms</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/handling-vertical-datums-and-geoid-separation/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Handling Vertical Datums and Geoid Separation</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/how-to-choose-crs-for-urban-digital-twins/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">How to Choose CRS for Urban Digital Twins</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/transforming-between-epoch-based-datums/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Transforming Between Epoch-Based Datums</span>
+                </a>
+              
+            </div>
+          </div>
+        
+      </div>
+    </article>
+
+    
+    <aside class="toc" aria-label="On this page" data-toc hidden>
+      <h4>On this page</h4>
+      <ul></ul>
+    </aside>
+  </div>
+</div>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+  <div class="container site-footer__inner">
+    <div class="site-footer__brand">
+      <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+        <img src="/assets/img/logo-mark.svg" alt="" class="brand__mark" width="36" height="36">
+        <span class="brand__name">
+          3D Geospatial
+          <small>Digital Twin Automation</small>
+        </span>
+      </a>
+      <p>Engineering-grade guides on point cloud processing, mesh pipelines, LOD strategies, and CI/CD automation for digital twin platforms.</p>
+      <a class="footer-social" href="https://github.com/3d-geospatial" aria-label="3D Geospatial on GitHub" rel="noopener" target="_blank">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+          <path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.53-1.34-1.3-1.7-1.3-1.7-1.06-.72.08-.71.08-.71 1.17.08 1.79 1.2 1.79 1.2 1.04 1.79 2.73 1.27 3.4.97.1-.75.4-1.27.73-1.56-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.19-3.08-.12-.3-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.75.11 3.05.74.8 1.19 1.83 1.19 3.08 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.07.78 2.15v3.18c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5Z"/>
+        </svg>
+        <span>GitHub</span>
+      </a>
+    </div>
+
+    <div class="site-footer__col">
+      <h4>Sections</h4>
+      <ul>
+        <li><a href="https://www.3d-geospatial.com/">Home</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management &amp; Optimization</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/">Point Cloud &amp; Mesh Pipelines</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/">Troubleshooting &amp; Reliability</a></li>
+        
+      </ul>
+    </div>
+
+    
+      <div class="site-footer__col">
+        <h4>3D Geospatial Fundamentals</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/">3D Format Standards Comparison</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/">BIM and IFC Georeferencing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/">CityGML and CityJSON Processing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems for 3D Assets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/">Digital Elevation Model Workflows</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/">Spatial Indexing and Tiling Schemes for 3D Data</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>LOD Management &amp; Optimization</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/">Automated Tile Generation for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/">Cesium ion Upload Automation for 3D Tilesets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/">glTF LOD Generation With Draco Compression</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/">Streaming Sync Patterns for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/">Tileset Metadata and 3D Tiles Next</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/">Vector Overlays on 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Point Cloud &amp; Mesh Pipelines</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/">Automated Mesh Decimation for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/">Change Detection Between LiDAR Scan Epochs</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/">CI/CD Automation for Spatial Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">LiDAR Classification and Ground Extraction</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/photogrammetry-processing-pipelines/">Photogrammetry Processing Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/">Point Cloud Filtering Techniques</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/">Surface Reconstruction for Geospatial Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/">Texture Mapping Workflows for Digital Twins</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Troubleshooting &amp; Reliability</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/">Cross-Section Failure Modes in Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/">Data Validation &amp; QA Gates for 3D Tiles</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/">Performance Profiling and Benchmarking</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/">Pipeline Observability and Monitoring</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/">Streaming &amp; Runtime Diagnostics for 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+  </div>
+  <div class="container site-footer__bottom">
+    <span>© 2026 3D Geospatial &amp; Digital Twin Automation</span>
+    <span>Built with Eleventy · PWA-enabled</span>
+  </div>
+</footer>
+
+
+  <script src="/assets/js/site.js?v=b99aa9f971" defer></script>
+  
+</body>
+</html>

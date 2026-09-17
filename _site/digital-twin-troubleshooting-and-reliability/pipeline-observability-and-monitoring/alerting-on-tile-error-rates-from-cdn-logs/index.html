@@ -1,0 +1,790 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <title>Alerting on Tile Error Rates from CDN Logs — 3D Geospatial</title>
+  <meta name="description" content="Turn CDN access logs into tile-serving alerts: parse per tileset version, split 404 from 5xx, watch cache hit ratio and set thresholds that catch a bad">
+  <meta name="keywords" content="3D geospatial, digital twin, point cloud, mesh pipeline, LOD, 3D Tiles, Cesium, PDAL, Open3D, Python, CI/CD">
+  <meta name="author" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta name="theme-color" content="#1f6b8a" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f171d" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+
+  
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem("theme");
+        var theme = (stored === "dark" || stored === "light") ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    })();
+  </script>
+  <meta name="generator" content="Eleventy">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="googlebot" content="index,follow,max-image-preview:large">
+
+  
+  <link rel="canonical" href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/alerting-on-tile-error-rates-from-cdn-logs/">
+  <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">
+
+  
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/icon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+
+  
+  <link rel="apple-touch-icon" href="/assets/img/icon-180.png">
+  <link rel="mask-icon" href="/assets/img/logo.svg" color="#1f6b8a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="3D Geospatial">
+  <meta name="application-name" content="3D Geospatial">
+
+  
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Alerting on Tile Error Rates from CDN Logs — 3D Geospatial">
+  <meta property="og:description" content="Turn CDN access logs into tile-serving alerts: parse per tileset version, split 404 from 5xx, watch cache hit ratio and set thresholds that catch a bad">
+  <meta property="og:url" content="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/alerting-on-tile-error-rates-from-cdn-logs/">
+  <meta property="og:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+  <meta property="og:site_name" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta property="og:locale" content="en_US">
+  
+  <meta property="article:published_time" content="2026-09-17T23:36:56.451Z">
+  <meta property="article:modified_time" content="2026-09-17T23:36:56.451Z">
+  <meta property="article:publisher" content="https://www.3d-geospatial.com/">
+  
+
+  
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Alerting on Tile Error Rates from CDN Logs — 3D Geospatial">
+  <meta name="twitter:description" content="Turn CDN access logs into tile-serving alerts: parse per tileset version, split 404 from 5xx, watch cache hit ratio and set thresholds that catch a bad">
+  <meta name="twitter:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta name="twitter:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+
+  
+  <link rel="preload" href="/assets/css/styles.css?v=8c46394d6c" as="style">
+  
+
+  <link rel="stylesheet" href="/assets/css/styles.css?v=8c46394d6c">
+
+  
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.3d-geospatial.com/#organization",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "url": "https://www.3d-geospatial.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/icon-512.png",
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://www.3d-geospatial.com/#website",
+      "url": "https://www.3d-geospatial.com/",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "description": "Build reliable 3D spatial data pipelines for digital twins — point clouds, meshes, LOD strategies, Python processing, and CI/CD automation.",
+      "inLanguage": "en",
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      }
+    },
+    {
+      "@type": "TechArticle",
+      "@id": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/alerting-on-tile-error-rates-from-cdn-logs/#article",
+      "isPartOf": {
+        "@id": "https://www.3d-geospatial.com/#website"
+      },
+      "headline": "Alerting on Tile Error Rates from CDN Logs",
+      "name": "Alerting on Tile Error Rates from CDN Logs",
+      "description": "Turn CDN access logs into tile-serving alerts: parse per tileset version, split 404 from 5xx, watch cache hit ratio and set thresholds that catch a bad",
+      "url": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/alerting-on-tile-error-rates-from-cdn-logs/",
+      "mainEntityOfPage": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/alerting-on-tile-error-rates-from-cdn-logs/",
+      "inLanguage": "en",
+      "datePublished": "2026-09-17T23:36:56.451Z",
+      "dateModified": "2026-09-17T23:36:56.451Z",
+      "author": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "image": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/og-cover.png",
+        "width": 1200,
+        "height": 630
+      },
+      "breadcrumb": {
+        "@id": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/alerting-on-tile-error-rates-from-cdn-logs/#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/alerting-on-tile-error-rates-from-cdn-logs/#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://www.3d-geospatial.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Digital Twin Troubleshooting And Reliability",
+          "item": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Pipeline Observability And Monitoring",
+          "item": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "name": "Alerting On Tile Error Rates From Cdn Logs",
+          "item": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/alerting-on-tile-error-rates-from-cdn-logs/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  
+<header class="site-header" role="banner">
+  <div class="container site-header__inner">
+    <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+      <img src="/assets/img/logo.svg" alt="" class="brand__mark" width="36" height="36">
+      <span class="brand__name">
+        3D Geospatial
+        <small>Digital Twin Automation</small>
+      </span>
+    </a>
+
+    <button class="theme-toggle" type="button" data-theme-toggle
+            aria-label="Switch to dark theme" title="Switch to dark theme">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4.2"/>
+        <path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/>
+      </svg>
+    </button>
+
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>
+      <span class="nav-toggle__icon" aria-hidden="true"><span></span></span>
+      Menu
+    </button>
+
+    <nav class="primary-nav" id="primary-nav" aria-label="Primary">
+      
+      <a href="https://www.3d-geospatial.com/" >
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/>
+        </svg>
+        Home
+      </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2 3 7l9 5 9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 17l9 5 9-5"/>
+            </svg>
+          
+          3D Geospatial Fundamentals
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+          
+          LOD Management &amp; Optimization
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="6" cy="6" r="1.5"/><circle cx="12" cy="6" r="1.5"/><circle cx="18" cy="6" r="1.5"/>
+              <circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/>
+              <circle cx="6" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="18" cy="18" r="1.5"/>
+            </svg>
+          
+          Point Cloud &amp; Mesh Pipelines
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/" aria-current="page">
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <path d="M12 9v4"/><path d="M12 17h.01"/>
+            </svg>
+          
+          Troubleshooting &amp; Reliability
+        </a>
+      
+    </nav>
+  </div>
+</header>
+
+
+  <main id="main">
+    
+
+
+<div class="container">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    
+      
+        <a href="https://www.3d-geospatial.com/">Home</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/">Digital Twin Troubleshooting And Reliability</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/">Pipeline Observability And Monitoring</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <span class="current">Alerting On Tile Error Rates From Cdn Logs</span>
+      
+    
+  </nav>
+
+  <div class="content-page">
+    <article class="article">
+      <h1 id="alerting-on-tile-error-rates-from-cdn-logs" tabindex="-1"><a class="heading-link" href="#alerting-on-tile-error-rates-from-cdn-logs"><span>Alerting on Tile Error Rates from CDN Logs</span></a></h1>
+<p>This page turns a CDN’s access logs into the alert that tells you a twin is broken for users — parsing requests per tileset version, separating missing tiles from server failures, watching the cache hit ratio for a build that invalidated everything, and setting thresholds that fire on a bad deploy within minutes rather than after a support ticket.</p>
+<h2 id="why-you-hit-this" tabindex="-1"><a class="heading-link" href="#why-you-hit-this"><span>Why you hit this</span></a></h2>
+<p>Every pipeline signal can be green while the twin is unusable. The build wrote 4,096 shards, the validator passed, the deploy reported success — and one path prefix is wrong, so every tile at level 16 returns 404 for everyone. Nothing in the pipeline notices, because the pipeline’s job ended at upload. The only place that failure is visible is where the requests are served, which makes CDN logs the closest thing a twin has to a user-experience signal. The wider instrumentation context is in <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/">pipeline observability and monitoring</a>.</p>
+<h2 id="prerequisites" tabindex="-1"><a class="heading-link" href="#prerequisites"><span>Prerequisites</span></a></h2>
+<ul>
+<li>Access to CDN or tile-server logs in a parseable form — JSON lines from Cloudflare or Fastly, or the S3/CloudFront format.</li>
+<li>Python 3.10+ with <code>prometheus-client&gt;=0.20</code>; <code>boto3&gt;=1.34</code> if the logs sit in object storage.</li>
+<li>A URL scheme that contains the tileset version, for example <code>/tilesets/city/v42/content/16/…</code>. Without a version in the path, none of the per-version analysis below is possible.</li>
+<li>An alerting route that reaches a person within minutes.</li>
+</ul>
+<h2 id="step-by-step" tabindex="-1"><a class="heading-link" href="#step-by-step"><span>Step-by-Step</span></a></h2>
+<h3 id="1-parse-the-log-into-the-dimensions-that-matter" tabindex="-1"><a class="heading-link" href="#1-parse-the-log-into-the-dimensions-that-matter"><span>1. Parse the log into the dimensions that matter</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> gzip
+<span class="token keyword">import</span> json
+<span class="token keyword">import</span> re
+<span class="token keyword">from</span> collections <span class="token keyword">import</span> Counter
+<span class="token keyword">from</span> pathlib <span class="token keyword">import</span> Path
+
+TILE_RE <span class="token operator">=</span> re<span class="token punctuation">.</span><span class="token builtin">compile</span><span class="token punctuation">(</span><span class="token string">r"^/tilesets/(?P&lt;dataset>[^/]+)/(?P&lt;version>v\d+)/(?P&lt;rest>.*)$"</span><span class="token punctuation">)</span>
+KIND <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token string">".json"</span><span class="token punctuation">:</span> <span class="token string">"tileset"</span><span class="token punctuation">,</span> <span class="token string">".glb"</span><span class="token punctuation">:</span> <span class="token string">"content"</span><span class="token punctuation">,</span> <span class="token string">".b3dm"</span><span class="token punctuation">:</span> <span class="token string">"content"</span><span class="token punctuation">,</span> <span class="token string">".pnts"</span><span class="token punctuation">:</span> <span class="token string">"content"</span><span class="token punctuation">,</span>
+        <span class="token string">".subtree"</span><span class="token punctuation">:</span> <span class="token string">"subtree"</span><span class="token punctuation">,</span> <span class="token string">".png"</span><span class="token punctuation">:</span> <span class="token string">"imagery"</span><span class="token punctuation">,</span> <span class="token string">".jpg"</span><span class="token punctuation">:</span> <span class="token string">"imagery"</span><span class="token punctuation">}</span>
+
+<span class="token keyword">def</span> <span class="token function">parse_log</span><span class="token punctuation">(</span>path<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    rows <span class="token operator">=</span> Counter<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    opener <span class="token operator">=</span> gzip<span class="token punctuation">.</span><span class="token builtin">open</span> <span class="token keyword">if</span> <span class="token builtin">str</span><span class="token punctuation">(</span>path<span class="token punctuation">)</span><span class="token punctuation">.</span>endswith<span class="token punctuation">(</span><span class="token string">".gz"</span><span class="token punctuation">)</span> <span class="token keyword">else</span> <span class="token builtin">open</span>
+    <span class="token keyword">with</span> opener<span class="token punctuation">(</span>path<span class="token punctuation">,</span> <span class="token string">"rt"</span><span class="token punctuation">)</span> <span class="token keyword">as</span> f<span class="token punctuation">:</span>
+        <span class="token keyword">for</span> line <span class="token keyword">in</span> f<span class="token punctuation">:</span>
+            <span class="token keyword">try</span><span class="token punctuation">:</span>
+                rec <span class="token operator">=</span> json<span class="token punctuation">.</span>loads<span class="token punctuation">(</span>line<span class="token punctuation">)</span>
+            <span class="token keyword">except</span> json<span class="token punctuation">.</span>JSONDecodeError<span class="token punctuation">:</span>
+                <span class="token keyword">continue</span>
+            m <span class="token operator">=</span> TILE_RE<span class="token punctuation">.</span><span class="token keyword">match</span><span class="token punctuation">(</span>rec<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"uri"</span><span class="token punctuation">,</span> rec<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"ClientRequestURI"</span><span class="token punctuation">,</span> <span class="token string">""</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+            <span class="token keyword">if</span> <span class="token keyword">not</span> m<span class="token punctuation">:</span>
+                <span class="token keyword">continue</span>
+            ext <span class="token operator">=</span> <span class="token string">"."</span> <span class="token operator">+</span> m<span class="token punctuation">[</span><span class="token string">"rest"</span><span class="token punctuation">]</span><span class="token punctuation">.</span>rsplit<span class="token punctuation">(</span><span class="token string">"."</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">]</span> <span class="token keyword">if</span> <span class="token string">"."</span> <span class="token keyword">in</span> m<span class="token punctuation">[</span><span class="token string">"rest"</span><span class="token punctuation">]</span> <span class="token keyword">else</span> <span class="token string">""</span>
+            key <span class="token operator">=</span> <span class="token punctuation">(</span>
+                m<span class="token punctuation">[</span><span class="token string">"dataset"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> m<span class="token punctuation">[</span><span class="token string">"version"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> KIND<span class="token punctuation">.</span>get<span class="token punctuation">(</span>ext<span class="token punctuation">,</span> <span class="token string">"other"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                <span class="token builtin">int</span><span class="token punctuation">(</span>rec<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"status"</span><span class="token punctuation">,</span> rec<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"EdgeResponseStatus"</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                rec<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"cache"</span><span class="token punctuation">,</span> rec<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"CacheCacheStatus"</span><span class="token punctuation">,</span> <span class="token string">"unknown"</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                rec<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"region"</span><span class="token punctuation">,</span> rec<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"ClientRegionCode"</span><span class="token punctuation">,</span> <span class="token string">"unknown"</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token punctuation">)</span>
+            rows<span class="token punctuation">[</span>key<span class="token punctuation">]</span> <span class="token operator">+=</span> <span class="token number">1</span>
+    <span class="token keyword">return</span> rows
+
+rows <span class="token operator">=</span> parse_log<span class="token punctuation">(</span><span class="token string">"logs/2026-09-17T02.json.gz"</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span><span class="token builtin">sum</span><span class="token punctuation">(</span>rows<span class="token punctuation">.</span>values<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">:</span><span class="token format-spec">,</span><span class="token punctuation">}</span></span><span class="token string"> tile requests across </span><span class="token interpolation"><span class="token punctuation">{</span><span class="token builtin">len</span><span class="token punctuation">(</span><span class="token punctuation">{</span>k<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span> <span class="token keyword">for</span> k <span class="token keyword">in</span> rows<span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">}</span></span><span class="token string"> versions"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Six dimensions carry almost all of the diagnostic value: dataset, version, content kind, status, cache status and region. Everything else in a CDN log — user agent, referrer, bytes — is noise for this purpose. Keeping the content kind separate matters because the failure modes differ: a missing <code>tileset.json</code> breaks everything, while a missing deep content tile breaks one building.</p>
+<h3 id="2-compute-rates-per-version-not-in-aggregate" tabindex="-1"><a class="heading-link" href="#2-compute-rates-per-version-not-in-aggregate"><span>2. Compute rates per version, not in aggregate</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">rates</span><span class="token punctuation">(</span>rows<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    by_version <span class="token operator">=</span> Counter<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    errors <span class="token operator">=</span> Counter<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    <span class="token keyword">for</span> <span class="token punctuation">(</span>dataset<span class="token punctuation">,</span> version<span class="token punctuation">,</span> kind<span class="token punctuation">,</span> status<span class="token punctuation">,</span> cache<span class="token punctuation">,</span> region<span class="token punctuation">)</span><span class="token punctuation">,</span> n <span class="token keyword">in</span> rows<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        by_version<span class="token punctuation">[</span><span class="token punctuation">(</span>dataset<span class="token punctuation">,</span> version<span class="token punctuation">)</span><span class="token punctuation">]</span> <span class="token operator">+=</span> n
+        <span class="token keyword">if</span> status <span class="token operator">>=</span> <span class="token number">400</span><span class="token punctuation">:</span>
+            errors<span class="token punctuation">[</span><span class="token punctuation">(</span>dataset<span class="token punctuation">,</span> version<span class="token punctuation">,</span> kind<span class="token punctuation">,</span> status<span class="token punctuation">)</span><span class="token punctuation">]</span> <span class="token operator">+=</span> n
+    out <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    <span class="token keyword">for</span> <span class="token punctuation">(</span>dataset<span class="token punctuation">,</span> version<span class="token punctuation">)</span><span class="token punctuation">,</span> total <span class="token keyword">in</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span>by_version<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">for</span> <span class="token punctuation">(</span>d<span class="token punctuation">,</span> v<span class="token punctuation">,</span> kind<span class="token punctuation">,</span> status<span class="token punctuation">)</span><span class="token punctuation">,</span> n <span class="token keyword">in</span> errors<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+            <span class="token keyword">if</span> <span class="token punctuation">(</span>d<span class="token punctuation">,</span> v<span class="token punctuation">)</span> <span class="token operator">!=</span> <span class="token punctuation">(</span>dataset<span class="token punctuation">,</span> version<span class="token punctuation">)</span><span class="token punctuation">:</span>
+                <span class="token keyword">continue</span>
+            out<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"dataset"</span><span class="token punctuation">:</span> dataset<span class="token punctuation">,</span> <span class="token string">"version"</span><span class="token punctuation">:</span> version<span class="token punctuation">,</span> <span class="token string">"kind"</span><span class="token punctuation">:</span> kind<span class="token punctuation">,</span>
+                        <span class="token string">"status"</span><span class="token punctuation">:</span> status<span class="token punctuation">,</span> <span class="token string">"count"</span><span class="token punctuation">:</span> n<span class="token punctuation">,</span> <span class="token string">"total"</span><span class="token punctuation">:</span> total<span class="token punctuation">,</span>
+                        <span class="token string">"rate_pct"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token number">100</span> <span class="token operator">*</span> n <span class="token operator">/</span> total<span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span>out<span class="token punctuation">,</span> key<span class="token operator">=</span><span class="token keyword">lambda</span> r<span class="token punctuation">:</span> <span class="token operator">-</span>r<span class="token punctuation">[</span><span class="token string">"rate_pct"</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+
+<span class="token keyword">for</span> r <span class="token keyword">in</span> rates<span class="token punctuation">(</span>rows<span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token number">8</span><span class="token punctuation">]</span><span class="token punctuation">:</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>r<span class="token punctuation">[</span><span class="token string">'dataset'</span><span class="token punctuation">]</span><span class="token punctuation">}</span></span><span class="token string">/</span><span class="token interpolation"><span class="token punctuation">{</span>r<span class="token punctuation">[</span><span class="token string">'version'</span><span class="token punctuation">]</span><span class="token punctuation">:</span><span class="token format-spec">>4</span><span class="token punctuation">}</span></span><span class="token string"> </span><span class="token interpolation"><span class="token punctuation">{</span>r<span class="token punctuation">[</span><span class="token string">'kind'</span><span class="token punctuation">]</span><span class="token punctuation">:</span><span class="token format-spec">&lt;8</span><span class="token punctuation">}</span></span><span class="token string"> </span><span class="token interpolation"><span class="token punctuation">{</span>r<span class="token punctuation">[</span><span class="token string">'status'</span><span class="token punctuation">]</span><span class="token punctuation">}</span></span><span class="token string"> "</span></span>
+          <span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>r<span class="token punctuation">[</span><span class="token string">'count'</span><span class="token punctuation">]</span><span class="token punctuation">:</span><span class="token format-spec">>7,</span><span class="token punctuation">}</span></span><span class="token string"> of </span><span class="token interpolation"><span class="token punctuation">{</span>r<span class="token punctuation">[</span><span class="token string">'total'</span><span class="token punctuation">]</span><span class="token punctuation">:</span><span class="token format-spec">>9,</span><span class="token punctuation">}</span></span><span class="token string"> = </span><span class="token interpolation"><span class="token punctuation">{</span>r<span class="token punctuation">[</span><span class="token string">'rate_pct'</span><span class="token punctuation">]</span><span class="token punctuation">:</span><span class="token format-spec">.3f</span><span class="token punctuation">}</span></span><span class="token string">%"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Per-version rates are the whole point. On the day of a deploy the new version might serve 3% of requests while carrying a 40% error rate, and the site-wide rate — which is what a default dashboard shows — sits at 1.2% and triggers nothing. The version dimension makes the broken build obvious while the old one is still carrying the traffic.</p>
+<figure class="diagram">
+<svg viewBox="26 26 805 226" role="img" aria-labelledby="cdn-ver-t cdn-ver-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="cdn-ver-t">Why the aggregate error rate hides a bad deploy</title>
+  <desc id="cdn-ver-d">On the day of a deploy, version 41 serves ninety-seven percent of requests with a tiny error rate while version 42 serves three percent with a forty percent error rate. The aggregate rate is about one point two percent, below a typical alert threshold, while the per-version rate for version 42 is unmistakable.</desc>
+  <rect class="svg-bg" x="26" y="26" width="805" height="226" fill="#ffffff"/>
+  <g stroke-width="1.5">
+    <rect x="40" y="40" width="580" height="40" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="40" y="96" width="20" height="40" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="40" y="170" width="20" height="34" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="60" y="170" width="8" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="start">
+    <text x="632" y="64">v41 · 97% of traffic · 0.1% errors</text>
+    <text x="72" y="120">v42 · 3% of traffic · 40% errors</text>
+    <text x="80" y="192">aggregate · 1.2% errors — under most thresholds</text>
+  </g>
+  <text x="380" y="234" fill="#15384a" font-size="12.5" text-anchor="middle">The broken version is a small slice of traffic and a complete failure for the users on it.</text>
+</svg>
+<figcaption>Alerting per version catches a bad deploy in its first minutes, while the version still serves a small share of requests.</figcaption>
+</figure>
+<h3 id="3-treat-404-and-5xx-as-different-problems" tabindex="-1"><a class="heading-link" href="#3-treat-404-and-5xx-as-different-problems"><span>3. Treat 404 and 5xx as different problems</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">classify_errors</span><span class="token punctuation">(</span>rows<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    buckets <span class="token operator">=</span> Counter<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    <span class="token keyword">for</span> <span class="token punctuation">(</span>dataset<span class="token punctuation">,</span> version<span class="token punctuation">,</span> kind<span class="token punctuation">,</span> status<span class="token punctuation">,</span> cache<span class="token punctuation">,</span> region<span class="token punctuation">)</span><span class="token punctuation">,</span> n <span class="token keyword">in</span> rows<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">if</span> status <span class="token operator">==</span> <span class="token number">404</span><span class="token punctuation">:</span>
+            buckets<span class="token punctuation">[</span><span class="token punctuation">(</span>dataset<span class="token punctuation">,</span> version<span class="token punctuation">,</span> <span class="token string">"missing"</span><span class="token punctuation">,</span> kind<span class="token punctuation">)</span><span class="token punctuation">]</span> <span class="token operator">+=</span> n
+        <span class="token keyword">elif</span> status <span class="token operator">==</span> <span class="token number">403</span><span class="token punctuation">:</span>
+            buckets<span class="token punctuation">[</span><span class="token punctuation">(</span>dataset<span class="token punctuation">,</span> version<span class="token punctuation">,</span> <span class="token string">"forbidden"</span><span class="token punctuation">,</span> kind<span class="token punctuation">)</span><span class="token punctuation">]</span> <span class="token operator">+=</span> n
+        <span class="token keyword">elif</span> <span class="token number">500</span> <span class="token operator">&lt;=</span> status <span class="token operator">&lt;</span> <span class="token number">600</span><span class="token punctuation">:</span>
+            buckets<span class="token punctuation">[</span><span class="token punctuation">(</span>dataset<span class="token punctuation">,</span> version<span class="token punctuation">,</span> <span class="token string">"server"</span><span class="token punctuation">,</span> kind<span class="token punctuation">)</span><span class="token punctuation">]</span> <span class="token operator">+=</span> n
+        <span class="token keyword">elif</span> status <span class="token operator">==</span> <span class="token number">206</span> <span class="token keyword">or</span> status <span class="token operator">==</span> <span class="token number">200</span><span class="token punctuation">:</span>
+            buckets<span class="token punctuation">[</span><span class="token punctuation">(</span>dataset<span class="token punctuation">,</span> version<span class="token punctuation">,</span> <span class="token string">"ok"</span><span class="token punctuation">,</span> kind<span class="token punctuation">)</span><span class="token punctuation">]</span> <span class="token operator">+=</span> n
+    <span class="token keyword">return</span> buckets
+
+<span class="token keyword">for</span> <span class="token punctuation">(</span>dataset<span class="token punctuation">,</span> version<span class="token punctuation">,</span> cls<span class="token punctuation">,</span> kind<span class="token punctuation">)</span><span class="token punctuation">,</span> n <span class="token keyword">in</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span>classify_errors<span class="token punctuation">(</span>rows<span class="token punctuation">)</span><span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">if</span> cls <span class="token operator">!=</span> <span class="token string">"ok"</span><span class="token punctuation">:</span>
+        <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>dataset<span class="token punctuation">}</span></span><span class="token string">/</span><span class="token interpolation"><span class="token punctuation">{</span>version<span class="token punctuation">}</span></span><span class="token string"> </span><span class="token interpolation"><span class="token punctuation">{</span>cls<span class="token punctuation">:</span><span class="token format-spec">&lt;9</span><span class="token punctuation">}</span></span><span class="token string"> </span><span class="token interpolation"><span class="token punctuation">{</span>kind<span class="token punctuation">:</span><span class="token format-spec">&lt;8</span><span class="token punctuation">}</span></span><span class="token string"> </span><span class="token interpolation"><span class="token punctuation">{</span>n<span class="token punctuation">:</span><span class="token format-spec">,</span><span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>A 404 means the pipeline did not publish what the tileset references: a path prefix error, a missing shard, a URL template using <code>{y}</code> where the tiles are <code>{reverseY}</code>. A 403 usually means object-store permissions or a signed-URL expiry, and it is the failure that appears hours after a deploy rather than immediately. A 5xx is the origin or the CDN failing, which is an operations problem rather than a build problem. Alerting on “errors” as one number sends all three to the same person with no information about which it is.</p>
+<figure class="diagram">
+<svg viewBox="6 10 728 244" role="img" aria-labelledby="cdn-kind-t cdn-kind-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="cdn-kind-t">How much damage a 404 does, by content kind</title>
+  <desc id="cdn-kind-d">A ranking. A missing root tileset.json breaks the whole layer for every user. A missing subtree file breaks a whole region. A missing external tileset breaks a district. A missing content tile breaks one building or one terrain patch. A missing imagery tile leaves a grey square. Alert thresholds should be tightest for the kinds at the top.</desc>
+  <rect class="svg-bg" x="6" y="10" width="728" height="244" fill="#ffffff"/>
+  <g stroke-width="1.5">
+    <rect x="20" y="24" width="700" height="38" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="20" y="66" width="560" height="38" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="20" y="108" width="420" height="38" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="20" y="150" width="240" height="38" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="20" y="192" width="140" height="38" fill="#eef5e9" stroke="#4f7a4d"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="start">
+    <text x="36" y="48">root tileset.json — the whole layer, every user</text>
+    <text x="36" y="90">subtree file — a whole region of an implicit tileset</text>
+    <text x="36" y="132">external tileset — one district</text>
+    <text x="36" y="174">content tile — one building</text>
+    <text x="172" y="216">imagery tile — a grey square</text>
+  </g>
+  <text x="380" y="236" fill="#15384a" font-size="12" text-anchor="middle">Bar length is the blast radius, which is why the alert splits by content kind.</text>
+</svg>
+<figcaption>A 0.1% 404 rate on root tilesets is an outage; the same rate on imagery tiles is cosmetic. One threshold cannot serve both.</figcaption>
+</figure>
+<h3 id="4-watch-the-cache-hit-ratio-as-a-cost-and-a-signal" tabindex="-1"><a class="heading-link" href="#4-watch-the-cache-hit-ratio-as-a-cost-and-a-signal"><span>4. Watch the cache hit ratio as a cost and a signal</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">cache_ratio</span><span class="token punctuation">(</span>rows<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    per_version <span class="token operator">=</span> Counter<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    hits <span class="token operator">=</span> Counter<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    <span class="token keyword">for</span> <span class="token punctuation">(</span>dataset<span class="token punctuation">,</span> version<span class="token punctuation">,</span> kind<span class="token punctuation">,</span> status<span class="token punctuation">,</span> cache<span class="token punctuation">,</span> region<span class="token punctuation">)</span><span class="token punctuation">,</span> n <span class="token keyword">in</span> rows<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">if</span> status <span class="token keyword">not</span> <span class="token keyword">in</span> <span class="token punctuation">(</span><span class="token number">200</span><span class="token punctuation">,</span> <span class="token number">206</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+            <span class="token keyword">continue</span>
+        per_version<span class="token punctuation">[</span><span class="token punctuation">(</span>dataset<span class="token punctuation">,</span> version<span class="token punctuation">)</span><span class="token punctuation">]</span> <span class="token operator">+=</span> n
+        <span class="token keyword">if</span> <span class="token builtin">str</span><span class="token punctuation">(</span>cache<span class="token punctuation">)</span><span class="token punctuation">.</span>lower<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">in</span> <span class="token punctuation">(</span><span class="token string">"hit"</span><span class="token punctuation">,</span> <span class="token string">"revalidated"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+            hits<span class="token punctuation">[</span><span class="token punctuation">(</span>dataset<span class="token punctuation">,</span> version<span class="token punctuation">)</span><span class="token punctuation">]</span> <span class="token operator">+=</span> n
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>k<span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token number">100</span> <span class="token operator">*</span> hits<span class="token punctuation">[</span>k<span class="token punctuation">]</span> <span class="token operator">/</span> v<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span> <span class="token keyword">for</span> k<span class="token punctuation">,</span> v <span class="token keyword">in</span> per_version<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">if</span> v<span class="token punctuation">}</span>
+
+<span class="token keyword">print</span><span class="token punctuation">(</span>cache_ratio<span class="token punctuation">(</span>rows<span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>A tileset served from immutable, versioned URLs should sit above 90% hits once it is warm. Two patterns are worth alerting on. A sudden drop across all versions means something invalidated the cache — a purge, or a change in cache headers — and the origin is about to carry the full load. A permanently low ratio for one version means its URLs are not cacheable at all, usually a query string that varies per request or a <code>Cache-Control: no-store</code> that slipped into the deploy.</p>
+<h3 id="5-export-the-numbers-as-metrics-and-alert" tabindex="-1"><a class="heading-link" href="#5-export-the-numbers-as-metrics-and-alert"><span>5. Export the numbers as metrics and alert</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">from</span> prometheus_client <span class="token keyword">import</span> CollectorRegistry<span class="token punctuation">,</span> Gauge<span class="token punctuation">,</span> push_to_gateway
+
+<span class="token keyword">def</span> <span class="token function">publish_metrics</span><span class="token punctuation">(</span>rows<span class="token punctuation">,</span> gateway<span class="token operator">=</span><span class="token string">"pushgw.internal:9091"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    reg <span class="token operator">=</span> CollectorRegistry<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    err <span class="token operator">=</span> Gauge<span class="token punctuation">(</span><span class="token string">"twin_tile_error_rate"</span><span class="token punctuation">,</span> <span class="token string">"share of tile requests returning 4xx or 5xx"</span><span class="token punctuation">,</span>
+                <span class="token punctuation">[</span><span class="token string">"dataset"</span><span class="token punctuation">,</span> <span class="token string">"version"</span><span class="token punctuation">,</span> <span class="token string">"kind"</span><span class="token punctuation">,</span> <span class="token string">"class"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> registry<span class="token operator">=</span>reg<span class="token punctuation">)</span>
+    req <span class="token operator">=</span> Gauge<span class="token punctuation">(</span><span class="token string">"twin_tile_requests"</span><span class="token punctuation">,</span> <span class="token string">"tile requests in the window"</span><span class="token punctuation">,</span>
+                <span class="token punctuation">[</span><span class="token string">"dataset"</span><span class="token punctuation">,</span> <span class="token string">"version"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> registry<span class="token operator">=</span>reg<span class="token punctuation">)</span>
+    hit <span class="token operator">=</span> Gauge<span class="token punctuation">(</span><span class="token string">"twin_tile_cache_hit_ratio"</span><span class="token punctuation">,</span> <span class="token string">"cache hit ratio"</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token string">"dataset"</span><span class="token punctuation">,</span> <span class="token string">"version"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> registry<span class="token operator">=</span>reg<span class="token punctuation">)</span>
+
+    totals <span class="token operator">=</span> Counter<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    <span class="token keyword">for</span> <span class="token punctuation">(</span>dataset<span class="token punctuation">,</span> version<span class="token punctuation">,</span> kind<span class="token punctuation">,</span> status<span class="token punctuation">,</span> cache<span class="token punctuation">,</span> region<span class="token punctuation">)</span><span class="token punctuation">,</span> n <span class="token keyword">in</span> rows<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        totals<span class="token punctuation">[</span><span class="token punctuation">(</span>dataset<span class="token punctuation">,</span> version<span class="token punctuation">)</span><span class="token punctuation">]</span> <span class="token operator">+=</span> n
+    <span class="token keyword">for</span> <span class="token punctuation">(</span>dataset<span class="token punctuation">,</span> version<span class="token punctuation">)</span><span class="token punctuation">,</span> total <span class="token keyword">in</span> totals<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        req<span class="token punctuation">.</span>labels<span class="token punctuation">(</span>dataset<span class="token punctuation">,</span> version<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">set</span><span class="token punctuation">(</span>total<span class="token punctuation">)</span>
+    <span class="token keyword">for</span> <span class="token punctuation">(</span>dataset<span class="token punctuation">,</span> version<span class="token punctuation">,</span> cls<span class="token punctuation">,</span> kind<span class="token punctuation">)</span><span class="token punctuation">,</span> n <span class="token keyword">in</span> classify_errors<span class="token punctuation">(</span>rows<span class="token punctuation">)</span><span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">if</span> cls <span class="token operator">==</span> <span class="token string">"ok"</span><span class="token punctuation">:</span>
+            <span class="token keyword">continue</span>
+        err<span class="token punctuation">.</span>labels<span class="token punctuation">(</span>dataset<span class="token punctuation">,</span> version<span class="token punctuation">,</span> kind<span class="token punctuation">,</span> cls<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">set</span><span class="token punctuation">(</span>n <span class="token operator">/</span> <span class="token builtin">max</span><span class="token punctuation">(</span>totals<span class="token punctuation">[</span><span class="token punctuation">(</span>dataset<span class="token punctuation">,</span> version<span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token keyword">for</span> <span class="token punctuation">(</span>dataset<span class="token punctuation">,</span> version<span class="token punctuation">)</span><span class="token punctuation">,</span> ratio <span class="token keyword">in</span> cache_ratio<span class="token punctuation">(</span>rows<span class="token punctuation">)</span><span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        hit<span class="token punctuation">.</span>labels<span class="token punctuation">(</span>dataset<span class="token punctuation">,</span> version<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">set</span><span class="token punctuation">(</span>ratio <span class="token operator">/</span> <span class="token number">100.0</span><span class="token punctuation">)</span>
+
+    push_to_gateway<span class="token punctuation">(</span>gateway<span class="token punctuation">,</span> job<span class="token operator">=</span><span class="token string">"twin-cdn-logs"</span><span class="token punctuation">,</span> registry<span class="token operator">=</span>reg<span class="token punctuation">,</span>
+                    grouping_key<span class="token operator">=</span><span class="token punctuation">{</span><span class="token string">"window"</span><span class="token punctuation">:</span> <span class="token string">"hourly"</span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> totals
+
+publish_metrics<span class="token punctuation">(</span>rows<span class="token punctuation">)</span>
+</code></pre></div>
+<div class="codeblock" data-lang="yaml"><div class="codeblock__bar"><span class="codeblock__lang">yaml</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-yaml" tabindex="0" role="group" aria-label="yaml code sample"><code class="language-yaml"><span class="token key atrule">groups</span><span class="token punctuation">:</span>
+  <span class="token punctuation">-</span> <span class="token key atrule">name</span><span class="token punctuation">:</span> twin<span class="token punctuation">-</span>tiles<span class="token punctuation">-</span>serving
+    <span class="token key atrule">rules</span><span class="token punctuation">:</span>
+      <span class="token punctuation">-</span> <span class="token key atrule">alert</span><span class="token punctuation">:</span> TileVersionMissingContent
+        <span class="token key atrule">expr</span><span class="token punctuation">:</span> <span class="token punctuation">|</span><span class="token scalar string">
+          twin_tile_error_rate{class="missing"} > 0.02
+          and on (dataset, version) twin_tile_requests > 500</span>
+        <span class="token key atrule">for</span><span class="token punctuation">:</span> 10m
+        <span class="token key atrule">labels</span><span class="token punctuation">:</span> <span class="token punctuation">{</span> <span class="token key atrule">severity</span><span class="token punctuation">:</span> critical <span class="token punctuation">}</span>
+        <span class="token key atrule">annotations</span><span class="token punctuation">:</span>
+          <span class="token key atrule">summary</span><span class="token punctuation">:</span> <span class="token string">"{{ $labels.dataset }}/{{ $labels.version }}: {{ $value | humanizePercentage }} of {{ $labels.kind }} requests are 404"</span>
+
+      <span class="token punctuation">-</span> <span class="token key atrule">alert</span><span class="token punctuation">:</span> TileServerErrors
+        <span class="token key atrule">expr</span><span class="token punctuation">:</span> twin_tile_error_rate<span class="token punctuation">{</span>class="server"<span class="token punctuation">}</span> <span class="token punctuation">></span> 0.005
+        <span class="token key atrule">for</span><span class="token punctuation">:</span> 5m
+        <span class="token key atrule">labels</span><span class="token punctuation">:</span> <span class="token punctuation">{</span> <span class="token key atrule">severity</span><span class="token punctuation">:</span> critical <span class="token punctuation">}</span>
+
+      <span class="token punctuation">-</span> <span class="token key atrule">alert</span><span class="token punctuation">:</span> TileForbiddenSpike
+        <span class="token key atrule">expr</span><span class="token punctuation">:</span> twin_tile_error_rate<span class="token punctuation">{</span>class="forbidden"<span class="token punctuation">}</span> <span class="token punctuation">></span> 0.01
+        <span class="token key atrule">for</span><span class="token punctuation">:</span> 15m
+        <span class="token key atrule">labels</span><span class="token punctuation">:</span> <span class="token punctuation">{</span> <span class="token key atrule">severity</span><span class="token punctuation">:</span> warning <span class="token punctuation">}</span>
+
+      <span class="token punctuation">-</span> <span class="token key atrule">alert</span><span class="token punctuation">:</span> TileCacheHitRatioDropped
+        <span class="token key atrule">expr</span><span class="token punctuation">:</span> twin_tile_cache_hit_ratio &lt; 0.7
+        <span class="token key atrule">for</span><span class="token punctuation">:</span> 30m
+        <span class="token key atrule">labels</span><span class="token punctuation">:</span> <span class="token punctuation">{</span> <span class="token key atrule">severity</span><span class="token punctuation">:</span> warning <span class="token punctuation">}</span>
+</code></pre></div>
+<p>The <code>and on (dataset, version) twin_tile_requests &gt; 500</code> clause is what stops a version with eleven requests and one 404 from paging somebody at three in the morning. Every rate alert on low-volume dimensions needs a volume guard, and versioned tilesets are the definition of a low-volume dimension in their first minutes.</p>
+<figure class="diagram">
+<svg viewBox="6 6 748 240" role="img" aria-labelledby="cdn-class-t cdn-class-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="cdn-class-t">Status code to cause to owner</title>
+  <desc id="cdn-class-d">A table mapping status classes to their usual cause and the team that fixes them. 404 means the build published the wrong paths, owned by the pipeline team. 403 means permissions or an expired signature, owned by platform. 5xx means the origin or CDN is failing, owned by operations. A low cache hit ratio means cache headers or purges, owned by whoever runs the deploy.</desc>
+  <rect class="svg-bg" x="6" y="6" width="748" height="240" fill="#ffffff"/>
+  <g stroke-width="1.5">
+    <rect x="20" y="20" width="150" height="36" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="170" y="20" width="360" height="36" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="530" y="20" width="210" height="36" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="20" y="56" width="150" height="44" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="170" y="56" width="360" height="44" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="530" y="56" width="210" height="44" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="20" y="100" width="150" height="44" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="170" y="100" width="360" height="44" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="530" y="100" width="210" height="44" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="20" y="144" width="150" height="44" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="170" y="144" width="360" height="44" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="530" y="144" width="210" height="44" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="20" y="188" width="150" height="44" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="170" y="188" width="360" height="44" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="530" y="188" width="210" height="44" fill="#eef5e9" stroke="#4f7a4d"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="95" y="43">signal</text>
+    <text x="350" y="43">usual cause</text>
+    <text x="635" y="43">who fixes it</text>
+    <text x="95" y="83">404</text><text x="350" y="83">wrong paths or a missing shard in the build</text><text x="635" y="83">pipeline team</text>
+    <text x="95" y="127">403</text><text x="350" y="127">bucket permissions, expired signature</text><text x="635" y="127">platform</text>
+    <text x="95" y="171">5xx</text><text x="350" y="171">origin or CDN failing</text><text x="635" y="171">operations</text>
+    <text x="95" y="215">low hit ratio</text><text x="350" y="215">cache headers, a purge, query strings</text><text x="635" y="215">deploy owner</text>
+  </g>
+</svg>
+<figcaption>Splitting the classes is what makes the alert actionable: each one has a different cause and a different first responder.</figcaption>
+</figure>
+<h3 id="6-diagnose-a-404-spike-down-to-a-path" tabindex="-1"><a class="heading-link" href="#6-diagnose-a-404-spike-down-to-a-path"><span>6. Diagnose a 404 spike down to a path</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">missing_paths</span><span class="token punctuation">(</span>path<span class="token punctuation">,</span> version<span class="token punctuation">,</span> limit<span class="token operator">=</span><span class="token number">20</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    counts <span class="token operator">=</span> Counter<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    opener <span class="token operator">=</span> gzip<span class="token punctuation">.</span><span class="token builtin">open</span> <span class="token keyword">if</span> <span class="token builtin">str</span><span class="token punctuation">(</span>path<span class="token punctuation">)</span><span class="token punctuation">.</span>endswith<span class="token punctuation">(</span><span class="token string">".gz"</span><span class="token punctuation">)</span> <span class="token keyword">else</span> <span class="token builtin">open</span>
+    <span class="token keyword">with</span> opener<span class="token punctuation">(</span>path<span class="token punctuation">,</span> <span class="token string">"rt"</span><span class="token punctuation">)</span> <span class="token keyword">as</span> f<span class="token punctuation">:</span>
+        <span class="token keyword">for</span> line <span class="token keyword">in</span> f<span class="token punctuation">:</span>
+            <span class="token keyword">try</span><span class="token punctuation">:</span>
+                rec <span class="token operator">=</span> json<span class="token punctuation">.</span>loads<span class="token punctuation">(</span>line<span class="token punctuation">)</span>
+            <span class="token keyword">except</span> json<span class="token punctuation">.</span>JSONDecodeError<span class="token punctuation">:</span>
+                <span class="token keyword">continue</span>
+            uri <span class="token operator">=</span> rec<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"uri"</span><span class="token punctuation">,</span> <span class="token string">""</span><span class="token punctuation">)</span>
+            <span class="token keyword">if</span> <span class="token builtin">int</span><span class="token punctuation">(</span>rec<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"status"</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token number">404</span> <span class="token keyword">and</span> <span class="token string-interpolation"><span class="token string">f"/</span><span class="token interpolation"><span class="token punctuation">{</span>version<span class="token punctuation">}</span></span><span class="token string">/"</span></span> <span class="token keyword">in</span> uri<span class="token punctuation">:</span>
+                counts<span class="token punctuation">[</span>uri<span class="token punctuation">]</span> <span class="token operator">+=</span> <span class="token number">1</span>
+    <span class="token keyword">return</span> counts<span class="token punctuation">.</span>most_common<span class="token punctuation">(</span>limit<span class="token punctuation">)</span>
+
+<span class="token keyword">for</span> uri<span class="token punctuation">,</span> n <span class="token keyword">in</span> missing_paths<span class="token punctuation">(</span><span class="token string">"logs/2026-09-17T02.json.gz"</span><span class="token punctuation">,</span> <span class="token string">"v42"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>n<span class="token punctuation">:</span><span class="token format-spec">>6,</span><span class="token punctuation">}</span></span><span class="token string">  </span><span class="token interpolation"><span class="token punctuation">{</span>uri<span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>The top missing paths name the bug directly. A list dominated by <code>/content/16/…</code> with levels 0–15 absent means the deepest level was never uploaded. A list of <code>/content/…/*.b3dm</code> when the build produced <code>.glb</code> means the tileset JSON was not regenerated. A single <code>tileset.json</code> at the top means the whole version is unreachable and the deploy did not complete.</p>
+<h2 id="expected-output-verification" tabindex="-1"><a class="heading-link" href="#expected-output-verification"><span>Expected Output &amp; Verification</span></a></h2>
+<div class="codeblock" data-lang="text"><div class="codeblock__bar"><span class="codeblock__lang">text</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-text" tabindex="0" role="group" aria-label="text code sample"><code class="language-text">4,918,204 tile requests across 2 versions
+city/ v41 content  404      412 of 4,762,118 = 0.009%
+city/ v42 content  404   62,004 of   156,086 = 39.725%
+city/ v41 server   500       88 of 4,762,118 = 0.002%
+{('city', 'v41'): 94.2, ('city', 'v42'): 41.8}
+  38,204  /tilesets/city/v42/content/16/34212/22418.glb
+  21,118  /tilesets/city/v42/content/16/34212/22419.glb
+</code></pre></div>
+<p>That output is a diagnosis: version 42 is missing its level-16 content, its cache hit ratio is low because nothing can be cached, and version 41 is healthy. The fix is in the deploy, and the alert fired ten minutes after it started rather than when a user complained.</p>
+<p>Verify the pipeline that produces these numbers, not only the numbers. Two checks matter:</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python">FIXTURE <span class="token operator">=</span> <span class="token string">"tests/fixtures/cdn_sample.json.gz"</span>
+rows <span class="token operator">=</span> parse_log<span class="token punctuation">(</span>FIXTURE<span class="token punctuation">)</span>
+<span class="token keyword">assert</span> <span class="token builtin">sum</span><span class="token punctuation">(</span>rows<span class="token punctuation">.</span>values<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token number">1000</span><span class="token punctuation">,</span> <span class="token string">"parser dropped or duplicated lines"</span>
+r <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token punctuation">(</span>x<span class="token punctuation">[</span><span class="token string">"version"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> x<span class="token punctuation">[</span><span class="token string">"class"</span><span class="token punctuation">]</span> <span class="token keyword">if</span> <span class="token string">"class"</span> <span class="token keyword">in</span> x <span class="token keyword">else</span> x<span class="token punctuation">[</span><span class="token string">"status"</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">:</span> x <span class="token keyword">for</span> x <span class="token keyword">in</span> rates<span class="token punctuation">(</span>rows<span class="token punctuation">)</span><span class="token punctuation">}</span>
+<span class="token keyword">assert</span> <span class="token builtin">any</span><span class="token punctuation">(</span>x<span class="token punctuation">[</span><span class="token string">"status"</span><span class="token punctuation">]</span> <span class="token operator">==</span> <span class="token number">404</span> <span class="token keyword">and</span> x<span class="token punctuation">[</span><span class="token string">"version"</span><span class="token punctuation">]</span> <span class="token operator">==</span> <span class="token string">"v42"</span> <span class="token keyword">for</span> x <span class="token keyword">in</span> rates<span class="token punctuation">(</span>rows<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"known 404s not detected"</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"log parser verified against the fixture"</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>A fixture of a thousand known lines, with a known number of 404s in a known version, is what stops a log-format change from silently turning the alert off. CDNs do change their field names, and an alert that stops firing looks exactly like an alert that has nothing to report.</p>
+<h2 id="performance-notes" tabindex="-1"><a class="heading-link" href="#performance-notes"><span>Performance Notes</span></a></h2>
+<ul>
+<li><strong>Parse incrementally.</strong> Hourly log files for a busy twin are hundreds of megabytes gzipped; a streaming parse with a <code>Counter</code> uses a few megabytes of memory regardless of size.</li>
+<li><strong>Aggregate before storing.</strong> Keep the six-dimension counters, not the raw lines, for history. A month of hourly aggregates is a few megabytes.</li>
+<li><strong>Run the job hourly, alert on the last two windows.</strong> A ten-minute alert delay is fine for this signal; a per-request stream is unnecessary complexity for a tile service.</li>
+<li><strong>Sample only if you must.</strong> Most CDNs offer sampled logs at a fraction of the cost; a 1% sample is enough for rates but will not show a single missing <code>tileset.json</code>, so keep unsampled logs for the tileset kind if the CDN allows it.</li>
+<li><strong>Guard every rate with a volume threshold</strong>, or a quiet version will page somebody over three requests.</li>
+</ul>
+<h2 id="common-errors" tabindex="-1"><a class="heading-link" href="#common-errors"><span>Common Errors</span></a></h2>
+<p><strong>No alert fires although users see failures.</strong> The URL scheme has no version, so the broken build’s errors are diluted into the aggregate. Version the paths; it also makes rollback trivial, as in <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/versioning-tilesets-with-immutable-prefixes/">versioning tilesets with immutable prefixes</a>.</p>
+<p><strong>404 rate is permanently a few percent.</strong> The viewer requests tiles that legitimately do not exist — an imagery layer without a <code>rectangle</code>, or a terrain provider probing for levels beyond the data. Set the layer bounds, and exclude known-probing paths from the alert rather than raising the threshold.</p>
+<p><strong>The parser silently matches nothing after a CDN change.</strong> Field names moved. The fixture assertion above is the guard; without it, silence looks like success.</p>
+<p><strong>Alerts fire during every deploy and are ignored.</strong> The threshold is too tight for the first minutes of a version, when a handful of requests can produce a high rate. Use the volume guard and a <code>for:</code> duration of ten minutes.</p>
+<h2 id="frequently-asked-questions" tabindex="-1"><a class="heading-link" href="#frequently-asked-questions"><span>Frequently Asked Questions</span></a></h2>
+<h3 id="should-this-alert-page-someone-at-night" tabindex="-1"><a class="heading-link" href="#should-this-alert-page-someone-at-night"><span>Should this alert page someone at night?</span></a></h3>
+<p>A 404 rate above a couple of percent on a version with real traffic means the twin is broken for its users, so yes for critical datasets. A 403 spike or a cache-ratio drop can wait for the morning.</p>
+<h3 id="can-i-use-the-cdns-own-analytics-instead" tabindex="-1"><a class="heading-link" href="#can-i-use-the-cdns-own-analytics-instead"><span>Can I use the CDN’s own analytics instead?</span></a></h3>
+<p>For dashboards, often yes. For alerting per tileset version and per content kind, most built-in analytics cannot slice the URL path that finely, which is why the parse above exists.</p>
+<h3 id="what-about-the-viewers-own-error-reporting" tabindex="-1"><a class="heading-link" href="#what-about-the-viewers-own-error-reporting"><span>What about the viewer’s own error reporting?</span></a></h3>
+<p>It is a useful complement — it sees CORS failures and decode errors that the CDN considers successful responses, as described in <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/fixing-cors-and-content-encoding-errors-on-tile-servers/">fixing CORS and content-encoding errors on tile servers</a>. It also only sees the users who stayed.</p>
+<h2 id="related-guides" tabindex="-1"><a class="heading-link" href="#related-guides"><span>Related Guides</span></a></h2>
+<ul>
+<li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/">Pipeline Observability and Monitoring</a> — where this signal fits</li>
+<li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/exporting-prometheus-metrics-from-tiling-jobs/">Exporting Prometheus Metrics from Tiling Jobs</a> — the build-side counterpart</li>
+<li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/detecting-stale-tiles-after-deploy/">Detecting Stale Tiles After Deploy</a> — when tiles load but are the wrong version</li>
+</ul>
+<p>Back to <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/">Pipeline Observability and Monitoring</a>.</p>
+
+
+      
+      
+
+      <div class="related-nav">
+        
+
+        
+          <div>
+            <h3>Related</h3>
+            <div class="related-grid">
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/detecting-data-drift-between-deliveries/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Detecting Data Drift Between Deliveries</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/exporting-prometheus-metrics-from-tiling-jobs/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Exporting Prometheus Metrics from Tiling Jobs</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/monitoring-twin-data-freshness-slos/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Monitoring Twin Data Freshness SLOs</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/structured-logging-for-spatial-pipelines/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Structured Logging for Spatial Pipelines</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/tracing-pipeline-stages-with-opentelemetry/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Tracing Pipeline Stages with OpenTelemetry</span>
+                </a>
+              
+            </div>
+          </div>
+        
+      </div>
+    </article>
+
+    
+    <aside class="toc" aria-label="On this page" data-toc hidden>
+      <h4>On this page</h4>
+      <ul></ul>
+    </aside>
+  </div>
+</div>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+  <div class="container site-footer__inner">
+    <div class="site-footer__brand">
+      <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+        <img src="/assets/img/logo-mark.svg" alt="" class="brand__mark" width="36" height="36">
+        <span class="brand__name">
+          3D Geospatial
+          <small>Digital Twin Automation</small>
+        </span>
+      </a>
+      <p>Engineering-grade guides on point cloud processing, mesh pipelines, LOD strategies, and CI/CD automation for digital twin platforms.</p>
+      <a class="footer-social" href="https://github.com/3d-geospatial" aria-label="3D Geospatial on GitHub" rel="noopener" target="_blank">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+          <path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.53-1.34-1.3-1.7-1.3-1.7-1.06-.72.08-.71.08-.71 1.17.08 1.79 1.2 1.79 1.2 1.04 1.79 2.73 1.27 3.4.97.1-.75.4-1.27.73-1.56-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.19-3.08-.12-.3-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.75.11 3.05.74.8 1.19 1.83 1.19 3.08 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.07.78 2.15v3.18c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5Z"/>
+        </svg>
+        <span>GitHub</span>
+      </a>
+    </div>
+
+    <div class="site-footer__col">
+      <h4>Sections</h4>
+      <ul>
+        <li><a href="https://www.3d-geospatial.com/">Home</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management &amp; Optimization</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/">Point Cloud &amp; Mesh Pipelines</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/">Troubleshooting &amp; Reliability</a></li>
+        
+      </ul>
+    </div>
+
+    
+      <div class="site-footer__col">
+        <h4>3D Geospatial Fundamentals</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/">3D Format Standards Comparison</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/">BIM and IFC Georeferencing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/">CityGML and CityJSON Processing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems for 3D Assets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/">Digital Elevation Model Workflows</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/">Spatial Indexing and Tiling Schemes for 3D Data</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>LOD Management &amp; Optimization</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/">Automated Tile Generation for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/">Cesium ion Upload Automation for 3D Tilesets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/">glTF LOD Generation With Draco Compression</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/">Streaming Sync Patterns for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/">Tileset Metadata and 3D Tiles Next</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/">Vector Overlays on 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Point Cloud &amp; Mesh Pipelines</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/">Automated Mesh Decimation for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/">Change Detection Between LiDAR Scan Epochs</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/">CI/CD Automation for Spatial Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">LiDAR Classification and Ground Extraction</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/photogrammetry-processing-pipelines/">Photogrammetry Processing Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/">Point Cloud Filtering Techniques</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/">Surface Reconstruction for Geospatial Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/">Texture Mapping Workflows for Digital Twins</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Troubleshooting &amp; Reliability</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/">Cross-Section Failure Modes in Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/">Data Validation &amp; QA Gates for 3D Tiles</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/">Performance Profiling and Benchmarking</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/">Pipeline Observability and Monitoring</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/">Streaming &amp; Runtime Diagnostics for 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+  </div>
+  <div class="container site-footer__bottom">
+    <span>© 2026 3D Geospatial &amp; Digital Twin Automation</span>
+    <span>Built with Eleventy · PWA-enabled</span>
+  </div>
+</footer>
+
+
+  <script src="/assets/js/site.js?v=b99aa9f971" defer></script>
+  
+</body>
+</html>

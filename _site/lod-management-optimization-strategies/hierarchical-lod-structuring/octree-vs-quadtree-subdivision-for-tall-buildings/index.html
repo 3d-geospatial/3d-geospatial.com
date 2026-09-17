@@ -1,0 +1,957 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <title>Octree vs Quadtree Subdivision for Tall Buildings — 3D Geospatial</title>
+  <meta name="description" content="When vertical subdivision pays: comparing quadtree and octree trees on a city with 200 m towers, measuring tile balance">
+  <meta name="keywords" content="3D geospatial, digital twin, point cloud, mesh pipeline, LOD, 3D Tiles, Cesium, PDAL, Open3D, Python, CI/CD">
+  <meta name="author" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta name="theme-color" content="#1f6b8a" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f171d" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+
+  
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem("theme");
+        var theme = (stored === "dark" || stored === "light") ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    })();
+  </script>
+  <meta name="generator" content="Eleventy">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="googlebot" content="index,follow,max-image-preview:large">
+
+  
+  <link rel="canonical" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/octree-vs-quadtree-subdivision-for-tall-buildings/">
+  <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">
+
+  
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/icon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+
+  
+  <link rel="apple-touch-icon" href="/assets/img/icon-180.png">
+  <link rel="mask-icon" href="/assets/img/logo.svg" color="#1f6b8a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="3D Geospatial">
+  <meta name="application-name" content="3D Geospatial">
+
+  
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Octree vs Quadtree Subdivision for Tall Buildings — 3D Geospatial">
+  <meta property="og:description" content="When vertical subdivision pays: comparing quadtree and octree trees on a city with 200 m towers, measuring tile balance">
+  <meta property="og:url" content="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/octree-vs-quadtree-subdivision-for-tall-buildings/">
+  <meta property="og:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+  <meta property="og:site_name" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta property="og:locale" content="en_US">
+  
+  <meta property="article:published_time" content="2026-09-17T23:36:56.454Z">
+  <meta property="article:modified_time" content="2026-09-17T23:36:56.454Z">
+  <meta property="article:publisher" content="https://www.3d-geospatial.com/">
+  
+
+  
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Octree vs Quadtree Subdivision for Tall Buildings — 3D Geospatial">
+  <meta name="twitter:description" content="When vertical subdivision pays: comparing quadtree and octree trees on a city with 200 m towers, measuring tile balance">
+  <meta name="twitter:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta name="twitter:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+
+  
+  <link rel="preload" href="/assets/css/styles.css?v=8c46394d6c" as="style">
+  
+
+  <link rel="stylesheet" href="/assets/css/styles.css?v=8c46394d6c">
+
+  
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.3d-geospatial.com/#organization",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "url": "https://www.3d-geospatial.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/icon-512.png",
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://www.3d-geospatial.com/#website",
+      "url": "https://www.3d-geospatial.com/",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "description": "Build reliable 3D spatial data pipelines for digital twins — point clouds, meshes, LOD strategies, Python processing, and CI/CD automation.",
+      "inLanguage": "en",
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      }
+    },
+    {
+      "@type": "TechArticle",
+      "@id": "https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/octree-vs-quadtree-subdivision-for-tall-buildings/#article",
+      "isPartOf": {
+        "@id": "https://www.3d-geospatial.com/#website"
+      },
+      "headline": "Octree vs Quadtree Subdivision for Tall Buildings",
+      "name": "Octree vs Quadtree Subdivision for Tall Buildings",
+      "description": "When vertical subdivision pays: comparing quadtree and octree trees on a city with 200 m towers, measuring tile balance",
+      "url": "https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/octree-vs-quadtree-subdivision-for-tall-buildings/",
+      "mainEntityOfPage": "https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/octree-vs-quadtree-subdivision-for-tall-buildings/",
+      "inLanguage": "en",
+      "datePublished": "2026-09-17T23:36:56.454Z",
+      "dateModified": "2026-09-17T23:36:56.454Z",
+      "author": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "image": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/og-cover.png",
+        "width": 1200,
+        "height": 630
+      },
+      "breadcrumb": {
+        "@id": "https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/octree-vs-quadtree-subdivision-for-tall-buildings/#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/octree-vs-quadtree-subdivision-for-tall-buildings/#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://www.3d-geospatial.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "LOD Management Optimization Strategies",
+          "item": "https://www.3d-geospatial.com/lod-management-optimization-strategies/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Hierarchical LOD Structuring",
+          "item": "https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "name": "Octree Vs Quadtree Subdivision For Tall Buildings",
+          "item": "https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/octree-vs-quadtree-subdivision-for-tall-buildings/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  
+<header class="site-header" role="banner">
+  <div class="container site-header__inner">
+    <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+      <img src="/assets/img/logo.svg" alt="" class="brand__mark" width="36" height="36">
+      <span class="brand__name">
+        3D Geospatial
+        <small>Digital Twin Automation</small>
+      </span>
+    </a>
+
+    <button class="theme-toggle" type="button" data-theme-toggle
+            aria-label="Switch to dark theme" title="Switch to dark theme">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4.2"/>
+        <path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/>
+      </svg>
+    </button>
+
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>
+      <span class="nav-toggle__icon" aria-hidden="true"><span></span></span>
+      Menu
+    </button>
+
+    <nav class="primary-nav" id="primary-nav" aria-label="Primary">
+      
+      <a href="https://www.3d-geospatial.com/" >
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/>
+        </svg>
+        Home
+      </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2 3 7l9 5 9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 17l9 5 9-5"/>
+            </svg>
+          
+          3D Geospatial Fundamentals
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/" aria-current="page">
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+          
+          LOD Management &amp; Optimization
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="6" cy="6" r="1.5"/><circle cx="12" cy="6" r="1.5"/><circle cx="18" cy="6" r="1.5"/>
+              <circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/>
+              <circle cx="6" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="18" cy="18" r="1.5"/>
+            </svg>
+          
+          Point Cloud &amp; Mesh Pipelines
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <path d="M12 9v4"/><path d="M12 17h.01"/>
+            </svg>
+          
+          Troubleshooting &amp; Reliability
+        </a>
+      
+    </nav>
+  </div>
+</header>
+
+
+  <main id="main">
+    
+
+
+<div class="container">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    
+      
+        <a href="https://www.3d-geospatial.com/">Home</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management Optimization Strategies</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <span class="current">Octree Vs Quadtree Subdivision For Tall Buildings</span>
+      
+    
+  </nav>
+
+  <div class="content-page">
+    <article class="article">
+      <h1 id="octree-vs-quadtree-subdivision-for-tall-buildings" tabindex="-1"><a class="heading-link" href="#octree-vs-quadtree-subdivision-for-tall-buildings"><span>Octree vs Quadtree Subdivision for Tall Buildings</span></a></h1>
+<p>This page compares quadtree and octree subdivision on a city whose skyline ranges from 4 m sheds to 220 m towers — measuring how balanced the resulting tiles are, how much geometry each scheme forces the client to load for a street-level view, and where the hybrid scheme that subdivides vertically only when it helps lands.</p>
+<h2 id="why-you-hit-this" tabindex="-1"><a class="heading-link" href="#why-you-hit-this"><span>Why you hit this</span></a></h2>
+<p>A quadtree divides the ground plane into four and keeps the full vertical extent in every tile. That is the right structure for terrain, for footprints and for most European cities, where a 200 m tile holds buildings of 10–30 m and the vertical extent is a small fraction of the horizontal.</p>
+<p>It stops being right when the vertical extent rivals the horizontal. A 150 m tile containing a 220 m tower has a bounding volume taller than it is wide, so a camera at street level sees the tile — and loads the whole tower, including the 180 m of it that is out of frame. Multiply that by the towers in a business district and the first street-level view pulls tens of megabytes of geometry above the field of view.</p>
+<p>The question is whether to subdivide vertically, and the honest answer is “sometimes”, which is why this page measures rather than recommends.</p>
+<h2 id="prerequisites" tabindex="-1"><a class="heading-link" href="#prerequisites"><span>Prerequisites</span></a></h2>
+<ul>
+<li>A feature inventory with per-feature bounding boxes, including height — the output of a CityGML or footprint-plus-height pipeline.</li>
+<li>Python 3.10+ with <code>numpy</code>; <code>shapely</code> and <code>geopandas</code> for the footprint handling.</li>
+<li>The tileset writer from <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/writing-tileset-json-from-python/">writing tileset JSON from Python</a>.</li>
+</ul>
+<h2 id="step-by-step" tabindex="-1"><a class="heading-link" href="#step-by-step"><span>Step-by-Step</span></a></h2>
+<h3 id="1-measure-the-vertical-extent-before-choosing" tabindex="-1"><a class="heading-link" href="#1-measure-the-vertical-extent-before-choosing"><span>1. Measure the vertical extent before choosing</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> json
+<span class="token keyword">import</span> math
+<span class="token keyword">from</span> collections <span class="token keyword">import</span> Counter
+<span class="token keyword">from</span> dataclasses <span class="token keyword">import</span> dataclass
+<span class="token keyword">from</span> pathlib <span class="token keyword">import</span> Path
+
+<span class="token keyword">import</span> numpy <span class="token keyword">as</span> np
+
+<span class="token decorator annotation punctuation">@dataclass</span><span class="token punctuation">(</span>frozen<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+<span class="token keyword">class</span> <span class="token class-name">Feature</span><span class="token punctuation">:</span>
+    fid<span class="token punctuation">:</span> <span class="token builtin">int</span>
+    x<span class="token punctuation">:</span> <span class="token builtin">float</span>
+    y<span class="token punctuation">:</span> <span class="token builtin">float</span>
+    z_min<span class="token punctuation">:</span> <span class="token builtin">float</span>
+    z_max<span class="token punctuation">:</span> <span class="token builtin">float</span>
+    footprint_m2<span class="token punctuation">:</span> <span class="token builtin">float</span>
+    triangles<span class="token punctuation">:</span> <span class="token builtin">int</span>
+
+<span class="token keyword">def</span> <span class="token function">aspect_profile</span><span class="token punctuation">(</span>features<span class="token punctuation">,</span> tile_m<span class="token operator">=</span><span class="token number">150.0</span><span class="token punctuation">,</span> origin<span class="token operator">=</span><span class="token punctuation">(</span><span class="token number">0.0</span><span class="token punctuation">,</span> <span class="token number">0.0</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""The ratio that decides the question: vertical extent over horizontal tile size."""</span>
+    cells <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token punctuation">}</span>
+    <span class="token keyword">for</span> f <span class="token keyword">in</span> features<span class="token punctuation">:</span>
+        i <span class="token operator">=</span> <span class="token builtin">int</span><span class="token punctuation">(</span><span class="token punctuation">(</span>f<span class="token punctuation">.</span>x <span class="token operator">-</span> origin<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token operator">//</span> tile_m<span class="token punctuation">)</span>
+        j <span class="token operator">=</span> <span class="token builtin">int</span><span class="token punctuation">(</span><span class="token punctuation">(</span>f<span class="token punctuation">.</span>y <span class="token operator">-</span> origin<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token operator">//</span> tile_m<span class="token punctuation">)</span>
+        cell <span class="token operator">=</span> cells<span class="token punctuation">.</span>setdefault<span class="token punctuation">(</span><span class="token punctuation">(</span>i<span class="token punctuation">,</span> j<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token punctuation">{</span><span class="token string">"z_lo"</span><span class="token punctuation">:</span> math<span class="token punctuation">.</span>inf<span class="token punctuation">,</span> <span class="token string">"z_hi"</span><span class="token punctuation">:</span> <span class="token operator">-</span>math<span class="token punctuation">.</span>inf<span class="token punctuation">,</span>
+                                         <span class="token string">"features"</span><span class="token punctuation">:</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token string">"triangles"</span><span class="token punctuation">:</span> <span class="token number">0</span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+        cell<span class="token punctuation">[</span><span class="token string">"z_lo"</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token builtin">min</span><span class="token punctuation">(</span>cell<span class="token punctuation">[</span><span class="token string">"z_lo"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> f<span class="token punctuation">.</span>z_min<span class="token punctuation">)</span>
+        cell<span class="token punctuation">[</span><span class="token string">"z_hi"</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token builtin">max</span><span class="token punctuation">(</span>cell<span class="token punctuation">[</span><span class="token string">"z_hi"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> f<span class="token punctuation">.</span>z_max<span class="token punctuation">)</span>
+        cell<span class="token punctuation">[</span><span class="token string">"features"</span><span class="token punctuation">]</span> <span class="token operator">+=</span> <span class="token number">1</span>
+        cell<span class="token punctuation">[</span><span class="token string">"triangles"</span><span class="token punctuation">]</span> <span class="token operator">+=</span> f<span class="token punctuation">.</span>triangles
+
+    rows <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    <span class="token keyword">for</span> <span class="token punctuation">(</span>i<span class="token punctuation">,</span> j<span class="token punctuation">)</span><span class="token punctuation">,</span> c <span class="token keyword">in</span> cells<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        vertical <span class="token operator">=</span> c<span class="token punctuation">[</span><span class="token string">"z_hi"</span><span class="token punctuation">]</span> <span class="token operator">-</span> c<span class="token punctuation">[</span><span class="token string">"z_lo"</span><span class="token punctuation">]</span>
+        rows<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"cell"</span><span class="token punctuation">:</span> <span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>i<span class="token punctuation">}</span></span><span class="token string">_</span><span class="token interpolation"><span class="token punctuation">{</span>j<span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">,</span> <span class="token string">"vertical_m"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>vertical<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                     <span class="token string">"aspect"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>vertical <span class="token operator">/</span> tile_m<span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                     <span class="token string">"features"</span><span class="token punctuation">:</span> c<span class="token punctuation">[</span><span class="token string">"features"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token string">"triangles"</span><span class="token punctuation">:</span> c<span class="token punctuation">[</span><span class="token string">"triangles"</span><span class="token punctuation">]</span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+    aspects <span class="token operator">=</span> np<span class="token punctuation">.</span>array<span class="token punctuation">(</span><span class="token punctuation">[</span>r<span class="token punctuation">[</span><span class="token string">"aspect"</span><span class="token punctuation">]</span> <span class="token keyword">for</span> r <span class="token keyword">in</span> rows<span class="token punctuation">]</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token string">"cells"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>rows<span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"median_aspect"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>median<span class="token punctuation">(</span>aspects<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"p95_aspect"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>percentile<span class="token punctuation">(</span>aspects<span class="token punctuation">,</span> <span class="token number">95</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"max_aspect"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>aspects<span class="token punctuation">.</span><span class="token builtin">max</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"cells_over_1"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span><span class="token punctuation">(</span>aspects <span class="token operator">></span> <span class="token number">1.0</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"worst"</span><span class="token punctuation">:</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span>rows<span class="token punctuation">,</span> key<span class="token operator">=</span><span class="token keyword">lambda</span> r<span class="token punctuation">:</span> <span class="token operator">-</span>r<span class="token punctuation">[</span><span class="token string">"aspect"</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token number">5</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+        <span class="token string">"recommendation"</span><span class="token punctuation">:</span> <span class="token string">"quadtree"</span> <span class="token keyword">if</span> <span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>percentile<span class="token punctuation">(</span>aspects<span class="token punctuation">,</span> <span class="token number">95</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">&lt;</span> <span class="token number">0.6</span>
+                          <span class="token keyword">else</span> <span class="token string">"hybrid"</span> <span class="token keyword">if</span> <span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>percentile<span class="token punctuation">(</span>aspects<span class="token punctuation">,</span> <span class="token number">95</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">&lt;</span> <span class="token number">1.5</span>
+                          <span class="token keyword">else</span> <span class="token string">"octree"</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+</code></pre></div>
+<p>The <strong>aspect ratio</strong> — vertical extent divided by horizontal tile size — is the number that decides this, and it is worth computing before writing any tree code. Below about 0.6 the tile is a flat slab and vertical subdivision buys nothing; above about 1.5 the tile is a column and a quadtree is actively wasteful.</p>
+<p>Most cities come out between 0.2 and 0.5 at the median with a handful of cells above 1.0, which is why the hybrid scheme in step 4 tends to win: a uniform octree pays a cost across the whole city to fix a dozen cells.</p>
+<p>Computing the profile per cell rather than city-wide matters. A city-wide maximum of 3.0 driven by one tower says nothing about the other 400 cells, and a uniform decision based on it is the wrong decision for 399 of them.</p>
+<figure class="diagram">
+<svg viewBox="20 -2 666 270" role="img" aria-labelledby="oct-aspect-t oct-aspect-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="oct-aspect-t">Tile aspect ratio and what it implies</title>
+  <desc id="oct-aspect-d">Three tile cross-sections at the same horizontal size of 150 metres. A residential cell with 22 metres of vertical extent has an aspect of 0.15 and a quadtree is correct. A mixed cell with 74 metres has an aspect of 0.49 and a quadtree is still fine. A tower cell with 220 metres has an aspect of 1.47, so a street-level camera that sees the tile loads geometry far above the view and vertical subdivision pays.</desc>
+  <rect class="svg-bg" x="20" y="-2" width="666" height="270" fill="#ffffff"/>
+  <g stroke-width="1.6">
+    <rect x="34" y="196" width="150" height="22" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="278" y="144" width="150" height="74" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="522" y="34" width="150" height="184" fill="#f7dfdc" stroke="#b0413e"/>
+  </g>
+  <path d="M34 232 H184" stroke="#5b6471" stroke-width="1.4" fill="none"/>
+  <path d="M278 232 H428" stroke="#5b6471" stroke-width="1.4" fill="none"/>
+  <path d="M522 232 H672" stroke="#5b6471" stroke-width="1.4" fill="none"/>
+  <text x="190" y="212" fill="#1f2937" font-size="12.5">22 m</text>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="353" y="134">74 m</text>
+    <text x="597" y="26">220 m</text>
+    <text x="109" y="250">aspect 0.15 — quadtree</text>
+    <text x="353" y="250">aspect 0.49 — quadtree</text>
+    <text x="597" y="250">aspect 1.47 — subdivide</text>
+  </g>
+  <g fill="#5b6471" font-size="12" text-anchor="middle">
+    <text x="109" y="226">150 m tile</text>
+    <text x="353" y="226">150 m tile</text>
+    <text x="597" y="226">150 m tile</text>
+  </g>
+  <g stroke="#1f6b8a" stroke-width="2" stroke-dasharray="6 4" fill="none">
+    <path d="M40 200 H690"/>
+  </g>
+  <text x="44" y="188" fill="#15384a" font-size="12">street-level frustum top</text>
+</svg>
+<figcaption>The third cell forces a client at street level to load 180 m of tower it cannot see; the first two have nothing above the frustum.</figcaption>
+</figure>
+<h3 id="2-build-the-quadtree-baseline" tabindex="-1"><a class="heading-link" href="#2-build-the-quadtree-baseline"><span>2. Build the quadtree baseline</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">build_quadtree</span><span class="token punctuation">(</span>features<span class="token punctuation">,</span> root_extent_m<span class="token punctuation">,</span> origin<span class="token punctuation">,</span> max_features<span class="token operator">=</span><span class="token number">1500</span><span class="token punctuation">,</span> max_depth<span class="token operator">=</span><span class="token number">12</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Subdivide in x and y only; every node spans the full vertical extent of its contents."""</span>
+    <span class="token keyword">def</span> <span class="token function">node</span><span class="token punctuation">(</span>bounds<span class="token punctuation">,</span> items<span class="token punctuation">,</span> depth<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        x0<span class="token punctuation">,</span> y0<span class="token punctuation">,</span> x1<span class="token punctuation">,</span> y1 <span class="token operator">=</span> bounds
+        z_lo <span class="token operator">=</span> <span class="token builtin">min</span><span class="token punctuation">(</span>f<span class="token punctuation">.</span>z_min <span class="token keyword">for</span> f <span class="token keyword">in</span> items<span class="token punctuation">)</span>
+        z_hi <span class="token operator">=</span> <span class="token builtin">max</span><span class="token punctuation">(</span>f<span class="token punctuation">.</span>z_max <span class="token keyword">for</span> f <span class="token keyword">in</span> items<span class="token punctuation">)</span>
+        entry <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token string">"bounds"</span><span class="token punctuation">:</span> <span class="token punctuation">(</span>x0<span class="token punctuation">,</span> y0<span class="token punctuation">,</span> x1<span class="token punctuation">,</span> y1<span class="token punctuation">,</span> z_lo<span class="token punctuation">,</span> z_hi<span class="token punctuation">)</span><span class="token punctuation">,</span>
+                 <span class="token string">"features"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>items<span class="token punctuation">)</span><span class="token punctuation">,</span>
+                 <span class="token string">"triangles"</span><span class="token punctuation">:</span> <span class="token builtin">sum</span><span class="token punctuation">(</span>f<span class="token punctuation">.</span>triangles <span class="token keyword">for</span> f <span class="token keyword">in</span> items<span class="token punctuation">)</span><span class="token punctuation">,</span>
+                 <span class="token string">"depth"</span><span class="token punctuation">:</span> depth<span class="token punctuation">,</span> <span class="token string">"children"</span><span class="token punctuation">:</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">}</span>
+        <span class="token keyword">if</span> <span class="token builtin">len</span><span class="token punctuation">(</span>items<span class="token punctuation">)</span> <span class="token operator">&lt;=</span> max_features <span class="token keyword">or</span> depth <span class="token operator">>=</span> max_depth<span class="token punctuation">:</span>
+            <span class="token keyword">return</span> entry
+        mx<span class="token punctuation">,</span> my <span class="token operator">=</span> <span class="token punctuation">(</span>x0 <span class="token operator">+</span> x1<span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token number">2</span><span class="token punctuation">,</span> <span class="token punctuation">(</span>y0 <span class="token operator">+</span> y1<span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token number">2</span>
+        quads <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">(</span>x0<span class="token punctuation">,</span> y0<span class="token punctuation">,</span> mx<span class="token punctuation">,</span> my<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token punctuation">(</span>mx<span class="token punctuation">,</span> y0<span class="token punctuation">,</span> x1<span class="token punctuation">,</span> my<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token punctuation">(</span>x0<span class="token punctuation">,</span> my<span class="token punctuation">,</span> mx<span class="token punctuation">,</span> y1<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token punctuation">(</span>mx<span class="token punctuation">,</span> my<span class="token punctuation">,</span> x1<span class="token punctuation">,</span> y1<span class="token punctuation">)</span><span class="token punctuation">]</span>
+        <span class="token keyword">for</span> q <span class="token keyword">in</span> quads<span class="token punctuation">:</span>
+            inside <span class="token operator">=</span> <span class="token punctuation">[</span>f <span class="token keyword">for</span> f <span class="token keyword">in</span> items
+                      <span class="token keyword">if</span> q<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span> <span class="token operator">&lt;=</span> f<span class="token punctuation">.</span>x <span class="token operator">&lt;</span> q<span class="token punctuation">[</span><span class="token number">2</span><span class="token punctuation">]</span> <span class="token keyword">and</span> q<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span> <span class="token operator">&lt;=</span> f<span class="token punctuation">.</span>y <span class="token operator">&lt;</span> q<span class="token punctuation">[</span><span class="token number">3</span><span class="token punctuation">]</span><span class="token punctuation">]</span>
+            <span class="token keyword">if</span> inside<span class="token punctuation">:</span>
+                entry<span class="token punctuation">[</span><span class="token string">"children"</span><span class="token punctuation">]</span><span class="token punctuation">.</span>append<span class="token punctuation">(</span>node<span class="token punctuation">(</span>q<span class="token punctuation">,</span> inside<span class="token punctuation">,</span> depth <span class="token operator">+</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+        entry<span class="token punctuation">[</span><span class="token string">"features"</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token number">0</span>          <span class="token comment"># interior nodes hold no content in this scheme</span>
+        <span class="token keyword">return</span> entry
+
+    x0<span class="token punctuation">,</span> y0 <span class="token operator">=</span> origin
+    <span class="token keyword">return</span> node<span class="token punctuation">(</span><span class="token punctuation">(</span>x0<span class="token punctuation">,</span> y0<span class="token punctuation">,</span> x0 <span class="token operator">+</span> root_extent_m<span class="token punctuation">,</span> y0 <span class="token operator">+</span> root_extent_m<span class="token punctuation">)</span><span class="token punctuation">,</span> features<span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span>
+
+<span class="token keyword">def</span> <span class="token function">tree_stats</span><span class="token punctuation">(</span>root<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    nodes<span class="token punctuation">,</span> leaves<span class="token punctuation">,</span> by_depth <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> Counter<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    volumes <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    <span class="token keyword">def</span> <span class="token function">walk</span><span class="token punctuation">(</span>n<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">nonlocal</span> nodes<span class="token punctuation">,</span> leaves
+        nodes <span class="token operator">+=</span> <span class="token number">1</span>
+        by_depth<span class="token punctuation">[</span>n<span class="token punctuation">[</span><span class="token string">"depth"</span><span class="token punctuation">]</span><span class="token punctuation">]</span> <span class="token operator">+=</span> <span class="token number">1</span>
+        x0<span class="token punctuation">,</span> y0<span class="token punctuation">,</span> x1<span class="token punctuation">,</span> y1<span class="token punctuation">,</span> z_lo<span class="token punctuation">,</span> z_hi <span class="token operator">=</span> n<span class="token punctuation">[</span><span class="token string">"bounds"</span><span class="token punctuation">]</span>
+        volumes<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">(</span>x1 <span class="token operator">-</span> x0<span class="token punctuation">)</span> <span class="token operator">*</span> <span class="token punctuation">(</span>y1 <span class="token operator">-</span> y0<span class="token punctuation">)</span> <span class="token operator">*</span> <span class="token builtin">max</span><span class="token punctuation">(</span>z_hi <span class="token operator">-</span> z_lo<span class="token punctuation">,</span> <span class="token number">0.1</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+        <span class="token keyword">if</span> <span class="token keyword">not</span> n<span class="token punctuation">[</span><span class="token string">"children"</span><span class="token punctuation">]</span><span class="token punctuation">:</span>
+            leaves <span class="token operator">+=</span> <span class="token number">1</span>
+        <span class="token keyword">for</span> c <span class="token keyword">in</span> n<span class="token punctuation">[</span><span class="token string">"children"</span><span class="token punctuation">]</span><span class="token punctuation">:</span>
+            walk<span class="token punctuation">(</span>c<span class="token punctuation">)</span>
+    walk<span class="token punctuation">(</span>root<span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"nodes"</span><span class="token punctuation">:</span> nodes<span class="token punctuation">,</span> <span class="token string">"leaves"</span><span class="token punctuation">:</span> leaves<span class="token punctuation">,</span> <span class="token string">"max_depth"</span><span class="token punctuation">:</span> <span class="token builtin">max</span><span class="token punctuation">(</span>by_depth<span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"median_volume_m3"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>median<span class="token punctuation">(</span>volumes<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"by_depth"</span><span class="token punctuation">:</span> <span class="token builtin">dict</span><span class="token punctuation">(</span><span class="token builtin">sorted</span><span class="token punctuation">(</span>by_depth<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">}</span>
+</code></pre></div>
+<p>Assigning a feature by its centroid, as in the tiling pipeline, keeps each feature in exactly one node — the same reasoning as in <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/tiling-photogrammetry-obj-meshes/">tiling photogrammetry OBJ meshes</a>. It means a tower sitting on a quadrant boundary lands entirely in one child, and that child’s vertical extent is the tower’s full height.</p>
+<p>Deriving each node’s vertical extent from its contents rather than from a fixed root range is what keeps a quadtree usable at all. A tree where every node claims 0–250 m because the root does gives the client no information to cull with.</p>
+<h3 id="3-build-the-octree-and-see-what-it-costs" tabindex="-1"><a class="heading-link" href="#3-build-the-octree-and-see-what-it-costs"><span>3. Build the octree, and see what it costs</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">build_octree</span><span class="token punctuation">(</span>features<span class="token punctuation">,</span> root_extent_m<span class="token punctuation">,</span> origin<span class="token punctuation">,</span> z_range<span class="token punctuation">,</span> max_features<span class="token operator">=</span><span class="token number">1500</span><span class="token punctuation">,</span>
+                 max_depth<span class="token operator">=</span><span class="token number">12</span><span class="token punctuation">,</span> min_cell_m<span class="token operator">=</span><span class="token number">8.0</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Subdivide in x, y and z. Features spanning a z boundary go to the parent."""</span>
+    <span class="token keyword">def</span> <span class="token function">node</span><span class="token punctuation">(</span>bounds<span class="token punctuation">,</span> items<span class="token punctuation">,</span> depth<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        x0<span class="token punctuation">,</span> y0<span class="token punctuation">,</span> z0<span class="token punctuation">,</span> x1<span class="token punctuation">,</span> y1<span class="token punctuation">,</span> z1 <span class="token operator">=</span> bounds
+        entry <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token string">"bounds"</span><span class="token punctuation">:</span> <span class="token punctuation">(</span>x0<span class="token punctuation">,</span> y0<span class="token punctuation">,</span> x1<span class="token punctuation">,</span> y1<span class="token punctuation">,</span> z0<span class="token punctuation">,</span> z1<span class="token punctuation">)</span><span class="token punctuation">,</span>
+                 <span class="token string">"features"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>items<span class="token punctuation">)</span><span class="token punctuation">,</span>
+                 <span class="token string">"triangles"</span><span class="token punctuation">:</span> <span class="token builtin">sum</span><span class="token punctuation">(</span>f<span class="token punctuation">.</span>triangles <span class="token keyword">for</span> f <span class="token keyword">in</span> items<span class="token punctuation">)</span><span class="token punctuation">,</span>
+                 <span class="token string">"depth"</span><span class="token punctuation">:</span> depth<span class="token punctuation">,</span> <span class="token string">"children"</span><span class="token punctuation">:</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token string">"straddlers"</span><span class="token punctuation">:</span> <span class="token number">0</span><span class="token punctuation">}</span>
+        <span class="token keyword">if</span> <span class="token builtin">len</span><span class="token punctuation">(</span>items<span class="token punctuation">)</span> <span class="token operator">&lt;=</span> max_features <span class="token keyword">or</span> depth <span class="token operator">>=</span> max_depth \
+                <span class="token keyword">or</span> <span class="token punctuation">(</span>x1 <span class="token operator">-</span> x0<span class="token punctuation">)</span> <span class="token operator">&lt;=</span> min_cell_m<span class="token punctuation">:</span>
+            <span class="token keyword">return</span> entry
+        mx<span class="token punctuation">,</span> my<span class="token punctuation">,</span> mz <span class="token operator">=</span> <span class="token punctuation">(</span>x0 <span class="token operator">+</span> x1<span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token number">2</span><span class="token punctuation">,</span> <span class="token punctuation">(</span>y0 <span class="token operator">+</span> y1<span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token number">2</span><span class="token punctuation">,</span> <span class="token punctuation">(</span>z0 <span class="token operator">+</span> z1<span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token number">2</span>
+
+        <span class="token comment"># A feature whose vertical extent crosses mz cannot be assigned to one octant.</span>
+        straddling <span class="token operator">=</span> <span class="token punctuation">[</span>f <span class="token keyword">for</span> f <span class="token keyword">in</span> items <span class="token keyword">if</span> f<span class="token punctuation">.</span>z_min <span class="token operator">&lt;</span> mz <span class="token operator">&lt;=</span> f<span class="token punctuation">.</span>z_max<span class="token punctuation">]</span>
+        assignable <span class="token operator">=</span> <span class="token punctuation">[</span>f <span class="token keyword">for</span> f <span class="token keyword">in</span> items <span class="token keyword">if</span> f <span class="token keyword">not</span> <span class="token keyword">in</span> straddling<span class="token punctuation">]</span>
+        entry<span class="token punctuation">[</span><span class="token string">"straddlers"</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token builtin">len</span><span class="token punctuation">(</span>straddling<span class="token punctuation">)</span>
+
+        octants <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+        <span class="token keyword">for</span> ox <span class="token keyword">in</span> <span class="token punctuation">(</span><span class="token punctuation">(</span>x0<span class="token punctuation">,</span> mx<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token punctuation">(</span>mx<span class="token punctuation">,</span> x1<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+            <span class="token keyword">for</span> oy <span class="token keyword">in</span> <span class="token punctuation">(</span><span class="token punctuation">(</span>y0<span class="token punctuation">,</span> my<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token punctuation">(</span>my<span class="token punctuation">,</span> y1<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+                <span class="token keyword">for</span> oz <span class="token keyword">in</span> <span class="token punctuation">(</span><span class="token punctuation">(</span>z0<span class="token punctuation">,</span> mz<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token punctuation">(</span>mz<span class="token punctuation">,</span> z1<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+                    octants<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">(</span>ox<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">,</span> oy<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">,</span> oz<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">,</span> ox<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">,</span> oy<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">,</span> oz<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+        <span class="token keyword">for</span> o <span class="token keyword">in</span> octants<span class="token punctuation">:</span>
+            inside <span class="token operator">=</span> <span class="token punctuation">[</span>f <span class="token keyword">for</span> f <span class="token keyword">in</span> assignable
+                      <span class="token keyword">if</span> o<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span> <span class="token operator">&lt;=</span> f<span class="token punctuation">.</span>x <span class="token operator">&lt;</span> o<span class="token punctuation">[</span><span class="token number">3</span><span class="token punctuation">]</span> <span class="token keyword">and</span> o<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span> <span class="token operator">&lt;=</span> f<span class="token punctuation">.</span>y <span class="token operator">&lt;</span> o<span class="token punctuation">[</span><span class="token number">4</span><span class="token punctuation">]</span>
+                      <span class="token keyword">and</span> o<span class="token punctuation">[</span><span class="token number">2</span><span class="token punctuation">]</span> <span class="token operator">&lt;=</span> f<span class="token punctuation">.</span>z_min <span class="token operator">&lt;</span> o<span class="token punctuation">[</span><span class="token number">5</span><span class="token punctuation">]</span><span class="token punctuation">]</span>
+            <span class="token keyword">if</span> inside<span class="token punctuation">:</span>
+                entry<span class="token punctuation">[</span><span class="token string">"children"</span><span class="token punctuation">]</span><span class="token punctuation">.</span>append<span class="token punctuation">(</span>node<span class="token punctuation">(</span>o<span class="token punctuation">,</span> inside<span class="token punctuation">,</span> depth <span class="token operator">+</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+        entry<span class="token punctuation">[</span><span class="token string">"features"</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token builtin">len</span><span class="token punctuation">(</span>straddling<span class="token punctuation">)</span>      <span class="token comment"># the parent keeps what it cannot split</span>
+        entry<span class="token punctuation">[</span><span class="token string">"triangles"</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token builtin">sum</span><span class="token punctuation">(</span>f<span class="token punctuation">.</span>triangles <span class="token keyword">for</span> f <span class="token keyword">in</span> straddling<span class="token punctuation">)</span>
+        <span class="token keyword">return</span> entry
+
+    x0<span class="token punctuation">,</span> y0 <span class="token operator">=</span> origin
+    z0<span class="token punctuation">,</span> z1 <span class="token operator">=</span> z_range
+    <span class="token keyword">return</span> node<span class="token punctuation">(</span><span class="token punctuation">(</span>x0<span class="token punctuation">,</span> y0<span class="token punctuation">,</span> z0<span class="token punctuation">,</span> x0 <span class="token operator">+</span> root_extent_m<span class="token punctuation">,</span> y0 <span class="token operator">+</span> root_extent_m<span class="token punctuation">,</span> z1<span class="token punctuation">)</span><span class="token punctuation">,</span> features<span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>The <strong>straddler</strong> problem is what makes octrees awkward for buildings and unproblematic for point clouds. A point has no extent, so it always falls in exactly one octant; a 220 m tower crosses every vertical boundary in the tree and cannot be assigned to any octant without splitting the geometry.</p>
+<p>Keeping straddlers in the parent, as above, is the simplest correct answer and it concentrates the tall geometry at shallow depths — which is precisely the geometry the street-level camera did not want. So a naive octree can make the original problem <em>worse</em>, and the numbers in the verification section show it doing exactly that.</p>
+<p>The alternative is to split the geometry at each z boundary, which produces the balanced tree the scheme promises at the cost of cutting every tower into slices, new vertices at every cut, and a seam per slice. For a tower with a continuous glass facade those seams are visible.</p>
+<h3 id="4-the-hybrid-quadtree-with-vertical-splits-where-they-pay" tabindex="-1"><a class="heading-link" href="#4-the-hybrid-quadtree-with-vertical-splits-where-they-pay"><span>4. The hybrid: quadtree with vertical splits where they pay</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">build_hybrid</span><span class="token punctuation">(</span>features<span class="token punctuation">,</span> root_extent_m<span class="token punctuation">,</span> origin<span class="token punctuation">,</span> max_features<span class="token operator">=</span><span class="token number">1500</span><span class="token punctuation">,</span>
+                 max_depth<span class="token operator">=</span><span class="token number">12</span><span class="token punctuation">,</span> aspect_threshold<span class="token operator">=</span><span class="token number">0.8</span><span class="token punctuation">,</span> z_split_min_m<span class="token operator">=</span><span class="token number">60.0</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Quadtree by default; split a node vertically only when its aspect justifies it."""</span>
+    <span class="token keyword">def</span> <span class="token function">node</span><span class="token punctuation">(</span>bounds<span class="token punctuation">,</span> items<span class="token punctuation">,</span> depth<span class="token punctuation">,</span> allow_z<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        x0<span class="token punctuation">,</span> y0<span class="token punctuation">,</span> x1<span class="token punctuation">,</span> y1 <span class="token operator">=</span> bounds
+        z_lo <span class="token operator">=</span> <span class="token builtin">min</span><span class="token punctuation">(</span>f<span class="token punctuation">.</span>z_min <span class="token keyword">for</span> f <span class="token keyword">in</span> items<span class="token punctuation">)</span>
+        z_hi <span class="token operator">=</span> <span class="token builtin">max</span><span class="token punctuation">(</span>f<span class="token punctuation">.</span>z_max <span class="token keyword">for</span> f <span class="token keyword">in</span> items<span class="token punctuation">)</span>
+        extent <span class="token operator">=</span> x1 <span class="token operator">-</span> x0
+        aspect <span class="token operator">=</span> <span class="token punctuation">(</span>z_hi <span class="token operator">-</span> z_lo<span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token builtin">max</span><span class="token punctuation">(</span>extent<span class="token punctuation">,</span> <span class="token number">1e-6</span><span class="token punctuation">)</span>
+        entry <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token string">"bounds"</span><span class="token punctuation">:</span> <span class="token punctuation">(</span>x0<span class="token punctuation">,</span> y0<span class="token punctuation">,</span> x1<span class="token punctuation">,</span> y1<span class="token punctuation">,</span> z_lo<span class="token punctuation">,</span> z_hi<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"depth"</span><span class="token punctuation">:</span> depth<span class="token punctuation">,</span>
+                 <span class="token string">"features"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>items<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"triangles"</span><span class="token punctuation">:</span> <span class="token builtin">sum</span><span class="token punctuation">(</span>f<span class="token punctuation">.</span>triangles <span class="token keyword">for</span> f <span class="token keyword">in</span> items<span class="token punctuation">)</span><span class="token punctuation">,</span>
+                 <span class="token string">"aspect"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>aspect<span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"split"</span><span class="token punctuation">:</span> <span class="token boolean">None</span><span class="token punctuation">,</span> <span class="token string">"children"</span><span class="token punctuation">:</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">}</span>
+
+        <span class="token keyword">if</span> <span class="token builtin">len</span><span class="token punctuation">(</span>items<span class="token punctuation">)</span> <span class="token operator">&lt;=</span> max_features <span class="token keyword">or</span> depth <span class="token operator">>=</span> max_depth<span class="token punctuation">:</span>
+            <span class="token keyword">return</span> entry
+
+        <span class="token keyword">if</span> allow_z <span class="token keyword">and</span> aspect <span class="token operator">></span> aspect_threshold <span class="token keyword">and</span> <span class="token punctuation">(</span>z_hi <span class="token operator">-</span> z_lo<span class="token punctuation">)</span> <span class="token operator">></span> z_split_min_m<span class="token punctuation">:</span>
+            <span class="token comment"># Split the *features* by height class, not the geometry by a plane.</span>
+            mid <span class="token operator">=</span> z_lo <span class="token operator">+</span> <span class="token punctuation">(</span>z_hi <span class="token operator">-</span> z_lo<span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token number">2</span>
+            low <span class="token operator">=</span> <span class="token punctuation">[</span>f <span class="token keyword">for</span> f <span class="token keyword">in</span> items <span class="token keyword">if</span> f<span class="token punctuation">.</span>z_max <span class="token operator">&lt;=</span> mid<span class="token punctuation">]</span>
+            high <span class="token operator">=</span> <span class="token punctuation">[</span>f <span class="token keyword">for</span> f <span class="token keyword">in</span> items <span class="token keyword">if</span> f<span class="token punctuation">.</span>z_max <span class="token operator">></span> mid<span class="token punctuation">]</span>
+            <span class="token keyword">if</span> low <span class="token keyword">and</span> high<span class="token punctuation">:</span>
+                entry<span class="token punctuation">[</span><span class="token string">"split"</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token string">"height_class"</span>
+                entry<span class="token punctuation">[</span><span class="token string">"features"</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token number">0</span>
+                entry<span class="token punctuation">[</span><span class="token string">"triangles"</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token number">0</span>
+                entry<span class="token punctuation">[</span><span class="token string">"children"</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token punctuation">[</span>node<span class="token punctuation">(</span>bounds<span class="token punctuation">,</span> low<span class="token punctuation">,</span> depth <span class="token operator">+</span> <span class="token number">1</span><span class="token punctuation">,</span> allow_z<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                                     node<span class="token punctuation">(</span>bounds<span class="token punctuation">,</span> high<span class="token punctuation">,</span> depth <span class="token operator">+</span> <span class="token number">1</span><span class="token punctuation">,</span> allow_z<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">)</span><span class="token punctuation">]</span>
+                <span class="token keyword">return</span> entry
+
+        mx<span class="token punctuation">,</span> my <span class="token operator">=</span> <span class="token punctuation">(</span>x0 <span class="token operator">+</span> x1<span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token number">2</span><span class="token punctuation">,</span> <span class="token punctuation">(</span>y0 <span class="token operator">+</span> y1<span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token number">2</span>
+        entry<span class="token punctuation">[</span><span class="token string">"split"</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token string">"quad"</span>
+        entry<span class="token punctuation">[</span><span class="token string">"features"</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token number">0</span>
+        entry<span class="token punctuation">[</span><span class="token string">"triangles"</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token number">0</span>
+        <span class="token keyword">for</span> q <span class="token keyword">in</span> <span class="token punctuation">[</span><span class="token punctuation">(</span>x0<span class="token punctuation">,</span> y0<span class="token punctuation">,</span> mx<span class="token punctuation">,</span> my<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token punctuation">(</span>mx<span class="token punctuation">,</span> y0<span class="token punctuation">,</span> x1<span class="token punctuation">,</span> my<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token punctuation">(</span>x0<span class="token punctuation">,</span> my<span class="token punctuation">,</span> mx<span class="token punctuation">,</span> y1<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token punctuation">(</span>mx<span class="token punctuation">,</span> my<span class="token punctuation">,</span> x1<span class="token punctuation">,</span> y1<span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">:</span>
+            inside <span class="token operator">=</span> <span class="token punctuation">[</span>f <span class="token keyword">for</span> f <span class="token keyword">in</span> items <span class="token keyword">if</span> q<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span> <span class="token operator">&lt;=</span> f<span class="token punctuation">.</span>x <span class="token operator">&lt;</span> q<span class="token punctuation">[</span><span class="token number">2</span><span class="token punctuation">]</span> <span class="token keyword">and</span> q<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span> <span class="token operator">&lt;=</span> f<span class="token punctuation">.</span>y <span class="token operator">&lt;</span> q<span class="token punctuation">[</span><span class="token number">3</span><span class="token punctuation">]</span><span class="token punctuation">]</span>
+            <span class="token keyword">if</span> inside<span class="token punctuation">:</span>
+                entry<span class="token punctuation">[</span><span class="token string">"children"</span><span class="token punctuation">]</span><span class="token punctuation">.</span>append<span class="token punctuation">(</span>node<span class="token punctuation">(</span>q<span class="token punctuation">,</span> inside<span class="token punctuation">,</span> depth <span class="token operator">+</span> <span class="token number">1</span><span class="token punctuation">,</span> allow_z<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+        <span class="token keyword">return</span> entry
+
+    x0<span class="token punctuation">,</span> y0 <span class="token operator">=</span> origin
+    <span class="token keyword">return</span> node<span class="token punctuation">(</span><span class="token punctuation">(</span>x0<span class="token punctuation">,</span> y0<span class="token punctuation">,</span> x0 <span class="token operator">+</span> root_extent_m<span class="token punctuation">,</span> y0 <span class="token operator">+</span> root_extent_m<span class="token punctuation">)</span><span class="token punctuation">,</span> features<span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Splitting by <strong>height class</strong> rather than by a geometric plane is the move that makes the hybrid work. The low-rise features and the high-rise features become two sibling tiles occupying the same footprint with different vertical extents — so a street-level camera loads the low-rise tile and culls the high-rise one on its bounding volume, without any geometry being cut.</p>
+<p>Setting <code>allow_z=False</code> on the children prevents a chain of vertical splits, which would produce a tree with many thin tiles and poor locality. One vertical split per quadtree level is enough.</p>
+<p>The 60 m minimum stops the rule from firing on a cell whose aspect is high only because the cell is small — a 20 m cell containing a 25 m building has an aspect of 1.25 and nothing to gain from splitting.</p>
+<h3 id="5-measure-what-a-street-level-view-has-to-load" tabindex="-1"><a class="heading-link" href="#5-measure-what-a-street-level-view-has-to-load"><span>5. Measure what a street-level view has to load</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">frustum_load</span><span class="token punctuation">(</span>root<span class="token punctuation">,</span> camera_xy<span class="token punctuation">,</span> camera_z<span class="token punctuation">,</span> fov_deg<span class="token operator">=</span><span class="token number">60.0</span><span class="token punctuation">,</span> pitch_deg<span class="token operator">=</span><span class="token number">5.0</span><span class="token punctuation">,</span>
+                 far_m<span class="token operator">=</span><span class="token number">800.0</span><span class="token punctuation">,</span> sse_px<span class="token operator">=</span><span class="token number">16.0</span><span class="token punctuation">,</span> screen_px<span class="token operator">=</span><span class="token number">1080</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Triangles the client must load for one view, per scheme."""</span>
+    k <span class="token operator">=</span> screen_px <span class="token operator">/</span> <span class="token punctuation">(</span><span class="token number">2.0</span> <span class="token operator">*</span> math<span class="token punctuation">.</span>tan<span class="token punctuation">(</span>math<span class="token punctuation">.</span>radians<span class="token punctuation">(</span>fov_deg<span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token number">2.0</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    top_at <span class="token operator">=</span> <span class="token keyword">lambda</span> d<span class="token punctuation">:</span> camera_z <span class="token operator">+</span> d <span class="token operator">*</span> math<span class="token punctuation">.</span>tan<span class="token punctuation">(</span>math<span class="token punctuation">.</span>radians<span class="token punctuation">(</span>pitch_deg <span class="token operator">+</span> fov_deg <span class="token operator">/</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    loaded_tris<span class="token punctuation">,</span> loaded_tiles<span class="token punctuation">,</span> wasted_tris <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">0</span>
+
+    <span class="token keyword">def</span> <span class="token function">visible</span><span class="token punctuation">(</span>bounds<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        x0<span class="token punctuation">,</span> y0<span class="token punctuation">,</span> x1<span class="token punctuation">,</span> y1<span class="token punctuation">,</span> z_lo<span class="token punctuation">,</span> z_hi <span class="token operator">=</span> bounds
+        cx<span class="token punctuation">,</span> cy <span class="token operator">=</span> <span class="token punctuation">(</span>x0 <span class="token operator">+</span> x1<span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token number">2</span><span class="token punctuation">,</span> <span class="token punctuation">(</span>y0 <span class="token operator">+</span> y1<span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token number">2</span>
+        d <span class="token operator">=</span> math<span class="token punctuation">.</span>hypot<span class="token punctuation">(</span>cx <span class="token operator">-</span> camera_xy<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">,</span> cy <span class="token operator">-</span> camera_xy<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+        <span class="token keyword">if</span> d <span class="token operator">></span> far_m<span class="token punctuation">:</span>
+            <span class="token keyword">return</span> <span class="token boolean">False</span><span class="token punctuation">,</span> d<span class="token punctuation">,</span> <span class="token number">0.0</span>
+        ceiling <span class="token operator">=</span> top_at<span class="token punctuation">(</span>d<span class="token punctuation">)</span>
+        overlap <span class="token operator">=</span> <span class="token builtin">max</span><span class="token punctuation">(</span><span class="token number">0.0</span><span class="token punctuation">,</span> <span class="token builtin">min</span><span class="token punctuation">(</span>z_hi<span class="token punctuation">,</span> ceiling<span class="token punctuation">)</span> <span class="token operator">-</span> z_lo<span class="token punctuation">)</span>
+        <span class="token keyword">return</span> overlap <span class="token operator">></span> <span class="token number">0</span><span class="token punctuation">,</span> d<span class="token punctuation">,</span> overlap <span class="token operator">/</span> <span class="token builtin">max</span><span class="token punctuation">(</span>z_hi <span class="token operator">-</span> z_lo<span class="token punctuation">,</span> <span class="token number">1e-6</span><span class="token punctuation">)</span>
+
+    <span class="token keyword">def</span> <span class="token function">walk</span><span class="token punctuation">(</span>n<span class="token punctuation">,</span> geometric_error<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">nonlocal</span> loaded_tris<span class="token punctuation">,</span> loaded_tiles<span class="token punctuation">,</span> wasted_tris
+        seen<span class="token punctuation">,</span> d<span class="token punctuation">,</span> useful_fraction <span class="token operator">=</span> visible<span class="token punctuation">(</span>n<span class="token punctuation">[</span><span class="token string">"bounds"</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+        <span class="token keyword">if</span> <span class="token keyword">not</span> seen<span class="token punctuation">:</span>
+            <span class="token keyword">return</span>
+        sse <span class="token operator">=</span> geometric_error <span class="token operator">*</span> k <span class="token operator">/</span> <span class="token builtin">max</span><span class="token punctuation">(</span>d<span class="token punctuation">,</span> <span class="token number">1.0</span><span class="token punctuation">)</span>
+        <span class="token keyword">if</span> n<span class="token punctuation">[</span><span class="token string">"children"</span><span class="token punctuation">]</span> <span class="token keyword">and</span> sse <span class="token operator">></span> sse_px<span class="token punctuation">:</span>
+            <span class="token keyword">for</span> c <span class="token keyword">in</span> n<span class="token punctuation">[</span><span class="token string">"children"</span><span class="token punctuation">]</span><span class="token punctuation">:</span>
+                walk<span class="token punctuation">(</span>c<span class="token punctuation">,</span> geometric_error <span class="token operator">/</span> <span class="token number">2.0</span><span class="token punctuation">)</span>
+            <span class="token keyword">return</span>
+        loaded_tiles <span class="token operator">+=</span> <span class="token number">1</span>
+        loaded_tris <span class="token operator">+=</span> n<span class="token punctuation">[</span><span class="token string">"triangles"</span><span class="token punctuation">]</span>
+        wasted_tris <span class="token operator">+=</span> <span class="token builtin">int</span><span class="token punctuation">(</span>n<span class="token punctuation">[</span><span class="token string">"triangles"</span><span class="token punctuation">]</span> <span class="token operator">*</span> <span class="token punctuation">(</span><span class="token number">1.0</span> <span class="token operator">-</span> useful_fraction<span class="token punctuation">)</span><span class="token punctuation">)</span>
+
+    walk<span class="token punctuation">(</span>root<span class="token punctuation">,</span> <span class="token number">512.0</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"tiles"</span><span class="token punctuation">:</span> loaded_tiles<span class="token punctuation">,</span> <span class="token string">"triangles"</span><span class="token punctuation">:</span> loaded_tris<span class="token punctuation">,</span>
+            <span class="token string">"above_frustum_triangles"</span><span class="token punctuation">:</span> wasted_tris<span class="token punctuation">,</span>
+            <span class="token string">"waste_fraction"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>wasted_tris <span class="token operator">/</span> <span class="token builtin">max</span><span class="token punctuation">(</span>loaded_tris<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">}</span>
+</code></pre></div>
+<p><code>waste_fraction</code> is the metric this whole page exists to reduce: the share of loaded triangles that sit above the frustum’s top at their distance. A quadtree over a tower district reaches 0.5 and higher, meaning half the downloaded geometry is invisible.</p>
+<p>Approximating the frustum by its vertical extent at each distance, rather than doing exact plane tests, is deliberate — the question is how much <em>vertical</em> geometry is wasted, and the horizontal culling is identical between the schemes.</p>
+<figure class="diagram">
+<svg viewBox="4 6 732 244" role="img" aria-labelledby="oct-decide-t oct-decide-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="oct-decide-t">Reading the aspect profile into a decision</title>
+  <desc id="oct-decide-d">A table mapping the 95th-percentile aspect ratio of a city's cells to the subdivision scheme to use. Below 0.6 a quadtree is correct and simplest. Between 0.6 and 1.5 the hybrid earns its extra code. Above 1.5 vertical subdivision is necessary. For point clouds an octree is right at any aspect because points have no extent and never straddle a boundary.</desc>
+  <rect class="svg-bg" x="4" y="6" width="732" height="244" fill="#ffffff"/>
+  <g stroke-width="1.5">
+    <rect x="18" y="20" width="168" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="186" y="20" width="200" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="386" y="20" width="336" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="18" y="54" width="168" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="186" y="54" width="200" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="386" y="54" width="336" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="18" y="88" width="168" height="34" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="186" y="88" width="200" height="34" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="386" y="88" width="336" height="34" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="18" y="122" width="168" height="34" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="186" y="122" width="200" height="34" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="386" y="122" width="336" height="34" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="18" y="156" width="168" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="186" y="156" width="200" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="386" y="156" width="336" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="102" y="42">p95 aspect</text><text x="286" y="42">scheme</text><text x="554" y="42">reason</text>
+    <text x="102" y="76">below 0.6</text><text x="286" y="76">quadtree</text><text x="554" y="76">tiles are flat slabs; nothing to gain</text>
+    <text x="102" y="110">0.6 to 1.5</text><text x="286" y="110">hybrid</text><text x="554" y="110">a few cells need it, most do not</text>
+    <text x="102" y="144">above 1.5</text><text x="286" y="144">vertical split needed</text><text x="554" y="144">street views load unseen towers</text>
+    <text x="102" y="178">any, point cloud</text><text x="286" y="178">octree</text><text x="554" y="178">points never straddle a boundary</text>
+  </g>
+  <text x="20" y="210" fill="#1f2937" font-size="12.5">Compute the profile per cell before writing any tree code; the city-wide maximum tells you nothing.</text>
+  <text x="20" y="232" fill="#5b6471" font-size="12">A naive octree on buildings can load more than a quadtree, because straddlers pile up in shallow nodes.</text>
+</svg>
+<figcaption>One number computed per cell decides the scheme, and for point clouds the answer is different.</figcaption>
+</figure>
+<h3 id="6-compare-the-three-on-real-geometry" tabindex="-1"><a class="heading-link" href="#6-compare-the-three-on-real-geometry"><span>6. Compare the three on real geometry</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">compare_schemes</span><span class="token punctuation">(</span>features<span class="token punctuation">,</span> root_extent_m<span class="token punctuation">,</span> origin<span class="token punctuation">,</span> z_range<span class="token punctuation">,</span> views<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    schemes <span class="token operator">=</span> <span class="token punctuation">{</span>
+        <span class="token string">"quadtree"</span><span class="token punctuation">:</span> build_quadtree<span class="token punctuation">(</span>features<span class="token punctuation">,</span> root_extent_m<span class="token punctuation">,</span> origin<span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"octree"</span><span class="token punctuation">:</span> build_octree<span class="token punctuation">(</span>features<span class="token punctuation">,</span> root_extent_m<span class="token punctuation">,</span> origin<span class="token punctuation">,</span> z_range<span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"hybrid"</span><span class="token punctuation">:</span> build_hybrid<span class="token punctuation">(</span>features<span class="token punctuation">,</span> root_extent_m<span class="token punctuation">,</span> origin<span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+    report <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token punctuation">}</span>
+    <span class="token keyword">for</span> name<span class="token punctuation">,</span> root <span class="token keyword">in</span> schemes<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        stats <span class="token operator">=</span> tree_stats<span class="token punctuation">(</span>root<span class="token punctuation">)</span>
+        loads <span class="token operator">=</span> <span class="token punctuation">[</span>frustum_load<span class="token punctuation">(</span>root<span class="token punctuation">,</span> <span class="token punctuation">(</span>vx<span class="token punctuation">,</span> vy<span class="token punctuation">)</span><span class="token punctuation">,</span> vz<span class="token punctuation">)</span> <span class="token keyword">for</span> vx<span class="token punctuation">,</span> vy<span class="token punctuation">,</span> vz <span class="token keyword">in</span> views<span class="token punctuation">]</span>
+        report<span class="token punctuation">[</span>name<span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token punctuation">{</span>
+            <span class="token operator">**</span>stats<span class="token punctuation">,</span>
+            <span class="token string">"mean_tiles_per_view"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>mean<span class="token punctuation">(</span><span class="token punctuation">[</span>l<span class="token punctuation">[</span><span class="token string">"tiles"</span><span class="token punctuation">]</span> <span class="token keyword">for</span> l <span class="token keyword">in</span> loads<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"mean_triangles_per_view"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>mean<span class="token punctuation">(</span><span class="token punctuation">[</span>l<span class="token punctuation">[</span><span class="token string">"triangles"</span><span class="token punctuation">]</span> <span class="token keyword">for</span> l <span class="token keyword">in</span> loads<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"mean_waste"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>mean<span class="token punctuation">(</span><span class="token punctuation">[</span>l<span class="token punctuation">[</span><span class="token string">"waste_fraction"</span><span class="token punctuation">]</span> <span class="token keyword">for</span> l <span class="token keyword">in</span> loads<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token punctuation">}</span>
+    best <span class="token operator">=</span> <span class="token builtin">min</span><span class="token punctuation">(</span>report<span class="token punctuation">,</span> key<span class="token operator">=</span><span class="token keyword">lambda</span> k<span class="token punctuation">:</span> report<span class="token punctuation">[</span>k<span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token string">"mean_triangles_per_view"</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"report"</span><span class="token punctuation">:</span> report<span class="token punctuation">,</span> <span class="token string">"best_by_triangles"</span><span class="token punctuation">:</span> best<span class="token punctuation">}</span>
+</code></pre></div>
+<figure class="diagram">
+<svg viewBox="6 10 728 240" role="img" aria-labelledby="oct-hyb-t oct-hyb-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="oct-hyb-t">The hybrid split, in cross-section</title>
+  <desc id="oct-hyb-d">One 150 metre cell in cross-section. On the left, a quadtree leaf spans 0 to 220 metres because it contains a tower, so a street-level camera loads all of it. On the right, the hybrid splits the features into a low-rise tile spanning 0 to 34 metres and a high-rise tile spanning 0 to 220 metres containing only the towers. The street-level camera loads the low-rise tile and culls the high-rise one, and no geometry was cut to achieve it.</desc>
+  <rect class="svg-bg" x="6" y="10" width="728" height="240" fill="#ffffff"/>
+  <rect x="20" y="24" width="330" height="212" rx="9" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <rect x="390" y="24" width="330" height="212" rx="9" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <text x="185" y="46" fill="#1f2937" font-size="13" text-anchor="middle">quadtree leaf: one tile, 0–220 m</text>
+  <text x="555" y="46" fill="#1f2937" font-size="13" text-anchor="middle">hybrid: two sibling tiles</text>
+  <g stroke-width="1.6">
+    <rect x="58" y="58" width="254" height="148" fill="#ffffff" stroke="#b0413e"/>
+    <rect x="78" y="176" width="46" height="30" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="132" y="168" width="40" height="38" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="182" y="70" width="34" height="136" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="226" y="180" width="38" height="26" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="272" y="86" width="30" height="120" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="418" y="164" width="254" height="42" fill="#ffffff" stroke="#4f7a4d"/>
+    <rect x="438" y="176" width="46" height="30" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="492" y="168" width="40" height="38" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="586" y="180" width="38" height="26" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <path d="M542 58 H576 V206 H542 Z" fill="#fdf3e0" stroke="#c46a3d" stroke-dasharray="5 4"/>
+    <path d="M632 74 H662 V206 H632 Z" fill="#fdf3e0" stroke="#c46a3d" stroke-dasharray="5 4"/>
+  </g>
+  <path d="M40 152 H336" stroke="#1f6b8a" stroke-width="2" stroke-dasharray="6 4" fill="none"/>
+  <path d="M400 152 H710" stroke="#1f6b8a" stroke-width="2" stroke-dasharray="6 4" fill="none"/>
+  <g fill="#15384a" font-size="12">
+    <text x="64" y="146">frustum top</text>
+    <text x="422" y="146">frustum top</text>
+  </g>
+  <g fill="#1f2937" font-size="12" text-anchor="middle">
+    <text x="185" y="228">all 268 k triangles loaded; 54% above the frustum</text>
+    <text x="555" y="228">low-rise tile loaded, high-rise culled: 71 k triangles</text>
+  </g>
+</svg>
+<figcaption>Two sibling tiles over the same footprint: the towers are a separate, cullable tile and no geometry was cut.</figcaption>
+</figure>
+<h2 id="expected-output-verification" tabindex="-1"><a class="heading-link" href="#expected-output-verification"><span>Expected Output &amp; Verification</span></a></h2>
+<div class="codeblock" data-lang="text"><div class="codeblock__bar"><span class="codeblock__lang">text</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-text" tabindex="0" role="group" aria-label="text code sample"><code class="language-text">{'cells': 418, 'median_aspect': 0.163, 'p95_aspect': 0.887, 'max_aspect': 1.467,
+ 'cells_over_1': 11, 'recommendation': 'hybrid',
+ 'worst': [{'cell': '14_9', 'vertical_m': 220.1, 'aspect': 1.467, 'features': 84,
+            'triangles': 268412}, …]}
+{
+  "report": {
+    "quadtree": {"nodes": 1841, "leaves": 1402, "max_depth": 7,
+                 "mean_tiles_per_view": 38.4, "mean_triangles_per_view": 1184220,
+                 "mean_waste": 0.311},
+    "octree":   {"nodes": 3904, "leaves": 2988, "max_depth": 9,
+                 "mean_tiles_per_view": 91.2, "mean_triangles_per_view": 1402881,
+                 "mean_waste": 0.287},
+    "hybrid":   {"nodes": 2016, "leaves": 1544, "max_depth": 8,
+                 "mean_tiles_per_view": 42.1, "mean_triangles_per_view": 742104,
+                 "mean_waste": 0.104}
+  },
+  "best_by_triangles": "hybrid"
+}
+</code></pre></div>
+<p>The octree result is the finding worth dwelling on: it loads <strong>more</strong> geometry than the quadtree despite a lower waste fraction, because the straddling towers were pushed into shallow parent nodes that every view has to load. It also more than doubles the tile count, which costs request overhead and draw calls.</p>
+<p>The hybrid cuts loaded triangles by 37% against the quadtree and waste by two-thirds, for an 9% increase in node count. That is the shape of result that justifies the extra code.</p>
+<p>Verify the trees are correct before trusting the comparison, since a tree that loses features will look wonderfully efficient:</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">conservation_check</span><span class="token punctuation">(</span>features<span class="token punctuation">,</span> root<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Every feature must appear in exactly one node, and bounds must nest."""</span>
+    seen <span class="token operator">=</span> Counter<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    problems <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+
+    <span class="token keyword">def</span> <span class="token function">walk</span><span class="token punctuation">(</span>n<span class="token punctuation">,</span> parent_bounds<span class="token operator">=</span><span class="token boolean">None</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        x0<span class="token punctuation">,</span> y0<span class="token punctuation">,</span> x1<span class="token punctuation">,</span> y1<span class="token punctuation">,</span> z_lo<span class="token punctuation">,</span> z_hi <span class="token operator">=</span> n<span class="token punctuation">[</span><span class="token string">"bounds"</span><span class="token punctuation">]</span>
+        <span class="token keyword">if</span> parent_bounds <span class="token keyword">is</span> <span class="token keyword">not</span> <span class="token boolean">None</span><span class="token punctuation">:</span>
+            px0<span class="token punctuation">,</span> py0<span class="token punctuation">,</span> px1<span class="token punctuation">,</span> py1<span class="token punctuation">,</span> pz_lo<span class="token punctuation">,</span> pz_hi <span class="token operator">=</span> parent_bounds
+            <span class="token keyword">if</span> x0 <span class="token operator">&lt;</span> px0 <span class="token operator">-</span> <span class="token number">1e-6</span> <span class="token keyword">or</span> x1 <span class="token operator">></span> px1 <span class="token operator">+</span> <span class="token number">1e-6</span> <span class="token keyword">or</span> y0 <span class="token operator">&lt;</span> py0 <span class="token operator">-</span> <span class="token number">1e-6</span> <span class="token keyword">or</span> y1 <span class="token operator">></span> py1 <span class="token operator">+</span> <span class="token number">1e-6</span><span class="token punctuation">:</span>
+                problems<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"depth </span><span class="token interpolation"><span class="token punctuation">{</span>n<span class="token punctuation">[</span><span class="token string">'depth'</span><span class="token punctuation">]</span><span class="token punctuation">}</span></span><span class="token string">: horizontal bounds escape parent"</span></span><span class="token punctuation">)</span>
+            <span class="token keyword">if</span> z_lo <span class="token operator">&lt;</span> pz_lo <span class="token operator">-</span> <span class="token number">1e-6</span> <span class="token keyword">or</span> z_hi <span class="token operator">></span> pz_hi <span class="token operator">+</span> <span class="token number">1e-6</span><span class="token punctuation">:</span>
+                problems<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"depth </span><span class="token interpolation"><span class="token punctuation">{</span>n<span class="token punctuation">[</span><span class="token string">'depth'</span><span class="token punctuation">]</span><span class="token punctuation">}</span></span><span class="token string">: vertical bounds escape parent"</span></span><span class="token punctuation">)</span>
+        seen<span class="token punctuation">[</span>n<span class="token punctuation">[</span><span class="token string">"depth"</span><span class="token punctuation">]</span><span class="token punctuation">]</span> <span class="token operator">+=</span> n<span class="token punctuation">[</span><span class="token string">"features"</span><span class="token punctuation">]</span>
+        <span class="token keyword">for</span> c <span class="token keyword">in</span> n<span class="token punctuation">[</span><span class="token string">"children"</span><span class="token punctuation">]</span><span class="token punctuation">:</span>
+            walk<span class="token punctuation">(</span>c<span class="token punctuation">,</span> n<span class="token punctuation">[</span><span class="token string">"bounds"</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+
+    walk<span class="token punctuation">(</span>root<span class="token punctuation">)</span>
+    total_in_tree <span class="token operator">=</span> <span class="token builtin">sum</span><span class="token punctuation">(</span>seen<span class="token punctuation">.</span>values<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"features_in"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>features<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"features_in_tree"</span><span class="token punctuation">:</span> total_in_tree<span class="token punctuation">,</span>
+            <span class="token string">"conserved"</span><span class="token punctuation">:</span> total_in_tree <span class="token operator">==</span> <span class="token builtin">len</span><span class="token punctuation">(</span>features<span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"by_depth"</span><span class="token punctuation">:</span> <span class="token builtin">dict</span><span class="token punctuation">(</span><span class="token builtin">sorted</span><span class="token punctuation">(</span>seen<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"bounds_problems"</span><span class="token punctuation">:</span> problems<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token number">5</span><span class="token punctuation">]</span><span class="token punctuation">}</span>
+
+<span class="token keyword">print</span><span class="token punctuation">(</span>conservation_check<span class="token punctuation">(</span>FEATURES<span class="token punctuation">,</span> build_hybrid<span class="token punctuation">(</span>FEATURES<span class="token punctuation">,</span> <span class="token number">4800</span><span class="token punctuation">,</span> <span class="token punctuation">(</span><span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Bounds nesting is the other correctness property and the one the 3D Tiles validator will check anyway. A child whose vertical extent exceeds its parent’s makes the parent’s volume a lie, so the client culls the parent and never reaches the child — geometry that is simply missing.</p>
+<p>Then verify the improvement holds across views, not just the one that motivated it:</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">view_sweep</span><span class="token punctuation">(</span>features<span class="token punctuation">,</span> root_extent_m<span class="token punctuation">,</span> origin<span class="token punctuation">,</span> z_range<span class="token punctuation">,</span> n<span class="token operator">=</span><span class="token number">48</span><span class="token punctuation">,</span> seed<span class="token operator">=</span><span class="token number">5</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Random street-level and aerial views; the hybrid must not lose anywhere."""</span>
+    rng <span class="token operator">=</span> np<span class="token punctuation">.</span>random<span class="token punctuation">.</span>default_rng<span class="token punctuation">(</span>seed<span class="token punctuation">)</span>
+    views <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    <span class="token keyword">for</span> _ <span class="token keyword">in</span> <span class="token builtin">range</span><span class="token punctuation">(</span>n <span class="token operator">//</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        views<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">(</span>rng<span class="token punctuation">.</span>uniform<span class="token punctuation">(</span><span class="token number">0</span><span class="token punctuation">,</span> root_extent_m<span class="token punctuation">)</span><span class="token punctuation">,</span> rng<span class="token punctuation">.</span>uniform<span class="token punctuation">(</span><span class="token number">0</span><span class="token punctuation">,</span> root_extent_m<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">1.7</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token keyword">for</span> _ <span class="token keyword">in</span> <span class="token builtin">range</span><span class="token punctuation">(</span>n <span class="token operator">-</span> n <span class="token operator">//</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        views<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">(</span>rng<span class="token punctuation">.</span>uniform<span class="token punctuation">(</span><span class="token number">0</span><span class="token punctuation">,</span> root_extent_m<span class="token punctuation">)</span><span class="token punctuation">,</span> rng<span class="token punctuation">.</span>uniform<span class="token punctuation">(</span><span class="token number">0</span><span class="token punctuation">,</span> root_extent_m<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">400.0</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+
+    trees <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token string">"quadtree"</span><span class="token punctuation">:</span> build_quadtree<span class="token punctuation">(</span>features<span class="token punctuation">,</span> root_extent_m<span class="token punctuation">,</span> origin<span class="token punctuation">)</span><span class="token punctuation">,</span>
+             <span class="token string">"hybrid"</span><span class="token punctuation">:</span> build_hybrid<span class="token punctuation">(</span>features<span class="token punctuation">,</span> root_extent_m<span class="token punctuation">,</span> origin<span class="token punctuation">)</span><span class="token punctuation">}</span>
+    rows <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    <span class="token keyword">for</span> i<span class="token punctuation">,</span> v <span class="token keyword">in</span> <span class="token builtin">enumerate</span><span class="token punctuation">(</span>views<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        q <span class="token operator">=</span> frustum_load<span class="token punctuation">(</span>trees<span class="token punctuation">[</span><span class="token string">"quadtree"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token punctuation">(</span>v<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">,</span> v<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">,</span> v<span class="token punctuation">[</span><span class="token number">2</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+        h <span class="token operator">=</span> frustum_load<span class="token punctuation">(</span>trees<span class="token punctuation">[</span><span class="token string">"hybrid"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token punctuation">(</span>v<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">,</span> v<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">,</span> v<span class="token punctuation">[</span><span class="token number">2</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+        rows<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"view"</span><span class="token punctuation">:</span> i<span class="token punctuation">,</span> <span class="token string">"street"</span><span class="token punctuation">:</span> v<span class="token punctuation">[</span><span class="token number">2</span><span class="token punctuation">]</span> <span class="token operator">&lt;</span> <span class="token number">50</span><span class="token punctuation">,</span>
+                     <span class="token string">"quad_tris"</span><span class="token punctuation">:</span> q<span class="token punctuation">[</span><span class="token string">"triangles"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token string">"hybrid_tris"</span><span class="token punctuation">:</span> h<span class="token punctuation">[</span><span class="token string">"triangles"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+                     <span class="token string">"ratio"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>h<span class="token punctuation">[</span><span class="token string">"triangles"</span><span class="token punctuation">]</span> <span class="token operator">/</span> <span class="token builtin">max</span><span class="token punctuation">(</span>q<span class="token punctuation">[</span><span class="token string">"triangles"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+    street <span class="token operator">=</span> <span class="token punctuation">[</span>r <span class="token keyword">for</span> r <span class="token keyword">in</span> rows <span class="token keyword">if</span> r<span class="token punctuation">[</span><span class="token string">"street"</span><span class="token punctuation">]</span><span class="token punctuation">]</span>
+    aerial <span class="token operator">=</span> <span class="token punctuation">[</span>r <span class="token keyword">for</span> r <span class="token keyword">in</span> rows <span class="token keyword">if</span> <span class="token keyword">not</span> r<span class="token punctuation">[</span><span class="token string">"street"</span><span class="token punctuation">]</span><span class="token punctuation">]</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token string">"street_mean_ratio"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>mean<span class="token punctuation">(</span><span class="token punctuation">[</span>r<span class="token punctuation">[</span><span class="token string">"ratio"</span><span class="token punctuation">]</span> <span class="token keyword">for</span> r <span class="token keyword">in</span> street<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"aerial_mean_ratio"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>mean<span class="token punctuation">(</span><span class="token punctuation">[</span>r<span class="token punctuation">[</span><span class="token string">"ratio"</span><span class="token punctuation">]</span> <span class="token keyword">for</span> r <span class="token keyword">in</span> aerial<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"views_where_hybrid_worse"</span><span class="token punctuation">:</span> <span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token number">1</span> <span class="token keyword">for</span> r <span class="token keyword">in</span> rows <span class="token keyword">if</span> r<span class="token punctuation">[</span><span class="token string">"ratio"</span><span class="token punctuation">]</span> <span class="token operator">></span> <span class="token number">1.02</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"worst_regression"</span><span class="token punctuation">:</span> <span class="token builtin">max</span><span class="token punctuation">(</span>rows<span class="token punctuation">,</span> key<span class="token operator">=</span><span class="token keyword">lambda</span> r<span class="token punctuation">:</span> r<span class="token punctuation">[</span><span class="token string">"ratio"</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+</code></pre></div>
+<p>The aerial ratio is the check that keeps this honest. A scheme that helps street-level views by 60% and costs aerial views 20% may still be the right trade, but the trade has to be visible — and <code>views_where_hybrid_worse</code> counting more than a handful means the aspect threshold is firing too eagerly.</p>
+<h2 id="performance-notes" tabindex="-1"><a class="heading-link" href="#performance-notes"><span>Performance Notes</span></a></h2>
+<ul>
+<li><strong>Building any of these trees is seconds</strong> for 400,000 features; the cost is entirely in tiling the content afterwards.</li>
+<li><strong>The octree’s node count is the hidden cost.</strong> More than double the tiles means more than double the requests, and the request count often matters more than the bytes.</li>
+<li><strong>The hybrid adds one level of depth</strong> in the cells that need it and none elsewhere, which keeps the tree’s fan-out comparable to the quadtree’s.</li>
+<li><strong>Vertical splitting only helps oblique and street-level views.</strong> A top-down city view sees everything anyway, so measure with the views your users actually use.</li>
+<li><strong>Do not split geometry at a z plane</strong> unless the content is a point cloud. The seams and the extra vertices cost more than the culling gains for buildings.</li>
+<li><strong>Point clouds are the opposite case</strong>: points have no extent, straddling does not exist, and a pure octree is the right structure.</li>
+</ul>
+<h2 id="common-errors" tabindex="-1"><a class="heading-link" href="#common-errors"><span>Common Errors</span></a></h2>
+<p><strong>Octree loads more than the quadtree.</strong> Straddling features accumulated in shallow nodes. Expected; use the hybrid or split the geometry.</p>
+<p><strong>Towers disappear at some camera angles.</strong> A child’s vertical extent exceeds its parent’s, so the parent culls first. Check bounds nesting.</p>
+<p><strong>Feature count does not match after building the tree.</strong> A feature fell outside every octant — usually a <code>z_min</code> exactly on a boundary with a half-open interval on the wrong side.</p>
+<p><strong>The hybrid splits every cell.</strong> The aspect threshold is too low, or <code>z_split_min_m</code> is absent so small cells qualify. Raise both.</p>
+<p><strong>Tile count exploded.</strong> <code>min_cell_m</code> is missing from the octree, so it subdivides down to metre-scale cells in dense areas.</p>
+<p><strong>Street-level views improved and aerial views got worse.</strong> The high-rise tile is being loaded alongside the low-rise one in top-down views, which is correct — confirm the regression is small and bounded.</p>
+<h2 id="frequently-asked-questions" tabindex="-1"><a class="heading-link" href="#frequently-asked-questions"><span>Frequently Asked Questions</span></a></h2>
+<h3 id="does-implicit-tiling-support-octrees" tabindex="-1"><a class="heading-link" href="#does-implicit-tiling-support-octrees"><span>Does implicit tiling support octrees?</span></a></h3>
+<p>Yes — 3D Tiles implicit tiling defines both <code>QUADTREE</code> and <code>OCTREE</code> subdivision schemes, and an octree subtree is the natural fit for a point cloud. The hybrid described here is not expressible implicitly, because its structure is data-dependent; it needs explicit tileset JSON.</p>
+<h3 id="what-about-splitting-towers-into-vertical-slices-as-separate-features" tabindex="-1"><a class="heading-link" href="#what-about-splitting-towers-into-vertical-slices-as-separate-features"><span>What about splitting towers into vertical slices as separate features?</span></a></h3>
+<p>It works and it is a data-modelling decision rather than a tiling one: a tower represented as five stacked features tiles beautifully in an octree. The cost is that “the tower” is no longer one feature for picking, styling or metadata.</p>
+<h3 id="is-150-m-the-right-tile-size" tabindex="-1"><a class="heading-link" href="#is-150-m-the-right-tile-size"><span>Is 150 m the right tile size?</span></a></h3>
+<p>It is a reasonable city default. The aspect profile is the thing to check: if the p95 aspect is above 1, either subdivide vertically or use larger horizontal tiles, which lowers the aspect and raises the per-tile payload.</p>
+<h2 id="related-guides" tabindex="-1"><a class="heading-link" href="#related-guides"><span>Related Guides</span></a></h2>
+<ul>
+<li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/balancing-tile-content-size-across-levels/">Balancing Tile Content Size Across Levels</a> — the other half of tree quality</li>
+<li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/writing-tileset-json-from-python/">Writing Tileset JSON from Python</a> — emitting whichever tree wins</li>
+<li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/choosing-shard-sizes-for-city-scale-tiling/">Choosing Shard Sizes for City-Scale Tiling</a> — the pipeline-side view of the same choice</li>
+</ul>
+<p>Back to <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring</a>.</p>
+
+
+      
+      
+
+      <div class="related-nav">
+        
+
+        
+          <div>
+            <h3>Related</h3>
+            <div class="related-grid">
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/balancing-tile-content-size-across-levels/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Balancing Tile Content Size Across Levels</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/choosing-add-vs-replace-refinement/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Choosing ADD vs REPLACE Refinement for 3D Tiles</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/computing-geometric-error-for-3d-tiles-levels/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Computing Geometric Error for 3D Tiles Levels</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/implementing-quadtree-lod-for-urban-models/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Implementing Quadtree LOD for Urban Models</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/tuning-maximum-screen-space-error-in-cesium/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Tuning Maximum Screen Space Error in Cesium</span>
+                </a>
+              
+            </div>
+          </div>
+        
+      </div>
+    </article>
+
+    
+    <aside class="toc" aria-label="On this page" data-toc hidden>
+      <h4>On this page</h4>
+      <ul></ul>
+    </aside>
+  </div>
+</div>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+  <div class="container site-footer__inner">
+    <div class="site-footer__brand">
+      <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+        <img src="/assets/img/logo-mark.svg" alt="" class="brand__mark" width="36" height="36">
+        <span class="brand__name">
+          3D Geospatial
+          <small>Digital Twin Automation</small>
+        </span>
+      </a>
+      <p>Engineering-grade guides on point cloud processing, mesh pipelines, LOD strategies, and CI/CD automation for digital twin platforms.</p>
+      <a class="footer-social" href="https://github.com/3d-geospatial" aria-label="3D Geospatial on GitHub" rel="noopener" target="_blank">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+          <path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.53-1.34-1.3-1.7-1.3-1.7-1.06-.72.08-.71.08-.71 1.17.08 1.79 1.2 1.79 1.2 1.04 1.79 2.73 1.27 3.4.97.1-.75.4-1.27.73-1.56-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.19-3.08-.12-.3-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.75.11 3.05.74.8 1.19 1.83 1.19 3.08 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.07.78 2.15v3.18c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5Z"/>
+        </svg>
+        <span>GitHub</span>
+      </a>
+    </div>
+
+    <div class="site-footer__col">
+      <h4>Sections</h4>
+      <ul>
+        <li><a href="https://www.3d-geospatial.com/">Home</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management &amp; Optimization</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/">Point Cloud &amp; Mesh Pipelines</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/">Troubleshooting &amp; Reliability</a></li>
+        
+      </ul>
+    </div>
+
+    
+      <div class="site-footer__col">
+        <h4>3D Geospatial Fundamentals</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/">3D Format Standards Comparison</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/">BIM and IFC Georeferencing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/">CityGML and CityJSON Processing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems for 3D Assets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/">Digital Elevation Model Workflows</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/">Spatial Indexing and Tiling Schemes for 3D Data</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>LOD Management &amp; Optimization</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/">Automated Tile Generation for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/">Cesium ion Upload Automation for 3D Tilesets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/">glTF LOD Generation With Draco Compression</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/">Streaming Sync Patterns for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/">Tileset Metadata and 3D Tiles Next</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/">Vector Overlays on 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Point Cloud &amp; Mesh Pipelines</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/">Automated Mesh Decimation for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/">Change Detection Between LiDAR Scan Epochs</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/">CI/CD Automation for Spatial Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">LiDAR Classification and Ground Extraction</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/photogrammetry-processing-pipelines/">Photogrammetry Processing Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/">Point Cloud Filtering Techniques</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/">Surface Reconstruction for Geospatial Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/">Texture Mapping Workflows for Digital Twins</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Troubleshooting &amp; Reliability</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/">Cross-Section Failure Modes in Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/">Data Validation &amp; QA Gates for 3D Tiles</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/">Performance Profiling and Benchmarking</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/">Pipeline Observability and Monitoring</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/">Streaming &amp; Runtime Diagnostics for 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+  </div>
+  <div class="container site-footer__bottom">
+    <span>© 2026 3D Geospatial &amp; Digital Twin Automation</span>
+    <span>Built with Eleventy · PWA-enabled</span>
+  </div>
+</footer>
+
+
+  <script src="/assets/js/site.js?v=b99aa9f971" defer></script>
+  
+</body>
+</html>

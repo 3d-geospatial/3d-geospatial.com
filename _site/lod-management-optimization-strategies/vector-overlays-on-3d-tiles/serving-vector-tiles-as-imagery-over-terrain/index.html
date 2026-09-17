@@ -1,0 +1,743 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <title>Serving Vector Tiles as Imagery over Terrain — 3D Geospatial</title>
+  <meta name="description" content="Render huge vector layers to raster tiles for Cesium: a deterministic Python tile renderer, zoom ranges, empty-tile skipping">
+  <meta name="keywords" content="3D geospatial, digital twin, point cloud, mesh pipeline, LOD, 3D Tiles, Cesium, PDAL, Open3D, Python, CI/CD">
+  <meta name="author" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta name="theme-color" content="#1f6b8a" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f171d" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+
+  
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem("theme");
+        var theme = (stored === "dark" || stored === "light") ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    })();
+  </script>
+  <meta name="generator" content="Eleventy">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="googlebot" content="index,follow,max-image-preview:large">
+
+  
+  <link rel="canonical" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/serving-vector-tiles-as-imagery-over-terrain/">
+  <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">
+
+  
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/icon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+
+  
+  <link rel="apple-touch-icon" href="/assets/img/icon-180.png">
+  <link rel="mask-icon" href="/assets/img/logo.svg" color="#1f6b8a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="3D Geospatial">
+  <meta name="application-name" content="3D Geospatial">
+
+  
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Serving Vector Tiles as Imagery over Terrain — 3D Geospatial">
+  <meta property="og:description" content="Render huge vector layers to raster tiles for Cesium: a deterministic Python tile renderer, zoom ranges, empty-tile skipping">
+  <meta property="og:url" content="https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/serving-vector-tiles-as-imagery-over-terrain/">
+  <meta property="og:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+  <meta property="og:site_name" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta property="og:locale" content="en_US">
+  
+  <meta property="article:published_time" content="2026-09-17T23:36:56.455Z">
+  <meta property="article:modified_time" content="2026-09-17T23:36:56.455Z">
+  <meta property="article:publisher" content="https://www.3d-geospatial.com/">
+  
+
+  
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Serving Vector Tiles as Imagery over Terrain — 3D Geospatial">
+  <meta name="twitter:description" content="Render huge vector layers to raster tiles for Cesium: a deterministic Python tile renderer, zoom ranges, empty-tile skipping">
+  <meta name="twitter:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta name="twitter:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+
+  
+  <link rel="preload" href="/assets/css/styles.css?v=8c46394d6c" as="style">
+  
+
+  <link rel="stylesheet" href="/assets/css/styles.css?v=8c46394d6c">
+
+  
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.3d-geospatial.com/#organization",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "url": "https://www.3d-geospatial.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/icon-512.png",
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://www.3d-geospatial.com/#website",
+      "url": "https://www.3d-geospatial.com/",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "description": "Build reliable 3D spatial data pipelines for digital twins — point clouds, meshes, LOD strategies, Python processing, and CI/CD automation.",
+      "inLanguage": "en",
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      }
+    },
+    {
+      "@type": "TechArticle",
+      "@id": "https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/serving-vector-tiles-as-imagery-over-terrain/#article",
+      "isPartOf": {
+        "@id": "https://www.3d-geospatial.com/#website"
+      },
+      "headline": "Serving Vector Tiles as Imagery over Terrain",
+      "name": "Serving Vector Tiles as Imagery over Terrain",
+      "description": "Render huge vector layers to raster tiles for Cesium: a deterministic Python tile renderer, zoom ranges, empty-tile skipping",
+      "url": "https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/serving-vector-tiles-as-imagery-over-terrain/",
+      "mainEntityOfPage": "https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/serving-vector-tiles-as-imagery-over-terrain/",
+      "inLanguage": "en",
+      "datePublished": "2026-09-17T23:36:56.455Z",
+      "dateModified": "2026-09-17T23:36:56.455Z",
+      "author": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "image": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/og-cover.png",
+        "width": 1200,
+        "height": 630
+      },
+      "breadcrumb": {
+        "@id": "https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/serving-vector-tiles-as-imagery-over-terrain/#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/serving-vector-tiles-as-imagery-over-terrain/#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://www.3d-geospatial.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "LOD Management Optimization Strategies",
+          "item": "https://www.3d-geospatial.com/lod-management-optimization-strategies/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Vector Overlays On 3D Tiles",
+          "item": "https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "name": "Serving Vector Tiles As Imagery Over Terrain",
+          "item": "https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/serving-vector-tiles-as-imagery-over-terrain/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  
+<header class="site-header" role="banner">
+  <div class="container site-header__inner">
+    <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+      <img src="/assets/img/logo.svg" alt="" class="brand__mark" width="36" height="36">
+      <span class="brand__name">
+        3D Geospatial
+        <small>Digital Twin Automation</small>
+      </span>
+    </a>
+
+    <button class="theme-toggle" type="button" data-theme-toggle
+            aria-label="Switch to dark theme" title="Switch to dark theme">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4.2"/>
+        <path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/>
+      </svg>
+    </button>
+
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>
+      <span class="nav-toggle__icon" aria-hidden="true"><span></span></span>
+      Menu
+    </button>
+
+    <nav class="primary-nav" id="primary-nav" aria-label="Primary">
+      
+      <a href="https://www.3d-geospatial.com/" >
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/>
+        </svg>
+        Home
+      </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2 3 7l9 5 9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 17l9 5 9-5"/>
+            </svg>
+          
+          3D Geospatial Fundamentals
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/" aria-current="page">
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+          
+          LOD Management &amp; Optimization
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="6" cy="6" r="1.5"/><circle cx="12" cy="6" r="1.5"/><circle cx="18" cy="6" r="1.5"/>
+              <circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/>
+              <circle cx="6" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="18" cy="18" r="1.5"/>
+            </svg>
+          
+          Point Cloud &amp; Mesh Pipelines
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <path d="M12 9v4"/><path d="M12 17h.01"/>
+            </svg>
+          
+          Troubleshooting &amp; Reliability
+        </a>
+      
+    </nav>
+  </div>
+</header>
+
+
+  <main id="main">
+    
+
+
+<div class="container">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    
+      
+        <a href="https://www.3d-geospatial.com/">Home</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management Optimization Strategies</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/">Vector Overlays On 3D Tiles</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <span class="current">Serving Vector Tiles As Imagery Over Terrain</span>
+      
+    
+  </nav>
+
+  <div class="content-page">
+    <article class="article">
+      <h1 id="serving-vector-tiles-as-imagery-over-terrain" tabindex="-1"><a class="heading-link" href="#serving-vector-tiles-as-imagery-over-terrain"><span>Serving Vector Tiles as Imagery over Terrain</span></a></h1>
+<p>This page turns a vector layer too large to drape — a cadastre, a soil map, a national network — into raster tiles that Cesium adds as an imagery layer over terrain: a small deterministic renderer in Python that draws Web Mercator (EPSG:3857) tiles with anti-aliasing, a zoom strategy that keeps the tile count sane, empty-tile skipping, MBTiles packaging, and an alignment check against known coordinates.</p>
+<h2 id="why-you-hit-this" tabindex="-1"><a class="heading-link" href="#why-you-hit-this"><span>Why you hit this</span></a></h2>
+<p>Geometry overlays scale to tens of thousands of features. A cadastre has two million parcels, a soil map has a million polygons with intricate boundaries, and a utility network has every service connection in a country. No amount of batching makes those into scene geometry a browser can hold, and they are not interactive data anyway — nobody clicks a soil polygon in a twin, they read the colours. Rendering them once, server-side, into cached raster tiles moves the cost off the client permanently. The trade-off against the geometry strategies is set out in <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/">vector overlays on 3D Tiles</a>.</p>
+<h2 id="prerequisites" tabindex="-1"><a class="heading-link" href="#prerequisites"><span>Prerequisites</span></a></h2>
+<ul>
+<li>Python 3.10+ with <code>geopandas&gt;=0.14</code>, <code>shapely&gt;=2.0</code>, <code>mercantile&gt;=1.2</code>, <code>Pillow&gt;=10</code>, <code>pyproj&gt;=3.6</code>.</li>
+<li>A vector layer with a declared CRS and a category column to colour by; the example is a cadastral parcel layer in EPSG:25832.</li>
+<li>A static file host or CDN for the tiles, and CesiumJS 1.110+ on the client.</li>
+</ul>
+<h2 id="step-by-step" tabindex="-1"><a class="heading-link" href="#step-by-step"><span>Step-by-Step</span></a></h2>
+<h3 id="1-reproject-once-and-index" tabindex="-1"><a class="heading-link" href="#1-reproject-once-and-index"><span>1. Reproject once and index</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> geopandas <span class="token keyword">as</span> gpd
+<span class="token keyword">from</span> shapely <span class="token keyword">import</span> make_valid
+
+gdf <span class="token operator">=</span> gpd<span class="token punctuation">.</span>read_file<span class="token punctuation">(</span><span class="token string">"cadastre.gpkg"</span><span class="token punctuation">,</span> layer<span class="token operator">=</span><span class="token string">"parcels"</span><span class="token punctuation">)</span>
+gdf<span class="token punctuation">.</span>loc<span class="token punctuation">[</span><span class="token operator">~</span>gdf<span class="token punctuation">.</span>geometry<span class="token punctuation">.</span>is_valid<span class="token punctuation">,</span> <span class="token string">"geometry"</span><span class="token punctuation">]</span> <span class="token operator">=</span> gdf<span class="token punctuation">.</span>loc<span class="token punctuation">[</span><span class="token operator">~</span>gdf<span class="token punctuation">.</span>geometry<span class="token punctuation">.</span>is_valid<span class="token punctuation">,</span> <span class="token string">"geometry"</span><span class="token punctuation">]</span><span class="token punctuation">.</span><span class="token builtin">apply</span><span class="token punctuation">(</span>make_valid<span class="token punctuation">)</span>
+gdf <span class="token operator">=</span> gdf<span class="token punctuation">.</span>to_crs<span class="token punctuation">(</span><span class="token number">3857</span><span class="token punctuation">)</span>                                  <span class="token comment"># Web Mercator: the tile scheme's CRS</span>
+gdf<span class="token punctuation">[</span><span class="token string">"geometry"</span><span class="token punctuation">]</span> <span class="token operator">=</span> gdf<span class="token punctuation">.</span>geometry<span class="token punctuation">.</span>simplify<span class="token punctuation">(</span><span class="token number">2.0</span><span class="token punctuation">,</span> preserve_topology<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>   <span class="token comment"># 2 m at the equator</span>
+sindex <span class="token operator">=</span> gdf<span class="token punctuation">.</span>sindex
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span><span class="token builtin">len</span><span class="token punctuation">(</span>gdf<span class="token punctuation">)</span><span class="token punctuation">:</span><span class="token format-spec">,</span><span class="token punctuation">}</span></span><span class="token string"> parcels in EPSG:3857, bounds </span><span class="token interpolation"><span class="token punctuation">{</span><span class="token punctuation">[</span><span class="token builtin">round</span><span class="token punctuation">(</span>v<span class="token punctuation">)</span> <span class="token keyword">for</span> v <span class="token keyword">in</span> gdf<span class="token punctuation">.</span>total_bounds<span class="token punctuation">]</span><span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Reprojecting the whole layer once, into the CRS the tile scheme uses, removes a per-tile transformation from the render loop — which matters when the loop runs a hundred thousand times. Web Mercator distances are inflated by the secant of the latitude, so a 2 m simplification tolerance at 48° N is really about 1.3 m on the ground; simplify in the source CRS instead if the tolerance has to be exact.</p>
+<h3 id="2-render-one-tile" tabindex="-1"><a class="heading-link" href="#2-render-one-tile"><span>2. Render one tile</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">from</span> io <span class="token keyword">import</span> BytesIO
+<span class="token keyword">import</span> mercantile
+<span class="token keyword">import</span> numpy <span class="token keyword">as</span> np
+<span class="token keyword">from</span> PIL <span class="token keyword">import</span> Image<span class="token punctuation">,</span> ImageDraw
+
+TILE <span class="token operator">=</span> <span class="token number">256</span>
+SUPERSAMPLE <span class="token operator">=</span> <span class="token number">2</span>                      <span class="token comment"># draw at 512 and downsample for anti-aliasing</span>
+
+PALETTE <span class="token operator">=</span> <span class="token punctuation">{</span>
+    <span class="token string">"residential"</span><span class="token punctuation">:</span> <span class="token punctuation">(</span><span class="token number">31</span><span class="token punctuation">,</span> <span class="token number">107</span><span class="token punctuation">,</span> <span class="token number">138</span><span class="token punctuation">,</span> <span class="token number">110</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token string">"commercial"</span><span class="token punctuation">:</span> <span class="token punctuation">(</span><span class="token number">196</span><span class="token punctuation">,</span> <span class="token number">106</span><span class="token punctuation">,</span> <span class="token number">61</span><span class="token punctuation">,</span> <span class="token number">110</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token string">"agricultural"</span><span class="token punctuation">:</span> <span class="token punctuation">(</span><span class="token number">79</span><span class="token punctuation">,</span> <span class="token number">122</span><span class="token punctuation">,</span> <span class="token number">77</span><span class="token punctuation">,</span> <span class="token number">110</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token string">"other"</span><span class="token punctuation">:</span> <span class="token punctuation">(</span><span class="token number">91</span><span class="token punctuation">,</span> <span class="token number">100</span><span class="token punctuation">,</span> <span class="token number">113</span><span class="token punctuation">,</span> <span class="token number">90</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+<span class="token punctuation">}</span>
+OUTLINE <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token number">21</span><span class="token punctuation">,</span> <span class="token number">56</span><span class="token punctuation">,</span> <span class="token number">74</span><span class="token punctuation">,</span> <span class="token number">180</span><span class="token punctuation">)</span>
+
+<span class="token keyword">def</span> <span class="token function">render_tile</span><span class="token punctuation">(</span>z<span class="token punctuation">,</span> x<span class="token punctuation">,</span> y<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    bounds <span class="token operator">=</span> mercantile<span class="token punctuation">.</span>xy_bounds<span class="token punctuation">(</span>x<span class="token punctuation">,</span> y<span class="token punctuation">,</span> z<span class="token punctuation">)</span>             <span class="token comment"># in EPSG:3857 metres</span>
+    width_m <span class="token operator">=</span> bounds<span class="token punctuation">.</span>right <span class="token operator">-</span> bounds<span class="token punctuation">.</span>left
+    scale <span class="token operator">=</span> TILE <span class="token operator">*</span> SUPERSAMPLE <span class="token operator">/</span> width_m
+
+    candidates <span class="token operator">=</span> <span class="token builtin">list</span><span class="token punctuation">(</span>sindex<span class="token punctuation">.</span>intersection<span class="token punctuation">(</span><span class="token punctuation">(</span>bounds<span class="token punctuation">.</span>left<span class="token punctuation">,</span> bounds<span class="token punctuation">.</span>bottom<span class="token punctuation">,</span> bounds<span class="token punctuation">.</span>right<span class="token punctuation">,</span> bounds<span class="token punctuation">.</span>top<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token keyword">if</span> <span class="token keyword">not</span> candidates<span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token boolean">None</span>
+    rows <span class="token operator">=</span> gdf<span class="token punctuation">.</span>iloc<span class="token punctuation">[</span>candidates<span class="token punctuation">]</span>
+
+    img <span class="token operator">=</span> Image<span class="token punctuation">.</span>new<span class="token punctuation">(</span><span class="token string">"RGBA"</span><span class="token punctuation">,</span> <span class="token punctuation">(</span>TILE <span class="token operator">*</span> SUPERSAMPLE<span class="token punctuation">,</span> TILE <span class="token operator">*</span> SUPERSAMPLE<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token punctuation">(</span><span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    draw <span class="token operator">=</span> ImageDraw<span class="token punctuation">.</span>Draw<span class="token punctuation">(</span>img<span class="token punctuation">)</span>
+    drawn <span class="token operator">=</span> <span class="token number">0</span>
+    <span class="token keyword">for</span> _<span class="token punctuation">,</span> r <span class="token keyword">in</span> rows<span class="token punctuation">.</span>iterrows<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        geoms <span class="token operator">=</span> r<span class="token punctuation">.</span>geometry<span class="token punctuation">.</span>geoms <span class="token keyword">if</span> r<span class="token punctuation">.</span>geometry<span class="token punctuation">.</span>geom_type <span class="token operator">==</span> <span class="token string">"MultiPolygon"</span> <span class="token keyword">else</span> <span class="token punctuation">[</span>r<span class="token punctuation">.</span>geometry<span class="token punctuation">]</span>
+        colour <span class="token operator">=</span> PALETTE<span class="token punctuation">.</span>get<span class="token punctuation">(</span>r<span class="token punctuation">[</span><span class="token string">"use_class"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> PALETTE<span class="token punctuation">[</span><span class="token string">"other"</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+        <span class="token keyword">for</span> g <span class="token keyword">in</span> geoms<span class="token punctuation">:</span>
+            xs<span class="token punctuation">,</span> ys <span class="token operator">=</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>g<span class="token punctuation">.</span>exterior<span class="token punctuation">.</span>coords<span class="token punctuation">)</span><span class="token punctuation">.</span>T
+            px <span class="token operator">=</span> <span class="token punctuation">(</span>xs <span class="token operator">-</span> bounds<span class="token punctuation">.</span>left<span class="token punctuation">)</span> <span class="token operator">*</span> scale
+            py <span class="token operator">=</span> <span class="token punctuation">(</span>bounds<span class="token punctuation">.</span>top <span class="token operator">-</span> ys<span class="token punctuation">)</span> <span class="token operator">*</span> scale             <span class="token comment"># image y grows downward</span>
+            <span class="token keyword">if</span> px<span class="token punctuation">.</span><span class="token builtin">max</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">-</span> px<span class="token punctuation">.</span><span class="token builtin">min</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">&lt;</span> <span class="token number">1</span> <span class="token keyword">and</span> py<span class="token punctuation">.</span><span class="token builtin">max</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">-</span> py<span class="token punctuation">.</span><span class="token builtin">min</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">&lt;</span> <span class="token number">1</span><span class="token punctuation">:</span>
+                <span class="token keyword">continue</span>                                <span class="token comment"># smaller than a pixel at this zoom</span>
+            draw<span class="token punctuation">.</span>polygon<span class="token punctuation">(</span><span class="token builtin">list</span><span class="token punctuation">(</span><span class="token builtin">zip</span><span class="token punctuation">(</span>px<span class="token punctuation">,</span> py<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> fill<span class="token operator">=</span>colour<span class="token punctuation">,</span> outline<span class="token operator">=</span>OUTLINE<span class="token punctuation">)</span>
+            drawn <span class="token operator">+=</span> <span class="token number">1</span>
+    <span class="token keyword">if</span> drawn <span class="token operator">==</span> <span class="token number">0</span><span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token boolean">None</span>
+    <span class="token keyword">return</span> img<span class="token punctuation">.</span>resize<span class="token punctuation">(</span><span class="token punctuation">(</span>TILE<span class="token punctuation">,</span> TILE<span class="token punctuation">)</span><span class="token punctuation">,</span> Image<span class="token punctuation">.</span>LANCZOS<span class="token punctuation">)</span>
+</code></pre></div>
+<p>Three decisions in that loop keep the output both correct and small. The spatial index turns “which parcels are in this tile” from a full scan into a lookup, which is the difference between a week and an hour for a national layer. Supersampling and downsampling give clean edges without a graphics stack. And returning <code>None</code> for a tile with nothing visible is what makes the empty-tile skipping in the next step possible.</p>
+<figure class="diagram">
+<svg viewBox="26 6 668 242" role="img" aria-labelledby="vt-pyr-t vt-pyr-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="vt-pyr-t">Tile counts per zoom level for one city extent</title>
+  <desc id="vt-pyr-d">A pyramid of Web Mercator tiles over a city extent. Zoom 12 needs about 4 tiles, zoom 14 about 60, zoom 16 about 950, zoom 18 about 15,000 and zoom 20 about 240,000. Because tile count quadruples per level, the top three levels are almost free and the bottom level dominates both render time and storage.</desc>
+  <rect class="svg-bg" x="26" y="6" width="668" height="242" fill="#ffffff"/>
+  <g stroke-width="1.5">
+    <rect x="330" y="20" width="60" height="26" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="300" y="52" width="120" height="26" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="250" y="84" width="220" height="26" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="170" y="116" width="380" height="26" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="40" y="148" width="640" height="26" fill="#f7dfdc" stroke="#b0413e"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="start">
+    <text x="400" y="39">z12 · ~4 tiles</text>
+    <text x="430" y="71">z14 · ~60</text>
+    <text x="480" y="103">z16 · ~950</text>
+    <text x="560" y="135">z18 · ~15,000</text>
+    <text x="40" y="196">z20 · ~240,000 tiles — most of the cost, rarely looked at</text>
+  </g>
+  <text x="380" y="230" fill="#15384a" font-size="12.5" text-anchor="middle">Stop one or two levels short and let the client over-zoom the last level.</text>
+</svg>
+<figcaption>Every extra level quadruples the work. The right maximum zoom is the one where the parcel boundaries are already a pixel apart.</figcaption>
+</figure>
+<h3 id="3-generate-a-zoom-range-into-mbtiles" tabindex="-1"><a class="heading-link" href="#3-generate-a-zoom-range-into-mbtiles"><span>3. Generate a zoom range into MBTiles</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> sqlite3
+<span class="token keyword">from</span> pathlib <span class="token keyword">import</span> Path
+
+<span class="token keyword">def</span> <span class="token function">build_mbtiles</span><span class="token punctuation">(</span>out_path<span class="token punctuation">,</span> min_zoom<span class="token operator">=</span><span class="token number">12</span><span class="token punctuation">,</span> max_zoom<span class="token operator">=</span><span class="token number">18</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    west<span class="token punctuation">,</span> south<span class="token punctuation">,</span> east<span class="token punctuation">,</span> north <span class="token operator">=</span> gdf<span class="token punctuation">.</span>to_crs<span class="token punctuation">(</span><span class="token number">4326</span><span class="token punctuation">)</span><span class="token punctuation">.</span>total_bounds
+    con <span class="token operator">=</span> sqlite3<span class="token punctuation">.</span>connect<span class="token punctuation">(</span>out_path<span class="token punctuation">)</span>
+    con<span class="token punctuation">.</span>executescript<span class="token punctuation">(</span><span class="token triple-quoted-string string">"""
+        CREATE TABLE IF NOT EXISTS tiles (zoom_level INTEGER, tile_column INTEGER,
+            tile_row INTEGER, tile_data BLOB, PRIMARY KEY (zoom_level, tile_column, tile_row));
+        CREATE TABLE IF NOT EXISTS metadata (name TEXT PRIMARY KEY, value TEXT);
+    """</span><span class="token punctuation">)</span>
+    written <span class="token operator">=</span> skipped <span class="token operator">=</span> <span class="token number">0</span>
+    <span class="token keyword">for</span> z <span class="token keyword">in</span> <span class="token builtin">range</span><span class="token punctuation">(</span>min_zoom<span class="token punctuation">,</span> max_zoom <span class="token operator">+</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">for</span> t <span class="token keyword">in</span> mercantile<span class="token punctuation">.</span>tiles<span class="token punctuation">(</span>west<span class="token punctuation">,</span> south<span class="token punctuation">,</span> east<span class="token punctuation">,</span> north<span class="token punctuation">,</span> z<span class="token punctuation">)</span><span class="token punctuation">:</span>
+            img <span class="token operator">=</span> render_tile<span class="token punctuation">(</span>t<span class="token punctuation">.</span>z<span class="token punctuation">,</span> t<span class="token punctuation">.</span>x<span class="token punctuation">,</span> t<span class="token punctuation">.</span>y<span class="token punctuation">)</span>
+            <span class="token keyword">if</span> img <span class="token keyword">is</span> <span class="token boolean">None</span><span class="token punctuation">:</span>
+                skipped <span class="token operator">+=</span> <span class="token number">1</span>
+                <span class="token keyword">continue</span>
+            buf <span class="token operator">=</span> BytesIO<span class="token punctuation">(</span><span class="token punctuation">)</span>
+            img<span class="token punctuation">.</span>save<span class="token punctuation">(</span>buf<span class="token punctuation">,</span> <span class="token string">"PNG"</span><span class="token punctuation">,</span> optimize<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+            con<span class="token punctuation">.</span>execute<span class="token punctuation">(</span><span class="token string">"INSERT OR REPLACE INTO tiles VALUES (?,?,?,?)"</span><span class="token punctuation">,</span>
+                        <span class="token punctuation">(</span>z<span class="token punctuation">,</span> t<span class="token punctuation">.</span>x<span class="token punctuation">,</span> <span class="token punctuation">(</span><span class="token number">1</span> <span class="token operator">&lt;&lt;</span> z<span class="token punctuation">)</span> <span class="token operator">-</span> <span class="token number">1</span> <span class="token operator">-</span> t<span class="token punctuation">.</span>y<span class="token punctuation">,</span> buf<span class="token punctuation">.</span>getvalue<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span>   <span class="token comment"># MBTiles rows count from the south</span>
+            written <span class="token operator">+=</span> <span class="token number">1</span>
+        con<span class="token punctuation">.</span>commit<span class="token punctuation">(</span><span class="token punctuation">)</span>
+        <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"z</span><span class="token interpolation"><span class="token punctuation">{</span>z<span class="token punctuation">}</span></span><span class="token string">: </span><span class="token interpolation"><span class="token punctuation">{</span>written<span class="token punctuation">}</span></span><span class="token string"> written, </span><span class="token interpolation"><span class="token punctuation">{</span>skipped<span class="token punctuation">}</span></span><span class="token string"> empty so far"</span></span><span class="token punctuation">)</span>
+    con<span class="token punctuation">.</span>executemany<span class="token punctuation">(</span><span class="token string">"INSERT OR REPLACE INTO metadata VALUES (?,?)"</span><span class="token punctuation">,</span> <span class="token punctuation">[</span>
+        <span class="token punctuation">(</span><span class="token string">"name"</span><span class="token punctuation">,</span> <span class="token string">"cadastre"</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token punctuation">(</span><span class="token string">"format"</span><span class="token punctuation">,</span> <span class="token string">"png"</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token punctuation">(</span><span class="token string">"minzoom"</span><span class="token punctuation">,</span> <span class="token builtin">str</span><span class="token punctuation">(</span>min_zoom<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token punctuation">(</span><span class="token string">"maxzoom"</span><span class="token punctuation">,</span> <span class="token builtin">str</span><span class="token punctuation">(</span>max_zoom<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token punctuation">(</span><span class="token string">"bounds"</span><span class="token punctuation">,</span> <span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>west<span class="token punctuation">}</span></span><span class="token string">,</span><span class="token interpolation"><span class="token punctuation">{</span>south<span class="token punctuation">}</span></span><span class="token string">,</span><span class="token interpolation"><span class="token punctuation">{</span>east<span class="token punctuation">}</span></span><span class="token string">,</span><span class="token interpolation"><span class="token punctuation">{</span>north<span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token punctuation">(</span><span class="token string">"type"</span><span class="token punctuation">,</span> <span class="token string">"overlay"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token punctuation">]</span><span class="token punctuation">)</span>
+    con<span class="token punctuation">.</span>commit<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span> con<span class="token punctuation">.</span>close<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> written<span class="token punctuation">,</span> skipped
+
+written<span class="token punctuation">,</span> skipped <span class="token operator">=</span> build_mbtiles<span class="token punctuation">(</span><span class="token string">"tiles/cadastre.mbtiles"</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>written<span class="token punctuation">:</span><span class="token format-spec">,</span><span class="token punctuation">}</span></span><span class="token string"> tiles written, </span><span class="token interpolation"><span class="token punctuation">{</span>skipped<span class="token punctuation">:</span><span class="token format-spec">,</span><span class="token punctuation">}</span></span><span class="token string"> empty tiles skipped, "</span></span>
+      <span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>Path<span class="token punctuation">(</span><span class="token string">'tiles/cadastre.mbtiles'</span><span class="token punctuation">)</span><span class="token punctuation">.</span>stat<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span>st_size <span class="token operator">/</span> <span class="token number">1e6</span><span class="token punctuation">:</span><span class="token format-spec">.1f</span><span class="token punctuation">}</span></span><span class="token string"> MB"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>The <code>(1 &lt;&lt; z) - 1 - t.y</code> is the MBTiles row flip, and getting it wrong produces a layer that is mirrored vertically — plausible-looking and completely wrong, which is why the verification step below checks a known coordinate rather than eyeballing the result. Skipping empty tiles matters for a layer with gaps: a cadastre covering 30% of a rectangular extent saves two thirds of the storage and render time.</p>
+<figure class="diagram">
+<svg viewBox="21 16 606 240" role="img" aria-labelledby="vt-flip-t vt-flip-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="vt-flip-t">Tile row numbering in XYZ and in MBTiles</title>
+  <desc id="vt-flip-d">At zoom two there are four rows. In the XYZ scheme used by web tiles, row zero is at the north. In MBTiles, row zero is at the south, so a tile stored without the flip appears mirrored vertically. The conversion is two to the power of the zoom, minus one, minus the row.</desc>
+  <rect class="svg-bg" x="21" y="16" width="606" height="240" fill="#ffffff"/>
+  <g stroke-width="1.5" fill="#e3f0f4" stroke="#1f6b8a">
+    <rect x="60" y="30" width="60" height="40"/><rect x="60" y="70" width="60" height="40"/>
+    <rect x="60" y="110" width="60" height="40"/><rect x="60" y="150" width="60" height="40"/>
+    <rect x="420" y="30" width="60" height="40"/><rect x="420" y="70" width="60" height="40"/>
+    <rect x="420" y="110" width="60" height="40"/><rect x="420" y="150" width="60" height="40"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="90" y="55">y = 0</text><text x="90" y="95">y = 1</text><text x="90" y="135">y = 2</text><text x="90" y="175">y = 3</text>
+    <text x="450" y="55">row 3</text><text x="450" y="95">row 2</text><text x="450" y="135">row 1</text><text x="450" y="175">row 0</text>
+    <text x="90" y="212">XYZ: 0 at the north</text>
+    <text x="450" y="212">MBTiles: 0 at the south</text>
+  </g>
+  <text x="270" y="110" fill="#15384a" font-size="12.5" text-anchor="middle">row = 2^z − 1 − y</text>
+  <text x="380" y="238" fill="#15384a" font-size="12.5" text-anchor="middle">Applying the flip twice, or not at all, mirrors the whole layer and looks plausible.</text>
+</svg>
+<figcaption>The two conventions differ only in which end row zero is, which is exactly why the error survives casual inspection.</figcaption>
+</figure>
+<h3 id="4-add-it-to-cesium-as-an-imagery-layer" tabindex="-1"><a class="heading-link" href="#4-add-it-to-cesium-as-an-imagery-layer"><span>4. Add it to Cesium as an imagery layer</span></a></h3>
+<div class="codeblock" data-lang="javascript"><div class="codeblock__bar"><span class="codeblock__lang">javascript</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-javascript" tabindex="0" role="group" aria-label="javascript code sample"><code class="language-javascript"><span class="token keyword">const</span> cadastre <span class="token operator">=</span> viewer<span class="token punctuation">.</span>imageryLayers<span class="token punctuation">.</span><span class="token function">addImageryProvider</span><span class="token punctuation">(</span>
+  <span class="token keyword">new</span> <span class="token class-name">Cesium<span class="token punctuation">.</span>UrlTemplateImageryProvider</span><span class="token punctuation">(</span><span class="token punctuation">{</span>
+    <span class="token literal-property property">url</span><span class="token operator">:</span> <span class="token string">"https://tiles.example.org/cadastre/{z}/{x}/{reverseY}.png"</span><span class="token punctuation">,</span>
+    <span class="token literal-property property">minimumLevel</span><span class="token operator">:</span> <span class="token number">12</span><span class="token punctuation">,</span>
+    <span class="token literal-property property">maximumLevel</span><span class="token operator">:</span> <span class="token number">18</span><span class="token punctuation">,</span>
+    <span class="token literal-property property">rectangle</span><span class="token operator">:</span> Cesium<span class="token punctuation">.</span>Rectangle<span class="token punctuation">.</span><span class="token function">fromDegrees</span><span class="token punctuation">(</span><span class="token number">11.36</span><span class="token punctuation">,</span> <span class="token number">48.06</span><span class="token punctuation">,</span> <span class="token number">11.72</span><span class="token punctuation">,</span> <span class="token number">48.22</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token literal-property property">credit</span><span class="token operator">:</span> <span class="token string">"Cadastre © state survey"</span><span class="token punctuation">,</span>
+  <span class="token punctuation">}</span><span class="token punctuation">)</span>
+<span class="token punctuation">)</span><span class="token punctuation">;</span>
+cadastre<span class="token punctuation">.</span>alpha <span class="token operator">=</span> <span class="token number">0.65</span><span class="token punctuation">;</span>
+cadastre<span class="token punctuation">.</span>brightness <span class="token operator">=</span> <span class="token number">1.0</span><span class="token punctuation">;</span>
+</code></pre></div>
+<p><code>maximumLevel</code> at 18 while the camera can go closer is deliberate: Cesium over-zooms the deepest available level rather than requesting tiles that do not exist, so the layer stays visible and slightly soft up close instead of disappearing. The <code>rectangle</code> stops the client requesting tiles outside the data extent, which otherwise generates a steady stream of 404s. Whether the URL template needs <code>{y}</code> or <code>{reverseY}</code> depends on how the tiles were written — the MBTiles convention above counts rows from the south, so a server unpacking them directly wants <code>{reverseY}</code>.</p>
+<h3 id="5-verify-the-alignment-against-a-known-coordinate" tabindex="-1"><a class="heading-link" href="#5-verify-the-alignment-against-a-known-coordinate"><span>5. Verify the alignment against a known coordinate</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">from</span> pyproj <span class="token keyword">import</span> Transformer
+
+to_merc <span class="token operator">=</span> Transformer<span class="token punctuation">.</span>from_crs<span class="token punctuation">(</span><span class="token number">4326</span><span class="token punctuation">,</span> <span class="token number">3857</span><span class="token punctuation">,</span> always_xy<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+
+<span class="token keyword">def</span> <span class="token function">pixel_of</span><span class="token punctuation">(</span>lon<span class="token punctuation">,</span> lat<span class="token punctuation">,</span> z<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    x<span class="token punctuation">,</span> y <span class="token operator">=</span> to_merc<span class="token punctuation">.</span>transform<span class="token punctuation">(</span>lon<span class="token punctuation">,</span> lat<span class="token punctuation">)</span>
+    t <span class="token operator">=</span> mercantile<span class="token punctuation">.</span>tile<span class="token punctuation">(</span>lon<span class="token punctuation">,</span> lat<span class="token punctuation">,</span> z<span class="token punctuation">)</span>
+    b <span class="token operator">=</span> mercantile<span class="token punctuation">.</span>xy_bounds<span class="token punctuation">(</span>t<span class="token punctuation">)</span>
+    px <span class="token operator">=</span> <span class="token punctuation">(</span>x <span class="token operator">-</span> b<span class="token punctuation">.</span>left<span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token punctuation">(</span>b<span class="token punctuation">.</span>right <span class="token operator">-</span> b<span class="token punctuation">.</span>left<span class="token punctuation">)</span> <span class="token operator">*</span> TILE
+    py <span class="token operator">=</span> <span class="token punctuation">(</span>b<span class="token punctuation">.</span>top <span class="token operator">-</span> y<span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token punctuation">(</span>b<span class="token punctuation">.</span>top <span class="token operator">-</span> b<span class="token punctuation">.</span>bottom<span class="token punctuation">)</span> <span class="token operator">*</span> TILE
+    <span class="token keyword">return</span> t<span class="token punctuation">,</span> px<span class="token punctuation">,</span> py
+
+t<span class="token punctuation">,</span> px<span class="token punctuation">,</span> py <span class="token operator">=</span> pixel_of<span class="token punctuation">(</span><span class="token number">11.5730216</span><span class="token punctuation">,</span> <span class="token number">48.1381190</span><span class="token punctuation">,</span> <span class="token number">18</span><span class="token punctuation">)</span>       <span class="token comment"># a surveyed parcel corner</span>
+img <span class="token operator">=</span> render_tile<span class="token punctuation">(</span>t<span class="token punctuation">.</span>z<span class="token punctuation">,</span> t<span class="token punctuation">.</span>x<span class="token punctuation">,</span> t<span class="token punctuation">.</span>y<span class="token punctuation">)</span>
+sample <span class="token operator">=</span> img<span class="token punctuation">.</span>getpixel<span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token builtin">int</span><span class="token punctuation">(</span>px<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token builtin">int</span><span class="token punctuation">(</span>py<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"tile </span><span class="token interpolation"><span class="token punctuation">{</span>t<span class="token punctuation">.</span>z<span class="token punctuation">}</span></span><span class="token string">/</span><span class="token interpolation"><span class="token punctuation">{</span>t<span class="token punctuation">.</span>x<span class="token punctuation">}</span></span><span class="token string">/</span><span class="token interpolation"><span class="token punctuation">{</span>t<span class="token punctuation">.</span>y<span class="token punctuation">}</span></span><span class="token string"> pixel (</span><span class="token interpolation"><span class="token punctuation">{</span>px<span class="token punctuation">:</span><span class="token format-spec">.1f</span><span class="token punctuation">}</span></span><span class="token string">, </span><span class="token interpolation"><span class="token punctuation">{</span>py<span class="token punctuation">:</span><span class="token format-spec">.1f</span><span class="token punctuation">}</span></span><span class="token string">) → RGBA </span><span class="token interpolation"><span class="token punctuation">{</span>sample<span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+<span class="token keyword">assert</span> sample<span class="token punctuation">[</span><span class="token number">3</span><span class="token punctuation">]</span> <span class="token operator">></span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token string">"the surveyed corner falls on a transparent pixel: the layer is misaligned"</span>
+</code></pre></div>
+<p>Rendering the tile that should contain a surveyed point and reading the pixel is the only check that catches the three silent failure modes together: a wrong CRS, a flipped row index and an extent computed in the wrong units. It is worth keeping as a test, with the expected colour class asserted as well, so a change to the palette or the renderer cannot quietly break geolocation.</p>
+<figure class="diagram">
+<svg viewBox="6 6 748 218" role="img" aria-labelledby="vt-cost-t vt-cost-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="vt-cost-t">Geometry overlay against imagery for the same layer</title>
+  <desc id="vt-cost-d">A comparison. Draped geometry sends every vertex to the client, holds it in memory, allows per-feature picking and styling, and stops scaling around tens of thousands of features. Imagery sends pixels, costs the client almost nothing, has no picking or client-side restyling, and scales to millions of features with a build step and cache storage.</desc>
+  <rect class="svg-bg" x="6" y="6" width="748" height="218" fill="#ffffff"/>
+  <g stroke-width="1.5">
+    <rect x="20" y="20" width="200" height="38" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="220" y="20" width="260" height="38" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="480" y="20" width="260" height="38" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="20" y="58" width="200" height="38" fill="#ffffff" stroke="#5b6471"/>
+    <rect x="220" y="58" width="260" height="38" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="480" y="58" width="260" height="38" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="20" y="96" width="200" height="38" fill="#ffffff" stroke="#5b6471"/>
+    <rect x="220" y="96" width="260" height="38" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="480" y="96" width="260" height="38" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="20" y="134" width="200" height="38" fill="#ffffff" stroke="#5b6471"/>
+    <rect x="220" y="134" width="260" height="38" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="480" y="134" width="260" height="38" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="20" y="172" width="200" height="38" fill="#ffffff" stroke="#5b6471"/>
+    <rect x="220" y="172" width="260" height="38" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="480" y="172" width="260" height="38" fill="#eef5e9" stroke="#4f7a4d"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="120" y="44">property</text>
+    <text x="350" y="44">draped geometry</text>
+    <text x="610" y="44">imagery tiles</text>
+    <text x="120" y="82">client memory</text><text x="350" y="82">all vertices</text><text x="610" y="82">a few textures</text>
+    <text x="120" y="120">picking</text><text x="350" y="120">per feature</text><text x="610" y="120">none</text>
+    <text x="120" y="158">restyling</text><text x="350" y="158">instant, client-side</text><text x="610" y="158">rebuild the tiles</text>
+    <text x="120" y="196">scale limit</text><text x="350" y="196">tens of thousands</text><text x="610" y="196">millions</text>
+  </g>
+</svg>
+<figcaption>Imagery trades interactivity for scale. Where a user needs to click a feature, keep a small geometry layer for the selection on top of the raster.</figcaption>
+</figure>
+<h2 id="expected-output-verification" tabindex="-1"><a class="heading-link" href="#expected-output-verification"><span>Expected Output &amp; Verification</span></a></h2>
+<div class="codeblock" data-lang="text"><div class="codeblock__bar"><span class="codeblock__lang">text</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-text" tabindex="0" role="group" aria-label="text code sample"><code class="language-text">1,842,204 parcels in EPSG:3857, bounds [1263000, 6115000, 1305000, 6141000]
+z12: 6 written, 2 empty so far
+z14: 78 written, 22 empty so far
+z16: 1094 written, 402 empty so far
+z18: 15922 written, 5210 empty so far
+15,922 tiles written, 5,210 empty tiles skipped, 412.6 MB
+tile 18/140361/91230 pixel (182.4, 98.7) → RGBA (31, 107, 138, 110)
+</code></pre></div>
+<p>Then verify in the viewer: the parcel edges should line up with the building footprints in the tileset and with the terrain features. A uniform shift of tens of metres means the source CRS was wrong; a shift that grows towards the poles means something was computed in degrees as if they were metres; a vertically mirrored layer is the MBTiles row flip.</p>
+<p>Keep two operational checks as well. Tile requests should be cacheable — <code>Cache-Control: public, max-age=31536000, immutable</code> with the layer version in the path — and the 404 rate should be near zero once <code>rectangle</code> is set, which is visible in the CDN logs described in <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/alerting-on-tile-error-rates-from-cdn-logs/">alerting on tile error rates from CDN logs</a>.</p>
+<h2 id="performance-notes" tabindex="-1"><a class="heading-link" href="#performance-notes"><span>Performance Notes</span></a></h2>
+<ul>
+<li><strong>Render in parallel per tile.</strong> Tiles are independent, so a process pool over the tile list scales linearly; the spatial index is read-only and can be rebuilt per worker or shared through a fork.</li>
+<li><strong>Stop at the zoom where boundaries are a pixel apart.</strong> For cadastral parcels that is typically z18–z19; going to z21 quadruples storage twice for detail nobody sees.</li>
+<li><strong>Cull sub-pixel features</strong> as the renderer does, and consider dropping small parcels entirely below a zoom threshold — at z12 a 200 m² parcel is a fraction of a pixel.</li>
+<li><strong>PNG for crisp boundaries, WebP for size.</strong> WebP at quality 85 typically halves the bytes with no visible change on flat-colour overlays; serve both with content negotiation if the CDN supports it.</li>
+<li><strong>Rebuild only what changed.</strong> Keep a per-tile hash of the features that intersect it, and re-render a tile only when that set changes — the same idea as <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/incremental-retiling-of-changed-city-blocks/">incremental retiling of changed city blocks</a>.</li>
+</ul>
+<h2 id="common-errors" tabindex="-1"><a class="heading-link" href="#common-errors"><span>Common Errors</span></a></h2>
+<p><strong>The layer is upside down.</strong> The MBTiles row flip was applied twice or not at all, or the URL template uses <code>{y}</code> where the tiles are stored with <code>{reverseY}</code>. Check one tile at a known coordinate.</p>
+<p><strong>Everything is transparent at low zoom.</strong> The sub-pixel cull removed every feature, because at z10 a parcel is smaller than a pixel. Either stop the layer at a higher minimum zoom or render a dissolved, generalised version for the low levels.</p>
+<p><strong>Edges look ragged.</strong> Supersampling was skipped or the downsample used a nearest filter. Draw at twice the size and resize with <code>LANCZOS</code>.</p>
+<p><strong>Tiles are enormous.</strong> Intricate boundaries at high zoom with anti-aliasing produce noisy PNGs. Simplify more aggressively, or quantise the palette — <code>img.convert(&quot;P&quot;, palette=Image.ADAPTIVE, colors=32)</code> often halves the size on flat overlays.</p>
+<h2 id="frequently-asked-questions" tabindex="-1"><a class="heading-link" href="#frequently-asked-questions"><span>Frequently Asked Questions</span></a></h2>
+<h3 id="why-not-serve-real-vector-tiles-with-maplibre" tabindex="-1"><a class="heading-link" href="#why-not-serve-real-vector-tiles-with-maplibre"><span>Why not serve real vector tiles with MapLibre?</span></a></h3>
+<p>Because CesiumJS has no native vector-tile imagery provider, so a vector tile has to be rasterised somewhere anyway — in a client-side canvas, which reintroduces the per-frame cost, or on the server, which is what this page does. If the application is a 2D map, real vector tiles are the better answer.</p>
+<h3 id="can-the-raster-layer-be-interactive-at-all" tabindex="-1"><a class="heading-link" href="#can-the-raster-layer-be-interactive-at-all"><span>Can the raster layer be interactive at all?</span></a></h3>
+<p>Indirectly. A click can query a feature service for the coordinate and highlight the result as a small geometry overlay. That gives one clickable feature at a time without shipping the layer’s geometry.</p>
+<h3 id="does-imagery-drape-on-buildings" tabindex="-1"><a class="heading-link" href="#does-imagery-drape-on-buildings"><span>Does imagery drape on buildings?</span></a></h3>
+<p>No — imagery drapes on terrain only. Anything that must appear on a facade needs classification or geometry, as covered in <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/classifying-3d-tiles-with-polygon-volumes/">classifying 3D Tiles with polygon volumes</a>.</p>
+<h2 id="related-guides" tabindex="-1"><a class="heading-link" href="#related-guides"><span>Related Guides</span></a></h2>
+<ul>
+<li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/">Vector Overlays on 3D Tiles</a> — where imagery fits among the strategies</li>
+<li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/draping-geojson-polygons-on-3d-tiles/">Draping GeoJSON Polygons on 3D Tiles</a> — the geometry route for smaller layers</li>
+<li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/automated-3d-tiles-deployment-to-cdn/">Automated 3D Tiles Deployment to CDN</a> — publishing and caching tile output</li>
+</ul>
+<p>Back to <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/">Vector Overlays on 3D Tiles</a>.</p>
+
+
+      
+      
+
+      <div class="related-nav">
+        
+
+        
+          <div>
+            <h3>Related</h3>
+            <div class="related-grid">
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/clamping-polylines-to-terrain-and-buildings/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Clamping Polylines to Terrain and Buildings</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/classifying-3d-tiles-with-polygon-volumes/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Classifying 3D Tiles with Polygon Volumes</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/draping-geojson-polygons-on-3d-tiles/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Draping GeoJSON Polygons on 3D Tiles</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/extruding-footprints-into-lod1-tiles/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Extruding Footprints into LOD1 Tiles</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/rendering-thousands-of-labels-and-billboards/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Rendering Thousands of Labels and Billboards</span>
+                </a>
+              
+            </div>
+          </div>
+        
+      </div>
+    </article>
+
+    
+    <aside class="toc" aria-label="On this page" data-toc hidden>
+      <h4>On this page</h4>
+      <ul></ul>
+    </aside>
+  </div>
+</div>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+  <div class="container site-footer__inner">
+    <div class="site-footer__brand">
+      <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+        <img src="/assets/img/logo-mark.svg" alt="" class="brand__mark" width="36" height="36">
+        <span class="brand__name">
+          3D Geospatial
+          <small>Digital Twin Automation</small>
+        </span>
+      </a>
+      <p>Engineering-grade guides on point cloud processing, mesh pipelines, LOD strategies, and CI/CD automation for digital twin platforms.</p>
+      <a class="footer-social" href="https://github.com/3d-geospatial" aria-label="3D Geospatial on GitHub" rel="noopener" target="_blank">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+          <path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.53-1.34-1.3-1.7-1.3-1.7-1.06-.72.08-.71.08-.71 1.17.08 1.79 1.2 1.79 1.2 1.04 1.79 2.73 1.27 3.4.97.1-.75.4-1.27.73-1.56-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.19-3.08-.12-.3-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.75.11 3.05.74.8 1.19 1.83 1.19 3.08 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.07.78 2.15v3.18c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5Z"/>
+        </svg>
+        <span>GitHub</span>
+      </a>
+    </div>
+
+    <div class="site-footer__col">
+      <h4>Sections</h4>
+      <ul>
+        <li><a href="https://www.3d-geospatial.com/">Home</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management &amp; Optimization</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/">Point Cloud &amp; Mesh Pipelines</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/">Troubleshooting &amp; Reliability</a></li>
+        
+      </ul>
+    </div>
+
+    
+      <div class="site-footer__col">
+        <h4>3D Geospatial Fundamentals</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/">3D Format Standards Comparison</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/">BIM and IFC Georeferencing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/">CityGML and CityJSON Processing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems for 3D Assets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/">Digital Elevation Model Workflows</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/">Spatial Indexing and Tiling Schemes for 3D Data</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>LOD Management &amp; Optimization</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/">Automated Tile Generation for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/">Cesium ion Upload Automation for 3D Tilesets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/">glTF LOD Generation With Draco Compression</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/">Streaming Sync Patterns for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/">Tileset Metadata and 3D Tiles Next</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/">Vector Overlays on 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Point Cloud &amp; Mesh Pipelines</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/">Automated Mesh Decimation for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/">Change Detection Between LiDAR Scan Epochs</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/">CI/CD Automation for Spatial Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">LiDAR Classification and Ground Extraction</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/photogrammetry-processing-pipelines/">Photogrammetry Processing Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/">Point Cloud Filtering Techniques</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/">Surface Reconstruction for Geospatial Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/">Texture Mapping Workflows for Digital Twins</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Troubleshooting &amp; Reliability</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/">Cross-Section Failure Modes in Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/">Data Validation &amp; QA Gates for 3D Tiles</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/">Performance Profiling and Benchmarking</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/">Pipeline Observability and Monitoring</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/">Streaming &amp; Runtime Diagnostics for 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+  </div>
+  <div class="container site-footer__bottom">
+    <span>© 2026 3D Geospatial &amp; Digital Twin Automation</span>
+    <span>Built with Eleventy · PWA-enabled</span>
+  </div>
+</footer>
+
+
+  <script src="/assets/js/site.js?v=b99aa9f971" defer></script>
+  
+</body>
+</html>

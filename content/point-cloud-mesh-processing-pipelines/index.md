@@ -247,6 +247,16 @@ The methods trade speed for defensibility. [Cloud-to-cloud distance with Open3D]
 
 ---
 
+## Photogrammetry Processing Pipelines
+
+Photogrammetry is the other way a twin acquires geometry, and it arrives with a different set of problems from lidar: the scale and orientation come from control rather than from the sensor, the reconstruction quality depends on image overlap that was decided in the field, and the output is a textured mesh rather than a classified cloud. [Photogrammetry Processing Pipelines](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/photogrammetry-processing-pipelines/) covers the run from oriented images to a georeferenced deliverable, and treats the quality report as the first thing to read rather than the last.
+
+The chain starts with control and ends with fusion. [Preparing ground control point files](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/photogrammetry-processing-pipelines/preparing-ground-control-point-files/) and [reading photogrammetry quality reports](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/photogrammetry-processing-pipelines/reading-photogrammetry-quality-reports/) are what make the reconstruction defensible; [running OpenDroneMap in Docker for city blocks](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/photogrammetry-processing-pipelines/running-opendronemap-in-docker-for-city-blocks/) and [sparse and dense reconstruction with COLMAP](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/photogrammetry-processing-pipelines/sparse-and-dense-reconstruction-with-colmap/) are the two reconstruction routes, one packaged and one granular. [Georeferencing photogrammetric point clouds](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/photogrammetry-processing-pipelines/georeferencing-photogrammetric-point-clouds/) fixes the result into a metric CRS, and [fusing lidar and photogrammetry point clouds](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/photogrammetry-processing-pipelines/fusing-lidar-and-photogrammetry-point-clouds/) combines the two sources where each is strongest — lidar under canopy, photogrammetry on facades.
+
+**Key Practice:** Read the quality report before the mesh. Reprojection error, the number of images matched per point and the control residuals tell you whether the reconstruction is trustworthy in seconds, and a mesh built on a weak bundle adjustment looks convincing and measures wrong.
+
+---
+
 ## Cross-Section Integration
 
 This pipeline is the middle link in a three-stage chain. It consumes the outputs of the fundamentals and feeds the LOD pipeline, and almost every production failure traces back to one of those two boundaries being crossed with unvalidated data.
@@ -366,5 +376,6 @@ A closing word on sequencing. The stages above are presented in order because ea
 - [Texture Mapping Workflows for Digital Twins](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/) — UV unwrapping and orthophoto projection
 - [Change Detection Between LiDAR Scan Epochs](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/) — measuring what changed between surveys
 - [LOD Management & Optimization Strategies](https://www.3d-geospatial.com/lod-management-optimization-strategies/) — where the decimated LOD chain gets tiled and streamed
+- [Photogrammetry Processing Pipelines](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/photogrammetry-processing-pipelines/) — photogrammetry reconstruction, georeferencing and fusion with lidar
 
 Back to [3D Geospatial Fundamentals for Digital Twins](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/) — the input contract for this pipeline.

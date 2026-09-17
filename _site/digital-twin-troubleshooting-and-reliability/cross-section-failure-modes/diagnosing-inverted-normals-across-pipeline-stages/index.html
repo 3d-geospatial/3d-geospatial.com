@@ -1,0 +1,1142 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <title>Diagnosing Inverted Normals Across Pipeline Stages — 3D Geospatial</title>
+  <meta name="description" content="Find the stage that flipped your winding: signed volume, ray-parity and normal-consistency tests applied at every handoff">
+  <meta name="keywords" content="3D geospatial, digital twin, point cloud, mesh pipeline, LOD, 3D Tiles, Cesium, PDAL, Open3D, Python, CI/CD">
+  <meta name="author" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta name="theme-color" content="#1f6b8a" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f171d" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+
+  
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem("theme");
+        var theme = (stored === "dark" || stored === "light") ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    })();
+  </script>
+  <meta name="generator" content="Eleventy">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="googlebot" content="index,follow,max-image-preview:large">
+
+  
+  <link rel="canonical" href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/diagnosing-inverted-normals-across-pipeline-stages/">
+  <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">
+
+  
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/icon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+
+  
+  <link rel="apple-touch-icon" href="/assets/img/icon-180.png">
+  <link rel="mask-icon" href="/assets/img/logo.svg" color="#1f6b8a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="3D Geospatial">
+  <meta name="application-name" content="3D Geospatial">
+
+  
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Diagnosing Inverted Normals Across Pipeline Stages — 3D Geospatial">
+  <meta property="og:description" content="Find the stage that flipped your winding: signed volume, ray-parity and normal-consistency tests applied at every handoff">
+  <meta property="og:url" content="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/diagnosing-inverted-normals-across-pipeline-stages/">
+  <meta property="og:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+  <meta property="og:site_name" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta property="og:locale" content="en_US">
+  
+  <meta property="article:published_time" content="2026-09-17T23:36:56.450Z">
+  <meta property="article:modified_time" content="2026-09-17T23:36:56.450Z">
+  <meta property="article:publisher" content="https://www.3d-geospatial.com/">
+  
+
+  
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Diagnosing Inverted Normals Across Pipeline Stages — 3D Geospatial">
+  <meta name="twitter:description" content="Find the stage that flipped your winding: signed volume, ray-parity and normal-consistency tests applied at every handoff">
+  <meta name="twitter:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta name="twitter:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+
+  
+  <link rel="preload" href="/assets/css/styles.css?v=8c46394d6c" as="style">
+  
+
+  <link rel="stylesheet" href="/assets/css/styles.css?v=8c46394d6c">
+
+  
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.3d-geospatial.com/#organization",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "url": "https://www.3d-geospatial.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/icon-512.png",
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://www.3d-geospatial.com/#website",
+      "url": "https://www.3d-geospatial.com/",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "description": "Build reliable 3D spatial data pipelines for digital twins — point clouds, meshes, LOD strategies, Python processing, and CI/CD automation.",
+      "inLanguage": "en",
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      }
+    },
+    {
+      "@type": "TechArticle",
+      "@id": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/diagnosing-inverted-normals-across-pipeline-stages/#article",
+      "isPartOf": {
+        "@id": "https://www.3d-geospatial.com/#website"
+      },
+      "headline": "Diagnosing Inverted Normals Across Pipeline Stages",
+      "name": "Diagnosing Inverted Normals Across Pipeline Stages",
+      "description": "Find the stage that flipped your winding: signed volume, ray-parity and normal-consistency tests applied at every handoff",
+      "url": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/diagnosing-inverted-normals-across-pipeline-stages/",
+      "mainEntityOfPage": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/diagnosing-inverted-normals-across-pipeline-stages/",
+      "inLanguage": "en",
+      "datePublished": "2026-09-17T23:36:56.450Z",
+      "dateModified": "2026-09-17T23:36:56.450Z",
+      "author": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "image": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/og-cover.png",
+        "width": 1200,
+        "height": 630
+      },
+      "breadcrumb": {
+        "@id": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/diagnosing-inverted-normals-across-pipeline-stages/#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/diagnosing-inverted-normals-across-pipeline-stages/#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://www.3d-geospatial.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Digital Twin Troubleshooting And Reliability",
+          "item": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Cross Section Failure Modes",
+          "item": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "name": "Diagnosing Inverted Normals Across Pipeline Stages",
+          "item": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/diagnosing-inverted-normals-across-pipeline-stages/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  
+<header class="site-header" role="banner">
+  <div class="container site-header__inner">
+    <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+      <img src="/assets/img/logo.svg" alt="" class="brand__mark" width="36" height="36">
+      <span class="brand__name">
+        3D Geospatial
+        <small>Digital Twin Automation</small>
+      </span>
+    </a>
+
+    <button class="theme-toggle" type="button" data-theme-toggle
+            aria-label="Switch to dark theme" title="Switch to dark theme">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4.2"/>
+        <path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/>
+      </svg>
+    </button>
+
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>
+      <span class="nav-toggle__icon" aria-hidden="true"><span></span></span>
+      Menu
+    </button>
+
+    <nav class="primary-nav" id="primary-nav" aria-label="Primary">
+      
+      <a href="https://www.3d-geospatial.com/" >
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/>
+        </svg>
+        Home
+      </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2 3 7l9 5 9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 17l9 5 9-5"/>
+            </svg>
+          
+          3D Geospatial Fundamentals
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+          
+          LOD Management &amp; Optimization
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="6" cy="6" r="1.5"/><circle cx="12" cy="6" r="1.5"/><circle cx="18" cy="6" r="1.5"/>
+              <circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/>
+              <circle cx="6" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="18" cy="18" r="1.5"/>
+            </svg>
+          
+          Point Cloud &amp; Mesh Pipelines
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/" aria-current="page">
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <path d="M12 9v4"/><path d="M12 17h.01"/>
+            </svg>
+          
+          Troubleshooting &amp; Reliability
+        </a>
+      
+    </nav>
+  </div>
+</header>
+
+
+  <main id="main">
+    
+
+
+<div class="container">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    
+      
+        <a href="https://www.3d-geospatial.com/">Home</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/">Digital Twin Troubleshooting And Reliability</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/">Cross Section Failure Modes</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <span class="current">Diagnosing Inverted Normals Across Pipeline Stages</span>
+      
+    
+  </nav>
+
+  <div class="content-page">
+    <article class="article">
+      <h1 id="diagnosing-inverted-normals-across-pipeline-stages" tabindex="-1"><a class="heading-link" href="#diagnosing-inverted-normals-across-pipeline-stages"><span>Diagnosing Inverted Normals Across Pipeline Stages</span></a></h1>
+<p>This page locates the stage in a pipeline that inverted a mesh’s normals — testing signed volume, ray parity and normal-to-face consistency at every handoff, checking the transforms for a negative determinant, and distinguishing the four separate things people mean by “the normals are wrong”.</p>
+<h2 id="why-you-hit-this" tabindex="-1"><a class="heading-link" href="#why-you-hit-this"><span>Why you hit this</span></a></h2>
+<p>A tileset renders with holes in every building, or with roofs visible from inside and invisible from outside, and the symptom appears after a pipeline of eight stages. The mesh was correct when it came off the scanner and it is wrong in the viewer, and the only way to find where is to test at each handoff.</p>
+<p>The diagnosis is confused by the fact that “inverted normals” covers four unrelated problems: the face winding order is reversed, the stored vertex normals point the wrong way, the winding and the normals disagree with each other, or nothing is inverted at all and backface culling is disabled. Each has a different fix, and a test that does not distinguish them sends you to the wrong stage.</p>
+<h2 id="prerequisites" tabindex="-1"><a class="heading-link" href="#prerequisites"><span>Prerequisites</span></a></h2>
+<ul>
+<li>Python 3.10+ with <code>numpy</code>, <code>trimesh</code>, <code>pymeshlab</code>; the pipeline’s intermediate outputs saved.</li>
+<li>The mesh at each stage boundary, or the ability to re-run with intermediates written.</li>
+<li>For the glTF end, <code>gltf-transform</code> or <code>pygltflib</code>.</li>
+</ul>
+<h2 id="step-by-step" tabindex="-1"><a class="heading-link" href="#step-by-step"><span>Step-by-Step</span></a></h2>
+<h3 id="1-separate-the-four-distinct-problems" tabindex="-1"><a class="heading-link" href="#1-separate-the-four-distinct-problems"><span>1. Separate the four distinct problems</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> json
+<span class="token keyword">import</span> math
+<span class="token keyword">from</span> pathlib <span class="token keyword">import</span> Path
+
+<span class="token keyword">import</span> numpy <span class="token keyword">as</span> np
+<span class="token keyword">import</span> trimesh
+
+PROBLEMS <span class="token operator">=</span> <span class="token punctuation">{</span>
+    <span class="token string">"winding_reversed"</span><span class="token punctuation">:</span> <span class="token punctuation">{</span>
+        <span class="token string">"what"</span><span class="token punctuation">:</span> <span class="token string">"face vertex order is clockwise where the convention is "</span>
+                <span class="token string">"counter-clockwise"</span><span class="token punctuation">,</span>
+        <span class="token string">"detect"</span><span class="token punctuation">:</span> <span class="token string">"signed volume is negative on a closed mesh; ray parity disagrees"</span><span class="token punctuation">,</span>
+        <span class="token string">"symptom"</span><span class="token punctuation">:</span> <span class="token string">"backface culling hides the outside and shows the inside"</span><span class="token punctuation">,</span>
+        <span class="token string">"usual_cause"</span><span class="token punctuation">:</span> <span class="token string">"a transform with a negative determinant, or an exporter "</span>
+                       <span class="token string">"with the opposite convention"</span><span class="token punctuation">,</span>
+        <span class="token string">"fix"</span><span class="token punctuation">:</span> <span class="token string">"reverse the face index order"</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span><span class="token punctuation">,</span>
+    <span class="token string">"stored_normals_flipped"</span><span class="token punctuation">:</span> <span class="token punctuation">{</span>
+        <span class="token string">"what"</span><span class="token punctuation">:</span> <span class="token string">"the NORMAL attribute points inward while the winding is correct"</span><span class="token punctuation">,</span>
+        <span class="token string">"detect"</span><span class="token punctuation">:</span> <span class="token string">"face normal from the winding disagrees with the stored vertex "</span>
+                  <span class="token string">"normal"</span><span class="token punctuation">,</span>
+        <span class="token string">"symptom"</span><span class="token punctuation">:</span> <span class="token string">"lighting is inverted — surfaces facing the light are dark"</span><span class="token punctuation">,</span>
+        <span class="token string">"usual_cause"</span><span class="token punctuation">:</span> <span class="token string">"normals estimated with an unoriented method, or negated by "</span>
+                       <span class="token string">"a conversion"</span><span class="token punctuation">,</span>
+        <span class="token string">"fix"</span><span class="token punctuation">:</span> <span class="token string">"recompute the normals from the winding, or negate them"</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span><span class="token punctuation">,</span>
+    <span class="token string">"winding_and_normals_disagree"</span><span class="token punctuation">:</span> <span class="token punctuation">{</span>
+        <span class="token string">"what"</span><span class="token punctuation">:</span> <span class="token string">"both exist and they contradict each other"</span><span class="token punctuation">,</span>
+        <span class="token string">"detect"</span><span class="token punctuation">:</span> <span class="token string">"the dot product of the face normal and the stored normal is "</span>
+                  <span class="token string">"negative on a large share of faces"</span><span class="token punctuation">,</span>
+        <span class="token string">"symptom"</span><span class="token punctuation">:</span> <span class="token string">"shading and culling disagree, so the result depends on the "</span>
+                   <span class="token string">"renderer"</span><span class="token punctuation">,</span>
+        <span class="token string">"usual_cause"</span><span class="token punctuation">:</span> <span class="token string">"one stage flipped the winding and another flipped the "</span>
+                       <span class="token string">"normals"</span><span class="token punctuation">,</span>
+        <span class="token string">"fix"</span><span class="token punctuation">:</span> <span class="token string">"pick the winding as authoritative and recompute the normals"</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span><span class="token punctuation">,</span>
+    <span class="token string">"nothing_inverted"</span><span class="token punctuation">:</span> <span class="token punctuation">{</span>
+        <span class="token string">"what"</span><span class="token punctuation">:</span> <span class="token string">"the mesh is correct and the material is double-sided or culling "</span>
+                <span class="token string">"is off"</span><span class="token punctuation">,</span>
+        <span class="token string">"detect"</span><span class="token punctuation">:</span> <span class="token string">"all the geometric tests pass"</span><span class="token punctuation">,</span>
+        <span class="token string">"symptom"</span><span class="token punctuation">:</span> <span class="token string">"looks wrong but only in one viewer"</span><span class="token punctuation">,</span>
+        <span class="token string">"usual_cause"</span><span class="token punctuation">:</span> <span class="token string">"a material with doubleSided true, or a viewer setting"</span><span class="token punctuation">,</span>
+        <span class="token string">"fix"</span><span class="token punctuation">:</span> <span class="token string">"fix the material, not the geometry"</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span><span class="token punctuation">,</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">for</span> name<span class="token punctuation">,</span> spec <span class="token keyword">in</span> PROBLEMS<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>name<span class="token punctuation">:</span><span class="token format-spec">&lt;32</span><span class="token punctuation">}</span></span><span class="token interpolation"><span class="token punctuation">{</span>spec<span class="token punctuation">[</span><span class="token string">'symptom'</span><span class="token punctuation">]</span><span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Naming the four problems before testing anything is what prevents the usual wasted afternoon. A mesh whose lighting is inverted but whose culling is correct has flipped <em>normals</em> and correct <em>winding</em>, and reversing the faces makes it worse — it swaps one symptom for the other.</p>
+<p>The fourth case is worth taking seriously because it is common and it is not a geometry problem at all. A glTF material with <code>doubleSided: true</code> renders both faces, so a mesh with genuinely reversed winding looks acceptable until it reaches a renderer that culls; conversely a correct mesh viewed with culling disabled can look wrong for unrelated reasons.</p>
+<h3 id="2-test-signed-volume-and-ray-parity" tabindex="-1"><a class="heading-link" href="#2-test-signed-volume-and-ray-parity"><span>2. Test signed volume and ray parity</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">signed_volume</span><span class="token punctuation">(</span>mesh<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Sum of tetrahedra from the origin: positive for outward-facing winding."""</span>
+    tri <span class="token operator">=</span> mesh<span class="token punctuation">.</span>vertices<span class="token punctuation">[</span>mesh<span class="token punctuation">.</span>faces<span class="token punctuation">]</span>
+    a<span class="token punctuation">,</span> b<span class="token punctuation">,</span> c <span class="token operator">=</span> tri<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">,</span> tri<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">,</span> tri<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">]</span>
+    volumes <span class="token operator">=</span> np<span class="token punctuation">.</span>einsum<span class="token punctuation">(</span><span class="token string">"ij,ij->i"</span><span class="token punctuation">,</span> a<span class="token punctuation">,</span> np<span class="token punctuation">.</span>cross<span class="token punctuation">(</span>b<span class="token punctuation">,</span> c<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token number">6.0</span>
+    <span class="token keyword">return</span> <span class="token builtin">float</span><span class="token punctuation">(</span>volumes<span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+
+<span class="token keyword">def</span> <span class="token function">winding_report</span><span class="token punctuation">(</span>mesh<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    closed <span class="token operator">=</span> <span class="token builtin">bool</span><span class="token punctuation">(</span>mesh<span class="token punctuation">.</span>is_watertight<span class="token punctuation">)</span>
+    vol <span class="token operator">=</span> signed_volume<span class="token punctuation">(</span>mesh<span class="token punctuation">)</span>
+    report <span class="token operator">=</span> <span class="token punctuation">{</span>
+        <span class="token string">"faces"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>mesh<span class="token punctuation">.</span>faces<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"watertight"</span><span class="token punctuation">:</span> closed<span class="token punctuation">,</span>
+        <span class="token string">"winding_consistent"</span><span class="token punctuation">:</span> <span class="token builtin">bool</span><span class="token punctuation">(</span>mesh<span class="token punctuation">.</span>is_winding_consistent<span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"signed_volume_m3"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>vol<span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"trimesh_volume_m3"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>mesh<span class="token punctuation">.</span>volume<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span> <span class="token keyword">if</span> closed <span class="token keyword">else</span> <span class="token boolean">None</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+    <span class="token keyword">if</span> closed<span class="token punctuation">:</span>
+        report<span class="token punctuation">[</span><span class="token string">"winding_outward"</span><span class="token punctuation">]</span> <span class="token operator">=</span> vol <span class="token operator">></span> <span class="token number">0</span>
+        report<span class="token punctuation">[</span><span class="token string">"verdict"</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token string">"winding is outward"</span> <span class="token keyword">if</span> vol <span class="token operator">></span> <span class="token number">0</span>
+                             <span class="token keyword">else</span> <span class="token string">"winding is INVERTED — signed volume is negative"</span><span class="token punctuation">)</span>
+    <span class="token keyword">else</span><span class="token punctuation">:</span>
+        report<span class="token punctuation">[</span><span class="token string">"winding_outward"</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token boolean">None</span>
+        report<span class="token punctuation">[</span><span class="token string">"verdict"</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token string">"mesh is open; signed volume is not decisive — use ray "</span>
+                             <span class="token string">"parity or the normal-consistency test"</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> report
+
+<span class="token keyword">def</span> <span class="token function">ray_parity_report</span><span class="token punctuation">(</span>mesh<span class="token punctuation">,</span> samples<span class="token operator">=</span><span class="token number">2000</span><span class="token punctuation">,</span> seed<span class="token operator">=</span><span class="token number">7</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""For a closed mesh, a point inside must have an odd crossing count."""</span>
+    <span class="token keyword">if</span> <span class="token keyword">not</span> mesh<span class="token punctuation">.</span>is_watertight<span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"applicable"</span><span class="token punctuation">:</span> <span class="token boolean">False</span><span class="token punctuation">,</span>
+                <span class="token string">"reason"</span><span class="token punctuation">:</span> <span class="token string">"ray parity requires a watertight mesh"</span><span class="token punctuation">}</span>
+    rng <span class="token operator">=</span> np<span class="token punctuation">.</span>random<span class="token punctuation">.</span>default_rng<span class="token punctuation">(</span>seed<span class="token punctuation">)</span>
+    lo<span class="token punctuation">,</span> hi <span class="token operator">=</span> mesh<span class="token punctuation">.</span>bounds
+    pts <span class="token operator">=</span> rng<span class="token punctuation">.</span>uniform<span class="token punctuation">(</span>lo<span class="token punctuation">,</span> hi<span class="token punctuation">,</span> size<span class="token operator">=</span><span class="token punctuation">(</span>samples<span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    inside <span class="token operator">=</span> mesh<span class="token punctuation">.</span>contains<span class="token punctuation">(</span>pts<span class="token punctuation">)</span>
+
+    <span class="token comment"># Independent check: the centroid of a convex-ish solid should be inside.</span>
+    centroid_inside <span class="token operator">=</span> <span class="token builtin">bool</span><span class="token punctuation">(</span>mesh<span class="token punctuation">.</span>contains<span class="token punctuation">(</span>mesh<span class="token punctuation">.</span>centroid<span class="token punctuation">.</span>reshape<span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    volume_fraction <span class="token operator">=</span> <span class="token builtin">float</span><span class="token punctuation">(</span>inside<span class="token punctuation">.</span>mean<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    bbox_volume <span class="token operator">=</span> <span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>prod<span class="token punctuation">(</span>hi <span class="token operator">-</span> lo<span class="token punctuation">)</span><span class="token punctuation">)</span>
+    expected_fraction <span class="token operator">=</span> <span class="token builtin">abs</span><span class="token punctuation">(</span>mesh<span class="token punctuation">.</span>volume<span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token builtin">max</span><span class="token punctuation">(</span>bbox_volume<span class="token punctuation">,</span> <span class="token number">1e-12</span><span class="token punctuation">)</span>
+
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token string">"applicable"</span><span class="token punctuation">:</span> <span class="token boolean">True</span><span class="token punctuation">,</span>
+        <span class="token string">"sampled"</span><span class="token punctuation">:</span> samples<span class="token punctuation">,</span>
+        <span class="token string">"inside_fraction"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>volume_fraction<span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"expected_fraction_from_volume"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>expected_fraction<span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"centroid_reported_inside"</span><span class="token punctuation">:</span> centroid_inside<span class="token punctuation">,</span>
+        <span class="token string">"consistent"</span><span class="token punctuation">:</span> <span class="token builtin">abs</span><span class="token punctuation">(</span>volume_fraction <span class="token operator">-</span> expected_fraction<span class="token punctuation">)</span> <span class="token operator">&lt;</span> <span class="token number">0.08</span>
+                      <span class="token keyword">and</span> centroid_inside<span class="token punctuation">,</span>
+        <span class="token string">"verdict"</span><span class="token punctuation">:</span> <span class="token punctuation">(</span><span class="token string">"parity agrees with the volume — winding is coherent"</span>
+                    <span class="token keyword">if</span> <span class="token builtin">abs</span><span class="token punctuation">(</span>volume_fraction <span class="token operator">-</span> expected_fraction<span class="token punctuation">)</span> <span class="token operator">&lt;</span> <span class="token number">0.08</span>
+                    <span class="token keyword">and</span> centroid_inside
+                    <span class="token keyword">else</span> <span class="token string">"parity disagrees with the volume — winding is inverted or "</span>
+                         <span class="token string">"inconsistent"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+</code></pre></div>
+<p>Signed volume is the decisive test for a <strong>closed</strong> mesh and says nothing about an open one. The sum of signed tetrahedra from the origin is positive when faces wind counter-clockwise as seen from outside, and a negative total on a watertight mesh is conclusive.</p>
+<p>Ray parity is the cross-check that catches a mesh whose winding is <em>inconsistent</em> rather than uniformly reversed — where signed volume can land near zero and look ambiguous. If the fraction of sampled bounding-box points reported inside disagrees with the fraction implied by the volume, the inside-outside test itself is unreliable, which means the winding is not coherent.</p>
+<p>Most surveyed meshes are open — a facade, a terrain patch, a scanned surface — so both tests report “not applicable” and the normal-consistency test in step 3 becomes the primary tool. That is the usual case and it is worth expecting.</p>
+<figure class="diagram">
+<svg viewBox="4 6 732 246" role="img" aria-labelledby="normals-four-t normals-four-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="normals-four-t">Four problems, four symptoms, four fixes</title>
+  <desc id="normals-four-d">A table of the four distinct problems. Reversed winding shows as backface culling hiding the outside, detected by a negative signed volume, fixed by reversing the face order. Flipped stored normals show as inverted lighting with correct culling, detected by comparing face normals against stored normals, fixed by recomputing the normals. Winding and normals disagreeing shows as shading and culling contradicting each other, fixed by taking the winding as authoritative. Nothing inverted shows as a problem in one viewer only, fixed in the material rather than the geometry.</desc>
+  <rect class="svg-bg" x="4" y="6" width="732" height="246" fill="#ffffff"/>
+  <g stroke-width="1.5">
+    <rect x="18" y="20" width="176" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="194" y="20" width="200" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="394" y="20" width="164" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="558" y="20" width="164" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="18" y="54" width="176" height="46" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="194" y="54" width="200" height="46" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="394" y="54" width="164" height="46" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="558" y="54" width="164" height="46" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="18" y="100" width="176" height="46" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="194" y="100" width="200" height="46" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="394" y="100" width="164" height="46" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="558" y="100" width="164" height="46" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="18" y="146" width="176" height="46" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="194" y="146" width="200" height="46" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="394" y="146" width="164" height="46" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="558" y="146" width="164" height="46" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="18" y="192" width="176" height="46" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="194" y="192" width="200" height="46" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="394" y="192" width="164" height="46" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="558" y="192" width="164" height="46" fill="#eef5e9" stroke="#4f7a4d"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="106" y="41">problem</text><text x="294" y="41">symptom</text>
+    <text x="476" y="41">detected by</text><text x="640" y="41">fix</text>
+    <text x="106" y="74">winding</text><text x="106" y="92">reversed</text>
+    <text x="294" y="74">culling hides the</text><text x="294" y="92">outside</text>
+    <text x="476" y="74">signed volume</text><text x="476" y="92">is negative</text>
+    <text x="640" y="74">reverse the</text><text x="640" y="92">face order</text>
+    <text x="106" y="120">stored normals</text><text x="106" y="138">flipped</text>
+    <text x="294" y="120">lighting inverted,</text><text x="294" y="138">culling correct</text>
+    <text x="476" y="120">face vs stored</text><text x="476" y="138">normal dot &lt; 0</text>
+    <text x="640" y="120">recompute from</text><text x="640" y="138">the winding</text>
+    <text x="106" y="166">the two</text><text x="106" y="184">disagree</text>
+    <text x="294" y="166">shading and culling</text><text x="294" y="184">contradict</text>
+    <text x="476" y="166">both tests fail</text><text x="476" y="184">in opposite ways</text>
+    <text x="640" y="166">winding wins;</text><text x="640" y="184">recompute normals</text>
+    <text x="106" y="212">nothing</text><text x="106" y="230">inverted</text>
+    <text x="294" y="212">wrong in one</text><text x="294" y="230">viewer only</text>
+    <text x="476" y="212">every geometric</text><text x="476" y="230">test passes</text>
+    <text x="640" y="212">the material,</text><text x="640" y="230">not the geometry</text>
+  </g>
+</svg>
+<figcaption>Reversing the faces fixes the first row and makes the second worse, which is why the tests have to run before the fix.</figcaption>
+</figure>
+<h3 id="3-compare-the-stored-normals-against-the-winding" tabindex="-1"><a class="heading-link" href="#3-compare-the-stored-normals-against-the-winding"><span>3. Compare the stored normals against the winding</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">normal_consistency_report</span><span class="token punctuation">(</span>mesh<span class="token punctuation">,</span> sample<span class="token operator">=</span><span class="token number">200_000</span><span class="token punctuation">,</span> seed<span class="token operator">=</span><span class="token number">7</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""The test that works on open meshes: do stored normals agree with the winding?"""</span>
+    faces <span class="token operator">=</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>mesh<span class="token punctuation">.</span>faces<span class="token punctuation">)</span>
+    verts <span class="token operator">=</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>mesh<span class="token punctuation">.</span>vertices<span class="token punctuation">)</span>
+    tri <span class="token operator">=</span> verts<span class="token punctuation">[</span>faces<span class="token punctuation">]</span>
+    geometric <span class="token operator">=</span> np<span class="token punctuation">.</span>cross<span class="token punctuation">(</span>tri<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">]</span> <span class="token operator">-</span> tri<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">,</span> tri<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">]</span> <span class="token operator">-</span> tri<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    lengths <span class="token operator">=</span> np<span class="token punctuation">.</span>linalg<span class="token punctuation">.</span>norm<span class="token punctuation">(</span>geometric<span class="token punctuation">,</span> axis<span class="token operator">=</span><span class="token number">1</span><span class="token punctuation">)</span>
+    valid <span class="token operator">=</span> lengths <span class="token operator">></span> <span class="token number">1e-12</span>
+    geometric <span class="token operator">=</span> geometric<span class="token punctuation">[</span>valid<span class="token punctuation">]</span> <span class="token operator">/</span> lengths<span class="token punctuation">[</span>valid<span class="token punctuation">,</span> <span class="token boolean">None</span><span class="token punctuation">]</span>
+
+    result <span class="token operator">=</span> <span class="token punctuation">{</span>
+        <span class="token string">"faces"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>faces<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"degenerate_faces"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token operator">~</span>valid<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"has_vertex_normals"</span><span class="token punctuation">:</span> <span class="token builtin">bool</span><span class="token punctuation">(</span>mesh<span class="token punctuation">.</span>vertex_normals <span class="token keyword">is</span> <span class="token keyword">not</span> <span class="token boolean">None</span>
+                                   <span class="token keyword">and</span> <span class="token builtin">len</span><span class="token punctuation">(</span>mesh<span class="token punctuation">.</span>vertex_normals<span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token builtin">len</span><span class="token punctuation">(</span>verts<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+
+    <span class="token keyword">if</span> <span class="token keyword">not</span> result<span class="token punctuation">[</span><span class="token string">"has_vertex_normals"</span><span class="token punctuation">]</span><span class="token punctuation">:</span>
+        result<span class="token punctuation">[</span><span class="token string">"verdict"</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token string">"no stored normals; only the winding matters and the "</span>
+                             <span class="token string">"renderer will derive normals from it"</span><span class="token punctuation">)</span>
+        <span class="token keyword">return</span> result
+
+    vn <span class="token operator">=</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>mesh<span class="token punctuation">.</span>vertex_normals<span class="token punctuation">)</span>
+    stored <span class="token operator">=</span> vn<span class="token punctuation">[</span>faces<span class="token punctuation">[</span>valid<span class="token punctuation">]</span><span class="token punctuation">]</span><span class="token punctuation">.</span>mean<span class="token punctuation">(</span>axis<span class="token operator">=</span><span class="token number">1</span><span class="token punctuation">)</span>
+    slen <span class="token operator">=</span> np<span class="token punctuation">.</span>linalg<span class="token punctuation">.</span>norm<span class="token punctuation">(</span>stored<span class="token punctuation">,</span> axis<span class="token operator">=</span><span class="token number">1</span><span class="token punctuation">)</span>
+    ok <span class="token operator">=</span> slen <span class="token operator">></span> <span class="token number">1e-12</span>
+    stored <span class="token operator">=</span> stored<span class="token punctuation">[</span>ok<span class="token punctuation">]</span> <span class="token operator">/</span> slen<span class="token punctuation">[</span>ok<span class="token punctuation">,</span> <span class="token boolean">None</span><span class="token punctuation">]</span>
+    geometric <span class="token operator">=</span> geometric<span class="token punctuation">[</span>ok<span class="token punctuation">]</span>
+
+    dots <span class="token operator">=</span> np<span class="token punctuation">.</span>einsum<span class="token punctuation">(</span><span class="token string">"ij,ij->i"</span><span class="token punctuation">,</span> geometric<span class="token punctuation">,</span> stored<span class="token punctuation">)</span>
+    rng <span class="token operator">=</span> np<span class="token punctuation">.</span>random<span class="token punctuation">.</span>default_rng<span class="token punctuation">(</span>seed<span class="token punctuation">)</span>
+    <span class="token keyword">if</span> <span class="token builtin">len</span><span class="token punctuation">(</span>dots<span class="token punctuation">)</span> <span class="token operator">></span> sample<span class="token punctuation">:</span>
+        dots <span class="token operator">=</span> dots<span class="token punctuation">[</span>rng<span class="token punctuation">.</span>choice<span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>dots<span class="token punctuation">)</span><span class="token punctuation">,</span> size<span class="token operator">=</span>sample<span class="token punctuation">,</span> replace<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">)</span><span class="token punctuation">]</span>
+
+    opposed <span class="token operator">=</span> dots <span class="token operator">&lt;</span> <span class="token operator">-</span><span class="token number">0.2</span>
+    aligned <span class="token operator">=</span> dots <span class="token operator">></span> <span class="token number">0.2</span>
+    result<span class="token punctuation">.</span>update<span class="token punctuation">(</span><span class="token punctuation">{</span>
+        <span class="token string">"faces_compared"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>dots<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"mean_dot"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>dots<span class="token punctuation">.</span>mean<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"opposed_share"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>opposed<span class="token punctuation">.</span>mean<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"aligned_share"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>aligned<span class="token punctuation">.</span>mean<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"ambiguous_share"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token operator">~</span>opposed <span class="token operator">&amp;</span> <span class="token operator">~</span>aligned<span class="token punctuation">)</span><span class="token punctuation">.</span>mean<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span><span class="token punctuation">)</span>
+    <span class="token keyword">if</span> <span class="token builtin">float</span><span class="token punctuation">(</span>opposed<span class="token punctuation">.</span>mean<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">></span> <span class="token number">0.9</span><span class="token punctuation">:</span>
+        result<span class="token punctuation">[</span><span class="token string">"verdict"</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token string">"stored normals oppose the winding on nearly every "</span>
+                             <span class="token string">"face — one of the two was flipped wholesale"</span><span class="token punctuation">)</span>
+    <span class="token keyword">elif</span> <span class="token builtin">float</span><span class="token punctuation">(</span>opposed<span class="token punctuation">.</span>mean<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">></span> <span class="token number">0.05</span><span class="token punctuation">:</span>
+        result<span class="token punctuation">[</span><span class="token string">"verdict"</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>opposed<span class="token punctuation">.</span>mean<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span><span class="token format-spec">.1%</span><span class="token punctuation">}</span></span><span class="token string"> of faces disagree — the mesh has "</span></span>
+                             <span class="token string-interpolation"><span class="token string">f"mixed winding or patchwise flipped normals"</span></span><span class="token punctuation">)</span>
+    <span class="token keyword">else</span><span class="token punctuation">:</span>
+        result<span class="token punctuation">[</span><span class="token string">"verdict"</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token string">"stored normals agree with the winding"</span>
+    <span class="token keyword">return</span> result
+
+<span class="token keyword">def</span> <span class="token function">outward_orientation_report</span><span class="token punctuation">(</span>mesh<span class="token punctuation">,</span> sample<span class="token operator">=</span><span class="token number">20_000</span><span class="token punctuation">,</span> seed<span class="token operator">=</span><span class="token number">7</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Does the winding face away from the local surface interior?"""</span>
+    rng <span class="token operator">=</span> np<span class="token punctuation">.</span>random<span class="token punctuation">.</span>default_rng<span class="token punctuation">(</span>seed<span class="token punctuation">)</span>
+    centres <span class="token operator">=</span> mesh<span class="token punctuation">.</span>triangles_center
+    normals <span class="token operator">=</span> mesh<span class="token punctuation">.</span>face_normals
+    n <span class="token operator">=</span> <span class="token builtin">len</span><span class="token punctuation">(</span>centres<span class="token punctuation">)</span>
+    idx <span class="token operator">=</span> rng<span class="token punctuation">.</span>choice<span class="token punctuation">(</span>n<span class="token punctuation">,</span> size<span class="token operator">=</span><span class="token builtin">min</span><span class="token punctuation">(</span>sample<span class="token punctuation">,</span> n<span class="token punctuation">)</span><span class="token punctuation">,</span> replace<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">)</span>
+
+    <span class="token comment"># Offset each centre slightly along its normal and check which side is denser.</span>
+    step <span class="token operator">=</span> <span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>linalg<span class="token punctuation">.</span>norm<span class="token punctuation">(</span>mesh<span class="token punctuation">.</span>extents<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">*</span> <span class="token number">0.002</span>
+    forward <span class="token operator">=</span> centres<span class="token punctuation">[</span>idx<span class="token punctuation">]</span> <span class="token operator">+</span> normals<span class="token punctuation">[</span>idx<span class="token punctuation">]</span> <span class="token operator">*</span> step
+    backward <span class="token operator">=</span> centres<span class="token punctuation">[</span>idx<span class="token punctuation">]</span> <span class="token operator">-</span> normals<span class="token punctuation">[</span>idx<span class="token punctuation">]</span> <span class="token operator">*</span> step
+
+    <span class="token keyword">from</span> scipy<span class="token punctuation">.</span>spatial <span class="token keyword">import</span> cKDTree
+    tree <span class="token operator">=</span> cKDTree<span class="token punctuation">(</span>centres<span class="token punctuation">)</span>
+    d_forward<span class="token punctuation">,</span> _ <span class="token operator">=</span> tree<span class="token punctuation">.</span>query<span class="token punctuation">(</span>forward<span class="token punctuation">,</span> k<span class="token operator">=</span><span class="token number">8</span><span class="token punctuation">,</span> workers<span class="token operator">=</span><span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">)</span>
+    d_backward<span class="token punctuation">,</span> _ <span class="token operator">=</span> tree<span class="token punctuation">.</span>query<span class="token punctuation">(</span>backward<span class="token punctuation">,</span> k<span class="token operator">=</span><span class="token number">8</span><span class="token punctuation">,</span> workers<span class="token operator">=</span><span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">)</span>
+    <span class="token comment"># On a surface, moving outward increases the distance to other faces.</span>
+    outward <span class="token operator">=</span> d_forward<span class="token punctuation">.</span>mean<span class="token punctuation">(</span>axis<span class="token operator">=</span><span class="token number">1</span><span class="token punctuation">)</span> <span class="token operator">></span> d_backward<span class="token punctuation">.</span>mean<span class="token punctuation">(</span>axis<span class="token operator">=</span><span class="token number">1</span><span class="token punctuation">)</span>
+
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token string">"sampled"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>idx<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"outward_share"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>outward<span class="token punctuation">.</span>mean<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"verdict"</span><span class="token punctuation">:</span> <span class="token punctuation">(</span><span class="token string">"winding faces outward"</span> <span class="token keyword">if</span> <span class="token builtin">float</span><span class="token punctuation">(</span>outward<span class="token punctuation">.</span>mean<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">></span> <span class="token number">0.6</span>
+                    <span class="token keyword">else</span> <span class="token string">"winding faces INWARD"</span> <span class="token keyword">if</span> <span class="token builtin">float</span><span class="token punctuation">(</span>outward<span class="token punctuation">.</span>mean<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">&lt;</span> <span class="token number">0.4</span>
+                    <span class="token keyword">else</span> <span class="token string">"ambiguous — the surface is too thin or too flat for this "</span>
+                         <span class="token string">"test"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"note"</span><span class="token punctuation">:</span> <span class="token string">"a heuristic for open meshes; the closed-mesh tests are decisive"</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+</code></pre></div>
+<p>The normal-consistency test is the workhorse because it works on open meshes, which is most surveyed geometry. It compares the normal derived from each face’s winding against the stored vertex normals averaged over that face, and the sign of the dot product says whether they agree.</p>
+<p>An <code>opposed_share</code> near 1.0 means one of the two was flipped wholesale and the mesh is internally contradictory — the third problem in the table. A share around 0.3 is more interesting: it means the flip is patchwise, which happens when normals were oriented by a propagation algorithm that got a region’s sign wrong, as discussed in <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/alpha-shape-reconstruction-with-open3d/">alpha shape reconstruction with Open3D</a>.</p>
+<p>The outward-orientation heuristic is explicitly labelled a heuristic. It works by testing whether stepping along the normal moves away from the rest of the surface, which is reliable on a curved shell and ambiguous on a flat plate — hence the three-way verdict.</p>
+<h3 id="4-check-the-transforms-for-a-negative-determinant" tabindex="-1"><a class="heading-link" href="#4-check-the-transforms-for-a-negative-determinant"><span>4. Check the transforms for a negative determinant</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">transform_report</span><span class="token punctuation">(</span>matrices<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""matrices: {stage_name: 4x4 array}. A negative determinant reverses winding."""</span>
+    rows <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    cumulative <span class="token operator">=</span> np<span class="token punctuation">.</span>identity<span class="token punctuation">(</span><span class="token number">4</span><span class="token punctuation">)</span>
+    <span class="token keyword">for</span> name<span class="token punctuation">,</span> m <span class="token keyword">in</span> matrices<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        m <span class="token operator">=</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>m<span class="token punctuation">,</span> dtype<span class="token operator">=</span>np<span class="token punctuation">.</span>float64<span class="token punctuation">)</span>
+        <span class="token keyword">if</span> m<span class="token punctuation">.</span>shape <span class="token operator">==</span> <span class="token punctuation">(</span><span class="token number">16</span><span class="token punctuation">,</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+            m <span class="token operator">=</span> m<span class="token punctuation">.</span>reshape<span class="token punctuation">(</span><span class="token number">4</span><span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">.</span>T          <span class="token comment"># 3D Tiles column-major</span>
+        linear <span class="token operator">=</span> m<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token number">3</span><span class="token punctuation">,</span> <span class="token punctuation">:</span><span class="token number">3</span><span class="token punctuation">]</span>
+        det <span class="token operator">=</span> <span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>linalg<span class="token punctuation">.</span>det<span class="token punctuation">(</span>linear<span class="token punctuation">)</span><span class="token punctuation">)</span>
+        cumulative <span class="token operator">=</span> cumulative @ m
+        cum_det <span class="token operator">=</span> <span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>linalg<span class="token punctuation">.</span>det<span class="token punctuation">(</span>cumulative<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token number">3</span><span class="token punctuation">,</span> <span class="token punctuation">:</span><span class="token number">3</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+        scales <span class="token operator">=</span> np<span class="token punctuation">.</span>linalg<span class="token punctuation">.</span>norm<span class="token punctuation">(</span>linear<span class="token punctuation">,</span> axis<span class="token operator">=</span><span class="token number">0</span><span class="token punctuation">)</span>
+        rows<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span>
+            <span class="token string">"stage"</span><span class="token punctuation">:</span> name<span class="token punctuation">,</span>
+            <span class="token string">"determinant"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>det<span class="token punctuation">,</span> <span class="token number">6</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"flips_winding"</span><span class="token punctuation">:</span> det <span class="token operator">&lt;</span> <span class="token number">0</span><span class="token punctuation">,</span>
+            <span class="token string">"cumulative_determinant"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>cum_det<span class="token punctuation">,</span> <span class="token number">6</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"cumulative_flips"</span><span class="token punctuation">:</span> cum_det <span class="token operator">&lt;</span> <span class="token number">0</span><span class="token punctuation">,</span>
+            <span class="token string">"scales"</span><span class="token punctuation">:</span> <span class="token punctuation">[</span><span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>s<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">6</span><span class="token punctuation">)</span> <span class="token keyword">for</span> s <span class="token keyword">in</span> scales<span class="token punctuation">]</span><span class="token punctuation">,</span>
+            <span class="token string">"uniform_scale"</span><span class="token punctuation">:</span> <span class="token builtin">bool</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>allclose<span class="token punctuation">(</span>scales<span class="token punctuation">,</span> scales<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">,</span> rtol<span class="token operator">=</span><span class="token number">1e-4</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"has_mirror"</span><span class="token punctuation">:</span> <span class="token builtin">bool</span><span class="token punctuation">(</span>det <span class="token operator">&lt;</span> <span class="token number">0</span> <span class="token keyword">and</span> np<span class="token punctuation">.</span><span class="token builtin">all</span><span class="token punctuation">(</span>scales <span class="token operator">></span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token punctuation">}</span><span class="token punctuation">)</span>
+    flipping <span class="token operator">=</span> <span class="token punctuation">[</span>r <span class="token keyword">for</span> r <span class="token keyword">in</span> rows <span class="token keyword">if</span> r<span class="token punctuation">[</span><span class="token string">"flips_winding"</span><span class="token punctuation">]</span><span class="token punctuation">]</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token string">"stages"</span><span class="token punctuation">:</span> rows<span class="token punctuation">,</span>
+        <span class="token string">"stages_that_flip"</span><span class="token punctuation">:</span> <span class="token punctuation">[</span>r<span class="token punctuation">[</span><span class="token string">"stage"</span><span class="token punctuation">]</span> <span class="token keyword">for</span> r <span class="token keyword">in</span> flipping<span class="token punctuation">]</span><span class="token punctuation">,</span>
+        <span class="token string">"net_flip"</span><span class="token punctuation">:</span> <span class="token builtin">bool</span><span class="token punctuation">(</span>rows <span class="token keyword">and</span> rows<span class="token punctuation">[</span><span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token string">"cumulative_flips"</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"verdict"</span><span class="token punctuation">:</span> <span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span><span class="token builtin">len</span><span class="token punctuation">(</span>flipping<span class="token punctuation">)</span><span class="token punctuation">}</span></span><span class="token string"> stage(s) flip the winding; net effect is "</span></span>
+                    <span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span><span class="token string">'a flip'</span> <span class="token keyword">if</span> rows <span class="token keyword">and</span> rows<span class="token punctuation">[</span><span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token string">'cumulative_flips'</span><span class="token punctuation">]</span> <span class="token keyword">else</span> <span class="token string">'no flip'</span><span class="token punctuation">}</span></span><span class="token string">"</span></span>
+                    <span class="token keyword">if</span> flipping <span class="token keyword">else</span> <span class="token string">"no stage flips the winding"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+
+COMMON_FLIPPING_TRANSFORMS <span class="token operator">=</span> <span class="token punctuation">{</span>
+    <span class="token string">"y_up_to_z_up_wrong_sign"</span><span class="token punctuation">:</span> np<span class="token punctuation">.</span>array<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+                                         <span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+                                        dtype<span class="token operator">=</span><span class="token builtin">float</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token string">"mirror_x"</span><span class="token punctuation">:</span> np<span class="token punctuation">.</span>diag<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token operator">-</span><span class="token number">1.0</span><span class="token punctuation">,</span> <span class="token number">1.0</span><span class="token punctuation">,</span> <span class="token number">1.0</span><span class="token punctuation">,</span> <span class="token number">1.0</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token string">"left_to_right_handed"</span><span class="token punctuation">:</span> np<span class="token punctuation">.</span>diag<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token number">1.0</span><span class="token punctuation">,</span> <span class="token number">1.0</span><span class="token punctuation">,</span> <span class="token operator">-</span><span class="token number">1.0</span><span class="token punctuation">,</span> <span class="token number">1.0</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token string">"correct_y_up_to_z_up"</span><span class="token punctuation">:</span> np<span class="token punctuation">.</span>array<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+                                      <span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">]</span><span class="token punctuation">,</span> dtype<span class="token operator">=</span><span class="token builtin">float</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">for</span> name<span class="token punctuation">,</span> m <span class="token keyword">in</span> COMMON_FLIPPING_TRANSFORMS<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    det <span class="token operator">=</span> <span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>linalg<span class="token punctuation">.</span>det<span class="token punctuation">(</span>m<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token number">3</span><span class="token punctuation">,</span> <span class="token punctuation">:</span><span class="token number">3</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>name<span class="token punctuation">:</span><span class="token format-spec">&lt;32</span><span class="token punctuation">}</span></span><span class="token string">det </span><span class="token interpolation"><span class="token punctuation">{</span>det<span class="token punctuation">:</span><span class="token format-spec">+.1f</span><span class="token punctuation">}</span></span><span class="token string">  </span><span class="token interpolation"><span class="token punctuation">{</span><span class="token string">'FLIPS'</span> <span class="token keyword">if</span> det <span class="token operator">&lt;</span> <span class="token number">0</span> <span class="token keyword">else</span> <span class="token string">'ok'</span><span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>A transform with a negative determinant reverses winding, and that is the mechanical cause of most inversions in a multi-stage pipeline. A mirror, a left-handed-to-right-handed conversion, and an axis swap done with the wrong sign all have determinant −1, and applying one silently turns every outward face inward.</p>
+<p>The Y-up to Z-up conversion is the specific trap. The correct matrix has determinant +1 and the naive one — swapping Y and Z without negating — has determinant −1, so a pipeline that “fixes” the up axis by exchanging two rows reverses every face in the process.</p>
+<p>Checking the <strong>cumulative</strong> determinant matters because two flips cancel. A pipeline with a mirror at stage 3 and another at stage 6 produces correct output, and fixing only one breaks it — which is exactly the kind of change that makes a “fix” produce a new bug report.</p>
+<figure class="diagram">
+<svg viewBox="4 6 732 240" role="img" aria-labelledby="normals-det-t normals-det-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="normals-det-t">Transforms that reverse winding, and the cumulative effect</title>
+  <desc id="normals-det-d">A table of four transform matrices with their determinants. The correct Y-up to Z-up rotation has determinant plus one and preserves winding. The naive version that swaps rows without negating one has determinant minus one and flips it. A mirror on the X axis has determinant minus one. A left-handed to right-handed conversion has determinant minus one. The cumulative row shows that two flips in a pipeline cancel, so fixing only one of them breaks output that currently looks correct.</desc>
+  <rect class="svg-bg" x="4" y="6" width="732" height="240" fill="#ffffff"/>
+  <g stroke-width="1.5">
+    <rect x="18" y="20" width="286" height="32" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="304" y="20" width="130" height="32" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="434" y="20" width="288" height="32" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="18" y="52" width="286" height="32" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="304" y="52" width="130" height="32" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="434" y="52" width="288" height="32" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="18" y="84" width="286" height="32" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="304" y="84" width="130" height="32" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="434" y="84" width="288" height="32" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="18" y="116" width="286" height="32" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="304" y="116" width="130" height="32" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="434" y="116" width="288" height="32" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="18" y="148" width="286" height="32" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="304" y="148" width="130" height="32" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="434" y="148" width="288" height="32" fill="#f7dfdc" stroke="#b0413e"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="161" y="41">transform</text><text x="369" y="41">determinant</text>
+    <text x="578" y="41">effect on winding</text>
+    <text x="161" y="73">correct Y-up to Z-up rotation</text>
+    <text x="369" y="73">+1</text><text x="578" y="73">preserved</text>
+    <text x="161" y="105">Y and Z swapped, neither negated</text>
+    <text x="369" y="105">−1</text><text x="578" y="105">reversed — the classic mistake</text>
+    <text x="161" y="137">mirror on X</text>
+    <text x="369" y="137">−1</text><text x="578" y="137">reversed</text>
+    <text x="161" y="169">left-handed to right-handed</text>
+    <text x="369" y="169">−1</text><text x="578" y="169">reversed</text>
+  </g>
+  <text x="18" y="206" fill="#1f2937" font-size="12.5">two flipping stages in one pipeline cancel: the cumulative determinant returns to +1</text>
+  <text x="18" y="228" fill="#5b6471" font-size="12">so fixing one of them breaks output that currently looks correct — fix all or none</text>
+</svg>
+<figcaption>A determinant of −1 is the mechanical cause; checking the cumulative product is what stops a fix from becoming a regression.</figcaption>
+</figure>
+<h3 id="5-test-at-every-handoff-and-bisect" tabindex="-1"><a class="heading-link" href="#5-test-at-every-handoff-and-bisect"><span>5. Test at every handoff and bisect</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">stage_probe</span><span class="token punctuation">(</span>path<span class="token punctuation">,</span> label<span class="token punctuation">,</span> expected_closed<span class="token operator">=</span><span class="token boolean">None</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    mesh <span class="token operator">=</span> trimesh<span class="token punctuation">.</span>load<span class="token punctuation">(</span>path<span class="token punctuation">,</span> process<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">,</span> force<span class="token operator">=</span><span class="token string">"mesh"</span><span class="token punctuation">)</span>
+    winding <span class="token operator">=</span> winding_report<span class="token punctuation">(</span>mesh<span class="token punctuation">)</span>
+    normals <span class="token operator">=</span> normal_consistency_report<span class="token punctuation">(</span>mesh<span class="token punctuation">)</span>
+    parity <span class="token operator">=</span> ray_parity_report<span class="token punctuation">(</span>mesh<span class="token punctuation">)</span> <span class="token keyword">if</span> mesh<span class="token punctuation">.</span>is_watertight <span class="token keyword">else</span> <span class="token punctuation">{</span><span class="token string">"applicable"</span><span class="token punctuation">:</span> <span class="token boolean">False</span><span class="token punctuation">}</span>
+    heuristic <span class="token operator">=</span> <span class="token punctuation">(</span>outward_orientation_report<span class="token punctuation">(</span>mesh<span class="token punctuation">)</span>
+                 <span class="token keyword">if</span> <span class="token keyword">not</span> mesh<span class="token punctuation">.</span>is_watertight <span class="token keyword">else</span> <span class="token punctuation">{</span><span class="token string">"skipped"</span><span class="token punctuation">:</span> <span class="token string">"closed mesh"</span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+
+    inverted <span class="token operator">=</span> <span class="token boolean">None</span>
+    <span class="token keyword">if</span> winding<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"winding_outward"</span><span class="token punctuation">)</span> <span class="token keyword">is</span> <span class="token boolean">False</span><span class="token punctuation">:</span>
+        inverted <span class="token operator">=</span> <span class="token string">"winding_reversed"</span>
+    <span class="token keyword">elif</span> normals<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"opposed_share"</span><span class="token punctuation">,</span> <span class="token number">0.0</span><span class="token punctuation">)</span> <span class="token operator">></span> <span class="token number">0.9</span><span class="token punctuation">:</span>
+        inverted <span class="token operator">=</span> <span class="token string">"winding_and_normals_disagree"</span>
+    <span class="token keyword">elif</span> normals<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"opposed_share"</span><span class="token punctuation">,</span> <span class="token number">0.0</span><span class="token punctuation">)</span> <span class="token operator">></span> <span class="token number">0.05</span><span class="token punctuation">:</span>
+        inverted <span class="token operator">=</span> <span class="token string">"patchwise_normals_flipped"</span>
+    <span class="token keyword">elif</span> heuristic<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"verdict"</span><span class="token punctuation">,</span> <span class="token string">""</span><span class="token punctuation">)</span><span class="token punctuation">.</span>endswith<span class="token punctuation">(</span><span class="token string">"INWARD"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        inverted <span class="token operator">=</span> <span class="token string">"winding_reversed_open_mesh"</span>
+
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token string">"stage"</span><span class="token punctuation">:</span> label<span class="token punctuation">,</span>
+        <span class="token string">"path"</span><span class="token punctuation">:</span> <span class="token builtin">str</span><span class="token punctuation">(</span>path<span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"faces"</span><span class="token punctuation">:</span> winding<span class="token punctuation">[</span><span class="token string">"faces"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+        <span class="token string">"watertight"</span><span class="token punctuation">:</span> winding<span class="token punctuation">[</span><span class="token string">"watertight"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+        <span class="token string">"signed_volume_m3"</span><span class="token punctuation">:</span> winding<span class="token punctuation">[</span><span class="token string">"signed_volume_m3"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+        <span class="token string">"opposed_share"</span><span class="token punctuation">:</span> normals<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"opposed_share"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"parity_consistent"</span><span class="token punctuation">:</span> parity<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"consistent"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"heuristic"</span><span class="token punctuation">:</span> heuristic<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"verdict"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"inverted"</span><span class="token punctuation">:</span> inverted<span class="token punctuation">,</span>
+        <span class="token string">"clean"</span><span class="token punctuation">:</span> inverted <span class="token keyword">is</span> <span class="token boolean">None</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+
+<span class="token keyword">def</span> <span class="token function">bisect_pipeline</span><span class="token punctuation">(</span>stage_paths<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""stage_paths: ordered [(label, path), ...] from source to output."""</span>
+    probes <span class="token operator">=</span> <span class="token punctuation">[</span>stage_probe<span class="token punctuation">(</span>path<span class="token punctuation">,</span> label<span class="token punctuation">)</span> <span class="token keyword">for</span> label<span class="token punctuation">,</span> path <span class="token keyword">in</span> stage_paths<span class="token punctuation">]</span>
+    first_bad <span class="token operator">=</span> <span class="token builtin">next</span><span class="token punctuation">(</span><span class="token punctuation">(</span>i <span class="token keyword">for</span> i<span class="token punctuation">,</span> p <span class="token keyword">in</span> <span class="token builtin">enumerate</span><span class="token punctuation">(</span>probes<span class="token punctuation">)</span> <span class="token keyword">if</span> <span class="token keyword">not</span> p<span class="token punctuation">[</span><span class="token string">"clean"</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token boolean">None</span><span class="token punctuation">)</span>
+    <span class="token keyword">if</span> first_bad <span class="token keyword">is</span> <span class="token boolean">None</span><span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"probes"</span><span class="token punctuation">:</span> probes<span class="token punctuation">,</span> <span class="token string">"culprit"</span><span class="token punctuation">:</span> <span class="token boolean">None</span><span class="token punctuation">,</span>
+                <span class="token string">"verdict"</span><span class="token punctuation">:</span> <span class="token string">"no stage inverted anything; look at the material and "</span>
+                           <span class="token string">"the renderer's culling"</span><span class="token punctuation">}</span>
+    culprit <span class="token operator">=</span> probes<span class="token punctuation">[</span>first_bad<span class="token punctuation">]</span>
+    previous <span class="token operator">=</span> probes<span class="token punctuation">[</span>first_bad <span class="token operator">-</span> <span class="token number">1</span><span class="token punctuation">]</span> <span class="token keyword">if</span> first_bad <span class="token operator">></span> <span class="token number">0</span> <span class="token keyword">else</span> <span class="token boolean">None</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token string">"probes"</span><span class="token punctuation">:</span> probes<span class="token punctuation">,</span>
+        <span class="token string">"culprit_stage"</span><span class="token punctuation">:</span> culprit<span class="token punctuation">[</span><span class="token string">"stage"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+        <span class="token string">"culprit_index"</span><span class="token punctuation">:</span> first_bad<span class="token punctuation">,</span>
+        <span class="token string">"problem"</span><span class="token punctuation">:</span> culprit<span class="token punctuation">[</span><span class="token string">"inverted"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+        <span class="token string">"was_clean_before"</span><span class="token punctuation">:</span> previous<span class="token punctuation">[</span><span class="token string">"stage"</span><span class="token punctuation">]</span> <span class="token keyword">if</span> previous <span class="token keyword">else</span> <span class="token string">"source is already bad"</span><span class="token punctuation">,</span>
+        <span class="token string">"verdict"</span><span class="token punctuation">:</span> <span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"'</span><span class="token interpolation"><span class="token punctuation">{</span>culprit<span class="token punctuation">[</span><span class="token string">'stage'</span><span class="token punctuation">]</span><span class="token punctuation">}</span></span><span class="token string">' introduced </span><span class="token interpolation"><span class="token punctuation">{</span>culprit<span class="token punctuation">[</span><span class="token string">'inverted'</span><span class="token punctuation">]</span><span class="token punctuation">}</span></span><span class="token string">"</span></span>
+                    <span class="token keyword">if</span> previous
+                    <span class="token keyword">else</span> <span class="token string-interpolation"><span class="token string">f"the source mesh already has </span><span class="token interpolation"><span class="token punctuation">{</span>culprit<span class="token punctuation">[</span><span class="token string">'inverted'</span><span class="token punctuation">]</span><span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+</code></pre></div>
+<p>Probing at every handoff and taking the <strong>first</strong> failing stage is the whole method. A pipeline of eight stages has eight candidate culprits, and testing the output tells you only that something went wrong; testing each boundary tells you which one.</p>
+<p>Saving intermediates is the prerequisite and is worth the disk. A pipeline that writes <code>stage_1_cleaned.ply</code>, <code>stage_2_decimated.ply</code> and so on can be bisected in one run of this function, and one that writes only its final output cannot be diagnosed at all without re-running it repeatedly.</p>
+<p>The “source is already bad” case is worth calling out separately, because it happens and it redirects the investigation entirely — to the scanner’s export settings or the vendor’s delivery rather than to your code.</p>
+<h3 id="6-fix-the-identified-problem-and-only-that-one" tabindex="-1"><a class="heading-link" href="#6-fix-the-identified-problem-and-only-that-one"><span>6. Fix the identified problem, and only that one</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">fix_winding</span><span class="token punctuation">(</span>mesh_path<span class="token punctuation">,</span> out_path<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    mesh <span class="token operator">=</span> trimesh<span class="token punctuation">.</span>load<span class="token punctuation">(</span>mesh_path<span class="token punctuation">,</span> process<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">,</span> force<span class="token operator">=</span><span class="token string">"mesh"</span><span class="token punctuation">)</span>
+    before <span class="token operator">=</span> winding_report<span class="token punctuation">(</span>mesh<span class="token punctuation">)</span>
+    faces <span class="token operator">=</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>mesh<span class="token punctuation">.</span>faces<span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token punctuation">:</span><span class="token punctuation">:</span><span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">]</span>
+    fixed <span class="token operator">=</span> trimesh<span class="token punctuation">.</span>Trimesh<span class="token punctuation">(</span>vertices<span class="token operator">=</span>mesh<span class="token punctuation">.</span>vertices<span class="token punctuation">,</span> faces<span class="token operator">=</span>faces<span class="token punctuation">,</span> process<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">)</span>
+    fixed<span class="token punctuation">.</span>export<span class="token punctuation">(</span>out_path<span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"before"</span><span class="token punctuation">:</span> before<span class="token punctuation">,</span> <span class="token string">"after"</span><span class="token punctuation">:</span> winding_report<span class="token punctuation">(</span>fixed<span class="token punctuation">)</span><span class="token punctuation">,</span>
+             <span class="token string">"action"</span><span class="token punctuation">:</span> <span class="token string">"reversed the face index order"</span><span class="token punctuation">}</span>
+
+<span class="token keyword">def</span> <span class="token function">fix_normals_from_winding</span><span class="token punctuation">(</span>mesh_path<span class="token punctuation">,</span> out_path<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    mesh <span class="token operator">=</span> trimesh<span class="token punctuation">.</span>load<span class="token punctuation">(</span>mesh_path<span class="token punctuation">,</span> process<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">,</span> force<span class="token operator">=</span><span class="token string">"mesh"</span><span class="token punctuation">)</span>
+    before <span class="token operator">=</span> normal_consistency_report<span class="token punctuation">(</span>mesh<span class="token punctuation">)</span>
+    fixed <span class="token operator">=</span> trimesh<span class="token punctuation">.</span>Trimesh<span class="token punctuation">(</span>vertices<span class="token operator">=</span>mesh<span class="token punctuation">.</span>vertices<span class="token punctuation">,</span> faces<span class="token operator">=</span>mesh<span class="token punctuation">.</span>faces<span class="token punctuation">,</span>
+                            process<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">)</span>
+    fixed<span class="token punctuation">.</span>rezero<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">if</span> <span class="token boolean">False</span> <span class="token keyword">else</span> <span class="token boolean">None</span>
+    fixed<span class="token punctuation">.</span>vertex_normals <span class="token operator">=</span> <span class="token boolean">None</span>                 <span class="token comment"># force recomputation</span>
+    _ <span class="token operator">=</span> fixed<span class="token punctuation">.</span>vertex_normals                     <span class="token comment"># trimesh recomputes from winding</span>
+    fixed<span class="token punctuation">.</span>export<span class="token punctuation">(</span>out_path<span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"before"</span><span class="token punctuation">:</span> before<span class="token punctuation">,</span> <span class="token string">"after"</span><span class="token punctuation">:</span> normal_consistency_report<span class="token punctuation">(</span>fixed<span class="token punctuation">)</span><span class="token punctuation">,</span>
+             <span class="token string">"action"</span><span class="token punctuation">:</span> <span class="token string">"recomputed vertex normals from the face winding"</span><span class="token punctuation">}</span>
+
+<span class="token keyword">def</span> <span class="token function">fix_with_pymeshlab</span><span class="token punctuation">(</span>mesh_path<span class="token punctuation">,</span> out_path<span class="token punctuation">,</span> reorient<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""For a patchwise problem, propagate a consistent orientation."""</span>
+    <span class="token keyword">import</span> pymeshlab <span class="token keyword">as</span> ml
+    ms <span class="token operator">=</span> ml<span class="token punctuation">.</span>MeshSet<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    ms<span class="token punctuation">.</span>load_new_mesh<span class="token punctuation">(</span><span class="token builtin">str</span><span class="token punctuation">(</span>mesh_path<span class="token punctuation">)</span><span class="token punctuation">)</span>
+    ms<span class="token punctuation">.</span>apply_filter<span class="token punctuation">(</span><span class="token string">"meshing_remove_duplicate_vertices"</span><span class="token punctuation">)</span>
+    ms<span class="token punctuation">.</span>apply_filter<span class="token punctuation">(</span><span class="token string">"meshing_remove_null_faces"</span><span class="token punctuation">)</span>
+    <span class="token keyword">if</span> reorient<span class="token punctuation">:</span>
+        ms<span class="token punctuation">.</span>apply_filter<span class="token punctuation">(</span><span class="token string">"meshing_re_orient_faces_coherently"</span><span class="token punctuation">)</span>
+    ms<span class="token punctuation">.</span>apply_filter<span class="token punctuation">(</span><span class="token string">"compute_normal_per_vertex"</span><span class="token punctuation">)</span>
+    ms<span class="token punctuation">.</span>save_current_mesh<span class="token punctuation">(</span><span class="token builtin">str</span><span class="token punctuation">(</span>out_path<span class="token punctuation">)</span><span class="token punctuation">)</span>
+    mesh <span class="token operator">=</span> trimesh<span class="token punctuation">.</span>load<span class="token punctuation">(</span>out_path<span class="token punctuation">,</span> process<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">,</span> force<span class="token operator">=</span><span class="token string">"mesh"</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"action"</span><span class="token punctuation">:</span> <span class="token string">"re-oriented faces coherently and recomputed normals"</span><span class="token punctuation">,</span>
+            <span class="token string">"winding"</span><span class="token punctuation">:</span> winding_report<span class="token punctuation">(</span>mesh<span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"normals"</span><span class="token punctuation">:</span> normal_consistency_report<span class="token punctuation">(</span>mesh<span class="token punctuation">)</span><span class="token punctuation">}</span>
+
+FIX_FOR <span class="token operator">=</span> <span class="token punctuation">{</span>
+    <span class="token string">"winding_reversed"</span><span class="token punctuation">:</span> fix_winding<span class="token punctuation">,</span>
+    <span class="token string">"winding_reversed_open_mesh"</span><span class="token punctuation">:</span> fix_winding<span class="token punctuation">,</span>
+    <span class="token string">"winding_and_normals_disagree"</span><span class="token punctuation">:</span> fix_normals_from_winding<span class="token punctuation">,</span>
+    <span class="token string">"patchwise_normals_flipped"</span><span class="token punctuation">:</span> fix_with_pymeshlab<span class="token punctuation">,</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">def</span> <span class="token function">apply_fix</span><span class="token punctuation">(</span>bisect_result<span class="token punctuation">,</span> stage_paths<span class="token punctuation">,</span> out_dir<span class="token operator">=</span><span class="token string">"build/fixed"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    problem <span class="token operator">=</span> bisect_result<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"problem"</span><span class="token punctuation">)</span>
+    <span class="token keyword">if</span> problem <span class="token keyword">is</span> <span class="token boolean">None</span><span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"action"</span><span class="token punctuation">:</span> <span class="token string">"none"</span><span class="token punctuation">,</span> <span class="token string">"reason"</span><span class="token punctuation">:</span> bisect_result<span class="token punctuation">[</span><span class="token string">"verdict"</span><span class="token punctuation">]</span><span class="token punctuation">}</span>
+    fixer <span class="token operator">=</span> FIX_FOR<span class="token punctuation">.</span>get<span class="token punctuation">(</span>problem<span class="token punctuation">)</span>
+    <span class="token keyword">if</span> fixer <span class="token keyword">is</span> <span class="token boolean">None</span><span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"action"</span><span class="token punctuation">:</span> <span class="token string">"none"</span><span class="token punctuation">,</span> <span class="token string">"reason"</span><span class="token punctuation">:</span> <span class="token string-interpolation"><span class="token string">f"no automatic fix for </span><span class="token interpolation"><span class="token punctuation">{</span>problem<span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">}</span>
+    label<span class="token punctuation">,</span> path <span class="token operator">=</span> stage_paths<span class="token punctuation">[</span>bisect_result<span class="token punctuation">[</span><span class="token string">"culprit_index"</span><span class="token punctuation">]</span><span class="token punctuation">]</span>
+    Path<span class="token punctuation">(</span>out_dir<span class="token punctuation">)</span><span class="token punctuation">.</span>mkdir<span class="token punctuation">(</span>parents<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> exist_ok<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+    out <span class="token operator">=</span> Path<span class="token punctuation">(</span>out_dir<span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>label<span class="token punctuation">}</span></span><span class="token string">_fixed</span><span class="token interpolation"><span class="token punctuation">{</span>Path<span class="token punctuation">(</span>path<span class="token punctuation">)</span><span class="token punctuation">.</span>suffix<span class="token punctuation">}</span></span><span class="token string">"</span></span>
+    result <span class="token operator">=</span> fixer<span class="token punctuation">(</span>path<span class="token punctuation">,</span> out<span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"problem"</span><span class="token punctuation">:</span> problem<span class="token punctuation">,</span> <span class="token string">"stage"</span><span class="token punctuation">:</span> label<span class="token punctuation">,</span> <span class="token string">"output"</span><span class="token punctuation">:</span> <span class="token builtin">str</span><span class="token punctuation">(</span>out<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token operator">**</span>result<span class="token punctuation">}</span>
+</code></pre></div>
+<p>Applying the fix that matches the diagnosed problem — and not a different one — is the discipline this page exists to enforce. <code>fix_winding</code> on a mesh whose problem is flipped stored normals converts a lighting bug into a culling bug, and the report says the geometry changed, so it looks like progress.</p>
+<p>Fixing at the <strong>culprit stage</strong> rather than at the output is the other half. Reversing the winding on the final GLB works and leaves the bug in the pipeline, so it returns with the next delivery; fixing the stage that introduced it fixes it permanently.</p>
+<p><code>meshing_re_orient_faces_coherently</code> in PyMeshLab is the right tool for the patchwise case, because it propagates a consistent orientation across the mesh rather than applying a uniform flip — which is what a patchwise problem needs and what a wholesale reversal cannot do.</p>
+<figure class="diagram">
+<svg viewBox="0 48 740 208" role="img" aria-labelledby="normals-bisect-t normals-bisect-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="normals-bisect-t">Bisecting an eight-stage pipeline</title>
+  <desc id="normals-bisect-d">Eight pipeline stages tested in order. The source scan, cleaning, decimation and planar simplification all pass. The coordinate conversion stage fails with a negative signed volume, because its Y-up to Z-up matrix has determinant minus one. The texture projection, glTF export and tiling stages inherit the problem. The first failing stage is the culprit, and fixing the matrix there fixes every stage after it.</desc>
+  <rect class="svg-bg" x="0" y="48" width="740" height="208" fill="#ffffff"/>
+  <defs>
+    <marker id="normals-bisect-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
+    </marker>
+  </defs>
+  <g stroke-width="1.6">
+    <rect x="16" y="64" width="80" height="52" rx="7" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="106" y="64" width="80" height="52" rx="7" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="196" y="64" width="80" height="52" rx="7" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="286" y="64" width="80" height="52" rx="7" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="376" y="64" width="96" height="52" rx="7" fill="#f7dfdc" stroke="#b0413e" stroke-width="2.6"/>
+    <rect x="482" y="64" width="80" height="52" rx="7" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="572" y="64" width="72" height="52" rx="7" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="654" y="64" width="72" height="52" rx="7" fill="#fdf3e0" stroke="#c46a3d"/>
+  </g>
+  <g stroke="#5b6471" stroke-width="1.6" fill="none" marker-end="url(#normals-bisect-arrow)">
+    <path d="M96 90 H104"/><path d="M186 90 H194"/><path d="M276 90 H284"/>
+    <path d="M366 90 H374"/><path d="M472 90 H480"/><path d="M562 90 H570"/>
+    <path d="M644 90 H652"/>
+  </g>
+  <g fill="#1f2937" font-size="11" text-anchor="middle">
+    <text x="56" y="86">scan</text><text x="56" y="102">✓</text>
+    <text x="146" y="86">clean</text><text x="146" y="102">✓</text>
+    <text x="236" y="86">decimate</text><text x="236" y="102">✓</text>
+    <text x="326" y="86">planar</text><text x="326" y="102">✓</text>
+    <text x="424" y="80">CRS convert</text><text x="424" y="96">✗ det −1</text>
+    <text x="522" y="86">texture</text><text x="522" y="102">✗</text>
+    <text x="608" y="86">glTF</text><text x="608" y="102">✗</text>
+    <text x="690" y="86">tile</text><text x="690" y="102">✗</text>
+  </g>
+  <path d="M424 122 V148" stroke="#b0413e" stroke-width="2" fill="none"/>
+  <text x="424" y="166" fill="#b0413e" font-size="12.5" text-anchor="middle">first failing stage — the culprit</text>
+  <text x="424" y="188" fill="#1f2937" font-size="12.5" text-anchor="middle">its Y-up to Z-up matrix swaps rows without negating one</text>
+  <text x="370" y="220" fill="#1f2937" font-size="12.5" text-anchor="middle">the three stages after it inherit the problem and are not at fault</text>
+  <text x="370" y="240" fill="#5b6471" font-size="12" text-anchor="middle">fixing the output instead of the culprit leaves the bug for the next delivery</text>
+</svg>
+<figcaption>Four stages pass, one fails and three inherit; only the first failure is worth fixing.</figcaption>
+</figure>
+<h2 id="expected-output-verification" tabindex="-1"><a class="heading-link" href="#expected-output-verification"><span>Expected Output &amp; Verification</span></a></h2>
+<div class="codeblock" data-lang="text"><div class="codeblock__bar"><span class="codeblock__lang">text</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-text" tabindex="0" role="group" aria-label="text code sample"><code class="language-text">correct_y_up_to_z_up            det +1.0  ok
+y_up_to_z_up_wrong_sign         det -1.0  FLIPS
+mirror_x                        det -1.0  FLIPS
+left_to_right_handed            det -1.0  FLIPS
+{
+  "stages": [
+    {"stage": "scan_export", "determinant": 1.0, "flips_winding": false,
+     "cumulative_determinant": 1.0, "cumulative_flips": false},
+    {"stage": "crs_convert", "determinant": -1.0, "flips_winding": true,
+     "cumulative_determinant": -1.0, "cumulative_flips": true},
+    {"stage": "tile_transform", "determinant": 1.0, "flips_winding": false,
+     "cumulative_determinant": -1.0, "cumulative_flips": true}
+  ],
+  "stages_that_flip": ["crs_convert"],
+  "net_flip": true,
+  "verdict": "1 stage(s) flip the winding; net effect is a flip"
+}
+{
+  "probes": [
+    {"stage": "scan", "faces": 412084, "watertight": false,
+     "signed_volume_m3": 18412.4, "opposed_share": 0.0012,
+     "heuristic": "winding faces outward", "inverted": null, "clean": true},
+    {"stage": "clean", "faces": 411802, "opposed_share": 0.0011,
+     "heuristic": "winding faces outward", "inverted": null, "clean": true},
+    {"stage": "decimate", "faces": 100000, "opposed_share": 0.0014,
+     "heuristic": "winding faces outward", "inverted": null, "clean": true},
+    {"stage": "planar", "faces": 1840, "opposed_share": 0.0000,
+     "heuristic": "winding faces outward", "inverted": null, "clean": true},
+    {"stage": "crs_convert", "faces": 1840, "signed_volume_m3": -18398.1,
+     "opposed_share": 0.9984, "heuristic": "winding faces INWARD",
+     "inverted": "winding_and_normals_disagree", "clean": false}
+  ],
+  "culprit_stage": "crs_convert",
+  "culprit_index": 4,
+  "problem": "winding_and_normals_disagree",
+  "was_clean_before": "planar",
+  "verdict": "'crs_convert' introduced winding_and_normals_disagree"
+}
+</code></pre></div>
+<p>The transform report and the bisect agree, which is the confirmation worth having: a determinant of −1 at <code>crs_convert</code> and the first failing probe at the same stage. The matrix swaps Y and Z without negating one of them, which is the naive Y-up to Z-up conversion.</p>
+<p>The <code>opposed_share</code> of 0.9984 identifies the problem as the third kind — winding and normals contradicting — because the transform reversed the winding while leaving the stored normals untouched. Reversing the faces would leave the normals still wrong; recomputing the normals from the corrected winding is the fix.</p>
+<p>Verify the fix at every stage, not just at the culprit:</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">verify_after_fix</span><span class="token punctuation">(</span>stage_paths<span class="token punctuation">,</span> fixed_stage_index<span class="token punctuation">,</span> out_dir<span class="token operator">=</span><span class="token string">"build/fixed"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Re-run the whole pipeline probe after fixing the culprit."""</span>
+    probes <span class="token operator">=</span> <span class="token punctuation">[</span>stage_probe<span class="token punctuation">(</span>path<span class="token punctuation">,</span> label<span class="token punctuation">)</span> <span class="token keyword">for</span> label<span class="token punctuation">,</span> path <span class="token keyword">in</span> stage_paths<span class="token punctuation">]</span>
+    still_bad <span class="token operator">=</span> <span class="token punctuation">[</span>p <span class="token keyword">for</span> p <span class="token keyword">in</span> probes <span class="token keyword">if</span> <span class="token keyword">not</span> p<span class="token punctuation">[</span><span class="token string">"clean"</span><span class="token punctuation">]</span><span class="token punctuation">]</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token string">"stages"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>probes<span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"still_failing"</span><span class="token punctuation">:</span> <span class="token punctuation">[</span>p<span class="token punctuation">[</span><span class="token string">"stage"</span><span class="token punctuation">]</span> <span class="token keyword">for</span> p <span class="token keyword">in</span> still_bad<span class="token punctuation">]</span><span class="token punctuation">,</span>
+        <span class="token string">"fixed_stage"</span><span class="token punctuation">:</span> stage_paths<span class="token punctuation">[</span>fixed_stage_index<span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+        <span class="token string">"all_clean"</span><span class="token punctuation">:</span> <span class="token keyword">not</span> still_bad<span class="token punctuation">,</span>
+        <span class="token string">"verdict"</span><span class="token punctuation">:</span> <span class="token punctuation">(</span><span class="token string">"every stage is clean"</span> <span class="token keyword">if</span> <span class="token keyword">not</span> still_bad
+                    <span class="token keyword">else</span> <span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span><span class="token builtin">len</span><span class="token punctuation">(</span>still_bad<span class="token punctuation">)</span><span class="token punctuation">}</span></span><span class="token string"> stage(s) still fail — either the fix was "</span></span>
+                         <span class="token string-interpolation"><span class="token string">f"applied to the output rather than the pipeline, or there "</span></span>
+                         <span class="token string-interpolation"><span class="token string">f"is a second flip downstream"</span></span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+
+<span class="token keyword">def</span> <span class="token function">double_flip_check</span><span class="token punctuation">(</span>matrices<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Two flips cancel; fixing one of them breaks a pipeline that worked."""</span>
+    report <span class="token operator">=</span> transform_report<span class="token punctuation">(</span>matrices<span class="token punctuation">)</span>
+    flipping <span class="token operator">=</span> report<span class="token punctuation">[</span><span class="token string">"stages_that_flip"</span><span class="token punctuation">]</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token string">"flipping_stages"</span><span class="token punctuation">:</span> flipping<span class="token punctuation">,</span>
+        <span class="token string">"count"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>flipping<span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"net_flip"</span><span class="token punctuation">:</span> report<span class="token punctuation">[</span><span class="token string">"net_flip"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+        <span class="token string">"warning"</span><span class="token punctuation">:</span> <span class="token punctuation">(</span><span class="token string">"two or more stages flip the winding and they cancel — fixing "</span>
+                    <span class="token string">"one of them will break output that currently looks correct; "</span>
+                    <span class="token string">"fix all of them or none"</span>
+                    <span class="token keyword">if</span> <span class="token builtin">len</span><span class="token punctuation">(</span>flipping<span class="token punctuation">)</span> <span class="token operator">>=</span> <span class="token number">2</span> <span class="token keyword">and</span> <span class="token keyword">not</span> report<span class="token punctuation">[</span><span class="token string">"net_flip"</span><span class="token punctuation">]</span> <span class="token keyword">else</span> <span class="token boolean">None</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"advice"</span><span class="token punctuation">:</span> <span class="token punctuation">(</span><span class="token string">"remove every negative-determinant transform and re-test"</span>
+                   <span class="token keyword">if</span> <span class="token builtin">len</span><span class="token punctuation">(</span>flipping<span class="token punctuation">)</span> <span class="token operator">>=</span> <span class="token number">2</span> <span class="token keyword">else</span> <span class="token string">"fix the single flipping stage"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+</code></pre></div>
+<p>The double-flip warning is the one that saves a regression. A pipeline with two cancelling flips produces correct output, and a well-meaning fix to one of them introduces the bug — so the check reports the situation explicitly rather than letting someone discover it.</p>
+<p>Then verify the renderer’s own view, because the geometric tests and the visible result can still disagree:</p>
+<div class="codeblock" data-lang="javascript"><div class="codeblock__bar"><span class="codeblock__lang">javascript</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-javascript" tabindex="0" role="group" aria-label="javascript code sample"><code class="language-javascript"><span class="token keyword">export</span> <span class="token keyword">async</span> <span class="token keyword">function</span> <span class="token function">rendererVerification</span><span class="token punctuation">(</span><span class="token parameter">viewer<span class="token punctuation">,</span> tilesetUrl</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+  <span class="token keyword">const</span> tileset <span class="token operator">=</span> <span class="token keyword">await</span> Cesium<span class="token punctuation">.</span>Cesium3DTileset<span class="token punctuation">.</span><span class="token function">fromUrl</span><span class="token punctuation">(</span>tilesetUrl<span class="token punctuation">,</span> <span class="token punctuation">{</span>
+    <span class="token literal-property property">maximumScreenSpaceError</span><span class="token operator">:</span> <span class="token number">16</span><span class="token punctuation">,</span>
+  <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  viewer<span class="token punctuation">.</span>scene<span class="token punctuation">.</span>primitives<span class="token punctuation">.</span><span class="token function">add</span><span class="token punctuation">(</span>tileset<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">await</span> <span class="token keyword">new</span> <span class="token class-name">Promise</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">r</span><span class="token punctuation">)</span> <span class="token operator">=></span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> <span class="token function-variable function">tick</span> <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">=></span> <span class="token punctuation">(</span>tileset<span class="token punctuation">.</span>tilesLoaded <span class="token operator">?</span> <span class="token function">r</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">:</span> <span class="token function">requestAnimationFrame</span><span class="token punctuation">(</span>tick<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token function">tick</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+  <span class="token keyword">const</span> materials <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+  <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">const</span> tile <span class="token keyword">of</span> tileset<span class="token punctuation">.</span>_selectedTiles <span class="token operator">??</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> gltf <span class="token operator">=</span> tile<span class="token punctuation">.</span>content<span class="token operator">?.</span>_model<span class="token operator">?.</span>gltf <span class="token operator">??</span> tile<span class="token punctuation">.</span>content<span class="token operator">?.</span>gltf<span class="token punctuation">;</span>
+    <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">const</span> material <span class="token keyword">of</span> gltf<span class="token operator">?.</span>materials <span class="token operator">??</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      materials<span class="token punctuation">.</span><span class="token function">push</span><span class="token punctuation">(</span><span class="token punctuation">{</span>
+        <span class="token literal-property property">name</span><span class="token operator">:</span> material<span class="token punctuation">.</span>name <span class="token operator">??</span> <span class="token string">'(unnamed)'</span><span class="token punctuation">,</span>
+        <span class="token literal-property property">doubleSided</span><span class="token operator">:</span> <span class="token function">Boolean</span><span class="token punctuation">(</span>material<span class="token punctuation">.</span>doubleSided<span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token literal-property property">alphaMode</span><span class="token operator">:</span> material<span class="token punctuation">.</span>alphaMode <span class="token operator">??</span> <span class="token string">'OPAQUE'</span><span class="token punctuation">,</span>
+      <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+  <span class="token punctuation">}</span>
+  <span class="token keyword">const</span> doubleSidedShare <span class="token operator">=</span> materials<span class="token punctuation">.</span>length
+    <span class="token operator">?</span> materials<span class="token punctuation">.</span><span class="token function">filter</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">m</span><span class="token punctuation">)</span> <span class="token operator">=></span> m<span class="token punctuation">.</span>doubleSided<span class="token punctuation">)</span><span class="token punctuation">.</span>length <span class="token operator">/</span> materials<span class="token punctuation">.</span>length <span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">;</span>
+
+  viewer<span class="token punctuation">.</span>scene<span class="token punctuation">.</span>primitives<span class="token punctuation">.</span><span class="token function">remove</span><span class="token punctuation">(</span>tileset<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">return</span> <span class="token punctuation">{</span>
+    <span class="token literal-property property">materials</span><span class="token operator">:</span> materials<span class="token punctuation">.</span>length<span class="token punctuation">,</span>
+    <span class="token literal-property property">doubleSidedShare</span><span class="token operator">:</span> <span class="token function">Number</span><span class="token punctuation">(</span>doubleSidedShare<span class="token punctuation">.</span><span class="token function">toFixed</span><span class="token punctuation">(</span><span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token literal-property property">backFaceCulling</span><span class="token operator">:</span> viewer<span class="token punctuation">.</span>scene<span class="token punctuation">.</span>globe<span class="token operator">?.</span>backFaceCulling <span class="token operator">??</span> <span class="token keyword">null</span><span class="token punctuation">,</span>
+    <span class="token literal-property property">finding</span><span class="token operator">:</span> doubleSidedShare <span class="token operator">></span> <span class="token number">0.5</span>
+      <span class="token operator">?</span> <span class="token string">'most materials are double-sided, so a winding error would be invisible '</span>
+        <span class="token operator">+</span> <span class="token string">'here and visible in a renderer that culls'</span>
+      <span class="token operator">:</span> <span class="token string">'materials cull backfaces, so the geometric tests match what is rendered'</span><span class="token punctuation">,</span>
+  <span class="token punctuation">}</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+</code></pre></div>
+<p>A tileset whose materials are mostly <code>doubleSided</code> hides a winding error completely, which is the fourth problem in the table seen from the other direction: the geometry is wrong and the renderer forgives it. That matters because the next consumer — a game engine, an analysis tool, a different viewer — will not.</p>
+<h2 id="performance-notes" tabindex="-1"><a class="heading-link" href="#performance-notes"><span>Performance Notes</span></a></h2>
+<ul>
+<li><strong>Signed volume is O(faces)</strong> and vectorised; a 400,000-face mesh takes milliseconds.</li>
+<li><strong><code>mesh.contains</code> builds a ray-tracing structure</strong> and is the slow test at roughly 20,000 queries per second. Two thousand samples is enough.</li>
+<li><strong>The normal-consistency test is pure NumPy</strong> and handles millions of faces in under a second; sample only for very large meshes.</li>
+<li><strong>The outward heuristic needs a KD-tree query per sample</strong>, so 20,000 samples is about a second.</li>
+<li><strong>Probe at every handoff, not every operation.</strong> Eight probes on a pipeline is seconds; probing inside a decimation loop is not useful.</li>
+<li><strong>Write intermediates during development and turn them off in production.</strong> The disk cost is real and the diagnostic value only matters when something is wrong.</li>
+</ul>
+<h2 id="common-errors" tabindex="-1"><a class="heading-link" href="#common-errors"><span>Common Errors</span></a></h2>
+<p><strong>Reversing the faces made the lighting wrong.</strong> The problem was flipped stored normals, not winding. Recompute the normals instead.</p>
+<p><strong>Signed volume is near zero on a closed mesh.</strong> The winding is inconsistent rather than uniformly reversed; use <code>meshing_re_orient_faces_coherently</code>.</p>
+<p><strong>Every stage reports <code>watertight: false</code>.</strong> Normal for surveyed surfaces. Rely on the normal-consistency test and the heuristic.</p>
+<p><strong>The heuristic says “ambiguous”.</strong> The surface is flat or thin, where stepping along the normal does not change the distance to other faces. Not a failure of the mesh.</p>
+<p><strong>The fix works and the next delivery is broken again.</strong> The fix was applied to the output, not to the culprit stage.</p>
+<p><strong>Fixing one flip broke everything.</strong> Two flips were cancelling. Run the double-flip check first.</p>
+<p><strong>The geometric tests pass and the viewer still looks wrong.</strong> Check the material’s <code>doubleSided</code> flag and the renderer’s culling; the geometry is not the problem.</p>
+<h2 id="frequently-asked-questions" tabindex="-1"><a class="heading-link" href="#frequently-asked-questions"><span>Frequently Asked Questions</span></a></h2>
+<h3 id="which-is-authoritative-the-winding-or-the-normals" tabindex="-1"><a class="heading-link" href="#which-is-authoritative-the-winding-or-the-normals"><span>Which is authoritative, the winding or the normals?</span></a></h3>
+<p>The winding, for tile content. Renderers cull on winding, and glTF’s own convention is counter-clockwise front faces — so the winding is the ground truth and the normals should be recomputed to match it.</p>
+<h3 id="should-i-just-make-every-material-double-sided" tabindex="-1"><a class="heading-link" href="#should-i-just-make-every-material-double-sided"><span>Should I just make every material double-sided?</span></a></h3>
+<p>No. It doubles the rasterisation cost, defeats backface culling entirely and hides the underlying defect from every consumer downstream. It is a legitimate choice for genuinely single-surface geometry such as a fence panel.</p>
+<h3 id="how-do-i-stop-this-recurring" tabindex="-1"><a class="heading-link" href="#how-do-i-stop-this-recurring"><span>How do I stop this recurring?</span></a></h3>
+<p>Add the stage probe to the pipeline’s tests, as in <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/testing-spatial-pipelines-with-pytest-fixtures/">testing spatial pipelines with pytest fixtures</a>: a synthetic closed mesh through every stage with a signed-volume assertion catches a new negative-determinant transform on the commit that introduces it.</p>
+<h2 id="related-guides" tabindex="-1"><a class="heading-link" href="#related-guides"><span>Related Guides</span></a></h2>
+<ul>
+<li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/tracing-unit-errors-from-feet-to-metres/">Tracing Unit Errors from Feet to Metres</a> — the same bisect method for a different cross-cutting defect</li>
+<li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/trimming-poisson-meshes-by-density/">Trimming Poisson Meshes by Density</a> — the reconstruction that fails visibly on inconsistent normals</li>
+<li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/merging-meshes-to-cut-draw-calls/">Merging Meshes to Cut Draw Calls</a> — where a flatten step can introduce a flip</li>
+</ul>
+<p>Back to <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/">Cross-Section Failure Modes</a>.</p>
+
+
+      
+      
+
+      <div class="related-nav">
+        
+
+        
+          <div>
+            <h3>Related</h3>
+            <div class="related-grid">
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/diagnosing-crs-drift-causing-lod-seams/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Diagnosing CRS Drift Causing LOD Seams</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/fixing-memory-oom-in-city-scale-decimation/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Fixing Memory OOM in City-Scale Decimation</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/resolving-float32-precision-jitter-in-large-coordinate-meshes/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Resolving Float32 Precision Jitter in Large-Coordinate Meshes</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/tracing-unit-errors-from-feet-to-metres/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Tracing Unit Errors from Feet to Metres</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/tracking-down-z-fighting-between-terrain-and-buildings/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Tracking Down Z-Fighting Between Terrain and Buildings</span>
+                </a>
+              
+            </div>
+          </div>
+        
+      </div>
+    </article>
+
+    
+    <aside class="toc" aria-label="On this page" data-toc hidden>
+      <h4>On this page</h4>
+      <ul></ul>
+    </aside>
+  </div>
+</div>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+  <div class="container site-footer__inner">
+    <div class="site-footer__brand">
+      <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+        <img src="/assets/img/logo-mark.svg" alt="" class="brand__mark" width="36" height="36">
+        <span class="brand__name">
+          3D Geospatial
+          <small>Digital Twin Automation</small>
+        </span>
+      </a>
+      <p>Engineering-grade guides on point cloud processing, mesh pipelines, LOD strategies, and CI/CD automation for digital twin platforms.</p>
+      <a class="footer-social" href="https://github.com/3d-geospatial" aria-label="3D Geospatial on GitHub" rel="noopener" target="_blank">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+          <path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.53-1.34-1.3-1.7-1.3-1.7-1.06-.72.08-.71.08-.71 1.17.08 1.79 1.2 1.79 1.2 1.04 1.79 2.73 1.27 3.4.97.1-.75.4-1.27.73-1.56-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.19-3.08-.12-.3-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.75.11 3.05.74.8 1.19 1.83 1.19 3.08 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.07.78 2.15v3.18c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5Z"/>
+        </svg>
+        <span>GitHub</span>
+      </a>
+    </div>
+
+    <div class="site-footer__col">
+      <h4>Sections</h4>
+      <ul>
+        <li><a href="https://www.3d-geospatial.com/">Home</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management &amp; Optimization</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/">Point Cloud &amp; Mesh Pipelines</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/">Troubleshooting &amp; Reliability</a></li>
+        
+      </ul>
+    </div>
+
+    
+      <div class="site-footer__col">
+        <h4>3D Geospatial Fundamentals</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/">3D Format Standards Comparison</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/">BIM and IFC Georeferencing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/">CityGML and CityJSON Processing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems for 3D Assets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/">Digital Elevation Model Workflows</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/">Spatial Indexing and Tiling Schemes for 3D Data</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>LOD Management &amp; Optimization</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/">Automated Tile Generation for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/">Cesium ion Upload Automation for 3D Tilesets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/">glTF LOD Generation With Draco Compression</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/">Streaming Sync Patterns for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/">Tileset Metadata and 3D Tiles Next</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/">Vector Overlays on 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Point Cloud &amp; Mesh Pipelines</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/">Automated Mesh Decimation for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/">Change Detection Between LiDAR Scan Epochs</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/">CI/CD Automation for Spatial Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">LiDAR Classification and Ground Extraction</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/photogrammetry-processing-pipelines/">Photogrammetry Processing Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/">Point Cloud Filtering Techniques</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/">Surface Reconstruction for Geospatial Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/">Texture Mapping Workflows for Digital Twins</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Troubleshooting &amp; Reliability</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/">Cross-Section Failure Modes in Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/">Data Validation &amp; QA Gates for 3D Tiles</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/">Performance Profiling and Benchmarking</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/">Pipeline Observability and Monitoring</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/">Streaming &amp; Runtime Diagnostics for 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+  </div>
+  <div class="container site-footer__bottom">
+    <span>© 2026 3D Geospatial &amp; Digital Twin Automation</span>
+    <span>Built with Eleventy · PWA-enabled</span>
+  </div>
+</footer>
+
+
+  <script src="/assets/js/site.js?v=b99aa9f971" defer></script>
+  
+</body>
+</html>

@@ -1,0 +1,997 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <title>Ground Classification with PDAL PMF — 3D Geospatial</title>
+  <meta name="description" content="Tune filters.pmf for real terrain: window size, slope and threshold parameters, when SMRF is the better choice, urban and steep-terrain failures">
+  <meta name="keywords" content="3D geospatial, digital twin, point cloud, mesh pipeline, LOD, 3D Tiles, Cesium, PDAL, Open3D, Python, CI/CD">
+  <meta name="author" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta name="theme-color" content="#1f6b8a" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f171d" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+
+  
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem("theme");
+        var theme = (stored === "dark" || stored === "light") ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    })();
+  </script>
+  <meta name="generator" content="Eleventy">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="googlebot" content="index,follow,max-image-preview:large">
+
+  
+  <link rel="canonical" href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/ground-classification-with-pdal-pmf/">
+  <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">
+
+  
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/icon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+
+  
+  <link rel="apple-touch-icon" href="/assets/img/icon-180.png">
+  <link rel="mask-icon" href="/assets/img/logo.svg" color="#1f6b8a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="3D Geospatial">
+  <meta name="application-name" content="3D Geospatial">
+
+  
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Ground Classification with PDAL PMF — 3D Geospatial">
+  <meta property="og:description" content="Tune filters.pmf for real terrain: window size, slope and threshold parameters, when SMRF is the better choice, urban and steep-terrain failures">
+  <meta property="og:url" content="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/ground-classification-with-pdal-pmf/">
+  <meta property="og:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+  <meta property="og:site_name" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta property="og:locale" content="en_US">
+  
+  <meta property="article:published_time" content="2026-09-17T23:36:56.456Z">
+  <meta property="article:modified_time" content="2026-09-17T23:36:56.456Z">
+  <meta property="article:publisher" content="https://www.3d-geospatial.com/">
+  
+
+  
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Ground Classification with PDAL PMF — 3D Geospatial">
+  <meta name="twitter:description" content="Tune filters.pmf for real terrain: window size, slope and threshold parameters, when SMRF is the better choice, urban and steep-terrain failures">
+  <meta name="twitter:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta name="twitter:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+
+  
+  <link rel="preload" href="/assets/css/styles.css?v=8c46394d6c" as="style">
+  
+
+  <link rel="stylesheet" href="/assets/css/styles.css?v=8c46394d6c">
+
+  
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.3d-geospatial.com/#organization",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "url": "https://www.3d-geospatial.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/icon-512.png",
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://www.3d-geospatial.com/#website",
+      "url": "https://www.3d-geospatial.com/",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "description": "Build reliable 3D spatial data pipelines for digital twins — point clouds, meshes, LOD strategies, Python processing, and CI/CD automation.",
+      "inLanguage": "en",
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      }
+    },
+    {
+      "@type": "TechArticle",
+      "@id": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/ground-classification-with-pdal-pmf/#article",
+      "isPartOf": {
+        "@id": "https://www.3d-geospatial.com/#website"
+      },
+      "headline": "Ground Classification with PDAL PMF",
+      "name": "Ground Classification with PDAL PMF",
+      "description": "Tune filters.pmf for real terrain: window size, slope and threshold parameters, when SMRF is the better choice, urban and steep-terrain failures",
+      "url": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/ground-classification-with-pdal-pmf/",
+      "mainEntityOfPage": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/ground-classification-with-pdal-pmf/",
+      "inLanguage": "en",
+      "datePublished": "2026-09-17T23:36:56.456Z",
+      "dateModified": "2026-09-17T23:36:56.456Z",
+      "author": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "image": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/og-cover.png",
+        "width": 1200,
+        "height": 630
+      },
+      "breadcrumb": {
+        "@id": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/ground-classification-with-pdal-pmf/#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/ground-classification-with-pdal-pmf/#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://www.3d-geospatial.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Point Cloud Mesh Processing Pipelines",
+          "item": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Lidar Classification And Ground Extraction",
+          "item": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "name": "Ground Classification With Pdal Pmf",
+          "item": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/ground-classification-with-pdal-pmf/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  
+<header class="site-header" role="banner">
+  <div class="container site-header__inner">
+    <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+      <img src="/assets/img/logo.svg" alt="" class="brand__mark" width="36" height="36">
+      <span class="brand__name">
+        3D Geospatial
+        <small>Digital Twin Automation</small>
+      </span>
+    </a>
+
+    <button class="theme-toggle" type="button" data-theme-toggle
+            aria-label="Switch to dark theme" title="Switch to dark theme">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4.2"/>
+        <path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/>
+      </svg>
+    </button>
+
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>
+      <span class="nav-toggle__icon" aria-hidden="true"><span></span></span>
+      Menu
+    </button>
+
+    <nav class="primary-nav" id="primary-nav" aria-label="Primary">
+      
+      <a href="https://www.3d-geospatial.com/" >
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/>
+        </svg>
+        Home
+      </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2 3 7l9 5 9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 17l9 5 9-5"/>
+            </svg>
+          
+          3D Geospatial Fundamentals
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+          
+          LOD Management &amp; Optimization
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/" aria-current="page">
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="6" cy="6" r="1.5"/><circle cx="12" cy="6" r="1.5"/><circle cx="18" cy="6" r="1.5"/>
+              <circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/>
+              <circle cx="6" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="18" cy="18" r="1.5"/>
+            </svg>
+          
+          Point Cloud &amp; Mesh Pipelines
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <path d="M12 9v4"/><path d="M12 17h.01"/>
+            </svg>
+          
+          Troubleshooting &amp; Reliability
+        </a>
+      
+    </nav>
+  </div>
+</header>
+
+
+  <main id="main">
+    
+
+
+<div class="container">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    
+      
+        <a href="https://www.3d-geospatial.com/">Home</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/">Point Cloud Mesh Processing Pipelines</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">Lidar Classification And Ground Extraction</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <span class="current">Ground Classification With Pdal Pmf</span>
+      
+    
+  </nav>
+
+  <div class="content-page">
+    <article class="article">
+      <h1 id="ground-classification-with-pdal-pmf" tabindex="-1"><a class="heading-link" href="#ground-classification-with-pdal-pmf"><span>Ground Classification with PDAL PMF</span></a></h1>
+<p>This page extracts bare-earth ground from an airborne lidar tile using PDAL’s progressive morphological filter — what each parameter does to the result, where PMF fails and SMRF does better, how to handle steep terrain and dense urban areas, and how to measure the classification’s accuracy against surveyed control rather than eyeballing a hillshade.</p>
+<h2 id="why-you-hit-this" tabindex="-1"><a class="heading-link" href="#why-you-hit-this"><span>Why you hit this</span></a></h2>
+<p>Everything downstream needs ground. A DTM needs it, contours need it, volume calculations need it, and building extraction needs it as the reference to measure heights against. Deliveries arrive unclassified or badly classified often enough that doing it yourself is a routine task rather than an exception.</p>
+<p>The progressive morphological filter is the classical algorithm and it is still a good default: it opens the surface with a growing structuring element, so small objects are removed first and large ones later, and it needs four parameters that all have physical meanings. Understanding those meanings is the difference between a clean DTM and one with buildings in it.</p>
+<h2 id="prerequisites" tabindex="-1"><a class="heading-link" href="#prerequisites"><span>Prerequisites</span></a></h2>
+<ul>
+<li>PDAL 2.6+ with the <code>filters.pmf</code> and <code>filters.smrf</code> stages; Python 3.10+ with <code>numpy</code>, <code>rasterio</code>.</li>
+<li>A LAS/LAZ tile with a known CRS and, ideally, return-number information.</li>
+<li>A handful of surveyed ground spot heights for the accuracy check.</li>
+</ul>
+<h2 id="step-by-step" tabindex="-1"><a class="heading-link" href="#step-by-step"><span>Step-by-Step</span></a></h2>
+<h3 id="1-understand-the-four-parameters-physically" tabindex="-1"><a class="heading-link" href="#1-understand-the-four-parameters-physically"><span>1. Understand the four parameters physically</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> json
+<span class="token keyword">import</span> math
+<span class="token keyword">import</span> subprocess
+<span class="token keyword">from</span> pathlib <span class="token keyword">import</span> Path
+
+<span class="token keyword">import</span> numpy <span class="token keyword">as</span> np
+
+PMF_PARAMETERS <span class="token operator">=</span> <span class="token punctuation">{</span>
+    <span class="token string">"cell_size"</span><span class="token punctuation">:</span> <span class="token punctuation">{</span>
+        <span class="token string">"meaning"</span><span class="token punctuation">:</span> <span class="token string">"grid resolution the morphological operations run on"</span><span class="token punctuation">,</span>
+        <span class="token string">"units"</span><span class="token punctuation">:</span> <span class="token string">"m"</span><span class="token punctuation">,</span>
+        <span class="token string">"default"</span><span class="token punctuation">:</span> <span class="token number">1.0</span><span class="token punctuation">,</span>
+        <span class="token string">"guidance"</span><span class="token punctuation">:</span> <span class="token string">"1–2× the mean point spacing; finer wastes time, coarser loses detail"</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span><span class="token punctuation">,</span>
+    <span class="token string">"max_window_size"</span><span class="token punctuation">:</span> <span class="token punctuation">{</span>
+        <span class="token string">"meaning"</span><span class="token punctuation">:</span> <span class="token string">"largest structuring element, in cells"</span><span class="token punctuation">,</span>
+        <span class="token string">"units"</span><span class="token punctuation">:</span> <span class="token string">"cells"</span><span class="token punctuation">,</span>
+        <span class="token string">"default"</span><span class="token punctuation">:</span> <span class="token number">33</span><span class="token punctuation">,</span>
+        <span class="token string">"guidance"</span><span class="token punctuation">:</span> <span class="token string">"must exceed the widest non-ground object: window_m = cell_size × size"</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span><span class="token punctuation">,</span>
+    <span class="token string">"slope"</span><span class="token punctuation">:</span> <span class="token punctuation">{</span>
+        <span class="token string">"meaning"</span><span class="token punctuation">:</span> <span class="token string">"terrain slope tolerated as ground, as a ratio (rise/run)"</span><span class="token punctuation">,</span>
+        <span class="token string">"units"</span><span class="token punctuation">:</span> <span class="token string">"m/m"</span><span class="token punctuation">,</span>
+        <span class="token string">"default"</span><span class="token punctuation">:</span> <span class="token number">1.0</span><span class="token punctuation">,</span>
+        <span class="token string">"guidance"</span><span class="token punctuation">:</span> <span class="token string">"0.15 for floodplain, 0.5 for rolling, 1.0+ for mountainous"</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span><span class="token punctuation">,</span>
+    <span class="token string">"initial_distance"</span><span class="token punctuation">:</span> <span class="token punctuation">{</span>
+        <span class="token string">"meaning"</span><span class="token punctuation">:</span> <span class="token string">"height tolerance at the smallest window"</span><span class="token punctuation">,</span>
+        <span class="token string">"units"</span><span class="token punctuation">:</span> <span class="token string">"m"</span><span class="token punctuation">,</span>
+        <span class="token string">"default"</span><span class="token punctuation">:</span> <span class="token number">0.15</span><span class="token punctuation">,</span>
+        <span class="token string">"guidance"</span><span class="token punctuation">:</span> <span class="token string">"the survey's vertical noise, typically 0.10–0.20 m"</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span><span class="token punctuation">,</span>
+    <span class="token string">"max_distance"</span><span class="token punctuation">:</span> <span class="token punctuation">{</span>
+        <span class="token string">"meaning"</span><span class="token punctuation">:</span> <span class="token string">"ceiling on the height tolerance as the window grows"</span><span class="token punctuation">,</span>
+        <span class="token string">"units"</span><span class="token punctuation">:</span> <span class="token string">"m"</span><span class="token punctuation">,</span>
+        <span class="token string">"default"</span><span class="token punctuation">:</span> <span class="token number">2.5</span><span class="token punctuation">,</span>
+        <span class="token string">"guidance"</span><span class="token punctuation">:</span> <span class="token string">"the tallest local relief within one max window"</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span><span class="token punctuation">,</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">def</span> <span class="token function">window_metres</span><span class="token punctuation">(</span>cell_size<span class="token punctuation">,</span> max_window_size<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">return</span> cell_size <span class="token operator">*</span> max_window_size
+
+<span class="token keyword">for</span> name<span class="token punctuation">,</span> spec <span class="token keyword">in</span> PMF_PARAMETERS<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>name<span class="token punctuation">:</span><span class="token format-spec">&lt;18</span><span class="token punctuation">}</span></span><span class="token interpolation"><span class="token punctuation">{</span><span class="token builtin">str</span><span class="token punctuation">(</span>spec<span class="token punctuation">[</span><span class="token string">'default'</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">:</span><span class="token format-spec">>6</span><span class="token punctuation">}</span></span><span class="token string"> </span><span class="token interpolation"><span class="token punctuation">{</span>spec<span class="token punctuation">[</span><span class="token string">'units'</span><span class="token punctuation">]</span><span class="token punctuation">:</span><span class="token format-spec">&lt;6</span><span class="token punctuation">}</span></span><span class="token interpolation"><span class="token punctuation">{</span>spec<span class="token punctuation">[</span><span class="token string">'guidance'</span><span class="token punctuation">]</span><span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"\nmax window at defaults:"</span><span class="token punctuation">,</span> window_metres<span class="token punctuation">(</span><span class="token number">1.0</span><span class="token punctuation">,</span> <span class="token number">33</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"m"</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p><code>max_window_size</code> is the parameter that decides whether buildings survive, and it is the one most often left at the default. The filter can only remove an object narrower than its largest window, so with a 1 m cell and a 33-cell window the widest removable object is 33 m — and a 60 m warehouse stays in the ground class, appearing in the DTM as a plateau.</p>
+<p>The height tolerance growing from <code>initial_distance</code> to <code>max_distance</code> as the window grows is the “progressive” part. At a small window the filter is strict, which removes cars and shrubs without eating a kerb; at a large window it is permissive, which lets real terrain relief through while it removes a building.</p>
+<p><code>slope</code> interacts with all of this: the tolerance at each window is also scaled by the slope times the window size, so a high slope value makes the filter accept more height change and therefore keeps more non-ground. On steep terrain that is necessary; on flat terrain it is how buildings survive.</p>
+<figure class="diagram">
+<svg viewBox="4 16 732 234" role="img" aria-labelledby="pmf-window-t pmf-window-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="pmf-window-t">Why max_window_size decides whether buildings survive</title>
+  <desc id="pmf-window-d">Three cross-sections of the same terrain with a 22 metre house and a 58 metre warehouse. With a 15-cell window at 1 metre cells the maximum removable width is 15 metres, so both buildings stay in the ground class. With a 33-cell window the house is removed and the warehouse remains as a plateau in the DTM. With a 65-cell window both are removed, but a genuine 50 metre terrace in the terrain is also flattened.</desc>
+  <rect class="svg-bg" x="4" y="16" width="732" height="234" fill="#ffffff"/>
+  <g stroke-width="1.5">
+    <rect x="18" y="30" width="228" height="180" rx="8" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="256" y="30" width="228" height="180" rx="8" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="494" y="30" width="228" height="180" rx="8" fill="#fdf3e0" stroke="#c46a3d"/>
+  </g>
+  <g font-size="12.5" text-anchor="middle" fill="#1f2937">
+    <text x="132" y="52">window 15 cells = 15 m</text>
+    <text x="370" y="52">window 33 cells = 33 m</text>
+    <text x="608" y="52">window 65 cells = 65 m</text>
+  </g>
+  <path d="M34 168 H78 V132 H122 V168 H150 V120 H230 V168" stroke="#1f6b8a" stroke-width="2.2" fill="none"/>
+  <path d="M272 168 H388 V120 H468 V168" stroke="#1f6b8a" stroke-width="2.2" fill="none"/>
+  <path d="M510 168 H710" stroke="#1f6b8a" stroke-width="2.2" fill="none"/>
+  <g fill="#1f2937" font-size="11.5" text-anchor="middle">
+    <text x="100" y="124">house</text>
+    <text x="190" y="112">warehouse</text>
+    <text x="428" y="112">warehouse survives</text>
+    <text x="608" y="158">both removed</text>
+  </g>
+  <g fill="#b0413e" font-size="11.5" text-anchor="middle">
+    <text x="132" y="192">both buildings in the DTM</text>
+    <text x="370" y="192">58 m plateau in the DTM</text>
+  </g>
+  <text x="608" y="192" fill="#9a4f26" font-size="11.5" text-anchor="middle">a real 50 m terrace flattened too</text>
+  <text x="370" y="232" fill="#5b6471" font-size="12" text-anchor="middle">max removable width = cell_size × max_window_size; set it above the widest building and below the narrowest real landform</text>
+</svg>
+<figcaption>The window has to be wider than the widest building and narrower than the narrowest genuine landform — in a city that band can be empty, which is when a building mask is needed.</figcaption>
+</figure>
+<h3 id="2-run-pmf-with-parameters-derived-from-the-data" tabindex="-1"><a class="heading-link" href="#2-run-pmf-with-parameters-derived-from-the-data"><span>2. Run PMF with parameters derived from the data</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">point_spacing</span><span class="token punctuation">(</span>las_path<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    info <span class="token operator">=</span> json<span class="token punctuation">.</span>loads<span class="token punctuation">(</span>subprocess<span class="token punctuation">.</span>run<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token string">"pdal"</span><span class="token punctuation">,</span> <span class="token string">"info"</span><span class="token punctuation">,</span> <span class="token string">"--summary"</span><span class="token punctuation">,</span> <span class="token builtin">str</span><span class="token punctuation">(</span>las_path<span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+                                     capture_output<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> text<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> check<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span><span class="token punctuation">.</span>stdout<span class="token punctuation">)</span>
+    s <span class="token operator">=</span> info<span class="token punctuation">[</span><span class="token string">"summary"</span><span class="token punctuation">]</span>
+    b <span class="token operator">=</span> s<span class="token punctuation">[</span><span class="token string">"bounds"</span><span class="token punctuation">]</span>
+    area <span class="token operator">=</span> <span class="token punctuation">(</span>b<span class="token punctuation">[</span><span class="token string">"maxx"</span><span class="token punctuation">]</span> <span class="token operator">-</span> b<span class="token punctuation">[</span><span class="token string">"minx"</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token operator">*</span> <span class="token punctuation">(</span>b<span class="token punctuation">[</span><span class="token string">"maxy"</span><span class="token punctuation">]</span> <span class="token operator">-</span> b<span class="token punctuation">[</span><span class="token string">"miny"</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    n <span class="token operator">=</span> s<span class="token punctuation">[</span><span class="token string">"num_points"</span><span class="token punctuation">]</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"points"</span><span class="token punctuation">:</span> n<span class="token punctuation">,</span> <span class="token string">"area_m2"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>area<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"density_per_m2"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>n <span class="token operator">/</span> <span class="token builtin">max</span><span class="token punctuation">(</span>area<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"mean_spacing_m"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>math<span class="token punctuation">.</span>sqrt<span class="token punctuation">(</span><span class="token builtin">max</span><span class="token punctuation">(</span>area<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token builtin">max</span><span class="token punctuation">(</span>n<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">}</span>
+
+<span class="token keyword">def</span> <span class="token function">pmf_parameters</span><span class="token punctuation">(</span>spacing_m<span class="token punctuation">,</span> widest_building_m<span class="token punctuation">,</span> terrain_slope_ratio<span class="token punctuation">,</span>
+                   vertical_noise_m<span class="token punctuation">,</span> local_relief_m<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    cell <span class="token operator">=</span> <span class="token builtin">max</span><span class="token punctuation">(</span><span class="token builtin">round</span><span class="token punctuation">(</span>spacing_m <span class="token operator">*</span> <span class="token number">1.5</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">0.5</span><span class="token punctuation">)</span>
+    window_cells <span class="token operator">=</span> <span class="token builtin">int</span><span class="token punctuation">(</span>math<span class="token punctuation">.</span>ceil<span class="token punctuation">(</span>widest_building_m <span class="token operator">*</span> <span class="token number">1.3</span> <span class="token operator">/</span> cell<span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token string">"cell_size"</span><span class="token punctuation">:</span> cell<span class="token punctuation">,</span>
+        <span class="token string">"max_window_size"</span><span class="token punctuation">:</span> window_cells<span class="token punctuation">,</span>
+        <span class="token string">"slope"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>terrain_slope_ratio<span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"initial_distance"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>vertical_noise_m<span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"max_distance"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>local_relief_m<span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"max_removable_width_m"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>cell <span class="token operator">*</span> window_cells<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+
+<span class="token keyword">def</span> <span class="token function">run_pmf</span><span class="token punctuation">(</span>las_path<span class="token punctuation">,</span> out_path<span class="token punctuation">,</span> params<span class="token punctuation">,</span> keep_last_return_only<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    stages <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token builtin">str</span><span class="token punctuation">(</span>las_path<span class="token punctuation">)</span><span class="token punctuation">]</span>
+    <span class="token keyword">if</span> keep_last_return_only<span class="token punctuation">:</span>
+        stages<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"filters.range"</span><span class="token punctuation">,</span>
+                       <span class="token string">"limits"</span><span class="token punctuation">:</span> <span class="token string">"ReturnNumber[ReturnNumber:ReturnNumber]"</span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+    stages<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"filters.range"</span><span class="token punctuation">,</span> <span class="token string">"limits"</span><span class="token punctuation">:</span> <span class="token string">"Classification![7:7]"</span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+    stages<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span>
+        <span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"filters.pmf"</span><span class="token punctuation">,</span>
+        <span class="token string">"cell_size"</span><span class="token punctuation">:</span> params<span class="token punctuation">[</span><span class="token string">"cell_size"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+        <span class="token string">"max_window_size"</span><span class="token punctuation">:</span> params<span class="token punctuation">[</span><span class="token string">"max_window_size"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+        <span class="token string">"slope"</span><span class="token punctuation">:</span> params<span class="token punctuation">[</span><span class="token string">"slope"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+        <span class="token string">"initial_distance"</span><span class="token punctuation">:</span> params<span class="token punctuation">[</span><span class="token string">"initial_distance"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+        <span class="token string">"max_distance"</span><span class="token punctuation">:</span> params<span class="token punctuation">[</span><span class="token string">"max_distance"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+        <span class="token string">"exponential"</span><span class="token punctuation">:</span> <span class="token boolean">True</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span><span class="token punctuation">)</span>
+    stages<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"writers.las"</span><span class="token punctuation">,</span> <span class="token string">"filename"</span><span class="token punctuation">:</span> <span class="token builtin">str</span><span class="token punctuation">(</span>out_path<span class="token punctuation">)</span><span class="token punctuation">,</span>
+                   <span class="token string">"compression"</span><span class="token punctuation">:</span> <span class="token string">"laszip"</span><span class="token punctuation">,</span> <span class="token string">"extra_dims"</span><span class="token punctuation">:</span> <span class="token string">"all"</span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+    spec <span class="token operator">=</span> Path<span class="token punctuation">(</span>out_path<span class="token punctuation">)</span><span class="token punctuation">.</span>with_suffix<span class="token punctuation">(</span><span class="token string">".pipeline.json"</span><span class="token punctuation">)</span>
+    spec<span class="token punctuation">.</span>write_text<span class="token punctuation">(</span>json<span class="token punctuation">.</span>dumps<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"pipeline"</span><span class="token punctuation">:</span> stages<span class="token punctuation">}</span><span class="token punctuation">,</span> indent<span class="token operator">=</span><span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    proc <span class="token operator">=</span> subprocess<span class="token punctuation">.</span>run<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token string">"pdal"</span><span class="token punctuation">,</span> <span class="token string">"pipeline"</span><span class="token punctuation">,</span> <span class="token builtin">str</span><span class="token punctuation">(</span>spec<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"--metadata"</span><span class="token punctuation">,</span>
+                           <span class="token builtin">str</span><span class="token punctuation">(</span>Path<span class="token punctuation">(</span>out_path<span class="token punctuation">)</span><span class="token punctuation">.</span>with_suffix<span class="token punctuation">(</span><span class="token string">".meta.json"</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+                          capture_output<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> text<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+    <span class="token keyword">if</span> proc<span class="token punctuation">.</span>returncode <span class="token operator">!=</span> <span class="token number">0</span><span class="token punctuation">:</span>
+        <span class="token keyword">raise</span> RuntimeError<span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"pdal failed: </span><span class="token interpolation"><span class="token punctuation">{</span>proc<span class="token punctuation">.</span>stderr<span class="token punctuation">[</span><span class="token operator">-</span><span class="token number">500</span><span class="token punctuation">:</span><span class="token format-spec">]</span><span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"output"</span><span class="token punctuation">:</span> <span class="token builtin">str</span><span class="token punctuation">(</span>out_path<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"params"</span><span class="token punctuation">:</span> params<span class="token punctuation">}</span>
+</code></pre></div>
+<p>Filtering to last returns before PMF is a cheap and large improvement on multi-return data. A first return from a tree canopy is definitely not ground; the last return from the same pulse may be. Removing the intermediate returns reduces the work and removes the points most likely to confuse the morphological opening.</p>
+<p><code>exponential: True</code> makes the window sizes grow as powers of two rather than linearly, which is the behaviour described in the original algorithm and is considerably faster: seven windows instead of thirty-three, each one an opening over the whole grid.</p>
+<p>Deriving <code>max_window_size</code> from the widest building on the tile, rather than from a default, is the step that makes this work in an urban area. It requires knowing that width, which is a one-off look at a map.</p>
+<h3 id="3-know-when-to-use-smrf-instead" tabindex="-1"><a class="heading-link" href="#3-know-when-to-use-smrf-instead"><span>3. Know when to use SMRF instead</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">run_smrf</span><span class="token punctuation">(</span>las_path<span class="token punctuation">,</span> out_path<span class="token punctuation">,</span> cell<span class="token operator">=</span><span class="token number">1.0</span><span class="token punctuation">,</span> scalar<span class="token operator">=</span><span class="token number">1.25</span><span class="token punctuation">,</span> slope<span class="token operator">=</span><span class="token number">0.15</span><span class="token punctuation">,</span>
+             threshold<span class="token operator">=</span><span class="token number">0.45</span><span class="token punctuation">,</span> window<span class="token operator">=</span><span class="token number">18</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    stages <span class="token operator">=</span> <span class="token punctuation">[</span>
+        <span class="token builtin">str</span><span class="token punctuation">(</span>las_path<span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"filters.range"</span><span class="token punctuation">,</span> <span class="token string">"limits"</span><span class="token punctuation">:</span> <span class="token string">"Classification![7:7]"</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+        <span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"filters.smrf"</span><span class="token punctuation">,</span>
+         <span class="token string">"cell"</span><span class="token punctuation">:</span> cell<span class="token punctuation">,</span> <span class="token string">"scalar"</span><span class="token punctuation">:</span> scalar<span class="token punctuation">,</span> <span class="token string">"slope"</span><span class="token punctuation">:</span> slope<span class="token punctuation">,</span>
+         <span class="token string">"threshold"</span><span class="token punctuation">:</span> threshold<span class="token punctuation">,</span> <span class="token string">"window"</span><span class="token punctuation">:</span> window<span class="token punctuation">}</span><span class="token punctuation">,</span>
+        <span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"writers.las"</span><span class="token punctuation">,</span> <span class="token string">"filename"</span><span class="token punctuation">:</span> <span class="token builtin">str</span><span class="token punctuation">(</span>out_path<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"compression"</span><span class="token punctuation">:</span> <span class="token string">"laszip"</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+    <span class="token punctuation">]</span>
+    spec <span class="token operator">=</span> Path<span class="token punctuation">(</span>out_path<span class="token punctuation">)</span><span class="token punctuation">.</span>with_suffix<span class="token punctuation">(</span><span class="token string">".pipeline.json"</span><span class="token punctuation">)</span>
+    spec<span class="token punctuation">.</span>write_text<span class="token punctuation">(</span>json<span class="token punctuation">.</span>dumps<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"pipeline"</span><span class="token punctuation">:</span> stages<span class="token punctuation">}</span><span class="token punctuation">,</span> indent<span class="token operator">=</span><span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    subprocess<span class="token punctuation">.</span>run<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token string">"pdal"</span><span class="token punctuation">,</span> <span class="token string">"pipeline"</span><span class="token punctuation">,</span> <span class="token builtin">str</span><span class="token punctuation">(</span>spec<span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">,</span> check<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> capture_output<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"output"</span><span class="token punctuation">:</span> <span class="token builtin">str</span><span class="token punctuation">(</span>out_path<span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"params"</span><span class="token punctuation">:</span> <span class="token punctuation">{</span><span class="token string">"cell"</span><span class="token punctuation">:</span> cell<span class="token punctuation">,</span> <span class="token string">"scalar"</span><span class="token punctuation">:</span> scalar<span class="token punctuation">,</span> <span class="token string">"slope"</span><span class="token punctuation">:</span> slope<span class="token punctuation">,</span>
+                       <span class="token string">"threshold"</span><span class="token punctuation">:</span> threshold<span class="token punctuation">,</span> <span class="token string">"window"</span><span class="token punctuation">:</span> window<span class="token punctuation">}</span><span class="token punctuation">}</span>
+
+CHOICE <span class="token operator">=</span> <span class="token punctuation">{</span>
+    <span class="token string">"flat_rural"</span><span class="token punctuation">:</span> <span class="token punctuation">(</span><span class="token string">"pmf"</span><span class="token punctuation">,</span> <span class="token string">"fast, and PMF's assumptions hold"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token string">"rolling_rural"</span><span class="token punctuation">:</span> <span class="token punctuation">(</span><span class="token string">"smrf"</span><span class="token punctuation">,</span> <span class="token string">"SMRF's slope handling is better on varied terrain"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token string">"steep_mountain"</span><span class="token punctuation">:</span> <span class="token punctuation">(</span><span class="token string">"smrf"</span><span class="token punctuation">,</span> <span class="token string">"PMF removes ridges; SMRF's net is more forgiving"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token string">"dense_urban"</span><span class="token punctuation">:</span> <span class="token punctuation">(</span><span class="token string">"smrf + building mask"</span><span class="token punctuation">,</span> <span class="token string">"neither handles wide buildings alone"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token string">"forest"</span><span class="token punctuation">:</span> <span class="token punctuation">(</span><span class="token string">"smrf"</span><span class="token punctuation">,</span> <span class="token string">"handles sparse ground returns under canopy better"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token string">"quarry_benches"</span><span class="token punctuation">:</span> <span class="token punctuation">(</span><span class="token string">"neither, alone"</span><span class="token punctuation">,</span> <span class="token string">"vertical faces violate both algorithms' models"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+<span class="token punctuation">}</span>
+<span class="token keyword">for</span> terrain<span class="token punctuation">,</span> <span class="token punctuation">(</span>algo<span class="token punctuation">,</span> why<span class="token punctuation">)</span> <span class="token keyword">in</span> CHOICE<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>terrain<span class="token punctuation">:</span><span class="token format-spec">&lt;16</span><span class="token punctuation">}</span></span><span class="token interpolation"><span class="token punctuation">{</span>algo<span class="token punctuation">:</span><span class="token format-spec">&lt;22</span><span class="token punctuation">}</span></span><span class="token interpolation"><span class="token punctuation">{</span>why<span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>SMRF — the simple morphological filter with a progressive net — handles varied slope better than PMF because it fits a surface that is allowed to follow the terrain rather than applying a global slope tolerance. On rolling or steep ground that difference is decisive: PMF with a slope value high enough to keep the ridges also keeps the buildings.</p>
+<p>PMF remains the better choice on flat ground because it is faster and its parameters are easier to reason about. It is also the more predictable of the two, which matters in a pipeline that has to produce the same result on every tile.</p>
+<p>Neither handles a quarry face, where the terrain is genuinely vertical. Both algorithms assume the ground is a height field with bounded slope, and a bench face violates that — so the honest answer there is a manual classification or a different method entirely.</p>
+<h3 id="4-handle-the-urban-case-with-a-building-mask" tabindex="-1"><a class="heading-link" href="#4-handle-the-urban-case-with-a-building-mask"><span>4. Handle the urban case with a building mask</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">building_footprint_mask</span><span class="token punctuation">(</span>las_path<span class="token punctuation">,</span> footprints_geojson<span class="token punctuation">,</span> out_path<span class="token punctuation">,</span>
+                            pmf_params<span class="token punctuation">,</span> buffer_m<span class="token operator">=</span><span class="token number">1.5</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Classify inside footprints as building first, so PMF never sees them."""</span>
+    stages <span class="token operator">=</span> <span class="token punctuation">[</span>
+        <span class="token builtin">str</span><span class="token punctuation">(</span>las_path<span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"filters.range"</span><span class="token punctuation">,</span> <span class="token string">"limits"</span><span class="token punctuation">:</span> <span class="token string">"Classification![7:7]"</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+        <span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"filters.overlay"</span><span class="token punctuation">,</span> <span class="token string">"dimension"</span><span class="token punctuation">:</span> <span class="token string">"Classification"</span><span class="token punctuation">,</span>
+         <span class="token string">"datasource"</span><span class="token punctuation">:</span> <span class="token builtin">str</span><span class="token punctuation">(</span>footprints_geojson<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"column"</span><span class="token punctuation">:</span> <span class="token string">"class_value"</span><span class="token punctuation">,</span>
+         <span class="token string">"layer"</span><span class="token punctuation">:</span> <span class="token string">"footprints"</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+        <span class="token comment"># Ground-classify only the points that are not inside a footprint.</span>
+        <span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"filters.expression"</span><span class="token punctuation">,</span> <span class="token string">"expression"</span><span class="token punctuation">:</span> <span class="token string">"Classification != 6"</span><span class="token punctuation">,</span>
+         <span class="token string">"tag"</span><span class="token punctuation">:</span> <span class="token string">"candidates"</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+        <span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"filters.pmf"</span><span class="token punctuation">,</span> <span class="token operator">**</span><span class="token punctuation">{</span>k<span class="token punctuation">:</span> v <span class="token keyword">for</span> k<span class="token punctuation">,</span> v <span class="token keyword">in</span> pmf_params<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span>
+                                   <span class="token keyword">if</span> k <span class="token keyword">in</span> <span class="token punctuation">{</span><span class="token string">"cell_size"</span><span class="token punctuation">,</span> <span class="token string">"max_window_size"</span><span class="token punctuation">,</span> <span class="token string">"slope"</span><span class="token punctuation">,</span>
+                                            <span class="token string">"initial_distance"</span><span class="token punctuation">,</span> <span class="token string">"max_distance"</span><span class="token punctuation">}</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+         <span class="token string">"inputs"</span><span class="token punctuation">:</span> <span class="token punctuation">[</span><span class="token string">"candidates"</span><span class="token punctuation">]</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+        <span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"writers.las"</span><span class="token punctuation">,</span> <span class="token string">"filename"</span><span class="token punctuation">:</span> <span class="token builtin">str</span><span class="token punctuation">(</span>out_path<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"compression"</span><span class="token punctuation">:</span> <span class="token string">"laszip"</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+    <span class="token punctuation">]</span>
+    spec <span class="token operator">=</span> Path<span class="token punctuation">(</span>out_path<span class="token punctuation">)</span><span class="token punctuation">.</span>with_suffix<span class="token punctuation">(</span><span class="token string">".pipeline.json"</span><span class="token punctuation">)</span>
+    spec<span class="token punctuation">.</span>write_text<span class="token punctuation">(</span>json<span class="token punctuation">.</span>dumps<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"pipeline"</span><span class="token punctuation">:</span> stages<span class="token punctuation">}</span><span class="token punctuation">,</span> indent<span class="token operator">=</span><span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    subprocess<span class="token punctuation">.</span>run<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token string">"pdal"</span><span class="token punctuation">,</span> <span class="token string">"pipeline"</span><span class="token punctuation">,</span> <span class="token builtin">str</span><span class="token punctuation">(</span>spec<span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">,</span> check<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> capture_output<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"output"</span><span class="token punctuation">:</span> <span class="token builtin">str</span><span class="token punctuation">(</span>out_path<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"mask"</span><span class="token punctuation">:</span> <span class="token builtin">str</span><span class="token punctuation">(</span>footprints_geojson<span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"buffer_m"</span><span class="token punctuation">:</span> buffer_m<span class="token punctuation">}</span>
+</code></pre></div>
+<p>Using the cadastral building footprints as a mask sidesteps the whole window-size dilemma: the widest building is no longer PMF’s problem, so <code>max_window_size</code> can be set from the widest <em>non-building</em> object — a truck, a container, a hedge — which is typically under 20 m.</p>
+<p><code>filters.overlay</code> writes an attribute from a polygon layer onto the points, and using it to pre-set <code>Classification</code> to 6 inside footprints means those points are never candidates for ground. The footprints need a buffer, because a building’s eaves overhang its footprint and a scanner sees the eaves.</p>
+<p>Where footprints are unavailable or stale, a planarity-and-height filter over the non-ground points gives a usable approximate mask, at the cost of another tuning exercise.</p>
+<h3 id="5-rasterise-and-look-at-the-result" tabindex="-1"><a class="heading-link" href="#5-rasterise-and-look-at-the-result"><span>5. Rasterise and look at the result</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> rasterio
+
+<span class="token keyword">def</span> <span class="token function">dtm_from_ground</span><span class="token punctuation">(</span>classified_las<span class="token punctuation">,</span> out_tif<span class="token punctuation">,</span> cell_m<span class="token operator">=</span><span class="token number">0.5</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    stages <span class="token operator">=</span> <span class="token punctuation">[</span>
+        <span class="token builtin">str</span><span class="token punctuation">(</span>classified_las<span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"filters.range"</span><span class="token punctuation">,</span> <span class="token string">"limits"</span><span class="token punctuation">:</span> <span class="token string">"Classification[2:2]"</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+        <span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"writers.gdal"</span><span class="token punctuation">,</span> <span class="token string">"filename"</span><span class="token punctuation">:</span> <span class="token builtin">str</span><span class="token punctuation">(</span>out_tif<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"gdaldriver"</span><span class="token punctuation">:</span> <span class="token string">"GTiff"</span><span class="token punctuation">,</span>
+         <span class="token string">"output_type"</span><span class="token punctuation">:</span> <span class="token string">"idw"</span><span class="token punctuation">,</span> <span class="token string">"resolution"</span><span class="token punctuation">:</span> cell_m<span class="token punctuation">,</span> <span class="token string">"radius"</span><span class="token punctuation">:</span> cell_m <span class="token operator">*</span> <span class="token number">3</span><span class="token punctuation">,</span>
+         <span class="token string">"nodata"</span><span class="token punctuation">:</span> <span class="token operator">-</span><span class="token number">9999.0</span><span class="token punctuation">,</span> <span class="token string">"data_type"</span><span class="token punctuation">:</span> <span class="token string">"float32"</span><span class="token punctuation">,</span>
+         <span class="token string">"gdalopts"</span><span class="token punctuation">:</span> <span class="token string">"COMPRESS=DEFLATE,PREDICTOR=3,TILED=YES"</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+    <span class="token punctuation">]</span>
+    spec <span class="token operator">=</span> Path<span class="token punctuation">(</span>out_tif<span class="token punctuation">)</span><span class="token punctuation">.</span>with_suffix<span class="token punctuation">(</span><span class="token string">".pipeline.json"</span><span class="token punctuation">)</span>
+    spec<span class="token punctuation">.</span>write_text<span class="token punctuation">(</span>json<span class="token punctuation">.</span>dumps<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"pipeline"</span><span class="token punctuation">:</span> stages<span class="token punctuation">}</span><span class="token punctuation">,</span> indent<span class="token operator">=</span><span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    subprocess<span class="token punctuation">.</span>run<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token string">"pdal"</span><span class="token punctuation">,</span> <span class="token string">"pipeline"</span><span class="token punctuation">,</span> <span class="token builtin">str</span><span class="token punctuation">(</span>spec<span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">,</span> check<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> capture_output<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+    <span class="token keyword">with</span> rasterio<span class="token punctuation">.</span><span class="token builtin">open</span><span class="token punctuation">(</span>out_tif<span class="token punctuation">)</span> <span class="token keyword">as</span> ds<span class="token punctuation">:</span>
+        z <span class="token operator">=</span> ds<span class="token punctuation">.</span>read<span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">,</span> masked<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span><span class="token punctuation">.</span>astype<span class="token punctuation">(</span><span class="token string">"float64"</span><span class="token punctuation">)</span>
+        res <span class="token operator">=</span> ds<span class="token punctuation">.</span>res<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span>
+    <span class="token keyword">return</span> z<span class="token punctuation">,</span> res
+
+<span class="token keyword">def</span> <span class="token function">artefact_scan</span><span class="token punctuation">(</span>z<span class="token punctuation">,</span> cell_m<span class="token punctuation">,</span> plateau_slope_deg<span class="token operator">=</span><span class="token number">1.0</span><span class="token punctuation">,</span> min_plateau_m2<span class="token operator">=</span><span class="token number">150.0</span><span class="token punctuation">,</span>
+                  pit_depth_m<span class="token operator">=</span><span class="token number">0.6</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Two signatures of a bad ground classification: plateaux and pits."""</span>
+    <span class="token keyword">from</span> scipy <span class="token keyword">import</span> ndimage
+    arr <span class="token operator">=</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>z<span class="token punctuation">.</span>filled<span class="token punctuation">(</span>np<span class="token punctuation">.</span>nan<span class="token punctuation">)</span> <span class="token keyword">if</span> <span class="token builtin">hasattr</span><span class="token punctuation">(</span>z<span class="token punctuation">,</span> <span class="token string">"filled"</span><span class="token punctuation">)</span> <span class="token keyword">else</span> z<span class="token punctuation">)</span>
+    gy<span class="token punctuation">,</span> gx <span class="token operator">=</span> np<span class="token punctuation">.</span>gradient<span class="token punctuation">(</span>np<span class="token punctuation">.</span>nan_to_num<span class="token punctuation">(</span>arr<span class="token punctuation">,</span> nan<span class="token operator">=</span>np<span class="token punctuation">.</span>nanmedian<span class="token punctuation">(</span>arr<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> cell_m<span class="token punctuation">)</span>
+    slope <span class="token operator">=</span> np<span class="token punctuation">.</span>degrees<span class="token punctuation">(</span>np<span class="token punctuation">.</span>arctan<span class="token punctuation">(</span>np<span class="token punctuation">.</span>hypot<span class="token punctuation">(</span>gx<span class="token punctuation">,</span> gy<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+
+    flat <span class="token operator">=</span> np<span class="token punctuation">.</span>nan_to_num<span class="token punctuation">(</span>slope<span class="token punctuation">,</span> nan<span class="token operator">=</span><span class="token number">90.0</span><span class="token punctuation">)</span> <span class="token operator">&lt;=</span> plateau_slope_deg
+    labels<span class="token punctuation">,</span> n <span class="token operator">=</span> ndimage<span class="token punctuation">.</span>label<span class="token punctuation">(</span>flat<span class="token punctuation">)</span>
+    sizes <span class="token operator">=</span> ndimage<span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>ones_like<span class="token punctuation">(</span>labels<span class="token punctuation">)</span><span class="token punctuation">,</span> labels<span class="token punctuation">,</span> index<span class="token operator">=</span>np<span class="token punctuation">.</span>arange<span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">,</span> n <span class="token operator">+</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">)</span> \
+        <span class="token keyword">if</span> n <span class="token keyword">else</span> np<span class="token punctuation">.</span>array<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    min_cells <span class="token operator">=</span> min_plateau_m2 <span class="token operator">/</span> cell_m <span class="token operator">**</span> <span class="token number">2</span>
+    plateaux <span class="token operator">=</span> <span class="token builtin">int</span><span class="token punctuation">(</span><span class="token punctuation">(</span>sizes <span class="token operator">>=</span> min_cells<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token keyword">if</span> sizes<span class="token punctuation">.</span>size <span class="token keyword">else</span> <span class="token number">0</span>
+
+    smooth <span class="token operator">=</span> ndimage<span class="token punctuation">.</span>median_filter<span class="token punctuation">(</span>np<span class="token punctuation">.</span>nan_to_num<span class="token punctuation">(</span>arr<span class="token punctuation">,</span> nan<span class="token operator">=</span>np<span class="token punctuation">.</span>nanmedian<span class="token punctuation">(</span>arr<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> size<span class="token operator">=</span><span class="token number">9</span><span class="token punctuation">)</span>
+    pits <span class="token operator">=</span> <span class="token builtin">int</span><span class="token punctuation">(</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>nan_to_num<span class="token punctuation">(</span>smooth <span class="token operator">-</span> arr<span class="token punctuation">,</span> nan<span class="token operator">=</span><span class="token number">0.0</span><span class="token punctuation">)</span> <span class="token operator">></span> pit_depth_m<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token string">"large_flat_regions"</span><span class="token punctuation">:</span> plateaux<span class="token punctuation">,</span>
+        <span class="token string">"largest_flat_m2"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>sizes<span class="token punctuation">.</span><span class="token builtin">max</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">*</span> cell_m <span class="token operator">**</span> <span class="token number">2</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span> <span class="token keyword">if</span> sizes<span class="token punctuation">.</span>size <span class="token keyword">else</span> <span class="token number">0</span><span class="token punctuation">,</span>
+        <span class="token string">"pit_cells"</span><span class="token punctuation">:</span> pits<span class="token punctuation">,</span>
+        <span class="token string">"pit_area_m2"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>pits <span class="token operator">*</span> cell_m <span class="token operator">**</span> <span class="token number">2</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"verdict"</span><span class="token punctuation">:</span> <span class="token string">"buildings likely still in ground"</span> <span class="token keyword">if</span> plateaux <span class="token operator">></span> <span class="token number">2</span>
+                   <span class="token keyword">else</span> <span class="token string">"pits suggest over-filtering"</span> <span class="token keyword">if</span> pits <span class="token operator">></span> <span class="token number">500</span>
+                   <span class="token keyword">else</span> <span class="token string">"no obvious artefacts"</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+</code></pre></div>
+<p>Plateaux and pits are the two diagnostic artefacts, and they point in opposite directions. A large perfectly flat region in a DTM is a building roof that survived, which means the window was too small or the slope too high. A pattern of pits is over-filtering: genuine ground points were removed, and the interpolation pulled the surface down into the gaps.</p>
+<p>Scanning for both automatically is worth far more than looking at a hillshade, because a hillshade makes plateaux obvious and pits almost invisible.</p>
+<figure class="diagram">
+<svg viewBox="4 6 732 312" role="img" aria-labelledby="pmf-choice-t pmf-choice-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="pmf-choice-t">PMF, SMRF or neither, by terrain</title>
+  <desc id="pmf-choice-d">A table of six terrain types with the filter to use and the reason. Flat rural ground suits PMF because its assumptions hold and it is faster. Rolling and steep terrain suit SMRF because its slope handling is better. Dense urban areas need SMRF plus a building footprint mask because neither filter handles wide buildings alone. Forest suits SMRF for sparse ground returns under canopy. Quarry benches suit neither because vertical faces violate both models.</desc>
+  <rect class="svg-bg" x="4" y="6" width="732" height="312" fill="#ffffff"/>
+  <g stroke-width="1.5">
+    <rect x="18" y="20" width="170" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="188" y="20" width="216" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="404" y="20" width="318" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="18" y="54" width="170" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="188" y="54" width="216" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="404" y="54" width="318" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="18" y="88" width="170" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="188" y="88" width="216" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="404" y="88" width="318" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="18" y="122" width="170" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="188" y="122" width="216" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="404" y="122" width="318" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="18" y="156" width="170" height="34" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="188" y="156" width="216" height="34" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="404" y="156" width="318" height="34" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="18" y="190" width="170" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="188" y="190" width="216" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="404" y="190" width="318" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="18" y="224" width="170" height="34" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="188" y="224" width="216" height="34" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="404" y="224" width="318" height="34" fill="#f7dfdc" stroke="#b0413e"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="103" y="42">terrain</text><text x="296" y="42">filter</text><text x="563" y="42">reason</text>
+    <text x="103" y="76">flat rural</text><text x="296" y="76">PMF</text><text x="563" y="76">assumptions hold; faster and predictable</text>
+    <text x="103" y="110">rolling rural</text><text x="296" y="110">SMRF</text><text x="563" y="110">better slope handling</text>
+    <text x="103" y="144">steep mountain</text><text x="296" y="144">SMRF</text><text x="563" y="144">PMF removes ridges</text>
+    <text x="103" y="178">dense urban</text><text x="296" y="178">SMRF + footprint mask</text><text x="563" y="178">neither handles wide buildings alone</text>
+    <text x="103" y="212">forest</text><text x="296" y="212">SMRF</text><text x="563" y="212">sparse ground returns under canopy</text>
+    <text x="103" y="246">quarry benches</text><text x="296" y="246">neither, alone</text><text x="563" y="246">vertical faces violate both models</text>
+  </g>
+  <text x="20" y="278" fill="#1f2937" font-size="12.5">A footprint mask beats every pure-parameter setting, because it removes the constraint they fight.</text>
+  <text x="20" y="300" fill="#5b6471" font-size="12">Both filters assume the ground is a height field with bounded slope; a bench face is not.</text>
+</svg>
+<figcaption>SMRF for varied terrain, PMF for flat and predictable, and a footprint mask wherever buildings are wide.</figcaption>
+</figure>
+<h3 id="6-measure-accuracy-against-control" tabindex="-1"><a class="heading-link" href="#6-measure-accuracy-against-control"><span>6. Measure accuracy against control</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">accuracy_against_control</span><span class="token punctuation">(</span>dtm_tif<span class="token punctuation">,</span> control_points<span class="token punctuation">,</span> tolerance_m<span class="token operator">=</span><span class="token number">0.15</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""control_points: [{'id':…, 'x':…, 'y':…, 'z':…}], in the DTM's CRS."""</span>
+    rows <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    <span class="token keyword">with</span> rasterio<span class="token punctuation">.</span><span class="token builtin">open</span><span class="token punctuation">(</span>dtm_tif<span class="token punctuation">)</span> <span class="token keyword">as</span> ds<span class="token punctuation">:</span>
+        <span class="token keyword">for</span> cp <span class="token keyword">in</span> control_points<span class="token punctuation">:</span>
+            <span class="token keyword">try</span><span class="token punctuation">:</span>
+                val <span class="token operator">=</span> <span class="token builtin">next</span><span class="token punctuation">(</span>ds<span class="token punctuation">.</span>sample<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token punctuation">(</span>cp<span class="token punctuation">[</span><span class="token string">"x"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> cp<span class="token punctuation">[</span><span class="token string">"y"</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">,</span> indexes<span class="token operator">=</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span>
+            <span class="token keyword">except</span> StopIteration<span class="token punctuation">:</span>
+                rows<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"id"</span><span class="token punctuation">:</span> cp<span class="token punctuation">[</span><span class="token string">"id"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token string">"status"</span><span class="token punctuation">:</span> <span class="token string">"outside raster"</span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+                <span class="token keyword">continue</span>
+            <span class="token keyword">if</span> ds<span class="token punctuation">.</span>nodata <span class="token keyword">is</span> <span class="token keyword">not</span> <span class="token boolean">None</span> <span class="token keyword">and</span> np<span class="token punctuation">.</span>isclose<span class="token punctuation">(</span>val<span class="token punctuation">,</span> ds<span class="token punctuation">.</span>nodata<span class="token punctuation">)</span><span class="token punctuation">:</span>
+                rows<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"id"</span><span class="token punctuation">:</span> cp<span class="token punctuation">[</span><span class="token string">"id"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token string">"status"</span><span class="token punctuation">:</span> <span class="token string">"nodata"</span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+                <span class="token keyword">continue</span>
+            rows<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"id"</span><span class="token punctuation">:</span> cp<span class="token punctuation">[</span><span class="token string">"id"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token string">"dtm_m"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>val<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                         <span class="token string">"control_m"</span><span class="token punctuation">:</span> cp<span class="token punctuation">[</span><span class="token string">"z"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+                         <span class="token string">"residual_m"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>val<span class="token punctuation">)</span> <span class="token operator">-</span> cp<span class="token punctuation">[</span><span class="token string">"z"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+    resid <span class="token operator">=</span> np<span class="token punctuation">.</span>array<span class="token punctuation">(</span><span class="token punctuation">[</span>r<span class="token punctuation">[</span><span class="token string">"residual_m"</span><span class="token punctuation">]</span> <span class="token keyword">for</span> r <span class="token keyword">in</span> rows <span class="token keyword">if</span> <span class="token string">"residual_m"</span> <span class="token keyword">in</span> r<span class="token punctuation">]</span><span class="token punctuation">)</span>
+    <span class="token keyword">if</span> resid<span class="token punctuation">.</span>size <span class="token operator">==</span> <span class="token number">0</span><span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"measurable"</span><span class="token punctuation">:</span> <span class="token boolean">False</span><span class="token punctuation">,</span> <span class="token string">"rows"</span><span class="token punctuation">:</span> rows<span class="token punctuation">}</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token string">"measurable"</span><span class="token punctuation">:</span> <span class="token boolean">True</span><span class="token punctuation">,</span>
+        <span class="token string">"points"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>rows<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"with_value"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span>resid<span class="token punctuation">.</span>size<span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"mean_m"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>resid<span class="token punctuation">.</span>mean<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"rmse_m"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>sqrt<span class="token punctuation">(</span><span class="token punctuation">(</span>resid <span class="token operator">**</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">.</span>mean<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"p95_abs_m"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>percentile<span class="token punctuation">(</span>np<span class="token punctuation">.</span><span class="token builtin">abs</span><span class="token punctuation">(</span>resid<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">95</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"max_abs_m"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span><span class="token builtin">abs</span><span class="token punctuation">(</span>resid<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">max</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"within_tolerance"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span><span class="token builtin">abs</span><span class="token punctuation">(</span>resid<span class="token punctuation">)</span> <span class="token operator">&lt;=</span> tolerance_m<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"outliers"</span><span class="token punctuation">:</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span><span class="token punctuation">(</span>r <span class="token keyword">for</span> r <span class="token keyword">in</span> rows <span class="token keyword">if</span> <span class="token string">"residual_m"</span> <span class="token keyword">in</span> r<span class="token punctuation">)</span><span class="token punctuation">,</span>
+                           key<span class="token operator">=</span><span class="token keyword">lambda</span> r<span class="token punctuation">:</span> <span class="token operator">-</span><span class="token builtin">abs</span><span class="token punctuation">(</span>r<span class="token punctuation">[</span><span class="token string">"residual_m"</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token number">4</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+        <span class="token string">"bias_significant"</span><span class="token punctuation">:</span> <span class="token builtin">abs</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>resid<span class="token punctuation">.</span>mean<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">></span> <span class="token builtin">float</span><span class="token punctuation">(</span>resid<span class="token punctuation">.</span>std<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">/</span> math<span class="token punctuation">.</span>sqrt<span class="token punctuation">(</span>resid<span class="token punctuation">.</span>size<span class="token punctuation">)</span> <span class="token operator">*</span> <span class="token number">3</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+
+<span class="token keyword">def</span> <span class="token function">classification_confusion</span><span class="token punctuation">(</span>reference_las<span class="token punctuation">,</span> test_las<span class="token punctuation">,</span> sample<span class="token operator">=</span><span class="token number">200_000</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""If a reference classification exists, compare class 2 assignment directly."""</span>
+    <span class="token keyword">import</span> laspy
+    ref <span class="token operator">=</span> laspy<span class="token punctuation">.</span>read<span class="token punctuation">(</span>reference_las<span class="token punctuation">)</span>
+    test <span class="token operator">=</span> laspy<span class="token punctuation">.</span>read<span class="token punctuation">(</span>test_las<span class="token punctuation">)</span>
+    n <span class="token operator">=</span> <span class="token builtin">min</span><span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>ref<span class="token punctuation">.</span>points<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token builtin">len</span><span class="token punctuation">(</span>test<span class="token punctuation">.</span>points<span class="token punctuation">)</span><span class="token punctuation">,</span> sample<span class="token punctuation">)</span>
+    idx <span class="token operator">=</span> np<span class="token punctuation">.</span>random<span class="token punctuation">.</span>default_rng<span class="token punctuation">(</span><span class="token number">5</span><span class="token punctuation">)</span><span class="token punctuation">.</span>choice<span class="token punctuation">(</span><span class="token builtin">min</span><span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>ref<span class="token punctuation">.</span>points<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token builtin">len</span><span class="token punctuation">(</span>test<span class="token punctuation">.</span>points<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                                          size<span class="token operator">=</span>n<span class="token punctuation">,</span> replace<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">)</span>
+    ref_ground <span class="token operator">=</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>ref<span class="token punctuation">.</span>classification<span class="token punctuation">)</span><span class="token punctuation">[</span>idx<span class="token punctuation">]</span> <span class="token operator">==</span> <span class="token number">2</span>
+    test_ground <span class="token operator">=</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>test<span class="token punctuation">.</span>classification<span class="token punctuation">)</span><span class="token punctuation">[</span>idx<span class="token punctuation">]</span> <span class="token operator">==</span> <span class="token number">2</span>
+    tp <span class="token operator">=</span> <span class="token builtin">int</span><span class="token punctuation">(</span><span class="token punctuation">(</span>ref_ground <span class="token operator">&amp;</span> test_ground<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    fp <span class="token operator">=</span> <span class="token builtin">int</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token operator">~</span>ref_ground <span class="token operator">&amp;</span> test_ground<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    fn <span class="token operator">=</span> <span class="token builtin">int</span><span class="token punctuation">(</span><span class="token punctuation">(</span>ref_ground <span class="token operator">&amp;</span> <span class="token operator">~</span>test_ground<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    tn <span class="token operator">=</span> <span class="token builtin">int</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token operator">~</span>ref_ground <span class="token operator">&amp;</span> <span class="token operator">~</span>test_ground<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token string">"sampled"</span><span class="token punctuation">:</span> n<span class="token punctuation">,</span>
+        <span class="token string">"true_positive"</span><span class="token punctuation">:</span> tp<span class="token punctuation">,</span> <span class="token string">"false_positive"</span><span class="token punctuation">:</span> fp<span class="token punctuation">,</span>
+        <span class="token string">"false_negative"</span><span class="token punctuation">:</span> fn<span class="token punctuation">,</span> <span class="token string">"true_negative"</span><span class="token punctuation">:</span> tn<span class="token punctuation">,</span>
+        <span class="token string">"precision"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>tp <span class="token operator">/</span> <span class="token builtin">max</span><span class="token punctuation">(</span>tp <span class="token operator">+</span> fp<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"recall"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>tp <span class="token operator">/</span> <span class="token builtin">max</span><span class="token punctuation">(</span>tp <span class="token operator">+</span> fn<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"type_i_pct"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token number">100.0</span> <span class="token operator">*</span> fn <span class="token operator">/</span> <span class="token builtin">max</span><span class="token punctuation">(</span>tp <span class="token operator">+</span> fn<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span>   <span class="token comment"># ground called non-ground</span>
+        <span class="token string">"type_ii_pct"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token number">100.0</span> <span class="token operator">*</span> fp <span class="token operator">/</span> <span class="token builtin">max</span><span class="token punctuation">(</span>fp <span class="token operator">+</span> tn<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span>  <span class="token comment"># non-ground called ground</span>
+    <span class="token punctuation">}</span>
+</code></pre></div>
+<p>Type I and type II error rates are the standard way this is reported in the literature and they are the right frame. Type I — real ground rejected — shows up as pits and as a thin DTM; type II — non-ground accepted — shows up as plateaux. A good classification on mixed terrain runs at a few percent type I and under 2% type II.</p>
+<p>Control-point residuals measure something slightly different and equally important: whether the <em>surface</em> is right where it matters. A classification with 4% type I error can still produce a DTM with a 3 cm RMSE against control, because the remaining ground points are enough to define the surface.</p>
+<figure class="diagram">
+<svg viewBox="4 6 732 252" role="img" aria-labelledby="pmf-tune-t pmf-tune-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="pmf-tune-t">Parameter effect on error rates</title>
+  <desc id="pmf-tune-d">A table of four parameter sets on the same suburban tile. Defaults give 1.2 percent type one error and 6.8 percent type two, with three building plateaux in the DTM. Raising the window to 78 cells gives 4.1 and 0.9 percent, with no plateaux but a flattened terrace. Lowering the slope to 0.2 gives 2.8 and 1.4 percent. Using a building footprint mask with a 24-cell window gives 1.1 and 0.4 percent with no plateaux and the terrace preserved.</desc>
+  <rect class="svg-bg" x="4" y="6" width="732" height="252" fill="#ffffff"/>
+  <g stroke-width="1.5">
+    <rect x="18" y="20" width="242" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="260" y="20" width="118" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="378" y="20" width="118" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="496" y="20" width="226" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="18" y="54" width="242" height="40" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="260" y="54" width="118" height="40" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="378" y="54" width="118" height="40" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="496" y="54" width="226" height="40" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="18" y="94" width="242" height="40" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="260" y="94" width="118" height="40" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="378" y="94" width="118" height="40" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="496" y="94" width="226" height="40" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="18" y="134" width="242" height="40" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="260" y="134" width="118" height="40" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="378" y="134" width="118" height="40" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="496" y="134" width="226" height="40" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="18" y="174" width="242" height="40" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="260" y="174" width="118" height="40" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="378" y="174" width="118" height="40" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="496" y="174" width="226" height="40" fill="#eef5e9" stroke="#4f7a4d"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="139" y="41">parameters</text><text x="319" y="41">type I</text>
+    <text x="437" y="41">type II</text><text x="609" y="41">DTM artefacts</text>
+    <text x="139" y="78">defaults: 1 m cell, 33 cells, slope 1.0</text>
+    <text x="319" y="78">1.2%</text><text x="437" y="78">6.8%</text><text x="609" y="78">3 building plateaux</text>
+    <text x="139" y="110">window 78 cells</text><text x="139" y="126">(78 m removable)</text>
+    <text x="319" y="118">4.1%</text><text x="437" y="118">0.9%</text>
+    <text x="609" y="110">no plateaux, but a real</text><text x="609" y="126">50 m terrace flattened</text>
+    <text x="139" y="150">slope 0.2, window 33</text><text x="139" y="166">initial_distance 0.12</text>
+    <text x="319" y="158">2.8%</text><text x="437" y="158">1.4%</text>
+    <text x="609" y="150">mild pitting on the</text><text x="609" y="166">steepest embankment</text>
+    <text x="139" y="190">footprint mask +</text><text x="139" y="206">24-cell window</text>
+    <text x="319" y="198">1.1%</text><text x="437" y="198">0.4%</text>
+    <text x="609" y="190">none — terrace preserved,</text><text x="609" y="206">no pitting</text>
+  </g>
+  <text x="370" y="240" fill="#5b6471" font-size="12" text-anchor="middle">the footprint mask beats every pure-parameter setting, because it removes the constraint the parameters were fighting</text>
+</svg>
+<figcaption>Every parameter-only setting trades one error against the other; the footprint mask removes the trade.</figcaption>
+</figure>
+<h2 id="expected-output-verification" tabindex="-1"><a class="heading-link" href="#expected-output-verification"><span>Expected Output &amp; Verification</span></a></h2>
+<div class="codeblock" data-lang="text"><div class="codeblock__bar"><span class="codeblock__lang">text</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-text" tabindex="0" role="group" aria-label="text code sample"><code class="language-text">{'points': 41820418, 'area_m2': 1000000.0, 'density_per_m2': 41.82, 'mean_spacing_m': 0.155}
+{'cell_size': 0.5, 'max_window_size': 24, 'slope': 0.2, 'initial_distance': 0.12,
+ 'max_distance': 3.5, 'max_removable_width_m': 12.0}
+{'large_flat_regions': 0, 'largest_flat_m2': 88.5, 'pit_cells': 142,
+ 'pit_area_m2': 35.5, 'verdict': 'no obvious artefacts'}
+{
+  "measurable": true,
+  "points": 34, "with_value": 34,
+  "mean_m": -0.0121, "rmse_m": 0.0418, "p95_abs_m": 0.0784, "max_abs_m": 0.1142,
+  "within_tolerance": 34,
+  "bias_significant": false
+}
+{'sampled': 200000, 'true_positive': 88412, 'false_positive': 412,
+ 'false_negative': 984, 'true_negative': 110192,
+ 'precision': 0.9954, 'recall': 0.989, 'type_i_pct': 1.1, 'type_ii_pct': 0.37}
+</code></pre></div>
+<p>A 4.2 cm RMSE against control with all 34 points inside tolerance and no significant bias is a good result for airborne lidar. The 1.1% type I and 0.37% type II rates are the numbers to quote when someone asks how good the classification is.</p>
+<p>The 142 pit cells covering 35 m² are worth a glance and are not a problem at this scale — they are typically at the base of dense hedges where genuine ground returns are sparse.</p>
+<p>Verify the parameters were actually applied, since a typo in a pipeline stage is silently ignored by some PDAL versions:</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">pipeline_verification</span><span class="token punctuation">(</span>meta_json_path<span class="token punctuation">,</span> expected_params<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    meta <span class="token operator">=</span> json<span class="token punctuation">.</span>loads<span class="token punctuation">(</span>Path<span class="token punctuation">(</span>meta_json_path<span class="token punctuation">)</span><span class="token punctuation">.</span>read_text<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    stages <span class="token operator">=</span> meta<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"stages"</span><span class="token punctuation">,</span> <span class="token punctuation">{</span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+    pmf <span class="token operator">=</span> <span class="token builtin">next</span><span class="token punctuation">(</span><span class="token punctuation">(</span>v <span class="token keyword">for</span> k<span class="token punctuation">,</span> v <span class="token keyword">in</span> stages<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">if</span> k<span class="token punctuation">.</span>startswith<span class="token punctuation">(</span><span class="token string">"filters.pmf"</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token boolean">None</span><span class="token punctuation">)</span>
+    <span class="token keyword">if</span> pmf <span class="token keyword">is</span> <span class="token boolean">None</span><span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"applied"</span><span class="token punctuation">:</span> <span class="token boolean">False</span><span class="token punctuation">,</span> <span class="token string">"reason"</span><span class="token punctuation">:</span> <span class="token string">"no filters.pmf stage in metadata"</span><span class="token punctuation">}</span>
+    mismatches <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    <span class="token keyword">for</span> key<span class="token punctuation">,</span> expected <span class="token keyword">in</span> expected_params<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">if</span> key <span class="token keyword">not</span> <span class="token keyword">in</span> pmf<span class="token punctuation">:</span>
+            <span class="token keyword">continue</span>
+        got <span class="token operator">=</span> pmf<span class="token punctuation">[</span>key<span class="token punctuation">]</span>
+        <span class="token keyword">if</span> <span class="token builtin">isinstance</span><span class="token punctuation">(</span>expected<span class="token punctuation">,</span> <span class="token builtin">float</span><span class="token punctuation">)</span> <span class="token keyword">and</span> <span class="token keyword">not</span> math<span class="token punctuation">.</span>isclose<span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>got<span class="token punctuation">)</span><span class="token punctuation">,</span> expected<span class="token punctuation">,</span> rel_tol<span class="token operator">=</span><span class="token number">1e-6</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+            mismatches<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"param"</span><span class="token punctuation">:</span> key<span class="token punctuation">,</span> <span class="token string">"expected"</span><span class="token punctuation">:</span> expected<span class="token punctuation">,</span> <span class="token string">"got"</span><span class="token punctuation">:</span> got<span class="token punctuation">}</span><span class="token punctuation">)</span>
+        <span class="token keyword">elif</span> <span class="token keyword">not</span> <span class="token builtin">isinstance</span><span class="token punctuation">(</span>expected<span class="token punctuation">,</span> <span class="token builtin">float</span><span class="token punctuation">)</span> <span class="token keyword">and</span> got <span class="token operator">!=</span> expected<span class="token punctuation">:</span>
+            mismatches<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"param"</span><span class="token punctuation">:</span> key<span class="token punctuation">,</span> <span class="token string">"expected"</span><span class="token punctuation">:</span> expected<span class="token punctuation">,</span> <span class="token string">"got"</span><span class="token punctuation">:</span> got<span class="token punctuation">}</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"applied"</span><span class="token punctuation">:</span> <span class="token boolean">True</span><span class="token punctuation">,</span> <span class="token string">"mismatches"</span><span class="token punctuation">:</span> mismatches<span class="token punctuation">,</span>
+            <span class="token string">"matches"</span><span class="token punctuation">:</span> <span class="token keyword">not</span> mismatches<span class="token punctuation">,</span>
+            <span class="token string">"effective"</span><span class="token punctuation">:</span> <span class="token punctuation">{</span>k<span class="token punctuation">:</span> pmf<span class="token punctuation">.</span>get<span class="token punctuation">(</span>k<span class="token punctuation">)</span> <span class="token keyword">for</span> k <span class="token keyword">in</span> expected_params <span class="token keyword">if</span> k <span class="token keyword">in</span> pmf<span class="token punctuation">}</span><span class="token punctuation">}</span>
+
+<span class="token keyword">print</span><span class="token punctuation">(</span>json<span class="token punctuation">.</span>dumps<span class="token punctuation">(</span>pipeline_verification<span class="token punctuation">(</span><span class="token string">"build/ground.meta.json"</span><span class="token punctuation">,</span>
+                                       <span class="token punctuation">{</span><span class="token string">"cell_size"</span><span class="token punctuation">:</span> <span class="token number">0.5</span><span class="token punctuation">,</span> <span class="token string">"max_window_size"</span><span class="token punctuation">:</span> <span class="token number">24</span><span class="token punctuation">,</span>
+                                        <span class="token string">"slope"</span><span class="token punctuation">:</span> <span class="token number">0.2</span><span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">,</span> indent<span class="token operator">=</span><span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Reading the parameters back from PDAL’s own metadata output is the only way to be sure the stage ran with what you intended. A misspelled option name — <code>cellsize</code> for <code>cell_size</code> — is accepted by some builds and ignored, leaving the default in force.</p>
+<p>Then verify the ground coverage is dense enough to define a surface everywhere:</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">ground_coverage_check</span><span class="token punctuation">(</span>classified_las<span class="token punctuation">,</span> cell_m<span class="token operator">=</span><span class="token number">2.0</span><span class="token punctuation">,</span> min_points_per_cell<span class="token operator">=</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    stages <span class="token operator">=</span> <span class="token punctuation">[</span>
+        <span class="token builtin">str</span><span class="token punctuation">(</span>classified_las<span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"filters.range"</span><span class="token punctuation">,</span> <span class="token string">"limits"</span><span class="token punctuation">:</span> <span class="token string">"Classification[2:2]"</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+        <span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"writers.gdal"</span><span class="token punctuation">,</span> <span class="token string">"filename"</span><span class="token punctuation">:</span> <span class="token string">"build/ground_count.tif"</span><span class="token punctuation">,</span>
+         <span class="token string">"output_type"</span><span class="token punctuation">:</span> <span class="token string">"count"</span><span class="token punctuation">,</span> <span class="token string">"resolution"</span><span class="token punctuation">:</span> cell_m<span class="token punctuation">,</span> <span class="token string">"nodata"</span><span class="token punctuation">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+         <span class="token string">"data_type"</span><span class="token punctuation">:</span> <span class="token string">"uint16"</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+    <span class="token punctuation">]</span>
+    Path<span class="token punctuation">(</span><span class="token string">"build/ground_count.json"</span><span class="token punctuation">)</span><span class="token punctuation">.</span>write_text<span class="token punctuation">(</span>json<span class="token punctuation">.</span>dumps<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"pipeline"</span><span class="token punctuation">:</span> stages<span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    subprocess<span class="token punctuation">.</span>run<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token string">"pdal"</span><span class="token punctuation">,</span> <span class="token string">"pipeline"</span><span class="token punctuation">,</span> <span class="token string">"build/ground_count.json"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+                   check<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> capture_output<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+    <span class="token keyword">with</span> rasterio<span class="token punctuation">.</span><span class="token builtin">open</span><span class="token punctuation">(</span><span class="token string">"build/ground_count.tif"</span><span class="token punctuation">)</span> <span class="token keyword">as</span> ds<span class="token punctuation">:</span>
+        counts <span class="token operator">=</span> ds<span class="token punctuation">.</span>read<span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">)</span>
+    empty <span class="token operator">=</span> counts <span class="token operator">&lt;</span> min_points_per_cell
+    <span class="token keyword">from</span> scipy <span class="token keyword">import</span> ndimage
+    labels<span class="token punctuation">,</span> n <span class="token operator">=</span> ndimage<span class="token punctuation">.</span>label<span class="token punctuation">(</span>empty<span class="token punctuation">)</span>
+    sizes <span class="token operator">=</span> ndimage<span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>ones_like<span class="token punctuation">(</span>labels<span class="token punctuation">)</span><span class="token punctuation">,</span> labels<span class="token punctuation">,</span> index<span class="token operator">=</span>np<span class="token punctuation">.</span>arange<span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">,</span> n <span class="token operator">+</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">)</span> \
+        <span class="token keyword">if</span> n <span class="token keyword">else</span> np<span class="token punctuation">.</span>array<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token string">"cells"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span>counts<span class="token punctuation">.</span>size<span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"empty_cells"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span>empty<span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"empty_fraction"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>empty<span class="token punctuation">.</span>mean<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"gap_clusters"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span>n<span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"largest_gap_m2"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>sizes<span class="token punctuation">.</span><span class="token builtin">max</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">*</span> cell_m <span class="token operator">**</span> <span class="token number">2</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span> <span class="token keyword">if</span> sizes<span class="token punctuation">.</span>size <span class="token keyword">else</span> <span class="token number">0</span><span class="token punctuation">,</span>
+        <span class="token string">"acceptable"</span><span class="token punctuation">:</span> <span class="token builtin">float</span><span class="token punctuation">(</span>empty<span class="token punctuation">.</span>mean<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">&lt;</span> <span class="token number">0.05</span>
+                      <span class="token keyword">and</span> <span class="token punctuation">(</span><span class="token keyword">not</span> sizes<span class="token punctuation">.</span>size <span class="token keyword">or</span> <span class="token builtin">float</span><span class="token punctuation">(</span>sizes<span class="token punctuation">.</span><span class="token builtin">max</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">*</span> cell_m <span class="token operator">**</span> <span class="token number">2</span> <span class="token operator">&lt;</span> <span class="token number">400</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+</code></pre></div>
+<p>Gaps in ground coverage are where the DTM is interpolated rather than measured, and a gap larger than a few hundred square metres — under a building, under dense canopy — is a region where the DTM is a guess. Reporting the largest gap is more useful than reporting the fraction, because one 2,000 m² gap matters more than 200 small ones.</p>
+<h2 id="performance-notes" tabindex="-1"><a class="heading-link" href="#performance-notes"><span>Performance Notes</span></a></h2>
+<ul>
+<li><strong>PMF with <code>exponential: True</code> runs in roughly 15–40 seconds per 40-million-point tile</strong> on one core; linear window growth is several times slower for the same result.</li>
+<li><strong>Cell size drives the cost quadratically.</strong> A 0.25 m cell on a 1 km tile is 16 million grid cells and is rarely worth it over 0.5 m.</li>
+<li><strong>SMRF is 2–4× slower than PMF</strong> and usually worth it on varied terrain.</li>
+<li><strong>Filter to last returns first.</strong> On 5-return data that removes 60% of the points before the expensive stage.</li>
+<li><strong>Tile with overlap.</strong> A morphological filter needs context beyond the tile edge; a 50–100 m buffer, classified and then clipped, avoids a seam of misclassification along every boundary.</li>
+<li><strong><code>filters.overlay</code> is cheap</strong> — a point-in-polygon test per point against a spatial index.</li>
+</ul>
+<h2 id="common-errors" tabindex="-1"><a class="heading-link" href="#common-errors"><span>Common Errors</span></a></h2>
+<p><strong>Buildings in the DTM as flat plateaux.</strong> <code>max_window_size</code> too small for the widest building. Raise it or use a footprint mask.</p>
+<p><strong>Real terraces and embankments flattened.</strong> <code>max_window_size</code> too large. This is the other half of the same trade.</p>
+<p><strong>Pits across the DTM.</strong> Over-filtering: <code>initial_distance</code> below the survey noise, or <code>slope</code> too low for the terrain.</p>
+<p><strong>A seam of bad classification along every tile edge.</strong> No overlap buffer. Classify with a buffer and clip after.</p>
+<p><strong><code>filters.pmf</code> had no effect.</strong> A misspelled parameter name, or the stage received no points because an earlier <code>filters.range</code> excluded everything. Read the metadata back.</p>
+<p><strong>Ground class is empty.</strong> PDAL’s PMF sets <code>Classification</code> to 2 for ground and 1 for non-ground; a later <code>writers.las</code> without <code>extra_dims</code> can drop custom dimensions but not classification — so an empty class 2 means the filter rejected everything, usually from a <code>max_distance</code> far too small.</p>
+<p><strong>Steep slopes classified as non-ground.</strong> PMF’s global slope tolerance. Use SMRF.</p>
+<h2 id="frequently-asked-questions" tabindex="-1"><a class="heading-link" href="#frequently-asked-questions"><span>Frequently Asked Questions</span></a></h2>
+<h3 id="pmf-or-smrf-as-a-default" tabindex="-1"><a class="heading-link" href="#pmf-or-smrf-as-a-default"><span>PMF or SMRF as a default?</span></a></h3>
+<p>SMRF for mixed and varied terrain, which is most real projects. PMF where the terrain is flat, the tiles are many and predictability matters.</p>
+<h3 id="should-i-trust-a-vendors-classification" tabindex="-1"><a class="heading-link" href="#should-i-trust-a-vendors-classification"><span>Should I trust a vendor’s classification?</span></a></h3>
+<p>Verify it with the same artefact scan and control-point check. Vendor classifications are usually good and occasionally have a systematic problem — a whole flight line misclassified — that is cheap to detect and expensive to discover late.</p>
+<h3 id="how-do-i-classify-a-quarry-or-a-cliff" tabindex="-1"><a class="heading-link" href="#how-do-i-classify-a-quarry-or-a-cliff"><span>How do I classify a quarry or a cliff?</span></a></h3>
+<p>Not with a morphological filter. Those need a method that does not assume a height field: region growing on normals, or a manual classification with the faces explicitly delineated.</p>
+<h2 id="related-guides" tabindex="-1"><a class="heading-link" href="#related-guides"><span>Related Guides</span></a></h2>
+<ul>
+<li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/detecting-power-lines-in-lidar/">Detecting Power Lines in Lidar</a> — classifying the linear features PMF leaves behind</li>
+<li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/training-a-random-forest-point-classifier/">Training a Random Forest Point Classifier</a> — when rules are not enough</li>
+<li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/delaunay-meshing-of-terrain-with-pdal/">Delaunay Meshing of Terrain with PDAL</a> — turning the ground class into a surface</li>
+</ul>
+<p>Back to <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">Lidar Classification and Ground Extraction</a>.</p>
+
+
+      
+      
+
+      <div class="related-nav">
+        
+
+        
+          <div>
+            <h3>Related</h3>
+            <div class="related-grid">
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/detecting-power-lines-in-lidar/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Detecting Power Lines in Lidar</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/extracting-building-footprints-from-classified-lidar/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Extracting Building Footprints from Classified LiDAR</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/pdal-smrf-vs-csf-ground-classification/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">PDAL SMRF vs CSF Ground Classification</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/reclassifying-noise-and-overlap-points-with-pdal/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Reclassifying Noise and Overlap Points with PDAL</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/training-a-random-forest-point-classifier/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Training a Random Forest Point Classifier</span>
+                </a>
+              
+            </div>
+          </div>
+        
+      </div>
+    </article>
+
+    
+    <aside class="toc" aria-label="On this page" data-toc hidden>
+      <h4>On this page</h4>
+      <ul></ul>
+    </aside>
+  </div>
+</div>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+  <div class="container site-footer__inner">
+    <div class="site-footer__brand">
+      <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+        <img src="/assets/img/logo-mark.svg" alt="" class="brand__mark" width="36" height="36">
+        <span class="brand__name">
+          3D Geospatial
+          <small>Digital Twin Automation</small>
+        </span>
+      </a>
+      <p>Engineering-grade guides on point cloud processing, mesh pipelines, LOD strategies, and CI/CD automation for digital twin platforms.</p>
+      <a class="footer-social" href="https://github.com/3d-geospatial" aria-label="3D Geospatial on GitHub" rel="noopener" target="_blank">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+          <path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.53-1.34-1.3-1.7-1.3-1.7-1.06-.72.08-.71.08-.71 1.17.08 1.79 1.2 1.79 1.2 1.04 1.79 2.73 1.27 3.4.97.1-.75.4-1.27.73-1.56-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.19-3.08-.12-.3-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.75.11 3.05.74.8 1.19 1.83 1.19 3.08 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.07.78 2.15v3.18c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5Z"/>
+        </svg>
+        <span>GitHub</span>
+      </a>
+    </div>
+
+    <div class="site-footer__col">
+      <h4>Sections</h4>
+      <ul>
+        <li><a href="https://www.3d-geospatial.com/">Home</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management &amp; Optimization</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/">Point Cloud &amp; Mesh Pipelines</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/">Troubleshooting &amp; Reliability</a></li>
+        
+      </ul>
+    </div>
+
+    
+      <div class="site-footer__col">
+        <h4>3D Geospatial Fundamentals</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/">3D Format Standards Comparison</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/">BIM and IFC Georeferencing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/">CityGML and CityJSON Processing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems for 3D Assets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/">Digital Elevation Model Workflows</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/">Spatial Indexing and Tiling Schemes for 3D Data</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>LOD Management &amp; Optimization</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/">Automated Tile Generation for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/">Cesium ion Upload Automation for 3D Tilesets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/">glTF LOD Generation With Draco Compression</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/">Streaming Sync Patterns for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/">Tileset Metadata and 3D Tiles Next</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/">Vector Overlays on 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Point Cloud &amp; Mesh Pipelines</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/">Automated Mesh Decimation for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/">Change Detection Between LiDAR Scan Epochs</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/">CI/CD Automation for Spatial Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">LiDAR Classification and Ground Extraction</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/photogrammetry-processing-pipelines/">Photogrammetry Processing Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/">Point Cloud Filtering Techniques</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/">Surface Reconstruction for Geospatial Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/">Texture Mapping Workflows for Digital Twins</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Troubleshooting &amp; Reliability</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/">Cross-Section Failure Modes in Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/">Data Validation &amp; QA Gates for 3D Tiles</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/">Performance Profiling and Benchmarking</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/">Pipeline Observability and Monitoring</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/">Streaming &amp; Runtime Diagnostics for 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+  </div>
+  <div class="container site-footer__bottom">
+    <span>© 2026 3D Geospatial &amp; Digital Twin Automation</span>
+    <span>Built with Eleventy · PWA-enabled</span>
+  </div>
+</footer>
+
+
+  <script src="/assets/js/site.js?v=b99aa9f971" defer></script>
+  
+</body>
+</html>

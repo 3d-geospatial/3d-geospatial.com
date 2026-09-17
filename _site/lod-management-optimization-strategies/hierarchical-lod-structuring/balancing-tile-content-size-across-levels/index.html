@@ -1,0 +1,960 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <title>Balancing Tile Content Size Across Levels — 3D Geospatial</title>
+  <meta name="description" content="Diagnose and fix a tileset whose tiles range from 8 KB to 40 MB: per-level payload histograms, adaptive subdivision thresholds">
+  <meta name="keywords" content="3D geospatial, digital twin, point cloud, mesh pipeline, LOD, 3D Tiles, Cesium, PDAL, Open3D, Python, CI/CD">
+  <meta name="author" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta name="theme-color" content="#1f6b8a" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f171d" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+
+  
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem("theme");
+        var theme = (stored === "dark" || stored === "light") ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    })();
+  </script>
+  <meta name="generator" content="Eleventy">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="googlebot" content="index,follow,max-image-preview:large">
+
+  
+  <link rel="canonical" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/balancing-tile-content-size-across-levels/">
+  <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">
+
+  
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/icon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+
+  
+  <link rel="apple-touch-icon" href="/assets/img/icon-180.png">
+  <link rel="mask-icon" href="/assets/img/logo.svg" color="#1f6b8a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="3D Geospatial">
+  <meta name="application-name" content="3D Geospatial">
+
+  
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Balancing Tile Content Size Across Levels — 3D Geospatial">
+  <meta property="og:description" content="Diagnose and fix a tileset whose tiles range from 8 KB to 40 MB: per-level payload histograms, adaptive subdivision thresholds">
+  <meta property="og:url" content="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/balancing-tile-content-size-across-levels/">
+  <meta property="og:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+  <meta property="og:site_name" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta property="og:locale" content="en_US">
+  
+  <meta property="article:published_time" content="2026-09-17T23:36:56.454Z">
+  <meta property="article:modified_time" content="2026-09-17T23:36:56.454Z">
+  <meta property="article:publisher" content="https://www.3d-geospatial.com/">
+  
+
+  
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Balancing Tile Content Size Across Levels — 3D Geospatial">
+  <meta name="twitter:description" content="Diagnose and fix a tileset whose tiles range from 8 KB to 40 MB: per-level payload histograms, adaptive subdivision thresholds">
+  <meta name="twitter:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta name="twitter:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+
+  
+  <link rel="preload" href="/assets/css/styles.css?v=8c46394d6c" as="style">
+  
+
+  <link rel="stylesheet" href="/assets/css/styles.css?v=8c46394d6c">
+
+  
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.3d-geospatial.com/#organization",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "url": "https://www.3d-geospatial.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/icon-512.png",
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://www.3d-geospatial.com/#website",
+      "url": "https://www.3d-geospatial.com/",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "description": "Build reliable 3D spatial data pipelines for digital twins — point clouds, meshes, LOD strategies, Python processing, and CI/CD automation.",
+      "inLanguage": "en",
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      }
+    },
+    {
+      "@type": "TechArticle",
+      "@id": "https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/balancing-tile-content-size-across-levels/#article",
+      "isPartOf": {
+        "@id": "https://www.3d-geospatial.com/#website"
+      },
+      "headline": "Balancing Tile Content Size Across Levels",
+      "name": "Balancing Tile Content Size Across Levels",
+      "description": "Diagnose and fix a tileset whose tiles range from 8 KB to 40 MB: per-level payload histograms, adaptive subdivision thresholds",
+      "url": "https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/balancing-tile-content-size-across-levels/",
+      "mainEntityOfPage": "https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/balancing-tile-content-size-across-levels/",
+      "inLanguage": "en",
+      "datePublished": "2026-09-17T23:36:56.454Z",
+      "dateModified": "2026-09-17T23:36:56.454Z",
+      "author": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "image": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/og-cover.png",
+        "width": 1200,
+        "height": 630
+      },
+      "breadcrumb": {
+        "@id": "https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/balancing-tile-content-size-across-levels/#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/balancing-tile-content-size-across-levels/#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://www.3d-geospatial.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "LOD Management Optimization Strategies",
+          "item": "https://www.3d-geospatial.com/lod-management-optimization-strategies/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Hierarchical LOD Structuring",
+          "item": "https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "name": "Balancing Tile Content Size Across Levels",
+          "item": "https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/balancing-tile-content-size-across-levels/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  
+<header class="site-header" role="banner">
+  <div class="container site-header__inner">
+    <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+      <img src="/assets/img/logo.svg" alt="" class="brand__mark" width="36" height="36">
+      <span class="brand__name">
+        3D Geospatial
+        <small>Digital Twin Automation</small>
+      </span>
+    </a>
+
+    <button class="theme-toggle" type="button" data-theme-toggle
+            aria-label="Switch to dark theme" title="Switch to dark theme">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4.2"/>
+        <path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/>
+      </svg>
+    </button>
+
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>
+      <span class="nav-toggle__icon" aria-hidden="true"><span></span></span>
+      Menu
+    </button>
+
+    <nav class="primary-nav" id="primary-nav" aria-label="Primary">
+      
+      <a href="https://www.3d-geospatial.com/" >
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/>
+        </svg>
+        Home
+      </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2 3 7l9 5 9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 17l9 5 9-5"/>
+            </svg>
+          
+          3D Geospatial Fundamentals
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/" aria-current="page">
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+          
+          LOD Management &amp; Optimization
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="6" cy="6" r="1.5"/><circle cx="12" cy="6" r="1.5"/><circle cx="18" cy="6" r="1.5"/>
+              <circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/>
+              <circle cx="6" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="18" cy="18" r="1.5"/>
+            </svg>
+          
+          Point Cloud &amp; Mesh Pipelines
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <path d="M12 9v4"/><path d="M12 17h.01"/>
+            </svg>
+          
+          Troubleshooting &amp; Reliability
+        </a>
+      
+    </nav>
+  </div>
+</header>
+
+
+  <main id="main">
+    
+
+
+<div class="container">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    
+      
+        <a href="https://www.3d-geospatial.com/">Home</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management Optimization Strategies</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <span class="current">Balancing Tile Content Size Across Levels</span>
+      
+    
+  </nav>
+
+  <div class="content-page">
+    <article class="article">
+      <h1 id="balancing-tile-content-size-across-levels" tabindex="-1"><a class="heading-link" href="#balancing-tile-content-size-across-levels"><span>Balancing Tile Content Size Across Levels</span></a></h1>
+<p>This page diagnoses a tileset whose tiles range from 8 KB to 40 MB, works out which levels are unbalanced and why, fixes it by making the subdivision threshold adaptive rather than fixed, splits the remaining outliers, and adds a balance gate so the problem does not come back with the next delivery.</p>
+<h2 id="why-you-hit-this" tabindex="-1"><a class="heading-link" href="#why-you-hit-this"><span>Why you hit this</span></a></h2>
+<p>A tileset’s worst tile determines its worst experience. One 40 MB tile in a district means every camera that looks at that district waits for it, and no amount of good behaviour elsewhere compensates. At the other end, a level made of 8 KB tiles spends more time on request overhead than on geometry.</p>
+<p>Fixed subdivision thresholds cause both. “Subdivide when a tile has more than 2,000 features” produces 8 KB tiles in suburbs where features are small and 40 MB tiles in a business district where they are not, because feature count is a poor proxy for payload. The fix is to measure payload and subdivide on that.</p>
+<h2 id="prerequisites" tabindex="-1"><a class="heading-link" href="#prerequisites"><span>Prerequisites</span></a></h2>
+<ul>
+<li>A tileset with per-tile content and, ideally, tile metadata recording feature counts — see <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/defining-tileset-and-group-metadata/">defining tileset and group metadata</a>.</li>
+<li>Python 3.10+ with <code>numpy</code>.</li>
+<li>The tree builder from <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/octree-vs-quadtree-subdivision-for-tall-buildings/">octree vs quadtree subdivision for tall buildings</a>.</li>
+</ul>
+<h2 id="step-by-step" tabindex="-1"><a class="heading-link" href="#step-by-step"><span>Step-by-Step</span></a></h2>
+<h3 id="1-build-the-per-level-payload-histogram" tabindex="-1"><a class="heading-link" href="#1-build-the-per-level-payload-histogram"><span>1. Build the per-level payload histogram</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> json
+<span class="token keyword">import</span> math
+<span class="token keyword">from</span> collections <span class="token keyword">import</span> defaultdict
+<span class="token keyword">from</span> pathlib <span class="token keyword">import</span> Path
+
+<span class="token keyword">import</span> numpy <span class="token keyword">as</span> np
+
+<span class="token keyword">def</span> <span class="token function">collect_tiles</span><span class="token punctuation">(</span>tileset_path<span class="token punctuation">,</span> content_root<span class="token operator">=</span><span class="token boolean">None</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Walk the tileset and record each content tile's depth and payload size."""</span>
+    doc <span class="token operator">=</span> json<span class="token punctuation">.</span>loads<span class="token punctuation">(</span>Path<span class="token punctuation">(</span>tileset_path<span class="token punctuation">)</span><span class="token punctuation">.</span>read_text<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    root_dir <span class="token operator">=</span> Path<span class="token punctuation">(</span>content_root <span class="token keyword">or</span> Path<span class="token punctuation">(</span>tileset_path<span class="token punctuation">)</span><span class="token punctuation">.</span>parent<span class="token punctuation">)</span>
+    rows <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+
+    <span class="token keyword">def</span> <span class="token function">walk</span><span class="token punctuation">(</span>tile<span class="token punctuation">,</span> depth<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        uri <span class="token operator">=</span> <span class="token punctuation">(</span>tile<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"content"</span><span class="token punctuation">)</span> <span class="token keyword">or</span> <span class="token punctuation">{</span><span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"uri"</span><span class="token punctuation">)</span>
+        <span class="token keyword">if</span> uri <span class="token keyword">and</span> <span class="token keyword">not</span> uri<span class="token punctuation">.</span>endswith<span class="token punctuation">(</span><span class="token string">".json"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+            path <span class="token operator">=</span> root_dir <span class="token operator">/</span> uri
+            rows<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span>
+                <span class="token string">"uri"</span><span class="token punctuation">:</span> uri<span class="token punctuation">,</span>
+                <span class="token string">"depth"</span><span class="token punctuation">:</span> depth<span class="token punctuation">,</span>
+                <span class="token string">"bytes"</span><span class="token punctuation">:</span> path<span class="token punctuation">.</span>stat<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span>st_size <span class="token keyword">if</span> path<span class="token punctuation">.</span>exists<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">else</span> <span class="token boolean">None</span><span class="token punctuation">,</span>
+                <span class="token string">"geometric_error"</span><span class="token punctuation">:</span> tile<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"geometricError"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                <span class="token string">"features"</span><span class="token punctuation">:</span> <span class="token punctuation">(</span><span class="token punctuation">(</span>tile<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"metadata"</span><span class="token punctuation">)</span> <span class="token keyword">or</span> <span class="token punctuation">{</span><span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"properties"</span><span class="token punctuation">)</span> <span class="token keyword">or</span> <span class="token punctuation">{</span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+                            <span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"featureCount"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token punctuation">}</span><span class="token punctuation">)</span>
+        <span class="token keyword">for</span> child <span class="token keyword">in</span> tile<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"children"</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+            walk<span class="token punctuation">(</span>child<span class="token punctuation">,</span> depth <span class="token operator">+</span> <span class="token number">1</span><span class="token punctuation">)</span>
+
+    walk<span class="token punctuation">(</span>doc<span class="token punctuation">[</span><span class="token string">"root"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">[</span>r <span class="token keyword">for</span> r <span class="token keyword">in</span> rows <span class="token keyword">if</span> r<span class="token punctuation">[</span><span class="token string">"bytes"</span><span class="token punctuation">]</span> <span class="token keyword">is</span> <span class="token keyword">not</span> <span class="token boolean">None</span><span class="token punctuation">]</span>
+
+<span class="token keyword">def</span> <span class="token function">level_profile</span><span class="token punctuation">(</span>rows<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    by_depth <span class="token operator">=</span> defaultdict<span class="token punctuation">(</span><span class="token builtin">list</span><span class="token punctuation">)</span>
+    <span class="token keyword">for</span> r <span class="token keyword">in</span> rows<span class="token punctuation">:</span>
+        by_depth<span class="token punctuation">[</span>r<span class="token punctuation">[</span><span class="token string">"depth"</span><span class="token punctuation">]</span><span class="token punctuation">]</span><span class="token punctuation">.</span>append<span class="token punctuation">(</span>r<span class="token punctuation">[</span><span class="token string">"bytes"</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    out <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    <span class="token keyword">for</span> depth <span class="token keyword">in</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span>by_depth<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        sizes <span class="token operator">=</span> np<span class="token punctuation">.</span>array<span class="token punctuation">(</span>by_depth<span class="token punctuation">[</span>depth<span class="token punctuation">]</span><span class="token punctuation">,</span> dtype<span class="token operator">=</span>np<span class="token punctuation">.</span>float64<span class="token punctuation">)</span>
+        out<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span>
+            <span class="token string">"depth"</span><span class="token punctuation">:</span> depth<span class="token punctuation">,</span>
+            <span class="token string">"tiles"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>sizes<span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"total_mb"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>sizes<span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token number">1e6</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"p50_kb"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>percentile<span class="token punctuation">(</span>sizes<span class="token punctuation">,</span> <span class="token number">50</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token number">1024</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"p95_kb"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>percentile<span class="token punctuation">(</span>sizes<span class="token punctuation">,</span> <span class="token number">95</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token number">1024</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"max_kb"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>sizes<span class="token punctuation">.</span><span class="token builtin">max</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token number">1024</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"min_kb"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>sizes<span class="token punctuation">.</span><span class="token builtin">min</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token number">1024</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"spread"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>sizes<span class="token punctuation">.</span><span class="token builtin">max</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token builtin">max</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>percentile<span class="token punctuation">(</span>sizes<span class="token punctuation">,</span> <span class="token number">50</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token punctuation">}</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> out
+
+rows <span class="token operator">=</span> collect_tiles<span class="token punctuation">(</span><span class="token string">"output/city/tileset.json"</span><span class="token punctuation">)</span>
+<span class="token keyword">for</span> level <span class="token keyword">in</span> level_profile<span class="token punctuation">(</span>rows<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span>level<span class="token punctuation">)</span>
+</code></pre></div>
+<p>The <strong>spread</strong> — maximum over median — is the single number that says whether a level is balanced. A spread of 2 or 3 is normal and healthy; a spread of 40 means one tile at that level is forty times the typical one, and that tile is the level’s real cost.</p>
+<p>Reading the sizes from disk rather than from tile metadata is deliberate for the diagnosis, because the metadata records what the pipeline <em>intended</em>. A tile whose metadata says 1,800 features and whose file is 38 MB has textures nobody accounted for.</p>
+<figure class="diagram">
+<svg viewBox="4 6 732 262" role="img" aria-labelledby="bal-prof-t bal-prof-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="bal-prof-t">Payload spread per level, before and after</title>
+  <desc id="bal-prof-d">A comparison of six tileset levels. Before the fix, median payloads are 6, 41, 180, 410, 520 and 380 kilobytes, with maximums of 18, 210, 3100, 41000, 8800 and 2100 kilobytes, giving spreads up to 100 at level 3. After making subdivision adaptive on payload and splitting outliers, medians are similar but maximums fall to 22, 96, 340, 980, 1100 and 890 kilobytes, with every spread under 3.</desc>
+  <rect class="svg-bg" x="4" y="6" width="732" height="262" fill="#ffffff"/>
+  <g stroke-width="1.5">
+    <rect x="18" y="20" width="96" height="32" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="114" y="20" width="152" height="32" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="266" y="20" width="152" height="32" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="418" y="20" width="152" height="32" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="570" y="20" width="152" height="32" fill="#e3f0f4" stroke="#1f6b8a"/>
+  </g>
+  <g stroke-width="1.4">
+    <rect x="18" y="52" width="96" height="30" fill="#ffffff" stroke="#5b6471"/>
+    <rect x="114" y="52" width="152" height="30" fill="#ffffff" stroke="#5b6471"/>
+    <rect x="266" y="52" width="152" height="30" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="418" y="52" width="152" height="30" fill="#ffffff" stroke="#5b6471"/>
+    <rect x="570" y="52" width="152" height="30" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="18" y="82" width="96" height="30" fill="#ffffff" stroke="#5b6471"/>
+    <rect x="114" y="82" width="152" height="30" fill="#ffffff" stroke="#5b6471"/>
+    <rect x="266" y="82" width="152" height="30" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="418" y="82" width="152" height="30" fill="#ffffff" stroke="#5b6471"/>
+    <rect x="570" y="82" width="152" height="30" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="18" y="112" width="96" height="30" fill="#ffffff" stroke="#5b6471"/>
+    <rect x="114" y="112" width="152" height="30" fill="#ffffff" stroke="#5b6471"/>
+    <rect x="266" y="112" width="152" height="30" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="418" y="112" width="152" height="30" fill="#ffffff" stroke="#5b6471"/>
+    <rect x="570" y="112" width="152" height="30" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="18" y="142" width="96" height="30" fill="#ffffff" stroke="#5b6471"/>
+    <rect x="114" y="142" width="152" height="30" fill="#ffffff" stroke="#5b6471"/>
+    <rect x="266" y="142" width="152" height="30" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="418" y="142" width="152" height="30" fill="#ffffff" stroke="#5b6471"/>
+    <rect x="570" y="142" width="152" height="30" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="18" y="172" width="96" height="30" fill="#ffffff" stroke="#5b6471"/>
+    <rect x="114" y="172" width="152" height="30" fill="#ffffff" stroke="#5b6471"/>
+    <rect x="266" y="172" width="152" height="30" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="418" y="172" width="152" height="30" fill="#ffffff" stroke="#5b6471"/>
+    <rect x="570" y="172" width="152" height="30" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="18" y="202" width="96" height="30" fill="#ffffff" stroke="#5b6471"/>
+    <rect x="114" y="202" width="152" height="30" fill="#ffffff" stroke="#5b6471"/>
+    <rect x="266" y="202" width="152" height="30" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="418" y="202" width="152" height="30" fill="#ffffff" stroke="#5b6471"/>
+    <rect x="570" y="202" width="152" height="30" fill="#eef5e9" stroke="#4f7a4d"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="66" y="41">level</text><text x="190" y="41">median before</text>
+    <text x="342" y="41">max before</text><text x="494" y="41">median after</text><text x="646" y="41">max after</text>
+    <text x="66" y="72">0</text><text x="190" y="72">6 KB</text><text x="342" y="72">18 KB</text><text x="494" y="72">8 KB</text><text x="646" y="72">22 KB</text>
+    <text x="66" y="102">1</text><text x="190" y="102">41 KB</text><text x="342" y="102">210 KB</text><text x="494" y="102">44 KB</text><text x="646" y="102">96 KB</text>
+    <text x="66" y="132">2</text><text x="190" y="132">180 KB</text><text x="342" y="132">3.1 MB</text><text x="494" y="132">172 KB</text><text x="646" y="132">340 KB</text>
+    <text x="66" y="162">3</text><text x="190" y="162">410 KB</text><text x="342" y="162">41.0 MB</text><text x="494" y="162">398 KB</text><text x="646" y="162">980 KB</text>
+    <text x="66" y="192">4</text><text x="190" y="192">520 KB</text><text x="342" y="192">8.8 MB</text><text x="494" y="192">505 KB</text><text x="646" y="192">1.1 MB</text>
+    <text x="66" y="222">5</text><text x="190" y="222">380 KB</text><text x="342" y="222">2.1 MB</text><text x="494" y="222">372 KB</text><text x="646" y="222">890 KB</text>
+  </g>
+  <text x="370" y="250" fill="#5b6471" font-size="12" text-anchor="middle">medians barely move; the maximums fall by up to 40× — the whole problem was the outliers</text>
+</svg>
+<figcaption>Level 3's 41 MB tile is the tileset's worst experience, and the median says nothing about it.</figcaption>
+</figure>
+<h3 id="2-find-out-what-makes-the-outliers-big" tabindex="-1"><a class="heading-link" href="#2-find-out-what-makes-the-outliers-big"><span>2. Find out what makes the outliers big</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> subprocess
+
+<span class="token keyword">def</span> <span class="token function">outlier_anatomy</span><span class="token punctuation">(</span>rows<span class="token punctuation">,</span> top_n<span class="token operator">=</span><span class="token number">6</span><span class="token punctuation">,</span> content_root<span class="token operator">=</span><span class="token string">"output/city"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""For the biggest tiles, is the cost geometry or texture?"""</span>
+    biggest <span class="token operator">=</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span>rows<span class="token punctuation">,</span> key<span class="token operator">=</span><span class="token keyword">lambda</span> r<span class="token punctuation">:</span> <span class="token operator">-</span>r<span class="token punctuation">[</span><span class="token string">"bytes"</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token punctuation">:</span>top_n<span class="token punctuation">]</span>
+    out <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    <span class="token keyword">for</span> r <span class="token keyword">in</span> biggest<span class="token punctuation">:</span>
+        path <span class="token operator">=</span> Path<span class="token punctuation">(</span>content_root<span class="token punctuation">)</span> <span class="token operator">/</span> r<span class="token punctuation">[</span><span class="token string">"uri"</span><span class="token punctuation">]</span>
+        proc <span class="token operator">=</span> subprocess<span class="token punctuation">.</span>run<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token string">"npx"</span><span class="token punctuation">,</span> <span class="token string">"gltf-transform"</span><span class="token punctuation">,</span> <span class="token string">"inspect"</span><span class="token punctuation">,</span> <span class="token string">"--format"</span><span class="token punctuation">,</span> <span class="token string">"json"</span><span class="token punctuation">,</span>
+                               <span class="token builtin">str</span><span class="token punctuation">(</span>path<span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">,</span> capture_output<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> text<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+        doc <span class="token operator">=</span> json<span class="token punctuation">.</span>loads<span class="token punctuation">(</span>proc<span class="token punctuation">.</span>stdout<span class="token punctuation">)</span> <span class="token keyword">if</span> proc<span class="token punctuation">.</span>returncode <span class="token operator">==</span> <span class="token number">0</span> <span class="token keyword">else</span> <span class="token punctuation">{</span><span class="token punctuation">}</span>
+        textures <span class="token operator">=</span> doc<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"textures"</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+        meshes <span class="token operator">=</span> doc<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"meshes"</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+        tex_bytes <span class="token operator">=</span> <span class="token builtin">sum</span><span class="token punctuation">(</span>t<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"size"</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token keyword">for</span> t <span class="token keyword">in</span> textures<span class="token punctuation">)</span>
+        out<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span>
+            <span class="token string">"uri"</span><span class="token punctuation">:</span> r<span class="token punctuation">[</span><span class="token string">"uri"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token string">"depth"</span><span class="token punctuation">:</span> r<span class="token punctuation">[</span><span class="token string">"depth"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+            <span class="token string">"mb"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>r<span class="token punctuation">[</span><span class="token string">"bytes"</span><span class="token punctuation">]</span> <span class="token operator">/</span> <span class="token number">1e6</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"texture_mb"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>tex_bytes <span class="token operator">/</span> <span class="token number">1e6</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"texture_share"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>tex_bytes <span class="token operator">/</span> <span class="token builtin">max</span><span class="token punctuation">(</span>r<span class="token punctuation">[</span><span class="token string">"bytes"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"textures"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>textures<span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"largest_texture"</span><span class="token punctuation">:</span> <span class="token builtin">max</span><span class="token punctuation">(</span><span class="token punctuation">(</span>t<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"resolution"</span><span class="token punctuation">)</span> <span class="token keyword">for</span> t <span class="token keyword">in</span> textures<span class="token punctuation">)</span><span class="token punctuation">,</span> default<span class="token operator">=</span><span class="token boolean">None</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"primitives"</span><span class="token punctuation">:</span> <span class="token builtin">sum</span><span class="token punctuation">(</span>m<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"primitives"</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token keyword">for</span> m <span class="token keyword">in</span> meshes<span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"vertices"</span><span class="token punctuation">:</span> <span class="token builtin">sum</span><span class="token punctuation">(</span>m<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"vertices"</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token keyword">for</span> m <span class="token keyword">in</span> meshes<span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"features"</span><span class="token punctuation">:</span> r<span class="token punctuation">[</span><span class="token string">"features"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+            <span class="token string">"cause"</span><span class="token punctuation">:</span> <span class="token boolean">None</span><span class="token punctuation">,</span>
+        <span class="token punctuation">}</span><span class="token punctuation">)</span>
+    <span class="token keyword">for</span> o <span class="token keyword">in</span> out<span class="token punctuation">:</span>
+        <span class="token keyword">if</span> o<span class="token punctuation">[</span><span class="token string">"texture_share"</span><span class="token punctuation">]</span> <span class="token operator">></span> <span class="token number">0.7</span><span class="token punctuation">:</span>
+            o<span class="token punctuation">[</span><span class="token string">"cause"</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token string">"texture-dominated — resize or recompress"</span>
+        <span class="token keyword">elif</span> o<span class="token punctuation">[</span><span class="token string">"features"</span><span class="token punctuation">]</span> <span class="token keyword">and</span> o<span class="token punctuation">[</span><span class="token string">"vertices"</span><span class="token punctuation">]</span> <span class="token operator">/</span> <span class="token builtin">max</span><span class="token punctuation">(</span>o<span class="token punctuation">[</span><span class="token string">"features"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span> <span class="token operator">></span> <span class="token number">3000</span><span class="token punctuation">:</span>
+            o<span class="token punctuation">[</span><span class="token string">"cause"</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token string">"few very detailed features — split by feature, not by area"</span>
+        <span class="token keyword">elif</span> o<span class="token punctuation">[</span><span class="token string">"features"</span><span class="token punctuation">]</span> <span class="token keyword">and</span> o<span class="token punctuation">[</span><span class="token string">"features"</span><span class="token punctuation">]</span> <span class="token operator">></span> <span class="token number">6000</span><span class="token punctuation">:</span>
+            o<span class="token punctuation">[</span><span class="token string">"cause"</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token string">"too many features — lower the subdivision threshold"</span>
+        <span class="token keyword">else</span><span class="token punctuation">:</span>
+            o<span class="token punctuation">[</span><span class="token string">"cause"</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token string">"dense geometry — subdivide further"</span>
+    <span class="token keyword">return</span> out
+
+<span class="token keyword">for</span> o <span class="token keyword">in</span> outlier_anatomy<span class="token punctuation">(</span>rows<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>o<span class="token punctuation">[</span><span class="token string">'uri'</span><span class="token punctuation">]</span><span class="token punctuation">:</span><span class="token format-spec">&lt;34</span><span class="token punctuation">}</span></span><span class="token interpolation"><span class="token punctuation">{</span>o<span class="token punctuation">[</span><span class="token string">'mb'</span><span class="token punctuation">]</span><span class="token punctuation">:</span><span class="token format-spec">>7</span><span class="token punctuation">}</span></span><span class="token string"> MB  tex </span><span class="token interpolation"><span class="token punctuation">{</span>o<span class="token punctuation">[</span><span class="token string">'texture_share'</span><span class="token punctuation">]</span><span class="token punctuation">:</span><span class="token format-spec">.0%</span><span class="token punctuation">}</span></span><span class="token string">  </span><span class="token interpolation"><span class="token punctuation">{</span>o<span class="token punctuation">[</span><span class="token string">'cause'</span><span class="token punctuation">]</span><span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Distinguishing texture-dominated from geometry-dominated outliers is the branch that matters, because the fixes are completely different. A 41 MB tile that is 94% texture is fixed by resizing the atlas, as in <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/gltfpack-settings-for-3d-tiles-content/">gltfpack settings for 3D Tiles content</a>, and subdividing it further would produce four 10 MB tiles that are still too big.</p>
+<p>The <code>vertices / features</code> ratio catches the case that fixed thresholds handle worst: a tile with 40 features and 8 million vertices, which happens when one photogrammetric mesh or one heavily modelled landmark lands in a cell. No feature-count threshold will ever split it.</p>
+<h3 id="3-make-the-subdivision-threshold-adaptive" tabindex="-1"><a class="heading-link" href="#3-make-the-subdivision-threshold-adaptive"><span>3. Make the subdivision threshold adaptive</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">from</span> dataclasses <span class="token keyword">import</span> dataclass
+
+<span class="token decorator annotation punctuation">@dataclass</span>
+<span class="token keyword">class</span> <span class="token class-name">BalanceTargets</span><span class="token punctuation">:</span>
+    target_kb<span class="token punctuation">:</span> <span class="token builtin">float</span> <span class="token operator">=</span> <span class="token number">400.0</span>        <span class="token comment"># the payload you want per tile</span>
+    max_kb<span class="token punctuation">:</span> <span class="token builtin">float</span> <span class="token operator">=</span> <span class="token number">1200.0</span>          <span class="token comment"># the hard ceiling</span>
+    min_kb<span class="token punctuation">:</span> <span class="token builtin">float</span> <span class="token operator">=</span> <span class="token number">40.0</span>            <span class="token comment"># below this, merging is better than splitting</span>
+    max_features<span class="token punctuation">:</span> <span class="token builtin">int</span> <span class="token operator">=</span> <span class="token number">8000</span>        <span class="token comment"># a safety net, not the primary criterion</span>
+
+<span class="token keyword">def</span> <span class="token function">estimate_payload_kb</span><span class="token punctuation">(</span>features<span class="token punctuation">,</span> texture_budget_kb_per_m2<span class="token operator">=</span><span class="token number">0.0</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Predict a tile's payload from its contents, before tiling it."""</span>
+    tris <span class="token operator">=</span> <span class="token builtin">sum</span><span class="token punctuation">(</span>f<span class="token punctuation">.</span>triangles <span class="token keyword">for</span> f <span class="token keyword">in</span> features<span class="token punctuation">)</span>
+    verts <span class="token operator">=</span> tris <span class="token operator">*</span> <span class="token number">0.55</span>                             <span class="token comment"># typical after welding</span>
+    geometry_kb <span class="token operator">=</span> <span class="token punctuation">(</span>verts <span class="token operator">*</span> <span class="token number">14</span><span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token number">1024</span>               <span class="token comment"># quantised + compressed, empirical</span>
+    footprint <span class="token operator">=</span> <span class="token builtin">sum</span><span class="token punctuation">(</span>f<span class="token punctuation">.</span>footprint_m2 <span class="token keyword">for</span> f <span class="token keyword">in</span> features<span class="token punctuation">)</span>
+    texture_kb <span class="token operator">=</span> footprint <span class="token operator">*</span> texture_budget_kb_per_m2
+    <span class="token keyword">return</span> geometry_kb <span class="token operator">+</span> texture_kb
+
+<span class="token keyword">def</span> <span class="token function">subdivide_decision</span><span class="token punctuation">(</span>features<span class="token punctuation">,</span> targets<span class="token punctuation">,</span> depth<span class="token punctuation">,</span> max_depth<span class="token operator">=</span><span class="token number">12</span><span class="token punctuation">,</span>
+                       texture_budget_kb_per_m2<span class="token operator">=</span><span class="token number">0.0</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    payload <span class="token operator">=</span> estimate_payload_kb<span class="token punctuation">(</span>features<span class="token punctuation">,</span> texture_budget_kb_per_m2<span class="token punctuation">)</span>
+    <span class="token keyword">if</span> depth <span class="token operator">>=</span> max_depth<span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"split"</span><span class="token punctuation">:</span> <span class="token boolean">False</span><span class="token punctuation">,</span> <span class="token string">"reason"</span><span class="token punctuation">:</span> <span class="token string">"max depth"</span><span class="token punctuation">,</span> <span class="token string">"payload_kb"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>payload<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">}</span>
+    <span class="token keyword">if</span> payload <span class="token operator">></span> targets<span class="token punctuation">.</span>max_kb<span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"split"</span><span class="token punctuation">:</span> <span class="token boolean">True</span><span class="token punctuation">,</span> <span class="token string">"reason"</span><span class="token punctuation">:</span> <span class="token string-interpolation"><span class="token string">f"payload </span><span class="token interpolation"><span class="token punctuation">{</span>payload<span class="token punctuation">:</span><span class="token format-spec">.0f</span><span class="token punctuation">}</span></span><span class="token string"> KB over ceiling"</span></span><span class="token punctuation">,</span>
+                <span class="token string">"payload_kb"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>payload<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">}</span>
+    <span class="token keyword">if</span> <span class="token builtin">len</span><span class="token punctuation">(</span>features<span class="token punctuation">)</span> <span class="token operator">></span> targets<span class="token punctuation">.</span>max_features<span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"split"</span><span class="token punctuation">:</span> <span class="token boolean">True</span><span class="token punctuation">,</span> <span class="token string">"reason"</span><span class="token punctuation">:</span> <span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span><span class="token builtin">len</span><span class="token punctuation">(</span>features<span class="token punctuation">)</span><span class="token punctuation">}</span></span><span class="token string"> features over safety net"</span></span><span class="token punctuation">,</span>
+                <span class="token string">"payload_kb"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>payload<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">}</span>
+    <span class="token keyword">if</span> payload <span class="token operator">></span> targets<span class="token punctuation">.</span>target_kb <span class="token operator">*</span> <span class="token number">1.5</span><span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"split"</span><span class="token punctuation">:</span> <span class="token boolean">True</span><span class="token punctuation">,</span> <span class="token string">"reason"</span><span class="token punctuation">:</span> <span class="token string-interpolation"><span class="token string">f"payload </span><span class="token interpolation"><span class="token punctuation">{</span>payload<span class="token punctuation">:</span><span class="token format-spec">.0f</span><span class="token punctuation">}</span></span><span class="token string"> KB over 1.5× target"</span></span><span class="token punctuation">,</span>
+                <span class="token string">"payload_kb"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>payload<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">}</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"split"</span><span class="token punctuation">:</span> <span class="token boolean">False</span><span class="token punctuation">,</span> <span class="token string">"reason"</span><span class="token punctuation">:</span> <span class="token string-interpolation"><span class="token string">f"payload </span><span class="token interpolation"><span class="token punctuation">{</span>payload<span class="token punctuation">:</span><span class="token format-spec">.0f</span><span class="token punctuation">}</span></span><span class="token string"> KB within target"</span></span><span class="token punctuation">,</span>
+            <span class="token string">"payload_kb"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>payload<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">}</span>
+</code></pre></div>
+<p>Predicting payload from triangle count and footprint, calibrated once against a real tiling run, is what makes this adaptive rather than iterative. The alternative — tile, measure, re-tile — is correct and costs several full passes over the city.</p>
+<p>The 14 bytes per vertex figure is empirical and worth recalibrating per project: it depends on the quantisation bits, the compression choice and how regular the meshes are. Measuring it from an existing run takes one division.</p>
+<p>The three-tier decision — hard ceiling, safety net, soft target — is what stops the tree from either exploding or leaving outliers. The ceiling is non-negotiable; the soft target at 1.5× allows some variance so the tree does not subdivide for a 10% overshoot.</p>
+<h3 id="4-split-the-outliers-that-subdivision-cannot-fix" tabindex="-1"><a class="heading-link" href="#4-split-the-outliers-that-subdivision-cannot-fix"><span>4. Split the outliers that subdivision cannot fix</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">split_dense_tile</span><span class="token punctuation">(</span>features<span class="token punctuation">,</span> targets<span class="token punctuation">,</span> max_parts<span class="token operator">=</span><span class="token number">8</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""When one cell holds a few enormous features, split by feature, not by area."""</span>
+    payload <span class="token operator">=</span> estimate_payload_kb<span class="token punctuation">(</span>features<span class="token punctuation">,</span> <span class="token number">0.0</span><span class="token punctuation">)</span>
+    <span class="token keyword">if</span> payload <span class="token operator">&lt;=</span> targets<span class="token punctuation">.</span>max_kb<span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token punctuation">[</span>features<span class="token punctuation">]</span>
+
+    ordered <span class="token operator">=</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span>features<span class="token punctuation">,</span> key<span class="token operator">=</span><span class="token keyword">lambda</span> f<span class="token punctuation">:</span> <span class="token operator">-</span>f<span class="token punctuation">.</span>triangles<span class="token punctuation">)</span>
+    parts <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">[</span><span class="token punctuation">]</span> <span class="token keyword">for</span> _ <span class="token keyword">in</span> <span class="token builtin">range</span><span class="token punctuation">(</span><span class="token builtin">min</span><span class="token punctuation">(</span>max_parts<span class="token punctuation">,</span>
+                                   <span class="token builtin">max</span><span class="token punctuation">(</span><span class="token number">2</span><span class="token punctuation">,</span> math<span class="token punctuation">.</span>ceil<span class="token punctuation">(</span>payload <span class="token operator">/</span> targets<span class="token punctuation">.</span>target_kb<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">]</span>
+    loads <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token number">0.0</span><span class="token punctuation">]</span> <span class="token operator">*</span> <span class="token builtin">len</span><span class="token punctuation">(</span>parts<span class="token punctuation">)</span>
+    <span class="token keyword">for</span> f <span class="token keyword">in</span> ordered<span class="token punctuation">:</span>                              <span class="token comment"># greedy: heaviest into lightest bin</span>
+        i <span class="token operator">=</span> <span class="token builtin">int</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>argmin<span class="token punctuation">(</span>loads<span class="token punctuation">)</span><span class="token punctuation">)</span>
+        parts<span class="token punctuation">[</span>i<span class="token punctuation">]</span><span class="token punctuation">.</span>append<span class="token punctuation">(</span>f<span class="token punctuation">)</span>
+        loads<span class="token punctuation">[</span>i<span class="token punctuation">]</span> <span class="token operator">+=</span> f<span class="token punctuation">.</span>triangles
+    <span class="token keyword">return</span> <span class="token punctuation">[</span>p <span class="token keyword">for</span> p <span class="token keyword">in</span> parts <span class="token keyword">if</span> p<span class="token punctuation">]</span>
+
+<span class="token keyword">def</span> <span class="token function">split_by_texture</span><span class="token punctuation">(</span>features<span class="token punctuation">,</span> targets<span class="token punctuation">,</span> texture_kb_per_m2<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Texture-dominated: reduce resolution instead of splitting."""</span>
+    footprint <span class="token operator">=</span> <span class="token builtin">sum</span><span class="token punctuation">(</span>f<span class="token punctuation">.</span>footprint_m2 <span class="token keyword">for</span> f <span class="token keyword">in</span> features<span class="token punctuation">)</span>
+    current <span class="token operator">=</span> footprint <span class="token operator">*</span> texture_kb_per_m2
+    <span class="token keyword">if</span> current <span class="token operator">&lt;=</span> targets<span class="token punctuation">.</span>target_kb<span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"action"</span><span class="token punctuation">:</span> <span class="token string">"none"</span><span class="token punctuation">,</span> <span class="token string">"texture_kb"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>current<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">}</span>
+    factor <span class="token operator">=</span> math<span class="token punctuation">.</span>sqrt<span class="token punctuation">(</span>current <span class="token operator">/</span> targets<span class="token punctuation">.</span>target_kb<span class="token punctuation">)</span>
+    new_dim <span class="token operator">=</span> <span class="token number">2</span> <span class="token operator">**</span> math<span class="token punctuation">.</span>floor<span class="token punctuation">(</span>math<span class="token punctuation">.</span>log2<span class="token punctuation">(</span><span class="token number">2048</span> <span class="token operator">/</span> factor<span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"action"</span><span class="token punctuation">:</span> <span class="token string">"resize_texture"</span><span class="token punctuation">,</span> <span class="token string">"from_px"</span><span class="token punctuation">:</span> <span class="token number">2048</span><span class="token punctuation">,</span>
+            <span class="token string">"to_px"</span><span class="token punctuation">:</span> <span class="token builtin">max</span><span class="token punctuation">(</span><span class="token builtin">int</span><span class="token punctuation">(</span>new_dim<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">256</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"predicted_texture_kb"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>current <span class="token operator">/</span> <span class="token punctuation">(</span><span class="token number">2048</span> <span class="token operator">/</span> <span class="token builtin">max</span><span class="token punctuation">(</span>new_dim<span class="token punctuation">,</span> <span class="token number">256</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">**</span> <span class="token number">2</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">}</span>
+</code></pre></div>
+<p>Splitting by feature with a greedy bin-packing, rather than by area, is the fix for the <code>vertices / features</code> outlier. Three 2-million-triangle landmarks in one cell become three tiles sharing a bounding volume — which costs a little culling efficiency and removes a 40 MB download.</p>
+<p>The texture case gets a resize rather than a split, because splitting a texture-dominated tile spatially reproduces the atlas in every part. The factor calculation says how far to reduce: a tile four times the target needs half the texture dimension in each axis.</p>
+<figure class="diagram">
+<svg viewBox="10 -2 720 238" role="img" aria-labelledby="bal-thr-t bal-thr-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="bal-thr-t">Fixed feature threshold against adaptive payload threshold</title>
+  <desc id="bal-thr-d">Two rows of cells across a city transect from suburb to business district. With a fixed threshold of 2000 features, the suburban cells produce 9 kilobyte tiles and the business-district cells produce a 41 megabyte tile, because feature count does not track payload. With an adaptive threshold that predicts payload, the suburb cells stop subdividing earlier and produce 180 kilobyte tiles while the business district subdivides two levels further and produces 390 kilobyte tiles.</desc>
+  <rect class="svg-bg" x="10" y="-2" width="720" height="238" fill="#ffffff"/>
+  <text x="370" y="26" fill="#1f2937" font-size="13" text-anchor="middle">one transect: suburb → mixed → business district</text>
+  <g stroke-width="1.5">
+    <rect x="24" y="44" width="160" height="42" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="188" y="44" width="160" height="42" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="352" y="44" width="160" height="42" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="516" y="44" width="200" height="42" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="24" y="130" width="160" height="42" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="188" y="130" width="160" height="42" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="352" y="130" width="160" height="42" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="516" y="130" width="200" height="42" fill="#eef5e9" stroke="#4f7a4d"/>
+  </g>
+  <g fill="#1f2937" font-size="12" text-anchor="middle">
+    <text x="104" y="64">1840 features</text><text x="104" y="80">9 KB tile</text>
+    <text x="268" y="64">1920 features</text><text x="268" y="80">140 KB tile</text>
+    <text x="432" y="64">1960 features</text><text x="432" y="80">1.8 MB tile</text>
+    <text x="616" y="64">1990 features</text><text x="616" y="80">41 MB tile</text>
+    <text x="104" y="150">stopped 2 levels earlier</text><text x="104" y="166">180 KB tile</text>
+    <text x="268" y="150">unchanged</text><text x="268" y="166">310 KB tile</text>
+    <text x="432" y="150">1 extra level</text><text x="432" y="166">420 KB tile</text>
+    <text x="616" y="150">2 extra levels + texture resize</text><text x="616" y="166">390 KB tile</text>
+  </g>
+  <text x="24" y="108" fill="#1f2937" font-size="12.5">fixed: subdivide above 2000 features — spread 4,600×</text>
+  <text x="24" y="196" fill="#1f2937" font-size="12.5">adaptive: subdivide above a predicted 600 KB payload — spread 2.3×</text>
+  <text x="24" y="218" fill="#5b6471" font-size="12">the feature counts are almost identical across the transect; the payloads differ by four orders of magnitude</text>
+</svg>
+<figcaption>Feature count is nearly constant across the transect while payload varies 4,600-fold, which is why a fixed threshold cannot balance anything.</figcaption>
+</figure>
+<h3 id="5-detect-and-merge-the-too-small-tiles" tabindex="-1"><a class="heading-link" href="#5-detect-and-merge-the-too-small-tiles"><span>5. Detect and merge the too-small tiles</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">merge_undersized</span><span class="token punctuation">(</span>tree_leaves<span class="token punctuation">,</span> targets<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Siblings that together stay under the target should be one tile."""</span>
+    by_parent <span class="token operator">=</span> defaultdict<span class="token punctuation">(</span><span class="token builtin">list</span><span class="token punctuation">)</span>
+    <span class="token keyword">for</span> leaf <span class="token keyword">in</span> tree_leaves<span class="token punctuation">:</span>
+        by_parent<span class="token punctuation">[</span>leaf<span class="token punctuation">[</span><span class="token string">"parent_key"</span><span class="token punctuation">]</span><span class="token punctuation">]</span><span class="token punctuation">.</span>append<span class="token punctuation">(</span>leaf<span class="token punctuation">)</span>
+
+    merges<span class="token punctuation">,</span> kept <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    <span class="token keyword">for</span> parent<span class="token punctuation">,</span> siblings <span class="token keyword">in</span> by_parent<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        total <span class="token operator">=</span> <span class="token builtin">sum</span><span class="token punctuation">(</span>s<span class="token punctuation">[</span><span class="token string">"payload_kb"</span><span class="token punctuation">]</span> <span class="token keyword">for</span> s <span class="token keyword">in</span> siblings<span class="token punctuation">)</span>
+        <span class="token keyword">if</span> <span class="token builtin">len</span><span class="token punctuation">(</span>siblings<span class="token punctuation">)</span> <span class="token operator">></span> <span class="token number">1</span> <span class="token keyword">and</span> total <span class="token operator">&lt;=</span> targets<span class="token punctuation">.</span>target_kb<span class="token punctuation">:</span>
+            merges<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"parent"</span><span class="token punctuation">:</span> parent<span class="token punctuation">,</span> <span class="token string">"merged"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>siblings<span class="token punctuation">)</span><span class="token punctuation">,</span>
+                           <span class="token string">"payload_kb"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>total<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                           <span class="token string">"saved_requests"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>siblings<span class="token punctuation">)</span> <span class="token operator">-</span> <span class="token number">1</span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+        <span class="token keyword">else</span><span class="token punctuation">:</span>
+            kept<span class="token punctuation">.</span>extend<span class="token punctuation">(</span>siblings<span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"merges"</span><span class="token punctuation">:</span> merges<span class="token punctuation">,</span> <span class="token string">"tiles_before"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>tree_leaves<span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"tiles_after"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>kept<span class="token punctuation">)</span> <span class="token operator">+</span> <span class="token builtin">len</span><span class="token punctuation">(</span>merges<span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"requests_saved"</span><span class="token punctuation">:</span> <span class="token builtin">sum</span><span class="token punctuation">(</span>m<span class="token punctuation">[</span><span class="token string">"saved_requests"</span><span class="token punctuation">]</span> <span class="token keyword">for</span> m <span class="token keyword">in</span> merges<span class="token punctuation">)</span><span class="token punctuation">}</span>
+</code></pre></div>
+<p>Undersized tiles are the less visible half of the imbalance and they cost real time. Four 9 KB siblings are four requests, four bounding-volume tests and four glTF parses for 36 KB of geometry — and on a high-latency link the four round trips dominate.</p>
+<p>Merging is safe when the union stays under the target, and the loss is culling granularity: the merged tile is loaded whenever any of its former children would have been. At these sizes that is a good trade.</p>
+<h3 id="6-gate-on-balance-in-ci" tabindex="-1"><a class="heading-link" href="#6-gate-on-balance-in-ci"><span>6. Gate on balance in CI</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python">BALANCE_GATE <span class="token operator">=</span> <span class="token punctuation">{</span>
+    <span class="token string">"max_tile_mb"</span><span class="token punctuation">:</span> <span class="token number">1.5</span><span class="token punctuation">,</span>
+    <span class="token string">"max_spread_per_level"</span><span class="token punctuation">:</span> <span class="token number">6.0</span><span class="token punctuation">,</span>
+    <span class="token string">"min_median_kb"</span><span class="token punctuation">:</span> <span class="token number">40.0</span><span class="token punctuation">,</span>
+    <span class="token string">"max_undersized_fraction"</span><span class="token punctuation">:</span> <span class="token number">0.15</span><span class="token punctuation">,</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">def</span> <span class="token function">balance_gate</span><span class="token punctuation">(</span>rows<span class="token punctuation">,</span> gate<span class="token operator">=</span>BALANCE_GATE<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    findings <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    profile <span class="token operator">=</span> level_profile<span class="token punctuation">(</span>rows<span class="token punctuation">)</span>
+    <span class="token keyword">for</span> level <span class="token keyword">in</span> profile<span class="token punctuation">:</span>
+        <span class="token keyword">if</span> level<span class="token punctuation">[</span><span class="token string">"max_kb"</span><span class="token punctuation">]</span> <span class="token operator">/</span> <span class="token number">1024</span> <span class="token operator">></span> gate<span class="token punctuation">[</span><span class="token string">"max_tile_mb"</span><span class="token punctuation">]</span><span class="token punctuation">:</span>
+            findings<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"level"</span><span class="token punctuation">:</span> level<span class="token punctuation">[</span><span class="token string">"depth"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token string">"severity"</span><span class="token punctuation">:</span> <span class="token string">"error"</span><span class="token punctuation">,</span>
+                             <span class="token string">"issue"</span><span class="token punctuation">:</span> <span class="token string-interpolation"><span class="token string">f"largest tile </span><span class="token interpolation"><span class="token punctuation">{</span>level<span class="token punctuation">[</span><span class="token string">'max_kb'</span><span class="token punctuation">]</span> <span class="token operator">/</span> <span class="token number">1024</span><span class="token punctuation">:</span><span class="token format-spec">.1f</span><span class="token punctuation">}</span></span><span class="token string"> MB "</span></span>
+                                      <span class="token string-interpolation"><span class="token string">f"over </span><span class="token interpolation"><span class="token punctuation">{</span>gate<span class="token punctuation">[</span><span class="token string">'max_tile_mb'</span><span class="token punctuation">]</span><span class="token punctuation">}</span></span><span class="token string"> MB"</span></span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+        <span class="token keyword">if</span> level<span class="token punctuation">[</span><span class="token string">"spread"</span><span class="token punctuation">]</span> <span class="token operator">></span> gate<span class="token punctuation">[</span><span class="token string">"max_spread_per_level"</span><span class="token punctuation">]</span><span class="token punctuation">:</span>
+            findings<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"level"</span><span class="token punctuation">:</span> level<span class="token punctuation">[</span><span class="token string">"depth"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token string">"severity"</span><span class="token punctuation">:</span> <span class="token string">"error"</span><span class="token punctuation">,</span>
+                             <span class="token string">"issue"</span><span class="token punctuation">:</span> <span class="token string-interpolation"><span class="token string">f"spread </span><span class="token interpolation"><span class="token punctuation">{</span>level<span class="token punctuation">[</span><span class="token string">'spread'</span><span class="token punctuation">]</span><span class="token punctuation">}</span></span><span class="token string"> over "</span></span>
+                                      <span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>gate<span class="token punctuation">[</span><span class="token string">'max_spread_per_level'</span><span class="token punctuation">]</span><span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+        <span class="token keyword">if</span> level<span class="token punctuation">[</span><span class="token string">"tiles"</span><span class="token punctuation">]</span> <span class="token operator">></span> <span class="token number">8</span> <span class="token keyword">and</span> level<span class="token punctuation">[</span><span class="token string">"p50_kb"</span><span class="token punctuation">]</span> <span class="token operator">&lt;</span> gate<span class="token punctuation">[</span><span class="token string">"min_median_kb"</span><span class="token punctuation">]</span> \
+                <span class="token keyword">and</span> level<span class="token punctuation">[</span><span class="token string">"depth"</span><span class="token punctuation">]</span> <span class="token operator">></span> <span class="token number">0</span><span class="token punctuation">:</span>
+            findings<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"level"</span><span class="token punctuation">:</span> level<span class="token punctuation">[</span><span class="token string">"depth"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token string">"severity"</span><span class="token punctuation">:</span> <span class="token string">"warn"</span><span class="token punctuation">,</span>
+                             <span class="token string">"issue"</span><span class="token punctuation">:</span> <span class="token string-interpolation"><span class="token string">f"median </span><span class="token interpolation"><span class="token punctuation">{</span>level<span class="token punctuation">[</span><span class="token string">'p50_kb'</span><span class="token punctuation">]</span><span class="token punctuation">}</span></span><span class="token string"> KB — tiles too small"</span></span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+    undersized <span class="token operator">=</span> <span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token number">1</span> <span class="token keyword">for</span> r <span class="token keyword">in</span> rows <span class="token keyword">if</span> r<span class="token punctuation">[</span><span class="token string">"bytes"</span><span class="token punctuation">]</span> <span class="token operator">&lt;</span> gate<span class="token punctuation">[</span><span class="token string">"min_median_kb"</span><span class="token punctuation">]</span> <span class="token operator">*</span> <span class="token number">1024</span><span class="token punctuation">)</span>
+    frac <span class="token operator">=</span> undersized <span class="token operator">/</span> <span class="token builtin">max</span><span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>rows<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span>
+    <span class="token keyword">if</span> frac <span class="token operator">></span> gate<span class="token punctuation">[</span><span class="token string">"max_undersized_fraction"</span><span class="token punctuation">]</span><span class="token punctuation">:</span>
+        findings<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"level"</span><span class="token punctuation">:</span> <span class="token string">"all"</span><span class="token punctuation">,</span> <span class="token string">"severity"</span><span class="token punctuation">:</span> <span class="token string">"warn"</span><span class="token punctuation">,</span>
+                         <span class="token string">"issue"</span><span class="token punctuation">:</span> <span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>frac<span class="token punctuation">:</span><span class="token format-spec">.0%</span><span class="token punctuation">}</span></span><span class="token string"> of tiles under "</span></span>
+                                  <span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>gate<span class="token punctuation">[</span><span class="token string">'min_median_kb'</span><span class="token punctuation">]</span><span class="token punctuation">}</span></span><span class="token string"> KB"</span></span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+    errors <span class="token operator">=</span> <span class="token punctuation">[</span>f <span class="token keyword">for</span> f <span class="token keyword">in</span> findings <span class="token keyword">if</span> f<span class="token punctuation">[</span><span class="token string">"severity"</span><span class="token punctuation">]</span> <span class="token operator">==</span> <span class="token string">"error"</span><span class="token punctuation">]</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"tiles"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>rows<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"levels"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>profile<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"findings"</span><span class="token punctuation">:</span> findings<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token number">8</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+            <span class="token string">"errors"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>errors<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"pass"</span><span class="token punctuation">:</span> <span class="token keyword">not</span> errors<span class="token punctuation">}</span>
+
+result <span class="token operator">=</span> balance_gate<span class="token punctuation">(</span>rows<span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span>json<span class="token punctuation">.</span>dumps<span class="token punctuation">(</span>result<span class="token punctuation">,</span> indent<span class="token operator">=</span><span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+<span class="token keyword">assert</span> result<span class="token punctuation">[</span><span class="token string">"pass"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token string">"tileset balance gate failed"</span>
+</code></pre></div>
+<p>Gating on the <strong>spread</strong> rather than only on the maximum is what catches a regression early. A new delivery that adds one large landmark raises the maximum by a lot and the median not at all, so a spread test fires while an absolute-size test might still pass if the ceiling was generous.</p>
+<figure class="diagram">
+<svg viewBox="4 6 732 250" role="img" aria-labelledby="bal-fix-t bal-fix-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="bal-fix-t">Which fix an outlier needs</title>
+  <desc id="bal-fix-d">A decision table for oversized tiles. A tile that is more than seventy percent texture needs the texture resized, not subdivision. A tile with fewer than a hundred features but millions of vertices needs splitting by feature with bin packing. A tile with many thousands of features needs a lower subdivision threshold. A tile that is merely dense needs one more level of subdivision. Groups of siblings that are all tiny need merging instead.</desc>
+  <rect class="svg-bg" x="4" y="6" width="732" height="250" fill="#ffffff"/>
+  <g stroke-width="1.5">
+    <rect x="18" y="20" width="320" height="32" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="338" y="20" width="384" height="32" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="18" y="52" width="320" height="34" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="338" y="52" width="384" height="34" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="18" y="86" width="320" height="34" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="338" y="86" width="384" height="34" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="18" y="120" width="320" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="338" y="120" width="384" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="18" y="154" width="320" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="338" y="154" width="384" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="18" y="188" width="320" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="338" y="188" width="384" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="178" y="41">symptom</text><text x="530" y="41">fix</text>
+    <text x="178" y="74">texture is &gt; 70% of the payload</text>
+    <text x="530" y="74">resize the atlas; subdividing reproduces it in every part</text>
+    <text x="178" y="108">&lt; 100 features, millions of vertices</text>
+    <text x="530" y="108">split by feature with bin packing, not by area</text>
+    <text x="178" y="142">&gt; 6000 features, each small</text>
+    <text x="530" y="142">lower the subdivision threshold for this branch</text>
+    <text x="178" y="176">dense but otherwise ordinary</text>
+    <text x="530" y="176">one more level of subdivision</text>
+    <text x="178" y="210">siblings all under 40 KB</text>
+    <text x="530" y="210">merge them — four requests for 36 KB is waste</text>
+  </g>
+  <text x="370" y="238" fill="#5b6471" font-size="12" text-anchor="middle">subdividing further is the right answer for only one of these five</text>
+</svg>
+<figcaption>Four of the five oversized cases are not fixed by more subdivision, which is why the anatomy step comes before the fix.</figcaption>
+</figure>
+<h2 id="expected-output-verification" tabindex="-1"><a class="heading-link" href="#expected-output-verification"><span>Expected Output &amp; Verification</span></a></h2>
+<div class="codeblock" data-lang="text"><div class="codeblock__bar"><span class="codeblock__lang">text</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-text" tabindex="0" role="group" aria-label="text code sample"><code class="language-text">{'depth': 0, 'tiles': 1, 'total_mb': 0.0, 'p50_kb': 6.0, 'p95_kb': 6.0, 'max_kb': 18.0,
+ 'min_kb': 6.0, 'spread': 3.0}
+{'depth': 3, 'tiles': 412, 'total_mb': 214.8, 'p50_kb': 410.2, 'p95_kb': 1840.5,
+ 'max_kb': 41984.0, 'min_kb': 9.1, 'spread': 102.3}
+content/3/14/9.glb                   41.98 MB  tex 94%  texture-dominated — resize or recompress
+content/3/12/7.glb                    8.60 MB  tex 11%  few very detailed features — split by feature, not by area
+content/4/28/19.glb                   3.12 MB  tex 62%  dense geometry — subdivide further
+{'action': 'resize_texture', 'from_px': 2048, 'to_px': 512, 'predicted_texture_kb': 2464.0}
+{'merges': [...], 'tiles_before': 1402, 'tiles_after': 1188, 'requests_saved': 214}
+{
+  "tiles": 1188,
+  "levels": 6,
+  "findings": [],
+  "errors": 0,
+  "pass": true
+}
+</code></pre></div>
+<p>Level 3’s spread of 102 before the fix and the 41.98 MB tile at 94% texture are the same finding seen two ways. The merge pass removed 214 requests by consolidating undersized siblings, which is a latency win that the payload histogram does not show.</p>
+<p>Verify the tree is still correct after splitting and merging, because both operations move features between tiles:</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">integrity_check</span><span class="token punctuation">(</span>tileset_path<span class="token punctuation">,</span> expected_features<span class="token punctuation">,</span> content_root<span class="token operator">=</span><span class="token string">"output/city"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    doc <span class="token operator">=</span> json<span class="token punctuation">.</span>loads<span class="token punctuation">(</span>Path<span class="token punctuation">(</span>tileset_path<span class="token punctuation">)</span><span class="token punctuation">.</span>read_text<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    root_dir <span class="token operator">=</span> Path<span class="token punctuation">(</span>content_root<span class="token punctuation">)</span>
+    seen_features <span class="token operator">=</span> <span class="token number">0</span>
+    problems <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+
+    <span class="token keyword">def</span> <span class="token function">walk</span><span class="token punctuation">(</span>tile<span class="token punctuation">,</span> depth<span class="token punctuation">,</span> parent_ge<span class="token punctuation">,</span> parent_region<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">nonlocal</span> seen_features
+        ge <span class="token operator">=</span> tile<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"geometricError"</span><span class="token punctuation">)</span>
+        <span class="token keyword">if</span> parent_ge <span class="token keyword">is</span> <span class="token keyword">not</span> <span class="token boolean">None</span> <span class="token keyword">and</span> ge <span class="token keyword">is</span> <span class="token keyword">not</span> <span class="token boolean">None</span> <span class="token keyword">and</span> ge <span class="token operator">>=</span> parent_ge<span class="token punctuation">:</span>
+            problems<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"depth </span><span class="token interpolation"><span class="token punctuation">{</span>depth<span class="token punctuation">}</span></span><span class="token string">: geometricError </span><span class="token interpolation"><span class="token punctuation">{</span>ge<span class="token punctuation">}</span></span><span class="token string"> >= parent </span><span class="token interpolation"><span class="token punctuation">{</span>parent_ge<span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+        bv <span class="token operator">=</span> <span class="token punctuation">(</span>tile<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"boundingVolume"</span><span class="token punctuation">)</span> <span class="token keyword">or</span> <span class="token punctuation">{</span><span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"region"</span><span class="token punctuation">)</span>
+        <span class="token keyword">if</span> bv <span class="token keyword">and</span> parent_region<span class="token punctuation">:</span>
+            <span class="token keyword">for</span> i<span class="token punctuation">,</span> <span class="token punctuation">(</span>v<span class="token punctuation">,</span> p<span class="token punctuation">)</span> <span class="token keyword">in</span> <span class="token builtin">enumerate</span><span class="token punctuation">(</span><span class="token builtin">zip</span><span class="token punctuation">(</span>bv<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token number">4</span><span class="token punctuation">]</span><span class="token punctuation">,</span> parent_region<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token number">4</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+                <span class="token keyword">if</span> <span class="token punctuation">(</span>i <span class="token operator">&lt;</span> <span class="token number">2</span> <span class="token keyword">and</span> v <span class="token operator">&lt;</span> p <span class="token operator">-</span> <span class="token number">1e-9</span><span class="token punctuation">)</span> <span class="token keyword">or</span> <span class="token punctuation">(</span>i <span class="token operator">>=</span> <span class="token number">2</span> <span class="token keyword">and</span> v <span class="token operator">></span> p <span class="token operator">+</span> <span class="token number">1e-9</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+                    problems<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"depth </span><span class="token interpolation"><span class="token punctuation">{</span>depth<span class="token punctuation">}</span></span><span class="token string">: region escapes parent"</span></span><span class="token punctuation">)</span>
+                    <span class="token keyword">break</span>
+        count <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token punctuation">(</span>tile<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"metadata"</span><span class="token punctuation">)</span> <span class="token keyword">or</span> <span class="token punctuation">{</span><span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"properties"</span><span class="token punctuation">)</span> <span class="token keyword">or</span> <span class="token punctuation">{</span><span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"featureCount"</span><span class="token punctuation">)</span>
+        uri <span class="token operator">=</span> <span class="token punctuation">(</span>tile<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"content"</span><span class="token punctuation">)</span> <span class="token keyword">or</span> <span class="token punctuation">{</span><span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"uri"</span><span class="token punctuation">)</span>
+        <span class="token keyword">if</span> uri <span class="token keyword">and</span> <span class="token keyword">not</span> uri<span class="token punctuation">.</span>endswith<span class="token punctuation">(</span><span class="token string">".json"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+            <span class="token keyword">if</span> <span class="token keyword">not</span> <span class="token punctuation">(</span>root_dir <span class="token operator">/</span> uri<span class="token punctuation">)</span><span class="token punctuation">.</span>exists<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+                problems<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"missing content </span><span class="token interpolation"><span class="token punctuation">{</span>uri<span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+            seen_features <span class="token operator">+=</span> count <span class="token keyword">or</span> <span class="token number">0</span>
+        <span class="token keyword">for</span> child <span class="token keyword">in</span> tile<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"children"</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+            walk<span class="token punctuation">(</span>child<span class="token punctuation">,</span> depth <span class="token operator">+</span> <span class="token number">1</span><span class="token punctuation">,</span> ge<span class="token punctuation">,</span> bv <span class="token keyword">or</span> parent_region<span class="token punctuation">)</span>
+
+    walk<span class="token punctuation">(</span>doc<span class="token punctuation">[</span><span class="token string">"root"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> doc<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"geometricError"</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token boolean">None</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"features_expected"</span><span class="token punctuation">:</span> expected_features<span class="token punctuation">,</span> <span class="token string">"features_in_tileset"</span><span class="token punctuation">:</span> seen_features<span class="token punctuation">,</span>
+            <span class="token string">"conserved"</span><span class="token punctuation">:</span> seen_features <span class="token operator">==</span> expected_features<span class="token punctuation">,</span>
+            <span class="token string">"problems"</span><span class="token punctuation">:</span> problems<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token number">5</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token string">"clean"</span><span class="token punctuation">:</span> <span class="token keyword">not</span> problems<span class="token punctuation">}</span>
+
+<span class="token keyword">print</span><span class="token punctuation">(</span>integrity_check<span class="token punctuation">(</span><span class="token string">"output/city/tileset.json"</span><span class="token punctuation">,</span> <span class="token number">412418</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Feature conservation is the property both fixes threaten. A bin-packing split that drops the last bin, or a merge that writes one content file and forgets to remove its siblings’ entries, both produce a tileset that validates and is missing buildings.</p>
+<p>Then verify the balance improvement translates into a better worst-case view:</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">worst_view_check</span><span class="token punctuation">(</span>rows<span class="token punctuation">,</span> tileset_path<span class="token punctuation">,</span> views<span class="token punctuation">,</span> content_root<span class="token operator">=</span><span class="token string">"output/city"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""The metric users feel: bytes to fill the worst view."""</span>
+    doc <span class="token operator">=</span> json<span class="token punctuation">.</span>loads<span class="token punctuation">(</span>Path<span class="token punctuation">(</span>tileset_path<span class="token punctuation">)</span><span class="token punctuation">.</span>read_text<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    by_uri <span class="token operator">=</span> <span class="token punctuation">{</span>r<span class="token punctuation">[</span><span class="token string">"uri"</span><span class="token punctuation">]</span><span class="token punctuation">:</span> r<span class="token punctuation">[</span><span class="token string">"bytes"</span><span class="token punctuation">]</span> <span class="token keyword">for</span> r <span class="token keyword">in</span> rows<span class="token punctuation">}</span>
+    results <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    <span class="token keyword">for</span> name<span class="token punctuation">,</span> uris <span class="token keyword">in</span> views<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        total <span class="token operator">=</span> <span class="token builtin">sum</span><span class="token punctuation">(</span>by_uri<span class="token punctuation">.</span>get<span class="token punctuation">(</span>u<span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token keyword">for</span> u <span class="token keyword">in</span> uris<span class="token punctuation">)</span>
+        biggest <span class="token operator">=</span> <span class="token builtin">max</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token punctuation">(</span>u<span class="token punctuation">,</span> by_uri<span class="token punctuation">.</span>get<span class="token punctuation">(</span>u<span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token keyword">for</span> u <span class="token keyword">in</span> uris<span class="token punctuation">)</span><span class="token punctuation">,</span>
+                      key<span class="token operator">=</span><span class="token keyword">lambda</span> kv<span class="token punctuation">:</span> kv<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">,</span> default<span class="token operator">=</span><span class="token punctuation">(</span><span class="token string">"none"</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+        results<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"view"</span><span class="token punctuation">:</span> name<span class="token punctuation">,</span> <span class="token string">"tiles"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>uris<span class="token punctuation">)</span><span class="token punctuation">,</span>
+                        <span class="token string">"total_mb"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>total <span class="token operator">/</span> <span class="token number">1e6</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                        <span class="token string">"largest_tile_mb"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>biggest<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span> <span class="token operator">/</span> <span class="token number">1e6</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                        <span class="token string">"largest_share"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>biggest<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span> <span class="token operator">/</span> <span class="token builtin">max</span><span class="token punctuation">(</span>total<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+    worst <span class="token operator">=</span> <span class="token builtin">max</span><span class="token punctuation">(</span>results<span class="token punctuation">,</span> key<span class="token operator">=</span><span class="token keyword">lambda</span> r<span class="token punctuation">:</span> r<span class="token punctuation">[</span><span class="token string">"total_mb"</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"views"</span><span class="token punctuation">:</span> results<span class="token punctuation">,</span> <span class="token string">"worst_view"</span><span class="token punctuation">:</span> worst<span class="token punctuation">[</span><span class="token string">"view"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+            <span class="token string">"worst_mb"</span><span class="token punctuation">:</span> worst<span class="token punctuation">[</span><span class="token string">"total_mb"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+            <span class="token string">"dominated_by_one_tile"</span><span class="token punctuation">:</span> worst<span class="token punctuation">[</span><span class="token string">"largest_share"</span><span class="token punctuation">]</span> <span class="token operator">></span> <span class="token number">0.4</span><span class="token punctuation">}</span>
+
+<span class="token keyword">print</span><span class="token punctuation">(</span>json<span class="token punctuation">.</span>dumps<span class="token punctuation">(</span>worst_view_check<span class="token punctuation">(</span>rows<span class="token punctuation">,</span> <span class="token string">"output/city/tileset.json"</span><span class="token punctuation">,</span> VIEWS<span class="token punctuation">)</span><span class="token punctuation">,</span> indent<span class="token operator">=</span><span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p><code>dominated_by_one_tile</code> is the check that says whether the balancing worked from the user’s side. A view whose payload is 60% one tile has not been balanced, whatever the histogram says.</p>
+<h2 id="performance-notes" tabindex="-1"><a class="heading-link" href="#performance-notes"><span>Performance Notes</span></a></h2>
+<ul>
+<li><strong>400 KB per tile is a good target</strong> for city geometry on a broadband link: large enough that latency is amortised, small enough that a single tile never blocks a frame.</li>
+<li><strong>1.5 MB is a reasonable ceiling.</strong> Above that, a tile’s parse time alone becomes visible as a hitch.</li>
+<li><strong>Below 40 KB, merge.</strong> The request overhead exceeds the payload.</li>
+<li><strong>Recalibrate the bytes-per-vertex constant</strong> from a real run; it varies by a factor of two between quantisation settings.</li>
+<li><strong>The gate runs on file sizes</strong>, so it costs a directory walk — seconds on a 6,000-tile city, cheap enough for every build.</li>
+<li><strong>Balance matters more than total size.</strong> A 20 GB tileset with a 1.2 MB ceiling streams better than a 12 GB one with a 40 MB outlier.</li>
+</ul>
+<h2 id="common-errors" tabindex="-1"><a class="heading-link" href="#common-errors"><span>Common Errors</span></a></h2>
+<p><strong>Subdivision runs forever on one cell.</strong> A feature larger than the cell keeps the payload above the ceiling at every depth. Add the depth cap and the feature-split path.</p>
+<p><strong>Splitting a texture-dominated tile made things worse.</strong> Each part carries the same atlas. Resize instead.</p>
+<p><strong>Merging broke culling.</strong> Merged tiles span the union of their children’s volumes, so a camera seeing any part loads all. Only merge when the union stays under the target.</p>
+<p><strong>Feature count no longer matches.</strong> A bin-packing split dropped an empty bin, or a merge left orphaned tileset entries. Check conservation.</p>
+<p><strong>Spread is fine and the tileset still streams badly.</strong> The problem is level <em>depth</em>, not balance — too few levels means the first view loads leaf detail. Check the geometric errors.</p>
+<p><strong>The gate fails on the root tile.</strong> The root often has no content or a tiny one. Exclude depth 0 from the median test, as above.</p>
+<h2 id="frequently-asked-questions" tabindex="-1"><a class="heading-link" href="#frequently-asked-questions"><span>Frequently Asked Questions</span></a></h2>
+<h3 id="should-every-level-have-the-same-target-payload" tabindex="-1"><a class="heading-link" href="#should-every-level-have-the-same-target-payload"><span>Should every level have the same target payload?</span></a></h3>
+<p>Roughly, yes. A level whose tiles are much larger than another’s means the geometric errors are mismatched to the content, and the client will refine unevenly.</p>
+<h3 id="does-implicit-tiling-help-with-balance" tabindex="-1"><a class="heading-link" href="#does-implicit-tiling-help-with-balance"><span>Does implicit tiling help with balance?</span></a></h3>
+<p>No — implicit tiling fixes the <em>structure</em>, so it cannot adapt the subdivision to payload. It is the right choice for uniformly dense data and the wrong choice for a city with a business district.</p>
+<h3 id="how-do-i-balance-a-point-cloud-tileset" tabindex="-1"><a class="heading-link" href="#how-do-i-balance-a-point-cloud-tileset"><span>How do I balance a point-cloud tileset?</span></a></h3>
+<p>By points per tile rather than bytes, and the mechanism is the same: measure the distribution, subdivide where the count exceeds the ceiling, and merge sparse siblings. Point payloads are far more predictable than mesh payloads, so a fixed threshold works better there.</p>
+<h2 id="related-guides" tabindex="-1"><a class="heading-link" href="#related-guides"><span>Related Guides</span></a></h2>
+<ul>
+<li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/octree-vs-quadtree-subdivision-for-tall-buildings/">Octree vs Quadtree Subdivision for Tall Buildings</a> — the structural choice this tunes</li>
+<li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/gltfpack-settings-for-3d-tiles-content/">gltfpack Settings for 3D Tiles Content</a> — fixing texture-dominated outliers</li>
+<li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/choosing-shard-sizes-for-city-scale-tiling/">Choosing Shard Sizes for City-Scale Tiling</a> — the same balance question for build work</li>
+</ul>
+<p>Back to <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring</a>.</p>
+
+
+      
+      
+
+      <div class="related-nav">
+        
+
+        
+          <div>
+            <h3>Related</h3>
+            <div class="related-grid">
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/choosing-add-vs-replace-refinement/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Choosing ADD vs REPLACE Refinement for 3D Tiles</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/computing-geometric-error-for-3d-tiles-levels/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Computing Geometric Error for 3D Tiles Levels</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/implementing-quadtree-lod-for-urban-models/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Implementing Quadtree LOD for Urban Models</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/octree-vs-quadtree-subdivision-for-tall-buildings/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Octree vs Quadtree Subdivision for Tall Buildings</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/tuning-maximum-screen-space-error-in-cesium/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Tuning Maximum Screen Space Error in Cesium</span>
+                </a>
+              
+            </div>
+          </div>
+        
+      </div>
+    </article>
+
+    
+    <aside class="toc" aria-label="On this page" data-toc hidden>
+      <h4>On this page</h4>
+      <ul></ul>
+    </aside>
+  </div>
+</div>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+  <div class="container site-footer__inner">
+    <div class="site-footer__brand">
+      <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+        <img src="/assets/img/logo-mark.svg" alt="" class="brand__mark" width="36" height="36">
+        <span class="brand__name">
+          3D Geospatial
+          <small>Digital Twin Automation</small>
+        </span>
+      </a>
+      <p>Engineering-grade guides on point cloud processing, mesh pipelines, LOD strategies, and CI/CD automation for digital twin platforms.</p>
+      <a class="footer-social" href="https://github.com/3d-geospatial" aria-label="3D Geospatial on GitHub" rel="noopener" target="_blank">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+          <path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.53-1.34-1.3-1.7-1.3-1.7-1.06-.72.08-.71.08-.71 1.17.08 1.79 1.2 1.79 1.2 1.04 1.79 2.73 1.27 3.4.97.1-.75.4-1.27.73-1.56-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.19-3.08-.12-.3-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.75.11 3.05.74.8 1.19 1.83 1.19 3.08 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.07.78 2.15v3.18c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5Z"/>
+        </svg>
+        <span>GitHub</span>
+      </a>
+    </div>
+
+    <div class="site-footer__col">
+      <h4>Sections</h4>
+      <ul>
+        <li><a href="https://www.3d-geospatial.com/">Home</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management &amp; Optimization</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/">Point Cloud &amp; Mesh Pipelines</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/">Troubleshooting &amp; Reliability</a></li>
+        
+      </ul>
+    </div>
+
+    
+      <div class="site-footer__col">
+        <h4>3D Geospatial Fundamentals</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/">3D Format Standards Comparison</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/">BIM and IFC Georeferencing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/">CityGML and CityJSON Processing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems for 3D Assets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/">Digital Elevation Model Workflows</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/">Spatial Indexing and Tiling Schemes for 3D Data</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>LOD Management &amp; Optimization</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/">Automated Tile Generation for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/">Cesium ion Upload Automation for 3D Tilesets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/">glTF LOD Generation With Draco Compression</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/">Streaming Sync Patterns for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/">Tileset Metadata and 3D Tiles Next</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/">Vector Overlays on 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Point Cloud &amp; Mesh Pipelines</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/">Automated Mesh Decimation for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/">Change Detection Between LiDAR Scan Epochs</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/">CI/CD Automation for Spatial Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">LiDAR Classification and Ground Extraction</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/photogrammetry-processing-pipelines/">Photogrammetry Processing Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/">Point Cloud Filtering Techniques</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/">Surface Reconstruction for Geospatial Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/">Texture Mapping Workflows for Digital Twins</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Troubleshooting &amp; Reliability</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/">Cross-Section Failure Modes in Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/">Data Validation &amp; QA Gates for 3D Tiles</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/">Performance Profiling and Benchmarking</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/">Pipeline Observability and Monitoring</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/">Streaming &amp; Runtime Diagnostics for 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+  </div>
+  <div class="container site-footer__bottom">
+    <span>© 2026 3D Geospatial &amp; Digital Twin Automation</span>
+    <span>Built with Eleventy · PWA-enabled</span>
+  </div>
+</footer>
+
+
+  <script src="/assets/js/site.js?v=b99aa9f971" defer></script>
+  
+</body>
+</html>

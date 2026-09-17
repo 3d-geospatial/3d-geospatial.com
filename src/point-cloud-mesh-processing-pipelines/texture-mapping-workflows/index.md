@@ -360,5 +360,7 @@ Match triangle size to the ground sampling distance (GSD) of the source photos. 
 - [Automated Mesh Decimation for Digital Twins](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/) — matching triangle density to image GSD
 - [Point Cloud Filtering Techniques](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/) — cleaning input data so textures don't smear
 - [Coordinate Reference Systems for 3D Assets](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/) — keeping mesh and cameras in one CRS
+- [Generating UV Atlases with xatlas](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/generating-uv-atlases-with-xatlas/) — parameterise a mesh for texturing with xatlas
+- [Projecting Textures from Oriented Images](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/projecting-textures-from-oriented-images/) — bake a texture from oriented photographs onto a mesh
 
 Back to [Point Cloud & Mesh Processing Pipelines](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/).

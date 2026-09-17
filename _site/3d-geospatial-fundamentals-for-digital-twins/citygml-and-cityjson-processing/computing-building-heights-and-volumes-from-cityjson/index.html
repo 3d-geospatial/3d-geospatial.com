@@ -1,0 +1,786 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <title>Computing Building Heights and Volumes from CityJSON — 3D Geospatial</title>
+  <meta name="description" content="Derive defensible building heights and volumes from CityJSON: which height definition, closing LOD2 shells at ground, the divergence theorem">
+  <meta name="keywords" content="3D geospatial, digital twin, point cloud, mesh pipeline, LOD, 3D Tiles, Cesium, PDAL, Open3D, Python, CI/CD">
+  <meta name="author" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta name="theme-color" content="#1f6b8a" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f171d" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+
+  
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem("theme");
+        var theme = (stored === "dark" || stored === "light") ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    })();
+  </script>
+  <meta name="generator" content="Eleventy">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="googlebot" content="index,follow,max-image-preview:large">
+
+  
+  <link rel="canonical" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/computing-building-heights-and-volumes-from-cityjson/">
+  <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">
+
+  
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/icon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+
+  
+  <link rel="apple-touch-icon" href="/assets/img/icon-180.png">
+  <link rel="mask-icon" href="/assets/img/logo.svg" color="#1f6b8a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="3D Geospatial">
+  <meta name="application-name" content="3D Geospatial">
+
+  
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Computing Building Heights and Volumes from CityJSON — 3D Geospatial">
+  <meta property="og:description" content="Derive defensible building heights and volumes from CityJSON: which height definition, closing LOD2 shells at ground, the divergence theorem">
+  <meta property="og:url" content="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/computing-building-heights-and-volumes-from-cityjson/">
+  <meta property="og:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+  <meta property="og:site_name" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta property="og:locale" content="en_US">
+  
+  <meta property="article:published_time" content="2026-09-17T23:36:56.449Z">
+  <meta property="article:modified_time" content="2026-09-17T23:36:56.449Z">
+  <meta property="article:publisher" content="https://www.3d-geospatial.com/">
+  
+
+  
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Computing Building Heights and Volumes from CityJSON — 3D Geospatial">
+  <meta name="twitter:description" content="Derive defensible building heights and volumes from CityJSON: which height definition, closing LOD2 shells at ground, the divergence theorem">
+  <meta name="twitter:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta name="twitter:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+
+  
+  <link rel="preload" href="/assets/css/styles.css?v=8c46394d6c" as="style">
+  
+
+  <link rel="stylesheet" href="/assets/css/styles.css?v=8c46394d6c">
+
+  
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.3d-geospatial.com/#organization",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "url": "https://www.3d-geospatial.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/icon-512.png",
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://www.3d-geospatial.com/#website",
+      "url": "https://www.3d-geospatial.com/",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "description": "Build reliable 3D spatial data pipelines for digital twins — point clouds, meshes, LOD strategies, Python processing, and CI/CD automation.",
+      "inLanguage": "en",
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      }
+    },
+    {
+      "@type": "TechArticle",
+      "@id": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/computing-building-heights-and-volumes-from-cityjson/#article",
+      "isPartOf": {
+        "@id": "https://www.3d-geospatial.com/#website"
+      },
+      "headline": "Computing Building Heights and Volumes from CityJSON",
+      "name": "Computing Building Heights and Volumes from CityJSON",
+      "description": "Derive defensible building heights and volumes from CityJSON: which height definition, closing LOD2 shells at ground, the divergence theorem",
+      "url": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/computing-building-heights-and-volumes-from-cityjson/",
+      "mainEntityOfPage": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/computing-building-heights-and-volumes-from-cityjson/",
+      "inLanguage": "en",
+      "datePublished": "2026-09-17T23:36:56.449Z",
+      "dateModified": "2026-09-17T23:36:56.449Z",
+      "author": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "image": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/og-cover.png",
+        "width": 1200,
+        "height": 630
+      },
+      "breadcrumb": {
+        "@id": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/computing-building-heights-and-volumes-from-cityjson/#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/computing-building-heights-and-volumes-from-cityjson/#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://www.3d-geospatial.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "3D Geospatial Fundamentals For Digital Twins",
+          "item": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Citygml And Cityjson Processing",
+          "item": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "name": "Computing Building Heights And Volumes From Cityjson",
+          "item": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/computing-building-heights-and-volumes-from-cityjson/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  
+<header class="site-header" role="banner">
+  <div class="container site-header__inner">
+    <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+      <img src="/assets/img/logo.svg" alt="" class="brand__mark" width="36" height="36">
+      <span class="brand__name">
+        3D Geospatial
+        <small>Digital Twin Automation</small>
+      </span>
+    </a>
+
+    <button class="theme-toggle" type="button" data-theme-toggle
+            aria-label="Switch to dark theme" title="Switch to dark theme">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4.2"/>
+        <path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/>
+      </svg>
+    </button>
+
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>
+      <span class="nav-toggle__icon" aria-hidden="true"><span></span></span>
+      Menu
+    </button>
+
+    <nav class="primary-nav" id="primary-nav" aria-label="Primary">
+      
+      <a href="https://www.3d-geospatial.com/" >
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/>
+        </svg>
+        Home
+      </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/" aria-current="page">
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2 3 7l9 5 9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 17l9 5 9-5"/>
+            </svg>
+          
+          3D Geospatial Fundamentals
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+          
+          LOD Management &amp; Optimization
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="6" cy="6" r="1.5"/><circle cx="12" cy="6" r="1.5"/><circle cx="18" cy="6" r="1.5"/>
+              <circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/>
+              <circle cx="6" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="18" cy="18" r="1.5"/>
+            </svg>
+          
+          Point Cloud &amp; Mesh Pipelines
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <path d="M12 9v4"/><path d="M12 17h.01"/>
+            </svg>
+          
+          Troubleshooting &amp; Reliability
+        </a>
+      
+    </nav>
+  </div>
+</header>
+
+
+  <main id="main">
+    
+
+
+<div class="container">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    
+      
+        <a href="https://www.3d-geospatial.com/">Home</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals For Digital Twins</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/">Citygml And Cityjson Processing</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <span class="current">Computing Building Heights And Volumes From Cityjson</span>
+      
+    
+  </nav>
+
+  <div class="content-page">
+    <article class="article">
+      <h1 id="computing-building-heights-and-volumes-from-cityjson" tabindex="-1"><a class="heading-link" href="#computing-building-heights-and-volumes-from-cityjson"><span>Computing Building Heights and Volumes from CityJSON</span></a></h1>
+<p>This page computes building heights and volumes from a CityJSON city model in a way a planner or energy modeller can defend — choosing between ridge, eave and reference heights, closing LOD2 shells at ground level so a volume exists at all, integrating volume with the divergence theorem, and cross-checking every number against the model’s own attributes, in EPSG:25832 with DHHN2016 heights.</p>
+<h2 id="why-you-hit-this" tabindex="-1"><a class="heading-link" href="#why-you-hit-this"><span>Why you hit this</span></a></h2>
+<p>“How tall is that building and how much volume does it enclose” sounds like a lookup and is not. A city model may carry <code>measuredHeight</code> with no statement of what it is measured from, and the answer differs by metres depending on whether you mean the ridge, the eave, the highest point of any superstructure, or the height above the terrain rather than above the datum. Volume is worse: an LOD2 building is usually a set of wall and roof surfaces with no ground surface, so it encloses nothing, and a naive integration over an open shell returns a number that depends on where the coordinate origin happens to be. Both quantities feed real decisions — daylight assessments, heating demand, tax valuation — so they need a stated definition and a check. The geometry access this builds on is in <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/extracting-lod2-roof-surfaces-from-cityjson/">extracting LOD2 roof surfaces from CityJSON</a>.</p>
+<h2 id="prerequisites" tabindex="-1"><a class="heading-link" href="#prerequisites"><span>Prerequisites</span></a></h2>
+<ul>
+<li>Python 3.10+ with <code>numpy&gt;=1.24</code>, <code>shapely&gt;=2.0</code>, <code>trimesh&gt;=4.0</code>.</li>
+<li>A CityJSON file with LOD1 or LOD2 geometry; semantics are needed to find ground and roof surfaces reliably.</li>
+<li>A terrain model — a DTM raster in the same CRS — if heights above ground rather than above the datum are wanted.</li>
+</ul>
+<h2 id="step-by-step" tabindex="-1"><a class="heading-link" href="#step-by-step"><span>Step-by-Step</span></a></h2>
+<h3 id="1-decide-which-height-you-mean" tabindex="-1"><a class="heading-link" href="#1-decide-which-height-you-mean"><span>1. Decide which height you mean</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> json
+<span class="token keyword">from</span> pathlib <span class="token keyword">import</span> Path
+<span class="token keyword">import</span> numpy <span class="token keyword">as</span> np
+
+cj <span class="token operator">=</span> json<span class="token punctuation">.</span>loads<span class="token punctuation">(</span>Path<span class="token punctuation">(</span><span class="token string">"district_lod2.city.json"</span><span class="token punctuation">)</span><span class="token punctuation">.</span>read_text<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+t <span class="token operator">=</span> cj<span class="token punctuation">[</span><span class="token string">"transform"</span><span class="token punctuation">]</span>
+V <span class="token operator">=</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>cj<span class="token punctuation">[</span><span class="token string">"vertices"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> dtype<span class="token operator">=</span>np<span class="token punctuation">.</span>float64<span class="token punctuation">)</span> <span class="token operator">*</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>t<span class="token punctuation">[</span><span class="token string">"scale"</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token operator">+</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>t<span class="token punctuation">[</span><span class="token string">"translate"</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+
+<span class="token keyword">def</span> <span class="token function">surfaces</span><span class="token punctuation">(</span>geom<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    b<span class="token punctuation">,</span> sem <span class="token operator">=</span> geom<span class="token punctuation">[</span><span class="token string">"boundaries"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> geom<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"semantics"</span><span class="token punctuation">,</span> <span class="token punctuation">{</span><span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"values"</span><span class="token punctuation">)</span>
+    <span class="token keyword">if</span> geom<span class="token punctuation">[</span><span class="token string">"type"</span><span class="token punctuation">]</span> <span class="token keyword">in</span> <span class="token punctuation">(</span><span class="token string">"MultiSurface"</span><span class="token punctuation">,</span> <span class="token string">"CompositeSurface"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">for</span> i<span class="token punctuation">,</span> s <span class="token keyword">in</span> <span class="token builtin">enumerate</span><span class="token punctuation">(</span>b<span class="token punctuation">)</span><span class="token punctuation">:</span>
+            <span class="token keyword">yield</span> s<span class="token punctuation">,</span> <span class="token punctuation">(</span>sem<span class="token punctuation">[</span>i<span class="token punctuation">]</span> <span class="token keyword">if</span> sem <span class="token keyword">else</span> <span class="token boolean">None</span><span class="token punctuation">)</span>
+    <span class="token keyword">elif</span> geom<span class="token punctuation">[</span><span class="token string">"type"</span><span class="token punctuation">]</span> <span class="token operator">==</span> <span class="token string">"Solid"</span><span class="token punctuation">:</span>
+        <span class="token keyword">for</span> k<span class="token punctuation">,</span> shell <span class="token keyword">in</span> <span class="token builtin">enumerate</span><span class="token punctuation">(</span>b<span class="token punctuation">)</span><span class="token punctuation">:</span>
+            <span class="token keyword">for</span> i<span class="token punctuation">,</span> s <span class="token keyword">in</span> <span class="token builtin">enumerate</span><span class="token punctuation">(</span>shell<span class="token punctuation">)</span><span class="token punctuation">:</span>
+                <span class="token keyword">yield</span> s<span class="token punctuation">,</span> <span class="token punctuation">(</span>sem<span class="token punctuation">[</span>k<span class="token punctuation">]</span><span class="token punctuation">[</span>i<span class="token punctuation">]</span> <span class="token keyword">if</span> sem <span class="token keyword">else</span> <span class="token boolean">None</span><span class="token punctuation">)</span>
+
+<span class="token keyword">def</span> <span class="token function">height_profile</span><span class="token punctuation">(</span>obj<span class="token punctuation">,</span> lod_prefix<span class="token operator">=</span><span class="token string">"2"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    zs <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token string">"RoofSurface"</span><span class="token punctuation">:</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token string">"WallSurface"</span><span class="token punctuation">:</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token string">"GroundSurface"</span><span class="token punctuation">:</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">}</span>
+    <span class="token keyword">for</span> g <span class="token keyword">in</span> obj<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"geometry"</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">if</span> <span class="token keyword">not</span> g<span class="token punctuation">[</span><span class="token string">"lod"</span><span class="token punctuation">]</span><span class="token punctuation">.</span>startswith<span class="token punctuation">(</span>lod_prefix<span class="token punctuation">)</span><span class="token punctuation">:</span>
+            <span class="token keyword">continue</span>
+        names <span class="token operator">=</span> <span class="token punctuation">[</span>s<span class="token punctuation">[</span><span class="token string">"type"</span><span class="token punctuation">]</span> <span class="token keyword">for</span> s <span class="token keyword">in</span> g<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"semantics"</span><span class="token punctuation">,</span> <span class="token punctuation">{</span><span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"surfaces"</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">]</span>
+        <span class="token keyword">for</span> rings<span class="token punctuation">,</span> si <span class="token keyword">in</span> surfaces<span class="token punctuation">(</span>g<span class="token punctuation">)</span><span class="token punctuation">:</span>
+            label <span class="token operator">=</span> names<span class="token punctuation">[</span>si<span class="token punctuation">]</span> <span class="token keyword">if</span> <span class="token punctuation">(</span>si <span class="token keyword">is</span> <span class="token keyword">not</span> <span class="token boolean">None</span> <span class="token keyword">and</span> names<span class="token punctuation">)</span> <span class="token keyword">else</span> <span class="token boolean">None</span>
+            <span class="token keyword">if</span> label <span class="token keyword">in</span> zs<span class="token punctuation">:</span>
+                zs<span class="token punctuation">[</span>label<span class="token punctuation">]</span><span class="token punctuation">.</span>append<span class="token punctuation">(</span>V<span class="token punctuation">[</span>rings<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    out <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token punctuation">}</span>
+    <span class="token keyword">for</span> k<span class="token punctuation">,</span> v <span class="token keyword">in</span> zs<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">if</span> v<span class="token punctuation">:</span>
+            z <span class="token operator">=</span> np<span class="token punctuation">.</span>concatenate<span class="token punctuation">(</span>v<span class="token punctuation">)</span>
+            out<span class="token punctuation">[</span>k<span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>z<span class="token punctuation">.</span><span class="token builtin">min</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token builtin">float</span><span class="token punctuation">(</span>z<span class="token punctuation">.</span><span class="token builtin">max</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> out
+
+first <span class="token operator">=</span> <span class="token builtin">next</span><span class="token punctuation">(</span><span class="token builtin">iter</span><span class="token punctuation">(</span>cj<span class="token punctuation">[</span><span class="token string">"CityObjects"</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span>height_profile<span class="token punctuation">(</span>cj<span class="token punctuation">[</span><span class="token string">"CityObjects"</span><span class="token punctuation">]</span><span class="token punctuation">[</span>first<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Four definitions cover nearly every requirement, and they come from different parts of the geometry. The <strong>ridge height</strong> is the maximum z of the roof surfaces. The <strong>eave height</strong> is the minimum z of the roof surfaces, which on a pitched roof is where it meets the wall. The <strong>reference height</strong> is the minimum z of the ground surface where one exists, and the minimum z of the walls where it does not. Height <em>above ground</em> is the ridge minus the reference; height <em>above datum</em> is the ridge itself, in the model’s vertical CRS.</p>
+<figure class="diagram">
+<svg viewBox="46 6 668 264" role="img" aria-labelledby="cjh-def-t cjh-def-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="cjh-def-t">Four height definitions on one building</title>
+  <desc id="cjh-def-d">A gable-roofed building in section on sloping terrain. The ridge height is the top of the roof, the eave height is where the roof meets the wall, and the reference height is the lowest point of the ground surface. Height above ground is ridge minus reference, while height above datum is the ridge value itself. On sloping terrain the reference differs by up to a metre between the uphill and downhill wall.</desc>
+  <rect class="svg-bg" x="46" y="6" width="668" height="264" fill="#ffffff"/>
+  <path d="M60 200 L300 180 L560 168 L700 172" fill="none" stroke="#4f7a4d" stroke-width="2.5"/>
+  <path d="M200 190 H420 V90 L310 40 L200 90 Z" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <path d="M60 230 H700" fill="none" stroke="#5b6471" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <g stroke="#9a4f26" stroke-width="2">
+    <path d="M470 40 V230"/><path d="M462 40 H478"/><path d="M462 230 H478"/>
+    <path d="M540 40 V186"/><path d="M532 40 H548"/><path d="M532 186 H548"/>
+    <path d="M610 90 V186"/><path d="M602 90 H618"/><path d="M602 186 H618"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="start">
+    <text x="486" y="82">above datum</text>
+    <text x="556" y="150">above ground</text>
+    <text x="626" y="118">eave height</text>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="310" y="34">ridge</text>
+    <text x="150" y="196">terrain</text>
+    <text x="310" y="212">reference: lowest ground surface</text>
+    <text x="380" y="252">vertical datum, z = 0 (DHHN2016)</text>
+  </g>
+</svg>
+<figcaption>On sloping ground the reference height is a choice in itself — the lowest, the mean or the entrance-side ground level — and the choice has to be recorded with the number.</figcaption>
+</figure>
+<h3 id="2-compute-heights-for-every-building" tabindex="-1"><a class="heading-link" href="#2-compute-heights-for-every-building"><span>2. Compute heights for every building</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">building_heights</span><span class="token punctuation">(</span>cj<span class="token punctuation">,</span> dtm_sampler<span class="token operator">=</span><span class="token boolean">None</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    rows <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token punctuation">}</span>
+    <span class="token keyword">for</span> oid<span class="token punctuation">,</span> obj <span class="token keyword">in</span> cj<span class="token punctuation">[</span><span class="token string">"CityObjects"</span><span class="token punctuation">]</span><span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">if</span> obj<span class="token punctuation">[</span><span class="token string">"type"</span><span class="token punctuation">]</span> <span class="token keyword">not</span> <span class="token keyword">in</span> <span class="token punctuation">(</span><span class="token string">"Building"</span><span class="token punctuation">,</span> <span class="token string">"BuildingPart"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+            <span class="token keyword">continue</span>
+        prof <span class="token operator">=</span> height_profile<span class="token punctuation">(</span>obj<span class="token punctuation">)</span>
+        <span class="token keyword">if</span> <span class="token string">"RoofSurface"</span> <span class="token keyword">not</span> <span class="token keyword">in</span> prof<span class="token punctuation">:</span>
+            <span class="token keyword">continue</span>
+        ridge <span class="token operator">=</span> prof<span class="token punctuation">[</span><span class="token string">"RoofSurface"</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span>
+        eave <span class="token operator">=</span> prof<span class="token punctuation">[</span><span class="token string">"RoofSurface"</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span>
+        <span class="token keyword">if</span> <span class="token string">"GroundSurface"</span> <span class="token keyword">in</span> prof<span class="token punctuation">:</span>
+            ref <span class="token operator">=</span> prof<span class="token punctuation">[</span><span class="token string">"GroundSurface"</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span>
+        <span class="token keyword">elif</span> <span class="token string">"WallSurface"</span> <span class="token keyword">in</span> prof<span class="token punctuation">:</span>
+            ref <span class="token operator">=</span> prof<span class="token punctuation">[</span><span class="token string">"WallSurface"</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span>
+        <span class="token keyword">else</span><span class="token punctuation">:</span>
+            <span class="token keyword">continue</span>
+        rows<span class="token punctuation">[</span>oid<span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token punctuation">{</span>
+            <span class="token string">"ridge_m"</span><span class="token punctuation">:</span> ridge<span class="token punctuation">,</span> <span class="token string">"eave_m"</span><span class="token punctuation">:</span> eave<span class="token punctuation">,</span> <span class="token string">"reference_m"</span><span class="token punctuation">:</span> ref<span class="token punctuation">,</span>
+            <span class="token string">"h_above_ground_m"</span><span class="token punctuation">:</span> ridge <span class="token operator">-</span> ref<span class="token punctuation">,</span>
+            <span class="token string">"h_eave_above_ground_m"</span><span class="token punctuation">:</span> eave <span class="token operator">-</span> ref<span class="token punctuation">,</span>
+            <span class="token string">"declared_m"</span><span class="token punctuation">:</span> obj<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"attributes"</span><span class="token punctuation">,</span> <span class="token punctuation">{</span><span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"measuredHeight"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token punctuation">}</span>
+    <span class="token keyword">return</span> rows
+
+heights <span class="token operator">=</span> building_heights<span class="token punctuation">(</span>cj<span class="token punctuation">)</span>
+hs <span class="token operator">=</span> np<span class="token punctuation">.</span>array<span class="token punctuation">(</span><span class="token punctuation">[</span>r<span class="token punctuation">[</span><span class="token string">"h_above_ground_m"</span><span class="token punctuation">]</span> <span class="token keyword">for</span> r <span class="token keyword">in</span> heights<span class="token punctuation">.</span>values<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span><span class="token builtin">len</span><span class="token punctuation">(</span>heights<span class="token punctuation">)</span><span class="token punctuation">:</span><span class="token format-spec">,</span><span class="token punctuation">}</span></span><span class="token string"> buildings | height above ground: median </span><span class="token interpolation"><span class="token punctuation">{</span>np<span class="token punctuation">.</span>median<span class="token punctuation">(</span>hs<span class="token punctuation">)</span><span class="token punctuation">:</span><span class="token format-spec">.1f</span><span class="token punctuation">}</span></span><span class="token string"> m, "</span></span>
+      <span class="token string-interpolation"><span class="token string">f"p5 </span><span class="token interpolation"><span class="token punctuation">{</span>np<span class="token punctuation">.</span>percentile<span class="token punctuation">(</span>hs<span class="token punctuation">,</span> <span class="token number">5</span><span class="token punctuation">)</span><span class="token punctuation">:</span><span class="token format-spec">.1f</span><span class="token punctuation">}</span></span><span class="token string">, p95 </span><span class="token interpolation"><span class="token punctuation">{</span>np<span class="token punctuation">.</span>percentile<span class="token punctuation">(</span>hs<span class="token punctuation">,</span> <span class="token number">95</span><span class="token punctuation">)</span><span class="token punctuation">:</span><span class="token format-spec">.1f</span><span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Falling back to the lowest wall vertex when no ground surface exists is the pragmatic choice for LOD2 data and is accurate to a few decimetres, because walls are modelled down to the terrain intersection. Estimating storeys from the result is tempting and should be done explicitly if at all: dividing the eave height by 3.0 m is a convention, not a measurement, and it belongs in a column named for the assumption.</p>
+<h3 id="3-close-the-shell-before-computing-any-volume" tabindex="-1"><a class="heading-link" href="#3-close-the-shell-before-computing-any-volume"><span>3. Close the shell before computing any volume</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">from</span> shapely<span class="token punctuation">.</span>geometry <span class="token keyword">import</span> Polygon
+<span class="token keyword">from</span> shapely<span class="token punctuation">.</span>ops <span class="token keyword">import</span> unary_union
+
+<span class="token keyword">def</span> <span class="token function">footprint</span><span class="token punctuation">(</span>obj<span class="token punctuation">,</span> lod_prefix<span class="token operator">=</span><span class="token string">"2"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    polys <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    <span class="token keyword">for</span> g <span class="token keyword">in</span> obj<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"geometry"</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">if</span> <span class="token keyword">not</span> g<span class="token punctuation">[</span><span class="token string">"lod"</span><span class="token punctuation">]</span><span class="token punctuation">.</span>startswith<span class="token punctuation">(</span>lod_prefix<span class="token punctuation">)</span><span class="token punctuation">:</span>
+            <span class="token keyword">continue</span>
+        <span class="token keyword">for</span> rings<span class="token punctuation">,</span> _ <span class="token keyword">in</span> surfaces<span class="token punctuation">(</span>g<span class="token punctuation">)</span><span class="token punctuation">:</span>
+            p <span class="token operator">=</span> Polygon<span class="token punctuation">(</span>V<span class="token punctuation">[</span>rings<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token punctuation">:</span><span class="token number">2</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+            <span class="token keyword">if</span> p<span class="token punctuation">.</span>is_valid <span class="token keyword">and</span> p<span class="token punctuation">.</span>area <span class="token operator">></span> <span class="token number">0.2</span><span class="token punctuation">:</span>
+                polys<span class="token punctuation">.</span>append<span class="token punctuation">(</span>p<span class="token punctuation">)</span>
+    <span class="token keyword">return</span> unary_union<span class="token punctuation">(</span>polys<span class="token punctuation">)</span> <span class="token keyword">if</span> polys <span class="token keyword">else</span> <span class="token boolean">None</span>
+
+<span class="token keyword">def</span> <span class="token function">closed_mesh</span><span class="token punctuation">(</span>obj<span class="token punctuation">,</span> ref_z<span class="token punctuation">,</span> lod_prefix<span class="token operator">=</span><span class="token string">"2"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Triangulate walls and roofs, then cap the building at ref_z with its footprint."""</span>
+    <span class="token keyword">import</span> trimesh
+    <span class="token keyword">from</span> trimesh<span class="token punctuation">.</span>creation <span class="token keyword">import</span> triangulate_polygon
+
+    tris <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    <span class="token keyword">for</span> g <span class="token keyword">in</span> obj<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"geometry"</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">if</span> <span class="token keyword">not</span> g<span class="token punctuation">[</span><span class="token string">"lod"</span><span class="token punctuation">]</span><span class="token punctuation">.</span>startswith<span class="token punctuation">(</span>lod_prefix<span class="token punctuation">)</span><span class="token punctuation">:</span>
+            <span class="token keyword">continue</span>
+        <span class="token keyword">for</span> rings<span class="token punctuation">,</span> _ <span class="token keyword">in</span> surfaces<span class="token punctuation">(</span>g<span class="token punctuation">)</span><span class="token punctuation">:</span>
+            pts <span class="token operator">=</span> V<span class="token punctuation">[</span>rings<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">]</span>
+            n <span class="token operator">=</span> np<span class="token punctuation">.</span>zeros<span class="token punctuation">(</span><span class="token number">3</span><span class="token punctuation">)</span>
+            <span class="token keyword">for</span> i <span class="token keyword">in</span> <span class="token builtin">range</span><span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>pts<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+                n <span class="token operator">+=</span> np<span class="token punctuation">.</span>cross<span class="token punctuation">(</span>pts<span class="token punctuation">[</span>i<span class="token punctuation">]</span><span class="token punctuation">,</span> pts<span class="token punctuation">[</span><span class="token punctuation">(</span>i <span class="token operator">+</span> <span class="token number">1</span><span class="token punctuation">)</span> <span class="token operator">%</span> <span class="token builtin">len</span><span class="token punctuation">(</span>pts<span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+            <span class="token keyword">if</span> np<span class="token punctuation">.</span>linalg<span class="token punctuation">.</span>norm<span class="token punctuation">(</span>n<span class="token punctuation">)</span> <span class="token operator">&lt;</span> <span class="token number">1e-9</span><span class="token punctuation">:</span>
+                <span class="token keyword">continue</span>
+            n <span class="token operator">/=</span> np<span class="token punctuation">.</span>linalg<span class="token punctuation">.</span>norm<span class="token punctuation">(</span>n<span class="token punctuation">)</span>
+            drop <span class="token operator">=</span> <span class="token builtin">int</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>argmax<span class="token punctuation">(</span>np<span class="token punctuation">.</span><span class="token builtin">abs</span><span class="token punctuation">(</span>n<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+            keep <span class="token operator">=</span> <span class="token punctuation">[</span>i <span class="token keyword">for</span> i <span class="token keyword">in</span> <span class="token builtin">range</span><span class="token punctuation">(</span><span class="token number">3</span><span class="token punctuation">)</span> <span class="token keyword">if</span> i <span class="token operator">!=</span> drop<span class="token punctuation">]</span>
+            poly <span class="token operator">=</span> Polygon<span class="token punctuation">(</span>pts<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> keep<span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token punctuation">[</span>V<span class="token punctuation">[</span>r<span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> keep<span class="token punctuation">]</span> <span class="token keyword">for</span> r <span class="token keyword">in</span> rings<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">:</span><span class="token punctuation">]</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+            <span class="token keyword">if</span> <span class="token keyword">not</span> poly<span class="token punctuation">.</span>is_valid <span class="token keyword">or</span> poly<span class="token punctuation">.</span>area <span class="token operator">&lt;</span> <span class="token number">1e-9</span><span class="token punctuation">:</span>
+                <span class="token keyword">continue</span>
+            p2<span class="token punctuation">,</span> faces <span class="token operator">=</span> triangulate_polygon<span class="token punctuation">(</span>poly<span class="token punctuation">,</span> engine<span class="token operator">=</span><span class="token string">"earcut"</span><span class="token punctuation">)</span>
+            p3 <span class="token operator">=</span> np<span class="token punctuation">.</span>zeros<span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>p2<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+            p3<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> keep<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">]</span><span class="token punctuation">,</span> p3<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> keep<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">]</span> <span class="token operator">=</span> p2<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">,</span> p2<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">]</span>
+            d <span class="token operator">=</span> <span class="token builtin">float</span><span class="token punctuation">(</span>n @ pts<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+            p3<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> drop<span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token punctuation">(</span>d <span class="token operator">-</span> p3<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> keep<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">]</span> <span class="token operator">*</span> n<span class="token punctuation">[</span>keep<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">]</span> <span class="token operator">-</span> p3<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> keep<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">]</span> <span class="token operator">*</span> n<span class="token punctuation">[</span>keep<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token operator">/</span> n<span class="token punctuation">[</span>drop<span class="token punctuation">]</span>
+            tris<span class="token punctuation">.</span>append<span class="token punctuation">(</span>p3<span class="token punctuation">[</span>faces<span class="token punctuation">]</span><span class="token punctuation">)</span>
+
+    fp <span class="token operator">=</span> footprint<span class="token punctuation">(</span>obj<span class="token punctuation">,</span> lod_prefix<span class="token punctuation">)</span>
+    <span class="token keyword">if</span> fp <span class="token keyword">is</span> <span class="token boolean">None</span> <span class="token keyword">or</span> fp<span class="token punctuation">.</span>is_empty<span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token boolean">None</span>
+    <span class="token keyword">for</span> geom <span class="token keyword">in</span> <span class="token builtin">getattr</span><span class="token punctuation">(</span>fp<span class="token punctuation">,</span> <span class="token string">"geoms"</span><span class="token punctuation">,</span> <span class="token punctuation">[</span>fp<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        p2<span class="token punctuation">,</span> faces <span class="token operator">=</span> triangulate_polygon<span class="token punctuation">(</span>geom<span class="token punctuation">,</span> engine<span class="token operator">=</span><span class="token string">"earcut"</span><span class="token punctuation">)</span>
+        p3 <span class="token operator">=</span> np<span class="token punctuation">.</span>column_stack<span class="token punctuation">(</span><span class="token punctuation">[</span>p2<span class="token punctuation">,</span> np<span class="token punctuation">.</span>full<span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>p2<span class="token punctuation">)</span><span class="token punctuation">,</span> ref_z<span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+        tris<span class="token punctuation">.</span>append<span class="token punctuation">(</span>p3<span class="token punctuation">[</span>faces<span class="token punctuation">]</span><span class="token punctuation">)</span>
+
+    tri <span class="token operator">=</span> np<span class="token punctuation">.</span>vstack<span class="token punctuation">(</span>tris<span class="token punctuation">)</span>
+    mesh <span class="token operator">=</span> trimesh<span class="token punctuation">.</span>Trimesh<span class="token punctuation">(</span>vertices<span class="token operator">=</span>tri<span class="token punctuation">.</span>reshape<span class="token punctuation">(</span><span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">,</span> faces<span class="token operator">=</span>np<span class="token punctuation">.</span>arange<span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>tri<span class="token punctuation">)</span> <span class="token operator">*</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">.</span>reshape<span class="token punctuation">(</span><span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    mesh<span class="token punctuation">.</span>merge_vertices<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    mesh<span class="token punctuation">.</span>remove_degenerate_faces<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    trimesh<span class="token punctuation">.</span>repair<span class="token punctuation">.</span>fix_winding<span class="token punctuation">(</span>mesh<span class="token punctuation">)</span>
+    trimesh<span class="token punctuation">.</span>repair<span class="token punctuation">.</span>fix_inversion<span class="token punctuation">(</span>mesh<span class="token punctuation">)</span>
+    <span class="token keyword">return</span> mesh
+</code></pre></div>
+<p>The cap is what turns a set of surfaces into a solid. Its height is the reference height chosen in step 1, and that choice is now visible in the volume: capping at the lowest ground point on a sloping site adds the wedge of air under the uphill side of the building, which can be several percent. Where that matters, cap at the mean ground level and record it.</p>
+<h3 id="4-integrate-the-volume-and-check-the-mesh-first" tabindex="-1"><a class="heading-link" href="#4-integrate-the-volume-and-check-the-mesh-first"><span>4. Integrate the volume and check the mesh first</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">building_volume</span><span class="token punctuation">(</span>obj<span class="token punctuation">,</span> ref_z<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    mesh <span class="token operator">=</span> closed_mesh<span class="token punctuation">(</span>obj<span class="token punctuation">,</span> ref_z<span class="token punctuation">)</span>
+    <span class="token keyword">if</span> mesh <span class="token keyword">is</span> <span class="token boolean">None</span><span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token boolean">None</span><span class="token punctuation">,</span> <span class="token string">"no footprint"</span>
+    <span class="token keyword">if</span> <span class="token keyword">not</span> mesh<span class="token punctuation">.</span>is_volume<span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token boolean">None</span><span class="token punctuation">,</span> <span class="token string-interpolation"><span class="token string">f"not a closed volume (watertight=</span><span class="token interpolation"><span class="token punctuation">{</span>mesh<span class="token punctuation">.</span>is_watertight<span class="token punctuation">}</span></span><span class="token string">, winding=</span><span class="token interpolation"><span class="token punctuation">{</span>mesh<span class="token punctuation">.</span>is_winding_consistent<span class="token punctuation">}</span></span><span class="token string">)"</span></span>
+    <span class="token keyword">return</span> <span class="token builtin">float</span><span class="token punctuation">(</span>mesh<span class="token punctuation">.</span>volume<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"ok"</span>
+
+results<span class="token punctuation">,</span> failures <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token punctuation">}</span><span class="token punctuation">,</span> <span class="token punctuation">{</span><span class="token punctuation">}</span>
+<span class="token keyword">for</span> oid<span class="token punctuation">,</span> h <span class="token keyword">in</span> heights<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    vol<span class="token punctuation">,</span> status <span class="token operator">=</span> building_volume<span class="token punctuation">(</span>cj<span class="token punctuation">[</span><span class="token string">"CityObjects"</span><span class="token punctuation">]</span><span class="token punctuation">[</span>oid<span class="token punctuation">]</span><span class="token punctuation">,</span> h<span class="token punctuation">[</span><span class="token string">"reference_m"</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    <span class="token keyword">if</span> vol <span class="token keyword">is</span> <span class="token boolean">None</span><span class="token punctuation">:</span>
+        failures<span class="token punctuation">[</span>oid<span class="token punctuation">]</span> <span class="token operator">=</span> status
+    <span class="token keyword">else</span><span class="token punctuation">:</span>
+        results<span class="token punctuation">[</span>oid<span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token operator">**</span>h<span class="token punctuation">,</span> <span class="token string">"volume_m3"</span><span class="token punctuation">:</span> vol<span class="token punctuation">,</span>
+                        <span class="token string">"footprint_m2"</span><span class="token punctuation">:</span> footprint<span class="token punctuation">(</span>cj<span class="token punctuation">[</span><span class="token string">"CityObjects"</span><span class="token punctuation">]</span><span class="token punctuation">[</span>oid<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">.</span>area<span class="token punctuation">}</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span><span class="token builtin">len</span><span class="token punctuation">(</span>results<span class="token punctuation">)</span><span class="token punctuation">:</span><span class="token format-spec">,</span><span class="token punctuation">}</span></span><span class="token string"> volumes computed, </span><span class="token interpolation"><span class="token punctuation">{</span><span class="token builtin">len</span><span class="token punctuation">(</span>failures<span class="token punctuation">)</span><span class="token punctuation">}</span></span><span class="token string"> failed"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p><code>trimesh.volume</code> uses the divergence theorem — it sums signed tetrahedra from the origin to every face — which is exact for a closed, consistently wound mesh and meaningless for anything else. That is why <code>is_volume</code> is checked before the number is read rather than after: on an open shell the same call returns a large number that changes if the building is moved, as described in <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/making-meshes-watertight-for-volume-calculations/">making meshes watertight for volume calculations</a>.</p>
+<figure class="diagram">
+<svg viewBox="66 46 648 212" role="img" aria-labelledby="cjh-cap-t cjh-cap-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="cjh-cap-t">Capping an LOD2 shell at ground level</title>
+  <desc id="cjh-cap-d">On the left, an LOD2 building has walls and a roof but no ground surface, so its shell is open at the bottom and encloses no volume. In the middle, the footprint is triangulated at the reference height and added as a cap, closing the shell. On the right, on sloping terrain, capping at the lowest ground point includes a wedge of air under the uphill wall, which capping at the mean level avoids.</desc>
+  <rect class="svg-bg" x="66" y="46" width="648" height="212" fill="#ffffff"/>
+  <path d="M40 180 H240" fill="none" stroke="#5b6471" stroke-width="1.5" stroke-dasharray="5 4"/>
+  <path d="M80 180 V100 L140 60 L200 100 V180" fill="none" stroke="#1f6b8a" stroke-width="2.5"/>
+  <text x="140" y="212" fill="#b0413e" font-size="12.5" text-anchor="middle">open: no volume</text>
+  <path d="M300 180 V100 L360 60 L420 100 V180 Z" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2.5"/>
+  <path d="M300 180 H420" fill="none" stroke="#4f7a4d" stroke-width="4"/>
+  <text x="360" y="212" fill="#4f7a4d" font-size="12.5" text-anchor="middle">capped: closed volume</text>
+  <path d="M540 190 L700 160" fill="none" stroke="#4f7a4d" stroke-width="2.5"/>
+  <path d="M560 186 V100 L620 60 L680 100 V168" fill="none" stroke="#1f6b8a" stroke-width="2.5"/>
+  <path d="M560 186 H680" fill="none" stroke="#9a4f26" stroke-width="3" stroke-dasharray="6 4"/>
+  <path d="M600 178 h60 v-12 h-60 Z" fill="#fdf3e0" stroke="#c46a3d" stroke-width="1.5"/>
+  <text x="620" y="212" fill="#9a4f26" font-size="12.5" text-anchor="middle">sloping site: wedge of air</text>
+  <text x="380" y="240" fill="#15384a" font-size="12.5" text-anchor="middle">The cap height is a modelling decision that lands directly in the volume.</text>
+</svg>
+<figcaption>Volume is only defined once the shell is closed, and the closure height is an assumption worth recording next to the number.</figcaption>
+</figure>
+<h3 id="5-cross-check-against-the-models-own-attributes" tabindex="-1"><a class="heading-link" href="#5-cross-check-against-the-models-own-attributes"><span>5. Cross-check against the model’s own attributes</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python">declared <span class="token operator">=</span> np<span class="token punctuation">.</span>array<span class="token punctuation">(</span><span class="token punctuation">[</span>r<span class="token punctuation">[</span><span class="token string">"declared_m"</span><span class="token punctuation">]</span> <span class="token keyword">for</span> r <span class="token keyword">in</span> results<span class="token punctuation">.</span>values<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">if</span> r<span class="token punctuation">[</span><span class="token string">"declared_m"</span><span class="token punctuation">]</span> <span class="token keyword">is</span> <span class="token keyword">not</span> <span class="token boolean">None</span><span class="token punctuation">]</span><span class="token punctuation">,</span> dtype<span class="token operator">=</span><span class="token builtin">float</span><span class="token punctuation">)</span>
+computed <span class="token operator">=</span> np<span class="token punctuation">.</span>array<span class="token punctuation">(</span><span class="token punctuation">[</span>r<span class="token punctuation">[</span><span class="token string">"h_above_ground_m"</span><span class="token punctuation">]</span> <span class="token keyword">for</span> r <span class="token keyword">in</span> results<span class="token punctuation">.</span>values<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">if</span> r<span class="token punctuation">[</span><span class="token string">"declared_m"</span><span class="token punctuation">]</span> <span class="token keyword">is</span> <span class="token keyword">not</span> <span class="token boolean">None</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+diff <span class="token operator">=</span> computed <span class="token operator">-</span> declared
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"declared vs computed height: median </span><span class="token interpolation"><span class="token punctuation">{</span>np<span class="token punctuation">.</span>median<span class="token punctuation">(</span>diff<span class="token punctuation">)</span><span class="token punctuation">:</span><span class="token format-spec">+.2f</span><span class="token punctuation">}</span></span><span class="token string"> m, "</span></span>
+      <span class="token string-interpolation"><span class="token string">f"p5 </span><span class="token interpolation"><span class="token punctuation">{</span>np<span class="token punctuation">.</span>percentile<span class="token punctuation">(</span>diff<span class="token punctuation">,</span> <span class="token number">5</span><span class="token punctuation">)</span><span class="token punctuation">:</span><span class="token format-spec">+.2f</span><span class="token punctuation">}</span></span><span class="token string">, p95 </span><span class="token interpolation"><span class="token punctuation">{</span>np<span class="token punctuation">.</span>percentile<span class="token punctuation">(</span>diff<span class="token punctuation">,</span> <span class="token number">95</span><span class="token punctuation">)</span><span class="token punctuation">:</span><span class="token format-spec">+.2f</span><span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+
+vols <span class="token operator">=</span> np<span class="token punctuation">.</span>array<span class="token punctuation">(</span><span class="token punctuation">[</span>r<span class="token punctuation">[</span><span class="token string">"volume_m3"</span><span class="token punctuation">]</span> <span class="token keyword">for</span> r <span class="token keyword">in</span> results<span class="token punctuation">.</span>values<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+areas <span class="token operator">=</span> np<span class="token punctuation">.</span>array<span class="token punctuation">(</span><span class="token punctuation">[</span>r<span class="token punctuation">[</span><span class="token string">"footprint_m2"</span><span class="token punctuation">]</span> <span class="token keyword">for</span> r <span class="token keyword">in</span> results<span class="token punctuation">.</span>values<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+implied <span class="token operator">=</span> vols <span class="token operator">/</span> areas
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"volume / footprint (mean height) median </span><span class="token interpolation"><span class="token punctuation">{</span>np<span class="token punctuation">.</span>median<span class="token punctuation">(</span>implied<span class="token punctuation">)</span><span class="token punctuation">:</span><span class="token format-spec">.1f</span><span class="token punctuation">}</span></span><span class="token string"> m"</span></span><span class="token punctuation">)</span>
+<span class="token keyword">assert</span> <span class="token builtin">abs</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>median<span class="token punctuation">(</span>implied<span class="token punctuation">)</span> <span class="token operator">-</span> np<span class="token punctuation">.</span>median<span class="token punctuation">(</span>hs<span class="token punctuation">)</span> <span class="token operator">*</span> <span class="token number">0.8</span><span class="token punctuation">)</span> <span class="token operator">&lt;</span> <span class="token number">3.0</span><span class="token punctuation">,</span> <span class="token string">"volume and height disagree structurally"</span>
+</code></pre></div>
+<p>The comparison is the point of the exercise. A median difference near zero means the model’s <code>measuredHeight</code> uses the same definition you computed. A median difference of one to three metres usually means the attribute is an eave height and you computed a ridge height, or the attribute is measured from a different reference. A difference that grows with building height points at a units problem or a percentile height such as the 3D BAG’s <code>h_dak_50p</code>, which is the median roof height rather than the maximum.</p>
+<p>Volume divided by footprint area is the mean height of the enclosed prism, and on pitched-roof buildings it should land around 75–85% of the ridge height above ground. Well outside that band means either the cap is wrong or the walls and roof do not meet.</p>
+<h3 id="6-export-a-table-with-its-definitions-attached" tabindex="-1"><a class="heading-link" href="#6-export-a-table-with-its-definitions-attached"><span>6. Export a table with its definitions attached</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> csv
+
+<span class="token keyword">with</span> <span class="token builtin">open</span><span class="token punctuation">(</span><span class="token string">"building_metrics.csv"</span><span class="token punctuation">,</span> <span class="token string">"w"</span><span class="token punctuation">,</span> newline<span class="token operator">=</span><span class="token string">""</span><span class="token punctuation">)</span> <span class="token keyword">as</span> f<span class="token punctuation">:</span>
+    w <span class="token operator">=</span> csv<span class="token punctuation">.</span>writer<span class="token punctuation">(</span>f<span class="token punctuation">)</span>
+    w<span class="token punctuation">.</span>writerow<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token string">"building_id"</span><span class="token punctuation">,</span> <span class="token string">"ridge_above_datum_m"</span><span class="token punctuation">,</span> <span class="token string">"ridge_above_ground_m"</span><span class="token punctuation">,</span> <span class="token string">"eave_above_ground_m"</span><span class="token punctuation">,</span>
+                <span class="token string">"reference_height_m"</span><span class="token punctuation">,</span> <span class="token string">"footprint_m2"</span><span class="token punctuation">,</span> <span class="token string">"volume_m3"</span><span class="token punctuation">,</span> <span class="token string">"declared_height_m"</span><span class="token punctuation">,</span>
+                <span class="token string">"height_definition"</span><span class="token punctuation">,</span> <span class="token string">"volume_definition"</span><span class="token punctuation">,</span> <span class="token string">"crs"</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    <span class="token keyword">for</span> oid<span class="token punctuation">,</span> r <span class="token keyword">in</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span>results<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        w<span class="token punctuation">.</span>writerow<span class="token punctuation">(</span><span class="token punctuation">[</span>oid<span class="token punctuation">,</span> <span class="token builtin">round</span><span class="token punctuation">(</span>r<span class="token punctuation">[</span><span class="token string">"ridge_m"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token builtin">round</span><span class="token punctuation">(</span>r<span class="token punctuation">[</span><span class="token string">"h_above_ground_m"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                    <span class="token builtin">round</span><span class="token punctuation">(</span>r<span class="token punctuation">[</span><span class="token string">"h_eave_above_ground_m"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token builtin">round</span><span class="token punctuation">(</span>r<span class="token punctuation">[</span><span class="token string">"reference_m"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                    <span class="token builtin">round</span><span class="token punctuation">(</span>r<span class="token punctuation">[</span><span class="token string">"footprint_m2"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token builtin">round</span><span class="token punctuation">(</span>r<span class="token punctuation">[</span><span class="token string">"volume_m3"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                    r<span class="token punctuation">[</span><span class="token string">"declared_m"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token string">"max roof z minus lowest ground z"</span><span class="token punctuation">,</span>
+                    <span class="token string">"closed shell capped at lowest ground z"</span><span class="token punctuation">,</span> <span class="token string">"EPSG:25832+7837"</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span>Path<span class="token punctuation">(</span><span class="token string">"building_metrics.csv"</span><span class="token punctuation">)</span><span class="token punctuation">.</span>stat<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span>st_size<span class="token punctuation">,</span> <span class="token string">"bytes"</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Writing the definitions into the table, rather than into an email, is what keeps the numbers usable a year later. Two analysts with the same model and different definitions will otherwise produce different answers and no way to tell which is which.</p>
+<h2 id="expected-output-verification" tabindex="-1"><a class="heading-link" href="#expected-output-verification"><span>Expected Output &amp; Verification</span></a></h2>
+<div class="codeblock" data-lang="text"><div class="codeblock__bar"><span class="codeblock__lang">text</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-text" tabindex="0" role="group" aria-label="text code sample"><code class="language-text">{'RoofSurface': (512.44, 519.86), 'WallSurface': (498.21, 519.86), 'GroundSurface': (498.21, 499.02)}
+4,731 buildings | height above ground: median 9.8 m, p5 4.1, p95 21.6
+4,402 volumes computed, 329 failed
+declared vs computed height: median +0.04 m, p5 -1.12, p95 +1.35
+volume / footprint (mean height) median 7.9 m
+</code></pre></div>
+<p>The 7% of buildings whose volume failed are the interesting output. Inspect the failure reasons rather than dropping them:</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">from</span> collections <span class="token keyword">import</span> Counter
+<span class="token keyword">print</span><span class="token punctuation">(</span>Counter<span class="token punctuation">(</span>failures<span class="token punctuation">.</span>values<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">.</span>most_common<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Most will be <code>not a closed volume</code> on buildings whose walls do not reach the footprint outline — terraced houses sharing a party wall modelled only once, or a building part whose neighbour carries the shared surface. Those need the geometry repaired or the parts merged before a volume means anything, and reporting them is more honest than substituting the footprint times the height.</p>
+<figure class="diagram">
+<svg viewBox="40 46 694 198" role="img" aria-labelledby="cjh-diff-t cjh-diff-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="cjh-diff-t">Interpreting the declared minus computed height distribution</title>
+  <desc id="cjh-diff-d">Three sketch distributions of declared minus computed height. A narrow distribution centred on zero means the same definition. A distribution centred near minus two metres means the attribute is an eave height while a ridge height was computed. A distribution that widens with building height means a percentile roof height or a unit problem.</desc>
+  <rect class="svg-bg" x="40" y="46" width="694" height="198" fill="#ffffff"/>
+  <path d="M40 170 H240" fill="none" stroke="#5b6471" stroke-width="1.5"/>
+  <path d="M140 170 V40" fill="none" stroke="#5b6471" stroke-width="1" stroke-dasharray="4 4"/>
+  <path d="M90 170 C120 170 125 60 140 60 C155 60 160 170 190 170" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <text x="140" y="196" fill="#1f2937" font-size="12.5" text-anchor="middle">centred on 0: same definition</text>
+  <path d="M290 170 H490" fill="none" stroke="#5b6471" stroke-width="1.5"/>
+  <path d="M390 170 V40" fill="none" stroke="#5b6471" stroke-width="1" stroke-dasharray="4 4"/>
+  <path d="M300 170 C330 170 335 70 350 70 C365 70 370 170 400 170" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <text x="390" y="196" fill="#1f2937" font-size="12.5" text-anchor="middle">offset: eave vs ridge</text>
+  <path d="M540 170 H740" fill="none" stroke="#5b6471" stroke-width="1.5"/>
+  <path d="M640 170 V40" fill="none" stroke="#5b6471" stroke-width="1" stroke-dasharray="4 4"/>
+  <path d="M560 170 C610 170 600 90 640 90 C680 90 670 170 720 170" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <text x="640" y="196" fill="#1f2937" font-size="12.5" text-anchor="middle">wide: percentile or units</text>
+  <text x="380" y="226" fill="#15384a" font-size="12.5" text-anchor="middle">declared minus computed height, metres</text>
+</svg>
+<figcaption>The shape of the disagreement identifies which definition the model's attribute actually uses, which no documentation reliably states.</figcaption>
+</figure>
+<h2 id="performance-notes" tabindex="-1"><a class="heading-link" href="#performance-notes"><span>Performance Notes</span></a></h2>
+<ul>
+<li><strong>Triangulation dominates.</strong> Heights are a pass over vertex z values and run over a city in seconds; closed-mesh volumes need triangulation per surface and run at roughly a thousand buildings per minute in pure Python.</li>
+<li><strong>Skip the mesh for LOD1.</strong> An LOD1 building is a prism, so its volume is footprint area times height — exact, and thousands of times faster than meshing.</li>
+<li><strong>Cache per building identifier and geometry checksum</strong>, because the metrics are deterministic and city models change one building at a time.</li>
+<li><strong>Parallelise per tile, not per building</strong>, so each worker holds one vertex array rather than one per task.</li>
+</ul>
+<h2 id="common-errors" tabindex="-1"><a class="heading-link" href="#common-errors"><span>Common Errors</span></a></h2>
+<p><strong>Volumes are negative.</strong> Normals point inward after triangulation. <code>fix_winding</code> then <code>fix_inversion</code> as in step 3, and re-check <code>is_volume</code> rather than taking the absolute value, which hides a real defect.</p>
+<p><strong>Heights are 40–50 m larger than expected.</strong> The model’s heights are ellipsoidal while the expectation is orthometric, or vice versa. Heights above ground are unaffected, which is a good reason to prefer them when comparing datasets.</p>
+<p><strong>Every building on a slope has an implausibly large volume.</strong> The cap sits at the lowest ground vertex on a steep site. Cap at the mean ground level, or subtract the wedge explicitly, and say which in the output table.</p>
+<p><strong><code>measuredHeight</code> and the geometry disagree by a constant on every building.</strong> The attribute is measured from a different reference — often the terrain intersection curve rather than the lowest ground vertex. That is a definition difference, not an error; record both.</p>
+<h2 id="frequently-asked-questions" tabindex="-1"><a class="heading-link" href="#frequently-asked-questions"><span>Frequently Asked Questions</span></a></h2>
+<h3 id="which-height-should-go-into-a-planning-report" tabindex="-1"><a class="heading-link" href="#which-height-should-go-into-a-planning-report"><span>Which height should go into a planning report?</span></a></h3>
+<p>The one the regulation names, which is usually eave and ridge height above the ground at a defined point. Compute both and keep the reference explicit; a single “height” column is what makes reports impossible to reconcile.</p>
+<h3 id="is-gross-volume-from-lod2-good-enough-for-energy-modelling" tabindex="-1"><a class="heading-link" href="#is-gross-volume-from-lod2-good-enough-for-energy-modelling"><span>Is gross volume from LOD2 good enough for energy modelling?</span></a></h3>
+<p>For stock-level screening, yes. For a single building, the enclosed volume from LOD2 overestimates heated volume because it includes unheated roof space and excludes nothing for walls, so energy models apply a correction factor or use an LOD3 model.</p>
+<h3 id="how-do-i-get-volumes-for-buildings-that-fail-the-closure-check" tabindex="-1"><a class="heading-link" href="#how-do-i-get-volumes-for-buildings-that-fail-the-closure-check"><span>How do I get volumes for buildings that fail the closure check?</span></a></h3>
+<p>Merge the building with its parts and neighbours that share surfaces, re-run, and if it still fails, repair the geometry. Reporting a footprint-times-height estimate is acceptable only if the column says that is what it is.</p>
+<h2 id="related-guides" tabindex="-1"><a class="heading-link" href="#related-guides"><span>Related Guides</span></a></h2>
+<ul>
+<li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/extracting-lod2-roof-surfaces-from-cityjson/">Extracting LOD2 Roof Surfaces from CityJSON</a> — the other standard derived measure</li>
+<li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/making-meshes-watertight-for-volume-calculations/">Making Meshes Watertight for Volume Calculations</a> — closure and volume in general</li>
+<li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/validating-cityjson-with-cjval/">Validating CityJSON with cjval</a> — catching the shells that will fail before you compute</li>
+</ul>
+<p>Back to <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/">CityGML and CityJSON Processing for Digital Twins</a>.</p>
+
+
+      
+      
+
+      <div class="related-nav">
+        
+
+        
+          <div>
+            <h3>Related</h3>
+            <div class="related-grid">
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/converting-citygml-to-cityjson-with-citygml-tools/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Converting CityGML to CityJSON with citygml-tools</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/extracting-lod2-roof-surfaces-from-cityjson/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Extracting LOD2 Roof Surfaces from CityJSON</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/reading-and-filtering-cityjson-with-cjio/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Reading and Filtering CityJSON with cjio</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/reprojecting-and-upgrading-cityjson-files/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Reprojecting and Upgrading CityJSON Files</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/validating-cityjson-with-cjval/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Validating CityJSON with cjval</span>
+                </a>
+              
+            </div>
+          </div>
+        
+      </div>
+    </article>
+
+    
+    <aside class="toc" aria-label="On this page" data-toc hidden>
+      <h4>On this page</h4>
+      <ul></ul>
+    </aside>
+  </div>
+</div>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+  <div class="container site-footer__inner">
+    <div class="site-footer__brand">
+      <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+        <img src="/assets/img/logo-mark.svg" alt="" class="brand__mark" width="36" height="36">
+        <span class="brand__name">
+          3D Geospatial
+          <small>Digital Twin Automation</small>
+        </span>
+      </a>
+      <p>Engineering-grade guides on point cloud processing, mesh pipelines, LOD strategies, and CI/CD automation for digital twin platforms.</p>
+      <a class="footer-social" href="https://github.com/3d-geospatial" aria-label="3D Geospatial on GitHub" rel="noopener" target="_blank">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+          <path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.53-1.34-1.3-1.7-1.3-1.7-1.06-.72.08-.71.08-.71 1.17.08 1.79 1.2 1.79 1.2 1.04 1.79 2.73 1.27 3.4.97.1-.75.4-1.27.73-1.56-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.19-3.08-.12-.3-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.75.11 3.05.74.8 1.19 1.83 1.19 3.08 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.07.78 2.15v3.18c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5Z"/>
+        </svg>
+        <span>GitHub</span>
+      </a>
+    </div>
+
+    <div class="site-footer__col">
+      <h4>Sections</h4>
+      <ul>
+        <li><a href="https://www.3d-geospatial.com/">Home</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management &amp; Optimization</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/">Point Cloud &amp; Mesh Pipelines</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/">Troubleshooting &amp; Reliability</a></li>
+        
+      </ul>
+    </div>
+
+    
+      <div class="site-footer__col">
+        <h4>3D Geospatial Fundamentals</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/">3D Format Standards Comparison</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/">BIM and IFC Georeferencing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/">CityGML and CityJSON Processing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems for 3D Assets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/">Digital Elevation Model Workflows</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/">Spatial Indexing and Tiling Schemes for 3D Data</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>LOD Management &amp; Optimization</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/">Automated Tile Generation for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/">Cesium ion Upload Automation for 3D Tilesets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/">glTF LOD Generation With Draco Compression</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/">Streaming Sync Patterns for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/">Tileset Metadata and 3D Tiles Next</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/">Vector Overlays on 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Point Cloud &amp; Mesh Pipelines</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/">Automated Mesh Decimation for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/">Change Detection Between LiDAR Scan Epochs</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/">CI/CD Automation for Spatial Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">LiDAR Classification and Ground Extraction</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/photogrammetry-processing-pipelines/">Photogrammetry Processing Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/">Point Cloud Filtering Techniques</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/">Surface Reconstruction for Geospatial Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/">Texture Mapping Workflows for Digital Twins</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Troubleshooting &amp; Reliability</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/">Cross-Section Failure Modes in Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/">Data Validation &amp; QA Gates for 3D Tiles</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/">Performance Profiling and Benchmarking</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/">Pipeline Observability and Monitoring</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/">Streaming &amp; Runtime Diagnostics for 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+  </div>
+  <div class="container site-footer__bottom">
+    <span>© 2026 3D Geospatial &amp; Digital Twin Automation</span>
+    <span>Built with Eleventy · PWA-enabled</span>
+  </div>
+</footer>
+
+
+  <script src="/assets/js/site.js?v=b99aa9f971" defer></script>
+  
+</body>
+</html>

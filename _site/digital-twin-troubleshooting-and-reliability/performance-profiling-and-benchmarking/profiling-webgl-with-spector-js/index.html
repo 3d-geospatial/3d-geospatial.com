@@ -1,0 +1,1105 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <title>Profiling WebGL with Spector.js — 3D Geospatial</title>
+  <meta name="description" content="Capture and read a WebGL frame from a 3D Tiles viewer: draw-call inventory, state-change counts, texture and shader inspection">
+  <meta name="keywords" content="3D geospatial, digital twin, point cloud, mesh pipeline, LOD, 3D Tiles, Cesium, PDAL, Open3D, Python, CI/CD">
+  <meta name="author" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta name="theme-color" content="#1f6b8a" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f171d" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+
+  
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem("theme");
+        var theme = (stored === "dark" || stored === "light") ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    })();
+  </script>
+  <meta name="generator" content="Eleventy">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="googlebot" content="index,follow,max-image-preview:large">
+
+  
+  <link rel="canonical" href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/profiling-webgl-with-spector-js/">
+  <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">
+
+  
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/icon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+
+  
+  <link rel="apple-touch-icon" href="/assets/img/icon-180.png">
+  <link rel="mask-icon" href="/assets/img/logo.svg" color="#1f6b8a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="3D Geospatial">
+  <meta name="application-name" content="3D Geospatial">
+
+  
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Profiling WebGL with Spector.js — 3D Geospatial">
+  <meta property="og:description" content="Capture and read a WebGL frame from a 3D Tiles viewer: draw-call inventory, state-change counts, texture and shader inspection">
+  <meta property="og:url" content="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/profiling-webgl-with-spector-js/">
+  <meta property="og:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+  <meta property="og:site_name" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta property="og:locale" content="en_US">
+  
+  <meta property="article:published_time" content="2026-09-17T23:36:56.451Z">
+  <meta property="article:modified_time" content="2026-09-17T23:36:56.451Z">
+  <meta property="article:publisher" content="https://www.3d-geospatial.com/">
+  
+
+  
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Profiling WebGL with Spector.js — 3D Geospatial">
+  <meta name="twitter:description" content="Capture and read a WebGL frame from a 3D Tiles viewer: draw-call inventory, state-change counts, texture and shader inspection">
+  <meta name="twitter:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta name="twitter:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+
+  
+  <link rel="preload" href="/assets/css/styles.css?v=8c46394d6c" as="style">
+  
+
+  <link rel="stylesheet" href="/assets/css/styles.css?v=8c46394d6c">
+
+  
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.3d-geospatial.com/#organization",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "url": "https://www.3d-geospatial.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/icon-512.png",
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://www.3d-geospatial.com/#website",
+      "url": "https://www.3d-geospatial.com/",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "description": "Build reliable 3D spatial data pipelines for digital twins — point clouds, meshes, LOD strategies, Python processing, and CI/CD automation.",
+      "inLanguage": "en",
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      }
+    },
+    {
+      "@type": "TechArticle",
+      "@id": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/profiling-webgl-with-spector-js/#article",
+      "isPartOf": {
+        "@id": "https://www.3d-geospatial.com/#website"
+      },
+      "headline": "Profiling WebGL with Spector.js",
+      "name": "Profiling WebGL with Spector.js",
+      "description": "Capture and read a WebGL frame from a 3D Tiles viewer: draw-call inventory, state-change counts, texture and shader inspection",
+      "url": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/profiling-webgl-with-spector-js/",
+      "mainEntityOfPage": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/profiling-webgl-with-spector-js/",
+      "inLanguage": "en",
+      "datePublished": "2026-09-17T23:36:56.451Z",
+      "dateModified": "2026-09-17T23:36:56.451Z",
+      "author": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "image": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/og-cover.png",
+        "width": 1200,
+        "height": 630
+      },
+      "breadcrumb": {
+        "@id": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/profiling-webgl-with-spector-js/#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/profiling-webgl-with-spector-js/#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://www.3d-geospatial.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Digital Twin Troubleshooting And Reliability",
+          "item": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Performance Profiling And Benchmarking",
+          "item": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "name": "Profiling Webgl With Spector Js",
+          "item": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/profiling-webgl-with-spector-js/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  
+<header class="site-header" role="banner">
+  <div class="container site-header__inner">
+    <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+      <img src="/assets/img/logo.svg" alt="" class="brand__mark" width="36" height="36">
+      <span class="brand__name">
+        3D Geospatial
+        <small>Digital Twin Automation</small>
+      </span>
+    </a>
+
+    <button class="theme-toggle" type="button" data-theme-toggle
+            aria-label="Switch to dark theme" title="Switch to dark theme">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4.2"/>
+        <path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/>
+      </svg>
+    </button>
+
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>
+      <span class="nav-toggle__icon" aria-hidden="true"><span></span></span>
+      Menu
+    </button>
+
+    <nav class="primary-nav" id="primary-nav" aria-label="Primary">
+      
+      <a href="https://www.3d-geospatial.com/" >
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/>
+        </svg>
+        Home
+      </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2 3 7l9 5 9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 17l9 5 9-5"/>
+            </svg>
+          
+          3D Geospatial Fundamentals
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+          
+          LOD Management &amp; Optimization
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="6" cy="6" r="1.5"/><circle cx="12" cy="6" r="1.5"/><circle cx="18" cy="6" r="1.5"/>
+              <circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/>
+              <circle cx="6" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="18" cy="18" r="1.5"/>
+            </svg>
+          
+          Point Cloud &amp; Mesh Pipelines
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/" aria-current="page">
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <path d="M12 9v4"/><path d="M12 17h.01"/>
+            </svg>
+          
+          Troubleshooting &amp; Reliability
+        </a>
+      
+    </nav>
+  </div>
+</header>
+
+
+  <main id="main">
+    
+
+
+<div class="container">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    
+      
+        <a href="https://www.3d-geospatial.com/">Home</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/">Digital Twin Troubleshooting And Reliability</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/">Performance Profiling And Benchmarking</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <span class="current">Profiling Webgl With Spector Js</span>
+      
+    
+  </nav>
+
+  <div class="content-page">
+    <article class="article">
+      <h1 id="profiling-webgl-with-spectorjs" tabindex="-1"><a class="heading-link" href="#profiling-webgl-with-spectorjs"><span>Profiling WebGL with Spector.js</span></a></h1>
+<p>This page captures a single frame from a CesiumJS viewer with Spector.js and reads it — counting draw calls and grouping them by what changed between them, finding the redundant state changes and texture binds, checking which shader programs are in use, and turning the capture into a specific change to the tileset rather than a vague “it is slow”.</p>
+<h2 id="why-you-hit-this" tabindex="-1"><a class="heading-link" href="#why-you-hit-this"><span>Why you hit this</span></a></h2>
+<p>The browser’s own performance panel tells you the frame took 38 ms and that most of it was in a function called <code>_executeCommands</code>. That is true and unusable. What you need to know is how many draw calls that frame issued, how many of them were for tiles outside the view, how many texture binds happened, and whether the shader was recompiled — and none of that is visible from a JavaScript profile.</p>
+<p>Spector.js captures the actual WebGL command stream for one frame. It is the only tool that answers “what did the GPU actually get asked to do?”, and the answer is usually surprising: a tileset that looks fine issues 2,800 draw calls per frame because every building is its own primitive.</p>
+<h2 id="prerequisites" tabindex="-1"><a class="heading-link" href="#prerequisites"><span>Prerequisites</span></a></h2>
+<ul>
+<li>Chrome or Firefox with the Spector.js extension, or the library loaded in the page.</li>
+<li>A CesiumJS viewer with the tileset loaded and the camera at a representative view.</li>
+<li><code>npm install spectorjs</code> if you want captures from a script rather than by hand.</li>
+</ul>
+<h2 id="step-by-step" tabindex="-1"><a class="heading-link" href="#step-by-step"><span>Step-by-Step</span></a></h2>
+<h3 id="1-capture-a-frame-reproducibly" tabindex="-1"><a class="heading-link" href="#1-capture-a-frame-reproducibly"><span>1. Capture a frame reproducibly</span></a></h3>
+<div class="codeblock" data-lang="javascript"><div class="codeblock__bar"><span class="codeblock__lang">javascript</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-javascript" tabindex="0" role="group" aria-label="javascript code sample"><code class="language-javascript"><span class="token keyword">import</span> <span class="token operator">*</span> <span class="token keyword">as</span> <span class="token constant">SPECTOR</span> <span class="token keyword">from</span> <span class="token string">'spectorjs'</span><span class="token punctuation">;</span>
+
+<span class="token keyword">export</span> <span class="token keyword">function</span> <span class="token function">attachSpector</span><span class="token punctuation">(</span><span class="token parameter">canvas<span class="token punctuation">,</span> <span class="token punctuation">{</span> commandsPerFrame <span class="token operator">=</span> <span class="token number">20_000</span> <span class="token punctuation">}</span> <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token punctuation">}</span></span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+  <span class="token keyword">const</span> spector <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">SPECTOR<span class="token punctuation">.</span>Spector</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  spector<span class="token punctuation">.</span><span class="token function">spyCanvases</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  spector<span class="token punctuation">.</span><span class="token function">setMarker</span><span class="token punctuation">(</span><span class="token string">'tileset-frame'</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">return</span> <span class="token punctuation">{</span>
+    spector<span class="token punctuation">,</span>
+    <span class="token function">capture</span><span class="token punctuation">(</span><span class="token parameter">frames <span class="token operator">=</span> <span class="token number">1</span></span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      <span class="token keyword">return</span> <span class="token keyword">new</span> <span class="token class-name">Promise</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">resolve</span><span class="token punctuation">)</span> <span class="token operator">=></span> <span class="token punctuation">{</span>
+        spector<span class="token punctuation">.</span>onCaptureStarted<span class="token punctuation">.</span><span class="token function">add</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">=></span> console<span class="token punctuation">.</span><span class="token function">log</span><span class="token punctuation">(</span><span class="token string">'capture started'</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        spector<span class="token punctuation">.</span>onCapture<span class="token punctuation">.</span><span class="token function">add</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">capture</span><span class="token punctuation">)</span> <span class="token operator">=></span> <span class="token function">resolve</span><span class="token punctuation">(</span>capture<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        spector<span class="token punctuation">.</span><span class="token function">captureCanvas</span><span class="token punctuation">(</span>canvas<span class="token punctuation">,</span> commandsPerFrame<span class="token punctuation">,</span> frames<span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span><span class="token punctuation">,</span>
+  <span class="token punctuation">}</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">export</span> <span class="token keyword">async</span> <span class="token keyword">function</span> <span class="token function">captureAtView</span><span class="token punctuation">(</span><span class="token parameter">viewer<span class="token punctuation">,</span> tileset<span class="token punctuation">,</span> view<span class="token punctuation">,</span> <span class="token punctuation">{</span> settleMs <span class="token operator">=</span> <span class="token number">4000</span> <span class="token punctuation">}</span> <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token punctuation">}</span></span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+  <span class="token comment">// A capture of a frame that is still loading tiles measures the loader, not the scene.</span>
+  viewer<span class="token punctuation">.</span>camera<span class="token punctuation">.</span><span class="token function">setView</span><span class="token punctuation">(</span>view<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">await</span> <span class="token function">waitForTilesSettled</span><span class="token punctuation">(</span>tileset<span class="token punctuation">,</span> settleMs<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">const</span> <span class="token punctuation">{</span> capture <span class="token punctuation">}</span> <span class="token operator">=</span> <span class="token function">attachSpector</span><span class="token punctuation">(</span>viewer<span class="token punctuation">.</span>canvas<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  viewer<span class="token punctuation">.</span>scene<span class="token punctuation">.</span><span class="token function">requestRender</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">const</span> frame <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token function">capture</span><span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">return</span> <span class="token punctuation">{</span>
+    frame<span class="token punctuation">,</span>
+    <span class="token literal-property property">context</span><span class="token operator">:</span> <span class="token punctuation">{</span>
+      <span class="token literal-property property">tilesLoaded</span><span class="token operator">:</span> tileset<span class="token punctuation">.</span>tilesLoaded<span class="token punctuation">,</span>
+      <span class="token literal-property property">selectedTiles</span><span class="token operator">:</span> tileset<span class="token punctuation">.</span>_selectedTiles<span class="token operator">?.</span>length <span class="token operator">??</span> <span class="token keyword">null</span><span class="token punctuation">,</span>
+      <span class="token literal-property property">maximumScreenSpaceError</span><span class="token operator">:</span> tileset<span class="token punctuation">.</span>maximumScreenSpaceError<span class="token punctuation">,</span>
+      <span class="token literal-property property">resolution</span><span class="token operator">:</span> <span class="token punctuation">[</span>viewer<span class="token punctuation">.</span>canvas<span class="token punctuation">.</span>width<span class="token punctuation">,</span> viewer<span class="token punctuation">.</span>canvas<span class="token punctuation">.</span>height<span class="token punctuation">]</span><span class="token punctuation">,</span>
+      <span class="token literal-property property">devicePixelRatio</span><span class="token operator">:</span> window<span class="token punctuation">.</span>devicePixelRatio<span class="token punctuation">,</span>
+    <span class="token punctuation">}</span><span class="token punctuation">,</span>
+  <span class="token punctuation">}</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">function</span> <span class="token function">waitForTilesSettled</span><span class="token punctuation">(</span><span class="token parameter">tileset<span class="token punctuation">,</span> timeoutMs</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+  <span class="token keyword">return</span> <span class="token keyword">new</span> <span class="token class-name">Promise</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">resolve</span><span class="token punctuation">)</span> <span class="token operator">=></span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> started <span class="token operator">=</span> performance<span class="token punctuation">.</span><span class="token function">now</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">const</span> <span class="token function-variable function">check</span> <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">=></span> <span class="token punctuation">{</span>
+      <span class="token keyword">if</span> <span class="token punctuation">(</span>tileset<span class="token punctuation">.</span>tilesLoaded <span class="token operator">||</span> performance<span class="token punctuation">.</span><span class="token function">now</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">-</span> started <span class="token operator">></span> timeoutMs<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token function">setTimeout</span><span class="token punctuation">(</span>resolve<span class="token punctuation">,</span> <span class="token number">250</span><span class="token punctuation">)</span><span class="token punctuation">;</span>      <span class="token comment">// one more frame for the last upload</span>
+        <span class="token keyword">return</span><span class="token punctuation">;</span>
+      <span class="token punctuation">}</span>
+      <span class="token function">requestAnimationFrame</span><span class="token punctuation">(</span>check<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span><span class="token punctuation">;</span>
+    <span class="token function">check</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+</code></pre></div>
+<p>Waiting for <code>tilesLoaded</code> before capturing is the step that makes a capture meaningful. A frame captured while tiles are still arriving is dominated by <code>texImage2D</code> and <code>bufferData</code> calls from the loader, which tells you about the loading path and nothing about the steady-state rendering cost — and those are different problems with different fixes.</p>
+<p>Recording the context alongside the capture matters because a draw-call count is meaningless without the screen-space error and the resolution that produced it. A capture at <code>maximumScreenSpaceError: 32</code> on a 1080p canvas is not comparable to one at 8 on a 4K display, and comparing them is how a “regression” gets invented.</p>
+<p>Setting the camera with <code>setView</code> rather than flying makes the capture repeatable, which is what lets two captures a week apart be compared.</p>
+<h3 id="2-inventory-the-draw-calls" tabindex="-1"><a class="heading-link" href="#2-inventory-the-draw-calls"><span>2. Inventory the draw calls</span></a></h3>
+<div class="codeblock" data-lang="javascript"><div class="codeblock__bar"><span class="codeblock__lang">javascript</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-javascript" tabindex="0" role="group" aria-label="javascript code sample"><code class="language-javascript"><span class="token keyword">const</span> <span class="token constant">DRAW_COMMANDS</span> <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Set</span><span class="token punctuation">(</span><span class="token punctuation">[</span>
+  <span class="token string">'drawArrays'</span><span class="token punctuation">,</span> <span class="token string">'drawElements'</span><span class="token punctuation">,</span> <span class="token string">'drawArraysInstanced'</span><span class="token punctuation">,</span> <span class="token string">'drawElementsInstanced'</span><span class="token punctuation">,</span>
+  <span class="token string">'drawRangeElements'</span><span class="token punctuation">,</span> <span class="token string">'drawArraysInstancedANGLE'</span><span class="token punctuation">,</span> <span class="token string">'drawElementsInstancedANGLE'</span><span class="token punctuation">,</span>
+<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token keyword">export</span> <span class="token keyword">function</span> <span class="token function">drawCallInventory</span><span class="token punctuation">(</span><span class="token parameter">capture</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+  <span class="token keyword">const</span> commands <span class="token operator">=</span> capture<span class="token punctuation">.</span>commands <span class="token operator">??</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+  <span class="token keyword">const</span> draws <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+  <span class="token keyword">let</span> currentProgram <span class="token operator">=</span> <span class="token keyword">null</span><span class="token punctuation">;</span>
+  <span class="token keyword">let</span> currentTexture <span class="token operator">=</span> <span class="token keyword">null</span><span class="token punctuation">;</span>
+  <span class="token keyword">let</span> currentFramebuffer <span class="token operator">=</span> <span class="token string">'default'</span><span class="token punctuation">;</span>
+
+  <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">const</span> cmd <span class="token keyword">of</span> commands<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> name <span class="token operator">=</span> cmd<span class="token punctuation">.</span>name<span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>name <span class="token operator">===</span> <span class="token string">'useProgram'</span><span class="token punctuation">)</span> currentProgram <span class="token operator">=</span> cmd<span class="token punctuation">.</span>text <span class="token operator">??</span> <span class="token function">String</span><span class="token punctuation">(</span>cmd<span class="token punctuation">.</span>arguments<span class="token operator">?.</span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>name <span class="token operator">===</span> <span class="token string">'bindTexture'</span><span class="token punctuation">)</span> currentTexture <span class="token operator">=</span> <span class="token function">String</span><span class="token punctuation">(</span>cmd<span class="token punctuation">.</span>arguments<span class="token operator">?.</span><span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>name <span class="token operator">===</span> <span class="token string">'bindFramebuffer'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      currentFramebuffer <span class="token operator">=</span> cmd<span class="token punctuation">.</span>arguments<span class="token operator">?.</span><span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span> <span class="token operator">?</span> <span class="token function">String</span><span class="token punctuation">(</span>cmd<span class="token punctuation">.</span>arguments<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token operator">:</span> <span class="token string">'default'</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span><span class="token constant">DRAW_COMMANDS</span><span class="token punctuation">.</span><span class="token function">has</span><span class="token punctuation">(</span>name<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token keyword">continue</span><span class="token punctuation">;</span>
+
+    <span class="token keyword">const</span> mode <span class="token operator">=</span> cmd<span class="token punctuation">.</span>arguments<span class="token operator">?.</span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+    <span class="token keyword">const</span> count <span class="token operator">=</span> <span class="token function">Number</span><span class="token punctuation">(</span>cmd<span class="token punctuation">.</span>arguments<span class="token operator">?.</span><span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span> <span class="token operator">??</span> cmd<span class="token punctuation">.</span>arguments<span class="token operator">?.</span><span class="token punctuation">[</span><span class="token number">2</span><span class="token punctuation">]</span> <span class="token operator">??</span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">const</span> instances <span class="token operator">=</span> name<span class="token punctuation">.</span><span class="token function">includes</span><span class="token punctuation">(</span><span class="token string">'Instanced'</span><span class="token punctuation">)</span>
+      <span class="token operator">?</span> <span class="token function">Number</span><span class="token punctuation">(</span>cmd<span class="token punctuation">.</span>arguments<span class="token operator">?.</span><span class="token punctuation">[</span>cmd<span class="token punctuation">.</span>arguments<span class="token punctuation">.</span>length <span class="token operator">-</span> <span class="token number">1</span><span class="token punctuation">]</span> <span class="token operator">??</span> <span class="token number">1</span><span class="token punctuation">)</span>
+      <span class="token operator">:</span> <span class="token number">1</span><span class="token punctuation">;</span>
+    draws<span class="token punctuation">.</span><span class="token function">push</span><span class="token punctuation">(</span><span class="token punctuation">{</span>
+      <span class="token literal-property property">command</span><span class="token operator">:</span> name<span class="token punctuation">,</span>
+      mode<span class="token punctuation">,</span>
+      <span class="token literal-property property">vertexOrIndexCount</span><span class="token operator">:</span> count<span class="token punctuation">,</span>
+      instances<span class="token punctuation">,</span>
+      <span class="token literal-property property">triangles</span><span class="token operator">:</span> Math<span class="token punctuation">.</span><span class="token function">floor</span><span class="token punctuation">(</span>count <span class="token operator">/</span> <span class="token number">3</span><span class="token punctuation">)</span> <span class="token operator">*</span> instances<span class="token punctuation">,</span>
+      <span class="token literal-property property">program</span><span class="token operator">:</span> currentProgram<span class="token punctuation">,</span>
+      <span class="token literal-property property">texture</span><span class="token operator">:</span> currentTexture<span class="token punctuation">,</span>
+      <span class="token literal-property property">framebuffer</span><span class="token operator">:</span> currentFramebuffer<span class="token punctuation">,</span>
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+
+  <span class="token keyword">const</span> byProgram <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Map</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">const</span> d <span class="token keyword">of</span> draws<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> entry <span class="token operator">=</span> byProgram<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span>d<span class="token punctuation">.</span>program<span class="token punctuation">)</span> <span class="token operator">??</span> <span class="token punctuation">{</span> <span class="token literal-property property">draws</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token literal-property property">triangles</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token literal-property property">instanced</span><span class="token operator">:</span> <span class="token number">0</span> <span class="token punctuation">}</span><span class="token punctuation">;</span>
+    entry<span class="token punctuation">.</span>draws <span class="token operator">+=</span> <span class="token number">1</span><span class="token punctuation">;</span>
+    entry<span class="token punctuation">.</span>triangles <span class="token operator">+=</span> d<span class="token punctuation">.</span>triangles<span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>d<span class="token punctuation">.</span>instances <span class="token operator">></span> <span class="token number">1</span><span class="token punctuation">)</span> entry<span class="token punctuation">.</span>instanced <span class="token operator">+=</span> <span class="token number">1</span><span class="token punctuation">;</span>
+    byProgram<span class="token punctuation">.</span><span class="token function">set</span><span class="token punctuation">(</span>d<span class="token punctuation">.</span>program<span class="token punctuation">,</span> entry<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+
+  <span class="token keyword">return</span> <span class="token punctuation">{</span>
+    <span class="token literal-property property">totalCommands</span><span class="token operator">:</span> commands<span class="token punctuation">.</span>length<span class="token punctuation">,</span>
+    <span class="token literal-property property">drawCalls</span><span class="token operator">:</span> draws<span class="token punctuation">.</span>length<span class="token punctuation">,</span>
+    <span class="token literal-property property">triangles</span><span class="token operator">:</span> draws<span class="token punctuation">.</span><span class="token function">reduce</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">s<span class="token punctuation">,</span> d</span><span class="token punctuation">)</span> <span class="token operator">=></span> s <span class="token operator">+</span> d<span class="token punctuation">.</span>triangles<span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token literal-property property">instancedDrawCalls</span><span class="token operator">:</span> draws<span class="token punctuation">.</span><span class="token function">filter</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">d</span><span class="token punctuation">)</span> <span class="token operator">=></span> d<span class="token punctuation">.</span>instances <span class="token operator">></span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">.</span>length<span class="token punctuation">,</span>
+    <span class="token literal-property property">instancesTotal</span><span class="token operator">:</span> draws<span class="token punctuation">.</span><span class="token function">reduce</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">s<span class="token punctuation">,</span> d</span><span class="token punctuation">)</span> <span class="token operator">=></span> s <span class="token operator">+</span> <span class="token punctuation">(</span>d<span class="token punctuation">.</span>instances <span class="token operator">></span> <span class="token number">1</span> <span class="token operator">?</span> d<span class="token punctuation">.</span>instances <span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token literal-property property">framebuffers</span><span class="token operator">:</span> <span class="token punctuation">[</span><span class="token operator">...</span><span class="token keyword">new</span> <span class="token class-name">Set</span><span class="token punctuation">(</span>draws<span class="token punctuation">.</span><span class="token function">map</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">d</span><span class="token punctuation">)</span> <span class="token operator">=></span> d<span class="token punctuation">.</span>framebuffer<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+    <span class="token literal-property property">programs</span><span class="token operator">:</span> <span class="token punctuation">[</span><span class="token operator">...</span>byProgram<span class="token punctuation">.</span><span class="token function">entries</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">]</span>
+      <span class="token punctuation">.</span><span class="token function">map</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter"><span class="token punctuation">[</span>program<span class="token punctuation">,</span> v<span class="token punctuation">]</span></span><span class="token punctuation">)</span> <span class="token operator">=></span> <span class="token punctuation">(</span><span class="token punctuation">{</span> program<span class="token punctuation">,</span> <span class="token operator">...</span>v <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+      <span class="token punctuation">.</span><span class="token function">sort</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">a<span class="token punctuation">,</span> b</span><span class="token punctuation">)</span> <span class="token operator">=></span> b<span class="token punctuation">.</span>draws <span class="token operator">-</span> a<span class="token punctuation">.</span>draws<span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token literal-property property">smallDraws</span><span class="token operator">:</span> draws<span class="token punctuation">.</span><span class="token function">filter</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">d</span><span class="token punctuation">)</span> <span class="token operator">=></span> d<span class="token punctuation">.</span>triangles <span class="token operator">&lt;</span> <span class="token number">300</span><span class="token punctuation">)</span><span class="token punctuation">.</span>length<span class="token punctuation">,</span>
+    draws<span class="token punctuation">,</span>
+  <span class="token punctuation">}</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+</code></pre></div>
+<p>The <code>smallDraws</code> count is the finding that most often explains a slow tileset. A draw call with fewer than 300 triangles costs almost the same as one with 30,000 — the per-call overhead dominates — so a frame with 2,400 draw calls averaging 180 triangles is spending its budget on state changes rather than on geometry.</p>
+<p>Grouping by shader program separates the passes, which matters in CesiumJS because the globe, the terrain, the tileset and any post-processing are different programs. A frame with 2,800 draw calls where 2,600 belong to one program is a tileset problem; one where they are spread across twelve programs has too many distinct materials.</p>
+<p>Tracking the bound framebuffer catches the case where half the draw calls are for a shadow map or a picking pass that nobody needs — and both are switchable off in a viewer.</p>
+<figure class="diagram">
+<svg viewBox="4 6 732 246" role="img" aria-labelledby="spector-inv-t spector-inv-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="spector-inv-t">One captured frame, broken down</title>
+  <desc id="spector-inv-d">A breakdown of a single captured frame with 2847 draw calls. The tileset program accounts for 2612 calls and 1.8 million triangles, of which 2104 calls carry fewer than 300 triangles each. The globe program accounts for 148 calls. A picking framebuffer accounts for 74 calls that the user never sees. Post-processing accounts for 13. The finding is that 2104 tiny draw calls are 74 percent of the frame's calls and 6 percent of its triangles.</desc>
+  <rect class="svg-bg" x="4" y="6" width="732" height="246" fill="#ffffff"/>
+  <g stroke-width="1.5">
+    <rect x="18" y="20" width="220" height="32" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="238" y="20" width="126" height="32" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="364" y="20" width="150" height="32" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="514" y="20" width="208" height="32" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="18" y="52" width="220" height="34" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="238" y="52" width="126" height="34" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="364" y="52" width="150" height="34" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="514" y="52" width="208" height="34" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="18" y="86" width="220" height="34" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="238" y="86" width="126" height="34" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="364" y="86" width="150" height="34" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="514" y="86" width="208" height="34" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="18" y="120" width="220" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="238" y="120" width="126" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="364" y="120" width="150" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="514" y="120" width="208" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="18" y="154" width="220" height="34" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="238" y="154" width="126" height="34" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="364" y="154" width="150" height="34" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="514" y="154" width="208" height="34" fill="#fdf3e0" stroke="#c46a3d"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="128" y="41">group</text><text x="301" y="41">draw calls</text>
+    <text x="439" y="41">triangles</text><text x="618" y="41">finding</text>
+    <text x="128" y="74">tileset program</text><text x="301" y="74">2,612</text>
+    <text x="439" y="74">1.80 M</text><text x="618" y="74">92% of all calls</text>
+    <text x="128" y="108">… of which &lt; 300 triangles</text><text x="301" y="108">2,104</text>
+    <text x="439" y="108">0.11 M</text><text x="618" y="108">74% of calls, 6% of triangles</text>
+    <text x="128" y="142">globe + terrain</text><text x="301" y="142">148</text>
+    <text x="439" y="142">0.42 M</text><text x="618" y="142">normal</text>
+    <text x="128" y="176">picking framebuffer</text><text x="301" y="176">74</text>
+    <text x="439" y="176">0.06 M</text><text x="618" y="176">not shown to the user</text>
+  </g>
+  <text x="370" y="214" fill="#1f2937" font-size="12.5" text-anchor="middle">the fix is not "fewer triangles" — it is fewer, larger draw calls</text>
+  <text x="370" y="234" fill="#5b6471" font-size="12" text-anchor="middle">2,104 calls carrying 6% of the geometry is what the frame time is actually going on</text>
+</svg>
+<figcaption>The frame's cost is in 2,104 tiny draw calls carrying 6% of the triangles, which no triangle-count optimisation touches.</figcaption>
+</figure>
+<h3 id="3-count-the-redundant-state-changes" tabindex="-1"><a class="heading-link" href="#3-count-the-redundant-state-changes"><span>3. Count the redundant state changes</span></a></h3>
+<div class="codeblock" data-lang="javascript"><div class="codeblock__bar"><span class="codeblock__lang">javascript</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-javascript" tabindex="0" role="group" aria-label="javascript code sample"><code class="language-javascript"><span class="token keyword">const</span> <span class="token constant">STATE_COMMANDS</span> <span class="token operator">=</span> <span class="token punctuation">{</span>
+  <span class="token function-variable function">useProgram</span><span class="token operator">:</span> <span class="token punctuation">(</span><span class="token parameter">c</span><span class="token punctuation">)</span> <span class="token operator">=></span> <span class="token function">String</span><span class="token punctuation">(</span>c<span class="token punctuation">.</span>arguments<span class="token operator">?.</span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+  <span class="token function-variable function">bindTexture</span><span class="token operator">:</span> <span class="token punctuation">(</span><span class="token parameter">c</span><span class="token punctuation">)</span> <span class="token operator">=></span> <span class="token template-string"><span class="token template-punctuation string">`</span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>c<span class="token punctuation">.</span>arguments<span class="token operator">?.</span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token interpolation-punctuation punctuation">}</span></span><span class="token string">:</span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>c<span class="token punctuation">.</span>arguments<span class="token operator">?.</span><span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token interpolation-punctuation punctuation">}</span></span><span class="token template-punctuation string">`</span></span><span class="token punctuation">,</span>
+  <span class="token function-variable function">bindBuffer</span><span class="token operator">:</span> <span class="token punctuation">(</span><span class="token parameter">c</span><span class="token punctuation">)</span> <span class="token operator">=></span> <span class="token template-string"><span class="token template-punctuation string">`</span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>c<span class="token punctuation">.</span>arguments<span class="token operator">?.</span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token interpolation-punctuation punctuation">}</span></span><span class="token string">:</span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>c<span class="token punctuation">.</span>arguments<span class="token operator">?.</span><span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token interpolation-punctuation punctuation">}</span></span><span class="token template-punctuation string">`</span></span><span class="token punctuation">,</span>
+  <span class="token function-variable function">bindVertexArray</span><span class="token operator">:</span> <span class="token punctuation">(</span><span class="token parameter">c</span><span class="token punctuation">)</span> <span class="token operator">=></span> <span class="token function">String</span><span class="token punctuation">(</span>c<span class="token punctuation">.</span>arguments<span class="token operator">?.</span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+  <span class="token function-variable function">blendFunc</span><span class="token operator">:</span> <span class="token punctuation">(</span><span class="token parameter">c</span><span class="token punctuation">)</span> <span class="token operator">=></span> <span class="token punctuation">(</span>c<span class="token punctuation">.</span>arguments <span class="token operator">??</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">join</span><span class="token punctuation">(</span><span class="token string">','</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+  <span class="token function-variable function">depthFunc</span><span class="token operator">:</span> <span class="token punctuation">(</span><span class="token parameter">c</span><span class="token punctuation">)</span> <span class="token operator">=></span> <span class="token function">String</span><span class="token punctuation">(</span>c<span class="token punctuation">.</span>arguments<span class="token operator">?.</span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+  <span class="token function-variable function">cullFace</span><span class="token operator">:</span> <span class="token punctuation">(</span><span class="token parameter">c</span><span class="token punctuation">)</span> <span class="token operator">=></span> <span class="token function">String</span><span class="token punctuation">(</span>c<span class="token punctuation">.</span>arguments<span class="token operator">?.</span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+  <span class="token function-variable function">enable</span><span class="token operator">:</span> <span class="token punctuation">(</span><span class="token parameter">c</span><span class="token punctuation">)</span> <span class="token operator">=></span> <span class="token template-string"><span class="token template-punctuation string">`</span><span class="token string">enable:</span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>c<span class="token punctuation">.</span>arguments<span class="token operator">?.</span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token interpolation-punctuation punctuation">}</span></span><span class="token template-punctuation string">`</span></span><span class="token punctuation">,</span>
+  <span class="token function-variable function">disable</span><span class="token operator">:</span> <span class="token punctuation">(</span><span class="token parameter">c</span><span class="token punctuation">)</span> <span class="token operator">=></span> <span class="token template-string"><span class="token template-punctuation string">`</span><span class="token string">disable:</span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>c<span class="token punctuation">.</span>arguments<span class="token operator">?.</span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token interpolation-punctuation punctuation">}</span></span><span class="token template-punctuation string">`</span></span><span class="token punctuation">,</span>
+  <span class="token function-variable function">viewport</span><span class="token operator">:</span> <span class="token punctuation">(</span><span class="token parameter">c</span><span class="token punctuation">)</span> <span class="token operator">=></span> <span class="token punctuation">(</span>c<span class="token punctuation">.</span>arguments <span class="token operator">??</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">join</span><span class="token punctuation">(</span><span class="token string">','</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+<span class="token punctuation">}</span><span class="token punctuation">;</span>
+
+<span class="token keyword">export</span> <span class="token keyword">function</span> <span class="token function">redundantStateChanges</span><span class="token punctuation">(</span><span class="token parameter">capture</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+  <span class="token keyword">const</span> commands <span class="token operator">=</span> capture<span class="token punctuation">.</span>commands <span class="token operator">??</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+  <span class="token keyword">const</span> lastValue <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Map</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">const</span> counts <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Map</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">const</span> redundant <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Map</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+  <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">const</span> cmd <span class="token keyword">of</span> commands<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> keyFn <span class="token operator">=</span> <span class="token constant">STATE_COMMANDS</span><span class="token punctuation">[</span>cmd<span class="token punctuation">.</span>name<span class="token punctuation">]</span><span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>keyFn<span class="token punctuation">)</span> <span class="token keyword">continue</span><span class="token punctuation">;</span>
+    <span class="token keyword">const</span> value <span class="token operator">=</span> <span class="token function">keyFn</span><span class="token punctuation">(</span>cmd<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    counts<span class="token punctuation">.</span><span class="token function">set</span><span class="token punctuation">(</span>cmd<span class="token punctuation">.</span>name<span class="token punctuation">,</span> <span class="token punctuation">(</span>counts<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span>cmd<span class="token punctuation">.</span>name<span class="token punctuation">)</span> <span class="token operator">??</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token operator">+</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>lastValue<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span>cmd<span class="token punctuation">.</span>name<span class="token punctuation">)</span> <span class="token operator">===</span> value<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      redundant<span class="token punctuation">.</span><span class="token function">set</span><span class="token punctuation">(</span>cmd<span class="token punctuation">.</span>name<span class="token punctuation">,</span> <span class="token punctuation">(</span>redundant<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span>cmd<span class="token punctuation">.</span>name<span class="token punctuation">)</span> <span class="token operator">??</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token operator">+</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+    lastValue<span class="token punctuation">.</span><span class="token function">set</span><span class="token punctuation">(</span>cmd<span class="token punctuation">.</span>name<span class="token punctuation">,</span> value<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+
+  <span class="token keyword">const</span> rows <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token operator">...</span>counts<span class="token punctuation">.</span><span class="token function">entries</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">.</span><span class="token function">map</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter"><span class="token punctuation">[</span>name<span class="token punctuation">,</span> total<span class="token punctuation">]</span></span><span class="token punctuation">)</span> <span class="token operator">=></span> <span class="token punctuation">(</span><span class="token punctuation">{</span>
+    <span class="token literal-property property">command</span><span class="token operator">:</span> name<span class="token punctuation">,</span>
+    total<span class="token punctuation">,</span>
+    <span class="token literal-property property">redundant</span><span class="token operator">:</span> redundant<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span>name<span class="token punctuation">)</span> <span class="token operator">??</span> <span class="token number">0</span><span class="token punctuation">,</span>
+    <span class="token literal-property property">redundantShare</span><span class="token operator">:</span> <span class="token function">Number</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token punctuation">(</span>redundant<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span>name<span class="token punctuation">)</span> <span class="token operator">??</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token operator">/</span> total<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">toFixed</span><span class="token punctuation">(</span><span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+  <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">sort</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">a<span class="token punctuation">,</span> b</span><span class="token punctuation">)</span> <span class="token operator">=></span> b<span class="token punctuation">.</span>redundant <span class="token operator">-</span> a<span class="token punctuation">.</span>redundant<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+  <span class="token keyword">return</span> <span class="token punctuation">{</span>
+    <span class="token literal-property property">stateCommands</span><span class="token operator">:</span> <span class="token punctuation">[</span><span class="token operator">...</span>counts<span class="token punctuation">.</span><span class="token function">values</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">.</span><span class="token function">reduce</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">a<span class="token punctuation">,</span> b</span><span class="token punctuation">)</span> <span class="token operator">=></span> a <span class="token operator">+</span> b<span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token literal-property property">redundantTotal</span><span class="token operator">:</span> <span class="token punctuation">[</span><span class="token operator">...</span>redundant<span class="token punctuation">.</span><span class="token function">values</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">.</span><span class="token function">reduce</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">a<span class="token punctuation">,</span> b</span><span class="token punctuation">)</span> <span class="token operator">=></span> a <span class="token operator">+</span> b<span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token literal-property property">rows</span><span class="token operator">:</span> rows<span class="token punctuation">.</span><span class="token function">slice</span><span class="token punctuation">(</span><span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">8</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token literal-property property">verdict</span><span class="token operator">:</span> rows<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token operator">?.</span>redundant <span class="token operator">></span> <span class="token number">200</span>
+      <span class="token operator">?</span> <span class="token template-string"><span class="token template-punctuation string">`</span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>rows<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">.</span>redundant<span class="token interpolation-punctuation punctuation">}</span></span><span class="token string"> redundant </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>rows<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">.</span>command<span class="token interpolation-punctuation punctuation">}</span></span><span class="token string"> calls — the renderer is </span><span class="token template-punctuation string">`</span></span>
+        <span class="token operator">+</span> <span class="token string">'not sorting by state'</span>
+      <span class="token operator">:</span> <span class="token string">'state changes look reasonable'</span><span class="token punctuation">,</span>
+  <span class="token punctuation">}</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+</code></pre></div>
+<p>A redundant state change is one that sets the driver to a value it already has. The driver usually filters these cheaply, and “usually” is doing a lot of work — on some mobile drivers a redundant <code>useProgram</code> still triggers a validation pass, and 600 of them per frame is measurable.</p>
+<p>More useful is what the count <em>implies</em>: a high redundant <code>bindTexture</code> count means draw calls are not sorted by texture, so the renderer is alternating between materials. That is not something a viewer user can fix directly, and it is a strong argument for the atlasing in <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/merging-meshes-to-cut-draw-calls/">merging meshes to cut draw calls</a> — fewer distinct textures means fewer binds however the renderer sorts.</p>
+<p><code>viewport</code> appearing in this list at all is worth investigating: it usually means a render pass is being set up per object, which is a viewer configuration problem.</p>
+<h3 id="4-check-the-textures-actually-bound" tabindex="-1"><a class="heading-link" href="#4-check-the-textures-actually-bound"><span>4. Check the textures actually bound</span></a></h3>
+<div class="codeblock" data-lang="javascript"><div class="codeblock__bar"><span class="codeblock__lang">javascript</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-javascript" tabindex="0" role="group" aria-label="javascript code sample"><code class="language-javascript"><span class="token keyword">export</span> <span class="token keyword">function</span> <span class="token function">textureInventory</span><span class="token punctuation">(</span><span class="token parameter">capture</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+  <span class="token keyword">const</span> commands <span class="token operator">=</span> capture<span class="token punctuation">.</span>commands <span class="token operator">??</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+  <span class="token keyword">const</span> textures <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Map</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">let</span> unit <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+
+  <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">const</span> cmd <span class="token keyword">of</span> commands<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>cmd<span class="token punctuation">.</span>name <span class="token operator">===</span> <span class="token string">'activeTexture'</span><span class="token punctuation">)</span> unit <span class="token operator">=</span> <span class="token function">Number</span><span class="token punctuation">(</span>cmd<span class="token punctuation">.</span>arguments<span class="token operator">?.</span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token operator">-</span> <span class="token number">0x84C0</span><span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>cmd<span class="token punctuation">.</span>name <span class="token operator">===</span> <span class="token string">'texImage2D'</span> <span class="token operator">||</span> cmd<span class="token punctuation">.</span>name <span class="token operator">===</span> <span class="token string">'texStorage2D'</span>
+        <span class="token operator">||</span> cmd<span class="token punctuation">.</span>name <span class="token operator">===</span> <span class="token string">'compressedTexImage2D'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      <span class="token keyword">const</span> key <span class="token operator">=</span> <span class="token template-string"><span class="token template-punctuation string">`</span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>cmd<span class="token punctuation">.</span>name<span class="token interpolation-punctuation punctuation">}</span></span><span class="token string">@unit</span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>unit<span class="token interpolation-punctuation punctuation">}</span></span><span class="token template-punctuation string">`</span></span><span class="token punctuation">;</span>
+      <span class="token keyword">const</span> width <span class="token operator">=</span> <span class="token function">Number</span><span class="token punctuation">(</span>cmd<span class="token punctuation">.</span>arguments<span class="token operator">?.</span><span class="token punctuation">[</span><span class="token number">3</span><span class="token punctuation">]</span> <span class="token operator">??</span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token keyword">const</span> height <span class="token operator">=</span> <span class="token function">Number</span><span class="token punctuation">(</span>cmd<span class="token punctuation">.</span>arguments<span class="token operator">?.</span><span class="token punctuation">[</span><span class="token number">4</span><span class="token punctuation">]</span> <span class="token operator">??</span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token keyword">const</span> entry <span class="token operator">=</span> textures<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span>key<span class="token punctuation">)</span> <span class="token operator">??</span> <span class="token punctuation">{</span> <span class="token literal-property property">uploads</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token literal-property property">sizes</span><span class="token operator">:</span> <span class="token punctuation">[</span><span class="token punctuation">]</span> <span class="token punctuation">}</span><span class="token punctuation">;</span>
+      entry<span class="token punctuation">.</span>uploads <span class="token operator">+=</span> <span class="token number">1</span><span class="token punctuation">;</span>
+      <span class="token keyword">if</span> <span class="token punctuation">(</span>width <span class="token operator">&amp;&amp;</span> height<span class="token punctuation">)</span> entry<span class="token punctuation">.</span>sizes<span class="token punctuation">.</span><span class="token function">push</span><span class="token punctuation">(</span><span class="token punctuation">[</span>width<span class="token punctuation">,</span> height<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      textures<span class="token punctuation">.</span><span class="token function">set</span><span class="token punctuation">(</span>key<span class="token punctuation">,</span> entry<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+  <span class="token punctuation">}</span>
+
+  <span class="token keyword">const</span> uploads <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token operator">...</span>textures<span class="token punctuation">.</span><span class="token function">entries</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">.</span><span class="token function">map</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter"><span class="token punctuation">[</span>key<span class="token punctuation">,</span> v<span class="token punctuation">]</span></span><span class="token punctuation">)</span> <span class="token operator">=></span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> areas <span class="token operator">=</span> v<span class="token punctuation">.</span>sizes<span class="token punctuation">.</span><span class="token function">map</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter"><span class="token punctuation">[</span>w<span class="token punctuation">,</span> h<span class="token punctuation">]</span></span><span class="token punctuation">)</span> <span class="token operator">=></span> w <span class="token operator">*</span> h<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">const</span> compressed <span class="token operator">=</span> key<span class="token punctuation">.</span><span class="token function">startsWith</span><span class="token punctuation">(</span><span class="token string">'compressed'</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">const</span> bytesPerTexel <span class="token operator">=</span> compressed <span class="token operator">?</span> <span class="token number">0.5</span> <span class="token operator">:</span> <span class="token number">4</span><span class="token punctuation">;</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+      key<span class="token punctuation">,</span>
+      <span class="token literal-property property">uploads</span><span class="token operator">:</span> v<span class="token punctuation">.</span>uploads<span class="token punctuation">,</span>
+      <span class="token literal-property property">largest</span><span class="token operator">:</span> v<span class="token punctuation">.</span>sizes<span class="token punctuation">.</span>length
+        <span class="token operator">?</span> v<span class="token punctuation">.</span>sizes<span class="token punctuation">[</span>areas<span class="token punctuation">.</span><span class="token function">indexOf</span><span class="token punctuation">(</span>Math<span class="token punctuation">.</span><span class="token function">max</span><span class="token punctuation">(</span><span class="token operator">...</span>areas<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">]</span>
+        <span class="token operator">:</span> <span class="token keyword">null</span><span class="token punctuation">,</span>
+      <span class="token literal-property property">estimatedGpuMB</span><span class="token operator">:</span> <span class="token function">Number</span><span class="token punctuation">(</span><span class="token punctuation">(</span>areas<span class="token punctuation">.</span><span class="token function">reduce</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">a<span class="token punctuation">,</span> b</span><span class="token punctuation">)</span> <span class="token operator">=></span> a <span class="token operator">+</span> b<span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span>
+        <span class="token operator">*</span> bytesPerTexel <span class="token operator">*</span> <span class="token number">1.333</span> <span class="token operator">/</span> <span class="token number">1e6</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">toFixed</span><span class="token punctuation">(</span><span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+      compressed<span class="token punctuation">,</span>
+    <span class="token punctuation">}</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">sort</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">a<span class="token punctuation">,</span> b</span><span class="token punctuation">)</span> <span class="token operator">=></span> b<span class="token punctuation">.</span>estimatedGpuMB <span class="token operator">-</span> a<span class="token punctuation">.</span>estimatedGpuMB<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+  <span class="token keyword">return</span> <span class="token punctuation">{</span>
+    <span class="token literal-property property">uploadCommands</span><span class="token operator">:</span> uploads<span class="token punctuation">.</span><span class="token function">reduce</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">s<span class="token punctuation">,</span> u</span><span class="token punctuation">)</span> <span class="token operator">=></span> s <span class="token operator">+</span> u<span class="token punctuation">.</span>uploads<span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token literal-property property">estimatedGpuMB</span><span class="token operator">:</span> <span class="token function">Number</span><span class="token punctuation">(</span>uploads<span class="token punctuation">.</span><span class="token function">reduce</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">s<span class="token punctuation">,</span> u</span><span class="token punctuation">)</span> <span class="token operator">=></span> s <span class="token operator">+</span> u<span class="token punctuation">.</span>estimatedGpuMB<span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span>
+      <span class="token punctuation">.</span><span class="token function">toFixed</span><span class="token punctuation">(</span><span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token literal-property property">anyUncompressed</span><span class="token operator">:</span> uploads<span class="token punctuation">.</span><span class="token function">some</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">u</span><span class="token punctuation">)</span> <span class="token operator">=></span> <span class="token operator">!</span>u<span class="token punctuation">.</span>compressed <span class="token operator">&amp;&amp;</span> u<span class="token punctuation">.</span>estimatedGpuMB <span class="token operator">></span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token literal-property property">uploads</span><span class="token operator">:</span> uploads<span class="token punctuation">.</span><span class="token function">slice</span><span class="token punctuation">(</span><span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">6</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token literal-property property">verdict</span><span class="token operator">:</span> uploads<span class="token punctuation">.</span><span class="token function">some</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">u</span><span class="token punctuation">)</span> <span class="token operator">=></span> <span class="token operator">!</span>u<span class="token punctuation">.</span>compressed <span class="token operator">&amp;&amp;</span> u<span class="token punctuation">.</span>estimatedGpuMB <span class="token operator">></span> <span class="token number">20</span><span class="token punctuation">)</span>
+      <span class="token operator">?</span> <span class="token string">'large uncompressed textures — KTX2/Basis would cut GPU memory 4–6×'</span>
+      <span class="token operator">:</span> <span class="token string">'texture memory looks controlled'</span><span class="token punctuation">,</span>
+  <span class="token punctuation">}</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+</code></pre></div>
+<p>Texture uploads appearing in a <em>steady-state</em> frame are the finding here. Once tiles are loaded, a frame should upload nothing; <code>texImage2D</code> in a settled frame means textures are being evicted and re-uploaded because the cache is too small, which shows as periodic hitching rather than a consistently low frame rate.</p>
+<p>The GPU memory estimate is deliberately crude and useful: width × height × 4 × 1.333 for an uncompressed texture, or × 0.5 for a Basis-compressed one. That factor of eight is the whole argument for KTX2, and seeing it against a real capture’s numbers is more persuasive than the general claim.</p>
+<h3 id="5-inspect-the-shader-programs" tabindex="-1"><a class="heading-link" href="#5-inspect-the-shader-programs"><span>5. Inspect the shader programs</span></a></h3>
+<div class="codeblock" data-lang="javascript"><div class="codeblock__bar"><span class="codeblock__lang">javascript</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-javascript" tabindex="0" role="group" aria-label="javascript code sample"><code class="language-javascript"><span class="token keyword">export</span> <span class="token keyword">function</span> <span class="token function">shaderReport</span><span class="token punctuation">(</span><span class="token parameter">capture</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+  <span class="token keyword">const</span> programs <span class="token operator">=</span> capture<span class="token punctuation">.</span>programs <span class="token operator">??</span> capture<span class="token punctuation">.</span>initState<span class="token operator">?.</span>programs <span class="token operator">??</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+  <span class="token keyword">const</span> rows <span class="token operator">=</span> programs<span class="token punctuation">.</span><span class="token function">map</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">p<span class="token punctuation">,</span> i</span><span class="token punctuation">)</span> <span class="token operator">=></span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> vertex <span class="token operator">=</span> p<span class="token punctuation">.</span>shaders<span class="token operator">?.</span><span class="token function">find</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">s</span><span class="token punctuation">)</span> <span class="token operator">=></span> <span class="token regex"><span class="token regex-delimiter">/</span><span class="token regex-source language-regex">vertex</span><span class="token regex-delimiter">/</span><span class="token regex-flags">i</span></span><span class="token punctuation">.</span><span class="token function">test</span><span class="token punctuation">(</span>s<span class="token punctuation">.</span>name <span class="token operator">??</span> s<span class="token punctuation">.</span>type <span class="token operator">??</span> <span class="token string">''</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">const</span> fragment <span class="token operator">=</span> p<span class="token punctuation">.</span>shaders<span class="token operator">?.</span><span class="token function">find</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">s</span><span class="token punctuation">)</span> <span class="token operator">=></span> <span class="token regex"><span class="token regex-delimiter">/</span><span class="token regex-source language-regex">fragment</span><span class="token regex-delimiter">/</span><span class="token regex-flags">i</span></span><span class="token punctuation">.</span><span class="token function">test</span><span class="token punctuation">(</span>s<span class="token punctuation">.</span>name <span class="token operator">??</span> s<span class="token punctuation">.</span>type <span class="token operator">??</span> <span class="token string">''</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">const</span> fragSource <span class="token operator">=</span> fragment<span class="token operator">?.</span>source <span class="token operator">??</span> <span class="token string">''</span><span class="token punctuation">;</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+      <span class="token literal-property property">index</span><span class="token operator">:</span> i<span class="token punctuation">,</span>
+      <span class="token literal-property property">uniforms</span><span class="token operator">:</span> <span class="token punctuation">(</span>p<span class="token punctuation">.</span>uniforms <span class="token operator">??</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">.</span>length<span class="token punctuation">,</span>
+      <span class="token literal-property property">attributes</span><span class="token operator">:</span> <span class="token punctuation">(</span>p<span class="token punctuation">.</span>attributes <span class="token operator">??</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">.</span>length<span class="token punctuation">,</span>
+      <span class="token literal-property property">vertexLines</span><span class="token operator">:</span> <span class="token punctuation">(</span>vertex<span class="token operator">?.</span>source <span class="token operator">??</span> <span class="token string">''</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">split</span><span class="token punctuation">(</span><span class="token string">'\n'</span><span class="token punctuation">)</span><span class="token punctuation">.</span>length<span class="token punctuation">,</span>
+      <span class="token literal-property property">fragmentLines</span><span class="token operator">:</span> fragSource<span class="token punctuation">.</span><span class="token function">split</span><span class="token punctuation">(</span><span class="token string">'\n'</span><span class="token punctuation">)</span><span class="token punctuation">.</span>length<span class="token punctuation">,</span>
+      <span class="token literal-property property">textureSamples</span><span class="token operator">:</span> <span class="token punctuation">(</span>fragSource<span class="token punctuation">.</span><span class="token function">match</span><span class="token punctuation">(</span><span class="token regex"><span class="token regex-delimiter">/</span><span class="token regex-source language-regex">texture2D|texture\s*\(</span><span class="token regex-delimiter">/</span><span class="token regex-flags">g</span></span><span class="token punctuation">)</span> <span class="token operator">??</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">.</span>length<span class="token punctuation">,</span>
+      <span class="token literal-property property">branches</span><span class="token operator">:</span> <span class="token punctuation">(</span>fragSource<span class="token punctuation">.</span><span class="token function">match</span><span class="token punctuation">(</span><span class="token regex"><span class="token regex-delimiter">/</span><span class="token regex-source language-regex">\bif\s*\(</span><span class="token regex-delimiter">/</span><span class="token regex-flags">g</span></span><span class="token punctuation">)</span> <span class="token operator">??</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">.</span>length<span class="token punctuation">,</span>
+      <span class="token literal-property property">loops</span><span class="token operator">:</span> <span class="token punctuation">(</span>fragSource<span class="token punctuation">.</span><span class="token function">match</span><span class="token punctuation">(</span><span class="token regex"><span class="token regex-delimiter">/</span><span class="token regex-source language-regex">\bfor\s*\(</span><span class="token regex-delimiter">/</span><span class="token regex-flags">g</span></span><span class="token punctuation">)</span> <span class="token operator">??</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">.</span>length<span class="token punctuation">,</span>
+      <span class="token literal-property property">usesDerivatives</span><span class="token operator">:</span> <span class="token regex"><span class="token regex-delimiter">/</span><span class="token regex-source language-regex">dFdx|dFdy|fwidth</span><span class="token regex-delimiter">/</span></span><span class="token punctuation">.</span><span class="token function">test</span><span class="token punctuation">(</span>fragSource<span class="token punctuation">)</span><span class="token punctuation">,</span>
+      <span class="token literal-property property">styleConditions</span><span class="token operator">:</span> <span class="token punctuation">(</span>fragSource<span class="token punctuation">.</span><span class="token function">match</span><span class="token punctuation">(</span><span class="token regex"><span class="token regex-delimiter">/</span><span class="token regex-source language-regex">czm_style|tiles3d_</span><span class="token regex-delimiter">/</span><span class="token regex-flags">g</span></span><span class="token punctuation">)</span> <span class="token operator">??</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">.</span>length<span class="token punctuation">,</span>
+    <span class="token punctuation">}</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+  <span class="token keyword">const</span> heavy <span class="token operator">=</span> rows<span class="token punctuation">.</span><span class="token function">filter</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">r</span><span class="token punctuation">)</span> <span class="token operator">=></span> r<span class="token punctuation">.</span>branches <span class="token operator">></span> <span class="token number">16</span> <span class="token operator">||</span> r<span class="token punctuation">.</span>textureSamples <span class="token operator">></span> <span class="token number">8</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">return</span> <span class="token punctuation">{</span>
+    <span class="token literal-property property">programs</span><span class="token operator">:</span> rows<span class="token punctuation">.</span>length<span class="token punctuation">,</span>
+    <span class="token literal-property property">rows</span><span class="token operator">:</span> rows<span class="token punctuation">.</span><span class="token function">sort</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">a<span class="token punctuation">,</span> b</span><span class="token punctuation">)</span> <span class="token operator">=></span> b<span class="token punctuation">.</span>branches <span class="token operator">-</span> a<span class="token punctuation">.</span>branches<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">slice</span><span class="token punctuation">(</span><span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">5</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token literal-property property">heavyPrograms</span><span class="token operator">:</span> heavy<span class="token punctuation">.</span>length<span class="token punctuation">,</span>
+    <span class="token literal-property property">verdict</span><span class="token operator">:</span> heavy<span class="token punctuation">.</span>length
+      <span class="token operator">?</span> <span class="token template-string"><span class="token template-punctuation string">`</span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>heavy<span class="token punctuation">.</span>length<span class="token interpolation-punctuation punctuation">}</span></span><span class="token string"> program(s) with heavy branching or many texture samples — </span><span class="token template-punctuation string">`</span></span>
+        <span class="token operator">+</span> <span class="token string">'check the Cesium3DTileStyle conditions'</span>
+      <span class="token operator">:</span> <span class="token string">'shaders are simple'</span><span class="token punctuation">,</span>
+  <span class="token punctuation">}</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+</code></pre></div>
+<p>Branch count in the fragment shader is the number that connects a capture back to a data decision. A <code>Cesium3DTileStyle</code> with 200 conditions compiles to 200 comparisons in the fragment shader, and the capture shows it — which is the measured version of the advice in <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/styling-tiles-by-metadata-with-cesium3dtilestyle/">styling tiles by metadata with Cesium3DTileStyle</a>.</p>
+<p>A program count above about fifteen in a tileset frame usually means the content has many distinct material configurations, each producing a shader variant. Every variant is a compile on first use, which is the source of a one-off stutter when a new kind of tile appears.</p>
+<figure class="diagram">
+<svg viewBox="6 10 708 234" role="img" aria-labelledby="spector-state-t spector-state-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="spector-state-t">Redundant state changes in the captured frame</title>
+  <desc id="spector-state-d">A bar chart of state commands in one frame with their redundant share. bindTexture is called 2612 times of which 1841 are redundant, because draw calls are not sorted by texture. useProgram is called 2612 times with 2504 redundant. bindBuffer is called 5224 times with 612 redundant. enable and disable are called 418 times with 380 redundant. The pattern says the renderer is alternating between materials rather than batching them.</desc>
+  <rect class="svg-bg" x="6" y="10" width="708" height="234" fill="#ffffff"/>
+  <path d="M136 24 V180 H700" stroke="#5b6471" stroke-width="1.5" fill="none"/>
+  <g stroke-width="1.4">
+    <rect x="136" y="34" width="400" height="24" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="136" y="34" width="47" height="24" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="136" y="70" width="200" height="24" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="136" y="70" width="141" height="24" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="136" y="106" width="200" height="24" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="136" y="106" width="192" height="24" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="136" y="142" width="32" height="24" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="136" y="142" width="29" height="24" fill="#f7dfdc" stroke="#b0413e"/>
+  </g>
+  <g fill="#1f2937" font-size="12">
+    <text x="20" y="51">bindBuffer</text>
+    <text x="20" y="87">bindTexture</text>
+    <text x="20" y="123">useProgram</text>
+    <text x="20" y="159">enable/disable</text>
+  </g>
+  <g fill="#1f2937" font-size="12">
+    <text x="546" y="51">5,224 — 612 redundant</text>
+    <text x="346" y="87">2,612 — 1,841 redundant</text>
+    <text x="346" y="123">2,612 — 2,504 redundant</text>
+    <text x="178" y="159">418 — 380 redundant</text>
+  </g>
+  <g font-size="12">
+    <text x="146" y="204" fill="#b0413e">red: redundant</text>
+    <text x="260" y="204" fill="#15384a">blue: total calls</text>
+  </g>
+  <text x="146" y="226" fill="#5b6471" font-size="12">2,504 redundant useProgram calls means one draw call per material, unbatched</text>
+</svg>
+<figcaption>Redundant binds are cheap individually; their count is the diagnostic, and it says the draw calls are one-per-material.</figcaption>
+</figure>
+<h3 id="6-turn-the-capture-into-a-change" tabindex="-1"><a class="heading-link" href="#6-turn-the-capture-into-a-change"><span>6. Turn the capture into a change</span></a></h3>
+<div class="codeblock" data-lang="javascript"><div class="codeblock__bar"><span class="codeblock__lang">javascript</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-javascript" tabindex="0" role="group" aria-label="javascript code sample"><code class="language-javascript"><span class="token keyword">const</span> <span class="token constant">THRESHOLDS</span> <span class="token operator">=</span> <span class="token punctuation">{</span>
+  <span class="token literal-property property">drawCallsPerFrame</span><span class="token operator">:</span> <span class="token number">400</span><span class="token punctuation">,</span>
+  <span class="token literal-property property">smallDrawShare</span><span class="token operator">:</span> <span class="token number">0.25</span><span class="token punctuation">,</span>
+  <span class="token literal-property property">trianglesPerFrame</span><span class="token operator">:</span> <span class="token number">4_000_000</span><span class="token punctuation">,</span>
+  <span class="token literal-property property">programs</span><span class="token operator">:</span> <span class="token number">15</span><span class="token punctuation">,</span>
+  <span class="token literal-property property">fragmentBranches</span><span class="token operator">:</span> <span class="token number">16</span><span class="token punctuation">,</span>
+  <span class="token literal-property property">uncompressedTextureMB</span><span class="token operator">:</span> <span class="token number">20</span><span class="token punctuation">,</span>
+  <span class="token literal-property property">uploadsInSettledFrame</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span>
+<span class="token punctuation">}</span><span class="token punctuation">;</span>
+
+<span class="token keyword">export</span> <span class="token keyword">function</span> <span class="token function">diagnose</span><span class="token punctuation">(</span><span class="token parameter">capture<span class="token punctuation">,</span> context<span class="token punctuation">,</span> thresholds <span class="token operator">=</span> <span class="token constant">THRESHOLDS</span></span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+  <span class="token keyword">const</span> draws <span class="token operator">=</span> <span class="token function">drawCallInventory</span><span class="token punctuation">(</span>capture<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">const</span> state <span class="token operator">=</span> <span class="token function">redundantStateChanges</span><span class="token punctuation">(</span>capture<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">const</span> textures <span class="token operator">=</span> <span class="token function">textureInventory</span><span class="token punctuation">(</span>capture<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">const</span> shaders <span class="token operator">=</span> <span class="token function">shaderReport</span><span class="token punctuation">(</span>capture<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+  <span class="token keyword">const</span> findings <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+  <span class="token keyword">const</span> smallShare <span class="token operator">=</span> draws<span class="token punctuation">.</span>smallDraws <span class="token operator">/</span> Math<span class="token punctuation">.</span><span class="token function">max</span><span class="token punctuation">(</span>draws<span class="token punctuation">.</span>drawCalls<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+  <span class="token keyword">if</span> <span class="token punctuation">(</span>draws<span class="token punctuation">.</span>drawCalls <span class="token operator">></span> thresholds<span class="token punctuation">.</span>drawCallsPerFrame<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    findings<span class="token punctuation">.</span><span class="token function">push</span><span class="token punctuation">(</span><span class="token punctuation">{</span>
+      <span class="token literal-property property">severity</span><span class="token operator">:</span> <span class="token string">'error'</span><span class="token punctuation">,</span>
+      <span class="token literal-property property">observation</span><span class="token operator">:</span> <span class="token template-string"><span class="token template-punctuation string">`</span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>draws<span class="token punctuation">.</span>drawCalls<span class="token interpolation-punctuation punctuation">}</span></span><span class="token string"> draw calls in one frame</span><span class="token template-punctuation string">`</span></span><span class="token punctuation">,</span>
+      <span class="token literal-property property">fix</span><span class="token operator">:</span> smallShare <span class="token operator">></span> thresholds<span class="token punctuation">.</span>smallDrawShare
+        <span class="token operator">?</span> <span class="token string">'merge primitives per material in the tile content (gltf-transform join)'</span>
+        <span class="token operator">:</span> <span class="token string">'reduce the number of visible tiles: raise maximumScreenSpaceError or '</span>
+          <span class="token operator">+</span> <span class="token string">'make tiles larger'</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  <span class="token keyword">if</span> <span class="token punctuation">(</span>smallShare <span class="token operator">></span> thresholds<span class="token punctuation">.</span>smallDrawShare<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    findings<span class="token punctuation">.</span><span class="token function">push</span><span class="token punctuation">(</span><span class="token punctuation">{</span>
+      <span class="token literal-property property">severity</span><span class="token operator">:</span> <span class="token string">'error'</span><span class="token punctuation">,</span>
+      <span class="token literal-property property">observation</span><span class="token operator">:</span> <span class="token template-string"><span class="token template-punctuation string">`</span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span><span class="token punctuation">(</span>smallShare <span class="token operator">*</span> <span class="token number">100</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">toFixed</span><span class="token punctuation">(</span><span class="token number">0</span><span class="token punctuation">)</span><span class="token interpolation-punctuation punctuation">}</span></span><span class="token string">% of draw calls carry </span><span class="token template-punctuation string">`</span></span>
+        <span class="token operator">+</span> <span class="token string">'&lt; 300 triangles'</span><span class="token punctuation">,</span>
+      <span class="token literal-property property">fix</span><span class="token operator">:</span> <span class="token string">'the content has one primitive per feature; join by material and use '</span>
+        <span class="token operator">+</span> <span class="token string">'feature ids for picking'</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  <span class="token keyword">if</span> <span class="token punctuation">(</span>draws<span class="token punctuation">.</span>triangles <span class="token operator">></span> thresholds<span class="token punctuation">.</span>trianglesPerFrame<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    findings<span class="token punctuation">.</span><span class="token function">push</span><span class="token punctuation">(</span><span class="token punctuation">{</span>
+      <span class="token literal-property property">severity</span><span class="token operator">:</span> <span class="token string">'warn'</span><span class="token punctuation">,</span>
+      <span class="token literal-property property">observation</span><span class="token operator">:</span> <span class="token template-string"><span class="token template-punctuation string">`</span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span><span class="token punctuation">(</span>draws<span class="token punctuation">.</span>triangles <span class="token operator">/</span> <span class="token number">1e6</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">toFixed</span><span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token interpolation-punctuation punctuation">}</span></span><span class="token string"> M triangles per frame</span><span class="token template-punctuation string">`</span></span><span class="token punctuation">,</span>
+      <span class="token literal-property property">fix</span><span class="token operator">:</span> <span class="token string">'raise maximumScreenSpaceError, or add a coarser level to the tileset'</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  <span class="token keyword">if</span> <span class="token punctuation">(</span>shaders<span class="token punctuation">.</span>programs <span class="token operator">></span> thresholds<span class="token punctuation">.</span>programs<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    findings<span class="token punctuation">.</span><span class="token function">push</span><span class="token punctuation">(</span><span class="token punctuation">{</span>
+      <span class="token literal-property property">severity</span><span class="token operator">:</span> <span class="token string">'warn'</span><span class="token punctuation">,</span>
+      <span class="token literal-property property">observation</span><span class="token operator">:</span> <span class="token template-string"><span class="token template-punctuation string">`</span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>shaders<span class="token punctuation">.</span>programs<span class="token interpolation-punctuation punctuation">}</span></span><span class="token string"> shader programs</span><span class="token template-punctuation string">`</span></span><span class="token punctuation">,</span>
+      <span class="token literal-property property">fix</span><span class="token operator">:</span> <span class="token string">'dedup materials in the content; each variant is a compile on first use'</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  <span class="token keyword">const</span> worstShader <span class="token operator">=</span> shaders<span class="token punctuation">.</span>rows<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+  <span class="token keyword">if</span> <span class="token punctuation">(</span>worstShader <span class="token operator">&amp;&amp;</span> worstShader<span class="token punctuation">.</span>branches <span class="token operator">></span> thresholds<span class="token punctuation">.</span>fragmentBranches<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    findings<span class="token punctuation">.</span><span class="token function">push</span><span class="token punctuation">(</span><span class="token punctuation">{</span>
+      <span class="token literal-property property">severity</span><span class="token operator">:</span> <span class="token string">'warn'</span><span class="token punctuation">,</span>
+      <span class="token literal-property property">observation</span><span class="token operator">:</span> <span class="token template-string"><span class="token template-punctuation string">`</span><span class="token string">fragment shader has </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>worstShader<span class="token punctuation">.</span>branches<span class="token interpolation-punctuation punctuation">}</span></span><span class="token string"> branches</span><span class="token template-punctuation string">`</span></span><span class="token punctuation">,</span>
+      <span class="token literal-property property">fix</span><span class="token operator">:</span> <span class="token string">'bucket the Cesium3DTileStyle conditions to 16 or fewer'</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  <span class="token keyword">if</span> <span class="token punctuation">(</span>textures<span class="token punctuation">.</span>uploadCommands <span class="token operator">></span> thresholds<span class="token punctuation">.</span>uploadsInSettledFrame<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    findings<span class="token punctuation">.</span><span class="token function">push</span><span class="token punctuation">(</span><span class="token punctuation">{</span>
+      <span class="token literal-property property">severity</span><span class="token operator">:</span> <span class="token string">'error'</span><span class="token punctuation">,</span>
+      <span class="token literal-property property">observation</span><span class="token operator">:</span> <span class="token template-string"><span class="token template-punctuation string">`</span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>textures<span class="token punctuation">.</span>uploadCommands<span class="token interpolation-punctuation punctuation">}</span></span><span class="token string"> texture upload(s) in a settled frame</span><span class="token template-punctuation string">`</span></span><span class="token punctuation">,</span>
+      <span class="token literal-property property">fix</span><span class="token operator">:</span> <span class="token string">'the tile cache is evicting textures — raise tileset.cacheBytes'</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  <span class="token keyword">if</span> <span class="token punctuation">(</span>textures<span class="token punctuation">.</span>anyUncompressed
+      <span class="token operator">&amp;&amp;</span> textures<span class="token punctuation">.</span>estimatedGpuMB <span class="token operator">></span> thresholds<span class="token punctuation">.</span>uncompressedTextureMB<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    findings<span class="token punctuation">.</span><span class="token function">push</span><span class="token punctuation">(</span><span class="token punctuation">{</span>
+      <span class="token literal-property property">severity</span><span class="token operator">:</span> <span class="token string">'warn'</span><span class="token punctuation">,</span>
+      <span class="token literal-property property">observation</span><span class="token operator">:</span> <span class="token template-string"><span class="token template-punctuation string">`</span><span class="token string">about </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>textures<span class="token punctuation">.</span>estimatedGpuMB<span class="token interpolation-punctuation punctuation">}</span></span><span class="token string"> MB of uncompressed texture</span><span class="token template-punctuation string">`</span></span><span class="token punctuation">,</span>
+      <span class="token literal-property property">fix</span><span class="token operator">:</span> <span class="token string">'encode tile textures as KTX2/Basis'</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+
+  <span class="token keyword">return</span> <span class="token punctuation">{</span>
+    context<span class="token punctuation">,</span>
+    <span class="token literal-property property">summary</span><span class="token operator">:</span> <span class="token punctuation">{</span>
+      <span class="token literal-property property">drawCalls</span><span class="token operator">:</span> draws<span class="token punctuation">.</span>drawCalls<span class="token punctuation">,</span>
+      <span class="token literal-property property">triangles</span><span class="token operator">:</span> draws<span class="token punctuation">.</span>triangles<span class="token punctuation">,</span>
+      <span class="token literal-property property">smallDrawShare</span><span class="token operator">:</span> <span class="token function">Number</span><span class="token punctuation">(</span>smallShare<span class="token punctuation">.</span><span class="token function">toFixed</span><span class="token punctuation">(</span><span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+      <span class="token literal-property property">instancedDrawCalls</span><span class="token operator">:</span> draws<span class="token punctuation">.</span>instancedDrawCalls<span class="token punctuation">,</span>
+      <span class="token literal-property property">programs</span><span class="token operator">:</span> shaders<span class="token punctuation">.</span>programs<span class="token punctuation">,</span>
+      <span class="token literal-property property">redundantStateChanges</span><span class="token operator">:</span> state<span class="token punctuation">.</span>redundantTotal<span class="token punctuation">,</span>
+      <span class="token literal-property property">estimatedTextureGpuMB</span><span class="token operator">:</span> textures<span class="token punctuation">.</span>estimatedGpuMB<span class="token punctuation">,</span>
+    <span class="token punctuation">}</span><span class="token punctuation">,</span>
+    findings<span class="token punctuation">,</span>
+    <span class="token literal-property property">errors</span><span class="token operator">:</span> findings<span class="token punctuation">.</span><span class="token function">filter</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">f</span><span class="token punctuation">)</span> <span class="token operator">=></span> f<span class="token punctuation">.</span>severity <span class="token operator">===</span> <span class="token string">'error'</span><span class="token punctuation">)</span><span class="token punctuation">.</span>length<span class="token punctuation">,</span>
+    <span class="token literal-property property">pass</span><span class="token operator">:</span> <span class="token operator">!</span>findings<span class="token punctuation">.</span><span class="token function">some</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">f</span><span class="token punctuation">)</span> <span class="token operator">=></span> f<span class="token punctuation">.</span>severity <span class="token operator">===</span> <span class="token string">'error'</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+  <span class="token punctuation">}</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+</code></pre></div>
+<p>Every finding carries a <strong>fix</strong> that names a specific change to the content or the viewer configuration, which is the difference between a profile and a diagnosis. “2,847 draw calls” is an observation; “the content has one primitive per feature, join by material” is something someone can do this afternoon.</p>
+<p>The distinction between too many draw calls and too many <em>small</em> draw calls is the important branch. Too many large draw calls means too many visible tiles, and the fix is in the tileset’s structure or the screen-space error; too many small ones means the tile content is fragmented, and the fix is in the content pipeline.</p>
+<h2 id="expected-output-verification" tabindex="-1"><a class="heading-link" href="#expected-output-verification"><span>Expected Output &amp; Verification</span></a></h2>
+<div class="codeblock" data-lang="text"><div class="codeblock__bar"><span class="codeblock__lang">text</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-text" tabindex="0" role="group" aria-label="text code sample"><code class="language-text">{
+  "context": {
+    "tilesLoaded": true, "selectedTiles": 148,
+    "maximumScreenSpaceError": 16, "resolution": [2560, 1340],
+    "devicePixelRatio": 2
+  },
+  "summary": {
+    "drawCalls": 2847, "triangles": 2284118, "smallDrawShare": 0.739,
+    "instancedDrawCalls": 4, "programs": 9,
+    "redundantStateChanges": 5337, "estimatedTextureGpuMB": 412.88
+  },
+  "findings": [
+    {"severity": "error", "observation": "2847 draw calls in one frame",
+     "fix": "merge primitives per material in the tile content (gltf-transform join)"},
+    {"severity": "error", "observation": "74% of draw calls carry &lt; 300 triangles",
+     "fix": "the content has one primitive per feature; join by material and use feature ids for picking"},
+    {"severity": "error", "observation": "18 texture upload(s) in a settled frame",
+     "fix": "the tile cache is evicting textures — raise tileset.cacheBytes"},
+    {"severity": "warn", "observation": "about 412.88 MB of uncompressed texture",
+     "fix": "encode tile textures as KTX2/Basis"}
+  ],
+  "errors": 3, "pass": false
+}
+</code></pre></div>
+<p>Three errors with concrete fixes, from one captured frame. The 74% small-draw share against 148 selected tiles says each tile is issuing about 19 draw calls, which is one per building — exactly the situation the merge step exists for.</p>
+<p>The 18 texture uploads in a settled frame is the second independent finding and explains a symptom the frame rate does not: periodic hitching as the cache thrashes.</p>
+<p>Verify the diagnosis by making the change and re-capturing the same view:</p>
+<div class="codeblock" data-lang="javascript"><div class="codeblock__bar"><span class="codeblock__lang">javascript</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-javascript" tabindex="0" role="group" aria-label="javascript code sample"><code class="language-javascript"><span class="token keyword">export</span> <span class="token keyword">async</span> <span class="token keyword">function</span> <span class="token function">beforeAfter</span><span class="token punctuation">(</span><span class="token parameter">viewer<span class="token punctuation">,</span> tilesetUrlBefore<span class="token punctuation">,</span> tilesetUrlAfter<span class="token punctuation">,</span> view</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+  <span class="token keyword">const</span> results <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token punctuation">}</span><span class="token punctuation">;</span>
+  <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">const</span> <span class="token punctuation">[</span>label<span class="token punctuation">,</span> url<span class="token punctuation">]</span> <span class="token keyword">of</span> <span class="token punctuation">[</span><span class="token punctuation">[</span><span class="token string">'before'</span><span class="token punctuation">,</span> tilesetUrlBefore<span class="token punctuation">]</span><span class="token punctuation">,</span>
+                              <span class="token punctuation">[</span><span class="token string">'after'</span><span class="token punctuation">,</span> tilesetUrlAfter<span class="token punctuation">]</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> tileset <span class="token operator">=</span> <span class="token keyword">await</span> Cesium<span class="token punctuation">.</span>Cesium3DTileset<span class="token punctuation">.</span><span class="token function">fromUrl</span><span class="token punctuation">(</span>url<span class="token punctuation">,</span> <span class="token punctuation">{</span>
+      <span class="token literal-property property">maximumScreenSpaceError</span><span class="token operator">:</span> <span class="token number">16</span><span class="token punctuation">,</span>
+      <span class="token literal-property property">cacheBytes</span><span class="token operator">:</span> <span class="token number">536_870_912</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    viewer<span class="token punctuation">.</span>scene<span class="token punctuation">.</span>primitives<span class="token punctuation">.</span><span class="token function">add</span><span class="token punctuation">(</span>tileset<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">const</span> <span class="token punctuation">{</span> frame<span class="token punctuation">,</span> context <span class="token punctuation">}</span> <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token function">captureAtView</span><span class="token punctuation">(</span>viewer<span class="token punctuation">,</span> tileset<span class="token punctuation">,</span> view<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">const</span> d <span class="token operator">=</span> <span class="token function">diagnose</span><span class="token punctuation">(</span>frame<span class="token punctuation">,</span> context<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">const</span> frames <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+    <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">let</span> i <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span> i <span class="token operator">&lt;</span> <span class="token number">120</span><span class="token punctuation">;</span> i<span class="token operator">++</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      <span class="token keyword">const</span> t0 <span class="token operator">=</span> performance<span class="token punctuation">.</span><span class="token function">now</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      viewer<span class="token punctuation">.</span>scene<span class="token punctuation">.</span><span class="token function">render</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      frames<span class="token punctuation">.</span><span class="token function">push</span><span class="token punctuation">(</span>performance<span class="token punctuation">.</span><span class="token function">now</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">-</span> t0<span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token keyword">await</span> <span class="token keyword">new</span> <span class="token class-name">Promise</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">r</span><span class="token punctuation">)</span> <span class="token operator">=></span> <span class="token function">requestAnimationFrame</span><span class="token punctuation">(</span>r<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+    frames<span class="token punctuation">.</span><span class="token function">sort</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">a<span class="token punctuation">,</span> b</span><span class="token punctuation">)</span> <span class="token operator">=></span> a <span class="token operator">-</span> b<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    results<span class="token punctuation">[</span>label<span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token punctuation">{</span>
+      <span class="token operator">...</span>d<span class="token punctuation">.</span>summary<span class="token punctuation">,</span>
+      <span class="token literal-property property">medianFrameMs</span><span class="token operator">:</span> <span class="token function">Number</span><span class="token punctuation">(</span>frames<span class="token punctuation">[</span><span class="token number">60</span><span class="token punctuation">]</span><span class="token punctuation">.</span><span class="token function">toFixed</span><span class="token punctuation">(</span><span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+      <span class="token literal-property property">p95FrameMs</span><span class="token operator">:</span> <span class="token function">Number</span><span class="token punctuation">(</span>frames<span class="token punctuation">[</span><span class="token number">114</span><span class="token punctuation">]</span><span class="token punctuation">.</span><span class="token function">toFixed</span><span class="token punctuation">(</span><span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span><span class="token punctuation">;</span>
+    viewer<span class="token punctuation">.</span>scene<span class="token punctuation">.</span>primitives<span class="token punctuation">.</span><span class="token function">remove</span><span class="token punctuation">(</span>tileset<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  <span class="token keyword">const</span> before <span class="token operator">=</span> results<span class="token punctuation">.</span>before<span class="token punctuation">;</span>
+  <span class="token keyword">const</span> after <span class="token operator">=</span> results<span class="token punctuation">.</span>after<span class="token punctuation">;</span>
+  <span class="token keyword">return</span> <span class="token punctuation">{</span>
+    results<span class="token punctuation">,</span>
+    <span class="token literal-property property">drawCallReduction</span><span class="token operator">:</span> <span class="token function">Number</span><span class="token punctuation">(</span><span class="token punctuation">(</span>before<span class="token punctuation">.</span>drawCalls <span class="token operator">/</span> Math<span class="token punctuation">.</span><span class="token function">max</span><span class="token punctuation">(</span>after<span class="token punctuation">.</span>drawCalls<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+      <span class="token punctuation">.</span><span class="token function">toFixed</span><span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token literal-property property">frameTimeReduction</span><span class="token operator">:</span> <span class="token function">Number</span><span class="token punctuation">(</span><span class="token punctuation">(</span>before<span class="token punctuation">.</span>medianFrameMs <span class="token operator">-</span> after<span class="token punctuation">.</span>medianFrameMs<span class="token punctuation">)</span>
+      <span class="token punctuation">.</span><span class="token function">toFixed</span><span class="token punctuation">(</span><span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token literal-property property">trianglesUnchanged</span><span class="token operator">:</span> Math<span class="token punctuation">.</span><span class="token function">abs</span><span class="token punctuation">(</span>before<span class="token punctuation">.</span>triangles <span class="token operator">-</span> after<span class="token punctuation">.</span>triangles<span class="token punctuation">)</span>
+      <span class="token operator">/</span> Math<span class="token punctuation">.</span><span class="token function">max</span><span class="token punctuation">(</span>before<span class="token punctuation">.</span>triangles<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span> <span class="token operator">&lt;</span> <span class="token number">0.02</span><span class="token punctuation">,</span>
+    <span class="token literal-property property">verdict</span><span class="token operator">:</span> after<span class="token punctuation">.</span>medianFrameMs <span class="token operator">&lt;</span> before<span class="token punctuation">.</span>medianFrameMs <span class="token operator">*</span> <span class="token number">0.75</span>
+      <span class="token operator">?</span> <span class="token string">'the change worked'</span>
+      <span class="token operator">:</span> <span class="token string">'draw calls fell and the frame time did not — the bottleneck is elsewhere'</span><span class="token punctuation">,</span>
+  <span class="token punctuation">}</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+</code></pre></div>
+<p>The <code>trianglesUnchanged</code> assertion is what makes this a valid comparison: a merge should change the draw-call count and not the geometry, so a triangle count that also fell means something else changed too and the frame-time improvement cannot be attributed.</p>
+<p>The verdict’s second branch is the honest outcome worth naming. A tileset whose draw calls drop 20× with no frame-time improvement was never draw-call bound, and the capture’s other findings — texture memory, shader branches, triangle count — are where to look next.</p>
+<p>Then verify the capture is representative rather than a lucky frame:</p>
+<div class="codeblock" data-lang="javascript"><div class="codeblock__bar"><span class="codeblock__lang">javascript</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-javascript" tabindex="0" role="group" aria-label="javascript code sample"><code class="language-javascript"><span class="token keyword">export</span> <span class="token keyword">async</span> <span class="token keyword">function</span> <span class="token function">captureStability</span><span class="token punctuation">(</span><span class="token parameter">viewer<span class="token punctuation">,</span> tileset<span class="token punctuation">,</span> view<span class="token punctuation">,</span> <span class="token punctuation">{</span> captures <span class="token operator">=</span> <span class="token number">5</span> <span class="token punctuation">}</span> <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token punctuation">}</span></span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+  <span class="token keyword">const</span> rows <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+  <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">let</span> i <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span> i <span class="token operator">&lt;</span> captures<span class="token punctuation">;</span> i<span class="token operator">++</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> <span class="token punctuation">{</span> frame<span class="token punctuation">,</span> context <span class="token punctuation">}</span> <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token function">captureAtView</span><span class="token punctuation">(</span>viewer<span class="token punctuation">,</span> tileset<span class="token punctuation">,</span> view<span class="token punctuation">,</span>
+                                                   <span class="token punctuation">{</span> <span class="token literal-property property">settleMs</span><span class="token operator">:</span> <span class="token number">6000</span> <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">const</span> d <span class="token operator">=</span> <span class="token function">diagnose</span><span class="token punctuation">(</span>frame<span class="token punctuation">,</span> context<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    rows<span class="token punctuation">.</span><span class="token function">push</span><span class="token punctuation">(</span><span class="token punctuation">{</span>
+      <span class="token literal-property property">capture</span><span class="token operator">:</span> i<span class="token punctuation">,</span>
+      <span class="token literal-property property">drawCalls</span><span class="token operator">:</span> d<span class="token punctuation">.</span>summary<span class="token punctuation">.</span>drawCalls<span class="token punctuation">,</span>
+      <span class="token literal-property property">triangles</span><span class="token operator">:</span> d<span class="token punctuation">.</span>summary<span class="token punctuation">.</span>triangles<span class="token punctuation">,</span>
+      <span class="token literal-property property">textureUploads</span><span class="token operator">:</span> d<span class="token punctuation">.</span>summary<span class="token punctuation">.</span>estimatedTextureGpuMB<span class="token punctuation">,</span>
+      <span class="token literal-property property">selectedTiles</span><span class="token operator">:</span> context<span class="token punctuation">.</span>selectedTiles<span class="token punctuation">,</span>
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  <span class="token keyword">const</span> calls <span class="token operator">=</span> rows<span class="token punctuation">.</span><span class="token function">map</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">r</span><span class="token punctuation">)</span> <span class="token operator">=></span> r<span class="token punctuation">.</span>drawCalls<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">const</span> spread <span class="token operator">=</span> <span class="token punctuation">(</span>Math<span class="token punctuation">.</span><span class="token function">max</span><span class="token punctuation">(</span><span class="token operator">...</span>calls<span class="token punctuation">)</span> <span class="token operator">-</span> Math<span class="token punctuation">.</span><span class="token function">min</span><span class="token punctuation">(</span><span class="token operator">...</span>calls<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">/</span> Math<span class="token punctuation">.</span><span class="token function">max</span><span class="token punctuation">(</span><span class="token operator">...</span>calls<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">return</span> <span class="token punctuation">{</span>
+    rows<span class="token punctuation">,</span>
+    <span class="token literal-property property">drawCallSpread</span><span class="token operator">:</span> <span class="token function">Number</span><span class="token punctuation">(</span>spread<span class="token punctuation">.</span><span class="token function">toFixed</span><span class="token punctuation">(</span><span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token literal-property property">stable</span><span class="token operator">:</span> spread <span class="token operator">&lt;</span> <span class="token number">0.05</span><span class="token punctuation">,</span>
+    <span class="token literal-property property">note</span><span class="token operator">:</span> spread <span class="token operator">>=</span> <span class="token number">0.05</span>
+      <span class="token operator">?</span> <span class="token string">'captures differ by more than 5% — the scene has not settled, or the '</span>
+        <span class="token operator">+</span> <span class="token string">'camera moved between captures'</span>
+      <span class="token operator">:</span> <span class="token string">'captures are consistent; the numbers are representative'</span><span class="token punctuation">,</span>
+  <span class="token punctuation">}</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+</code></pre></div>
+<p>A draw-call count that varies by more than a few percent across captures of the same view means the scene was not settled, and every number derived from it is provisional. Five captures is cheap and it converts a single measurement into a claim.</p>
+<figure class="diagram">
+<svg viewBox="4 6 732 234" role="img" aria-labelledby="spector-fix-t spector-fix-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="spector-fix-t">Observation to fix</title>
+  <desc id="spector-fix-d">A mapping from capture observation to the change it implies. Many draw calls with small triangle counts means the content has one primitive per feature, fixed by joining per material. Many draw calls with large triangle counts means too many visible tiles, fixed by raising the screen-space error. Texture uploads in a settled frame means the tile cache is too small. Many shader programs means duplicate materials. Many fragment branches means too many style conditions. High uncompressed texture memory means KTX2 is needed.</desc>
+  <rect class="svg-bg" x="4" y="6" width="732" height="234" fill="#ffffff"/>
+  <defs>
+    <marker id="spector-fix-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
+    </marker>
+  </defs>
+  <g stroke-width="1.5">
+    <rect x="18" y="20" width="312" height="30" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="18" y="56" width="312" height="30" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="18" y="92" width="312" height="30" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="18" y="128" width="312" height="30" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="18" y="164" width="312" height="30" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="410" y="20" width="312" height="30" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="410" y="56" width="312" height="30" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="410" y="92" width="312" height="30" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="410" y="128" width="312" height="30" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="410" y="164" width="312" height="30" fill="#eef5e9" stroke="#4f7a4d"/>
+  </g>
+  <g stroke="#5b6471" stroke-width="1.6" fill="none" marker-end="url(#spector-fix-arrow)">
+    <path d="M330 35 H408"/><path d="M330 71 H408"/><path d="M330 107 H408"/>
+    <path d="M330 143 H408"/><path d="M330 179 H408"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="174" y="40">many calls, few triangles each</text>
+    <text x="566" y="40">join primitives per material</text>
+    <text x="174" y="76">many calls, many triangles each</text>
+    <text x="566" y="76">raise maximumScreenSpaceError</text>
+    <text x="174" y="112">texture uploads in a settled frame</text>
+    <text x="566" y="112">raise tileset.cacheBytes</text>
+    <text x="174" y="148">many shader programs</text>
+    <text x="566" y="148">dedup materials in the content</text>
+    <text x="174" y="184">many fragment branches</text>
+    <text x="566" y="184">bucket the style conditions</text>
+  </g>
+  <text x="370" y="222" fill="#5b6471" font-size="12" text-anchor="middle">the first two look identical in a JavaScript profile and need opposite fixes</text>
+</svg>
+<figcaption>The top two rows are indistinguishable without a capture and their fixes are in different places — the content pipeline and the viewer configuration.</figcaption>
+</figure>
+<h2 id="performance-notes" tabindex="-1"><a class="heading-link" href="#performance-notes"><span>Performance Notes</span></a></h2>
+<ul>
+<li><strong>Spector.js slows the page substantially while spying.</strong> Capture, read the result, then reload without the extension; never measure frame times with it attached.</li>
+<li><strong>A capture of 20,000 commands is a few megabytes of JSON.</strong> A frame with 2,800 draw calls generates roughly 15,000 commands, so the default limit is usually adequate; raise it if the capture truncates.</li>
+<li><strong>Capture one frame, not ten.</strong> The interesting information is in a single frame’s command stream, and ten captures are ten times the JSON for the same finding.</li>
+<li><strong>The browser’s own frame timing is the measurement</strong>; the capture is the explanation. Use both.</li>
+<li><strong><code>EXT_disjoint_timer_query_webgl2</code> gives real GPU timings</strong> where the browser exposes it, which is the only way to attribute time to a specific draw call rather than counting calls.</li>
+<li><strong>Automate the capture in CI against a fixed view</strong> and assert on the draw-call count; it is a stable number and it regresses quietly.</li>
+</ul>
+<h2 id="common-errors" tabindex="-1"><a class="heading-link" href="#common-errors"><span>Common Errors</span></a></h2>
+<p><strong>The capture is empty.</strong> <code>spyCanvases()</code> was called after the context was created, or the canvas was obtained differently. Call it before the viewer initialises.</p>
+<p><strong>The capture is dominated by <code>texImage2D</code> and <code>bufferData</code>.</strong> The frame was captured while tiles were loading. Wait for <code>tilesLoaded</code>.</p>
+<p><strong>Draw-call count varies wildly between captures.</strong> The camera moved or the scene had not settled. Fix the view with <code>setView</code> and use the stability check.</p>
+<p><strong><code>capture.programs</code> is empty.</strong> Some Spector versions put programs in <code>initState</code>. The shader report handles both.</p>
+<p><strong>Frame time is much worse than usual while profiling.</strong> Expected — the spy wraps every WebGL call. Detach before timing.</p>
+<p><strong>Everything looks fine and the viewer still stutters.</strong> The stutter is probably not in the render frame: check the loader, the decode workers, and garbage collection in the browser’s performance panel.</p>
+<p><strong>The instanced draw-call count is 0 on a tileset with instanced trees.</strong> The instancing extension was flattened by the content pipeline; see <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/generating-instanced-tiles-for-trees/">generating instanced tiles for trees</a>.</p>
+<h2 id="frequently-asked-questions" tabindex="-1"><a class="heading-link" href="#frequently-asked-questions"><span>Frequently Asked Questions</span></a></h2>
+<h3 id="spectorjs-or-the-browsers-webgl-inspector" tabindex="-1"><a class="heading-link" href="#spectorjs-or-the-browsers-webgl-inspector"><span>Spector.js or the browser’s WebGL inspector?</span></a></h3>
+<p>Spector.js gives the full command stream with state at each call, which is what the analysis above needs. Chrome’s own tooling is better for GPU timing and worse for command inspection, so they complement each other.</p>
+<h3 id="can-i-capture-from-a-headless-browser-in-ci" tabindex="-1"><a class="heading-link" href="#can-i-capture-from-a-headless-browser-in-ci"><span>Can I capture from a headless browser in CI?</span></a></h3>
+<p>Yes, with the library rather than the extension: load <code>spectorjs</code>, capture on a fixed view, and assert on the draw-call count. It is a stable regression test and much cheaper than a visual one.</p>
+<h3 id="does-a-high-draw-call-count-always-matter" tabindex="-1"><a class="heading-link" href="#does-a-high-draw-call-count-always-matter"><span>Does a high draw-call count always matter?</span></a></h3>
+<p>On desktop, up to a few hundred calls per frame is free. The threshold that matters is the device: a mid-range phone starts struggling at about 150, so a tileset intended for mobile needs an order of magnitude fewer calls than one for a workstation.</p>
+<h2 id="related-guides" tabindex="-1"><a class="heading-link" href="#related-guides"><span>Related Guides</span></a></h2>
+<ul>
+<li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/merging-meshes-to-cut-draw-calls/">Merging Meshes to Cut Draw Calls</a> — the fix for the commonest finding</li>
+<li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/diagnosing-slow-first-render-of-tilesets/">Diagnosing Slow First Render of Tilesets</a> — the loading path this capture deliberately excludes</li>
+<li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/debugging-with-the-cesium-3d-tiles-inspector/">Debugging with the Cesium 3D Tiles Inspector</a> — the tileset-level view of the same frame</li>
+</ul>
+<p>Back to <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/">Performance Profiling and Benchmarking</a>.</p>
+
+
+      
+      
+
+      <div class="related-nav">
+        
+
+        
+          <div>
+            <h3>Related</h3>
+            <div class="related-grid">
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/benchmarking-draco-decode-on-mobile-gpus/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Benchmarking Draco Decode on Mobile GPUs</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/load-testing-tile-servers-with-locust/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Load Testing Tile Servers with Locust</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/measuring-tile-load-times-in-the-cesium-frame-loop/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Measuring Tile Load Times in the Cesium Frame Loop</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/memory-profiling-python-pipelines-with-memray/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Memory Profiling Python Pipelines with memray</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/profiling-pdal-pipelines-with-cprofile-and-py-spy/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Profiling PDAL Pipelines with cProfile and py-spy</span>
+                </a>
+              
+            </div>
+          </div>
+        
+      </div>
+    </article>
+
+    
+    <aside class="toc" aria-label="On this page" data-toc hidden>
+      <h4>On this page</h4>
+      <ul></ul>
+    </aside>
+  </div>
+</div>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+  <div class="container site-footer__inner">
+    <div class="site-footer__brand">
+      <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+        <img src="/assets/img/logo-mark.svg" alt="" class="brand__mark" width="36" height="36">
+        <span class="brand__name">
+          3D Geospatial
+          <small>Digital Twin Automation</small>
+        </span>
+      </a>
+      <p>Engineering-grade guides on point cloud processing, mesh pipelines, LOD strategies, and CI/CD automation for digital twin platforms.</p>
+      <a class="footer-social" href="https://github.com/3d-geospatial" aria-label="3D Geospatial on GitHub" rel="noopener" target="_blank">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+          <path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.53-1.34-1.3-1.7-1.3-1.7-1.06-.72.08-.71.08-.71 1.17.08 1.79 1.2 1.79 1.2 1.04 1.79 2.73 1.27 3.4.97.1-.75.4-1.27.73-1.56-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.19-3.08-.12-.3-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.75.11 3.05.74.8 1.19 1.83 1.19 3.08 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.07.78 2.15v3.18c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5Z"/>
+        </svg>
+        <span>GitHub</span>
+      </a>
+    </div>
+
+    <div class="site-footer__col">
+      <h4>Sections</h4>
+      <ul>
+        <li><a href="https://www.3d-geospatial.com/">Home</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management &amp; Optimization</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/">Point Cloud &amp; Mesh Pipelines</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/">Troubleshooting &amp; Reliability</a></li>
+        
+      </ul>
+    </div>
+
+    
+      <div class="site-footer__col">
+        <h4>3D Geospatial Fundamentals</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/">3D Format Standards Comparison</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/">BIM and IFC Georeferencing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/">CityGML and CityJSON Processing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems for 3D Assets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/">Digital Elevation Model Workflows</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/">Spatial Indexing and Tiling Schemes for 3D Data</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>LOD Management &amp; Optimization</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/">Automated Tile Generation for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/">Cesium ion Upload Automation for 3D Tilesets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/">glTF LOD Generation With Draco Compression</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/">Streaming Sync Patterns for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/">Tileset Metadata and 3D Tiles Next</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/">Vector Overlays on 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Point Cloud &amp; Mesh Pipelines</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/">Automated Mesh Decimation for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/">Change Detection Between LiDAR Scan Epochs</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/">CI/CD Automation for Spatial Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">LiDAR Classification and Ground Extraction</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/photogrammetry-processing-pipelines/">Photogrammetry Processing Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/">Point Cloud Filtering Techniques</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/">Surface Reconstruction for Geospatial Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/">Texture Mapping Workflows for Digital Twins</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Troubleshooting &amp; Reliability</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/">Cross-Section Failure Modes in Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/">Data Validation &amp; QA Gates for 3D Tiles</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/">Performance Profiling and Benchmarking</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/">Pipeline Observability and Monitoring</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/">Streaming &amp; Runtime Diagnostics for 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+  </div>
+  <div class="container site-footer__bottom">
+    <span>© 2026 3D Geospatial &amp; Digital Twin Automation</span>
+    <span>Built with Eleventy · PWA-enabled</span>
+  </div>
+</footer>
+
+
+  <script src="/assets/js/site.js?v=b99aa9f971" defer></script>
+  
+</body>
+</html>

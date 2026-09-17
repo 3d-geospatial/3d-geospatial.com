@@ -1,0 +1,1028 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <title>Memory Profiling Python Pipelines with memray — 3D Geospatial</title>
+  <meta name="description" content="Find why a point-cloud pipeline needs 90 GB: memray native tracking, high watermark vs leak, the temporary array copies that dominate">
+  <meta name="keywords" content="3D geospatial, digital twin, point cloud, mesh pipeline, LOD, 3D Tiles, Cesium, PDAL, Open3D, Python, CI/CD">
+  <meta name="author" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta name="theme-color" content="#1f6b8a" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f171d" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+
+  
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem("theme");
+        var theme = (stored === "dark" || stored === "light") ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    })();
+  </script>
+  <meta name="generator" content="Eleventy">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="googlebot" content="index,follow,max-image-preview:large">
+
+  
+  <link rel="canonical" href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/memory-profiling-python-pipelines-with-memray/">
+  <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">
+
+  
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/icon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+
+  
+  <link rel="apple-touch-icon" href="/assets/img/icon-180.png">
+  <link rel="mask-icon" href="/assets/img/logo.svg" color="#1f6b8a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="3D Geospatial">
+  <meta name="application-name" content="3D Geospatial">
+
+  
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Memory Profiling Python Pipelines with memray — 3D Geospatial">
+  <meta property="og:description" content="Find why a point-cloud pipeline needs 90 GB: memray native tracking, high watermark vs leak, the temporary array copies that dominate">
+  <meta property="og:url" content="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/memory-profiling-python-pipelines-with-memray/">
+  <meta property="og:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+  <meta property="og:site_name" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta property="og:locale" content="en_US">
+  
+  <meta property="article:published_time" content="2026-09-17T23:36:56.451Z">
+  <meta property="article:modified_time" content="2026-09-17T23:36:56.451Z">
+  <meta property="article:publisher" content="https://www.3d-geospatial.com/">
+  
+
+  
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Memory Profiling Python Pipelines with memray — 3D Geospatial">
+  <meta name="twitter:description" content="Find why a point-cloud pipeline needs 90 GB: memray native tracking, high watermark vs leak, the temporary array copies that dominate">
+  <meta name="twitter:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta name="twitter:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+
+  
+  <link rel="preload" href="/assets/css/styles.css?v=8c46394d6c" as="style">
+  
+
+  <link rel="stylesheet" href="/assets/css/styles.css?v=8c46394d6c">
+
+  
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.3d-geospatial.com/#organization",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "url": "https://www.3d-geospatial.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/icon-512.png",
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://www.3d-geospatial.com/#website",
+      "url": "https://www.3d-geospatial.com/",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "description": "Build reliable 3D spatial data pipelines for digital twins — point clouds, meshes, LOD strategies, Python processing, and CI/CD automation.",
+      "inLanguage": "en",
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      }
+    },
+    {
+      "@type": "TechArticle",
+      "@id": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/memory-profiling-python-pipelines-with-memray/#article",
+      "isPartOf": {
+        "@id": "https://www.3d-geospatial.com/#website"
+      },
+      "headline": "Memory Profiling Python Pipelines with memray",
+      "name": "Memory Profiling Python Pipelines with memray",
+      "description": "Find why a point-cloud pipeline needs 90 GB: memray native tracking, high watermark vs leak, the temporary array copies that dominate",
+      "url": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/memory-profiling-python-pipelines-with-memray/",
+      "mainEntityOfPage": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/memory-profiling-python-pipelines-with-memray/",
+      "inLanguage": "en",
+      "datePublished": "2026-09-17T23:36:56.451Z",
+      "dateModified": "2026-09-17T23:36:56.451Z",
+      "author": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "image": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/og-cover.png",
+        "width": 1200,
+        "height": 630
+      },
+      "breadcrumb": {
+        "@id": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/memory-profiling-python-pipelines-with-memray/#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/memory-profiling-python-pipelines-with-memray/#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://www.3d-geospatial.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Digital Twin Troubleshooting And Reliability",
+          "item": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Performance Profiling And Benchmarking",
+          "item": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "name": "Memory Profiling Python Pipelines With Memray",
+          "item": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/memory-profiling-python-pipelines-with-memray/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  
+<header class="site-header" role="banner">
+  <div class="container site-header__inner">
+    <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+      <img src="/assets/img/logo.svg" alt="" class="brand__mark" width="36" height="36">
+      <span class="brand__name">
+        3D Geospatial
+        <small>Digital Twin Automation</small>
+      </span>
+    </a>
+
+    <button class="theme-toggle" type="button" data-theme-toggle
+            aria-label="Switch to dark theme" title="Switch to dark theme">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4.2"/>
+        <path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/>
+      </svg>
+    </button>
+
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>
+      <span class="nav-toggle__icon" aria-hidden="true"><span></span></span>
+      Menu
+    </button>
+
+    <nav class="primary-nav" id="primary-nav" aria-label="Primary">
+      
+      <a href="https://www.3d-geospatial.com/" >
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/>
+        </svg>
+        Home
+      </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2 3 7l9 5 9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 17l9 5 9-5"/>
+            </svg>
+          
+          3D Geospatial Fundamentals
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+          
+          LOD Management &amp; Optimization
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="6" cy="6" r="1.5"/><circle cx="12" cy="6" r="1.5"/><circle cx="18" cy="6" r="1.5"/>
+              <circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/>
+              <circle cx="6" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="18" cy="18" r="1.5"/>
+            </svg>
+          
+          Point Cloud &amp; Mesh Pipelines
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/" aria-current="page">
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <path d="M12 9v4"/><path d="M12 17h.01"/>
+            </svg>
+          
+          Troubleshooting &amp; Reliability
+        </a>
+      
+    </nav>
+  </div>
+</header>
+
+
+  <main id="main">
+    
+
+
+<div class="container">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    
+      
+        <a href="https://www.3d-geospatial.com/">Home</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/">Digital Twin Troubleshooting And Reliability</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/">Performance Profiling And Benchmarking</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <span class="current">Memory Profiling Python Pipelines With Memray</span>
+      
+    
+  </nav>
+
+  <div class="content-page">
+    <article class="article">
+      <h1 id="memory-profiling-python-pipelines-with-memray" tabindex="-1"><a class="heading-link" href="#memory-profiling-python-pipelines-with-memray"><span>Memory Profiling Python Pipelines with memray</span></a></h1>
+<p>This page finds where a point-cloud pipeline’s memory goes — running it under memray with native tracking so NumPy and PDAL allocations are attributed to your own lines, distinguishing a high watermark from a leak, finding the temporary array copies that multiply peak usage, and turning the result into a per-stage budget the pipeline can be held to.</p>
+<h2 id="why-you-hit-this" tabindex="-1"><a class="heading-link" href="#why-you-hit-this"><span>Why you hit this</span></a></h2>
+<p>A pipeline that processes a 40-million-point tile in 6 GB fails on a 400-million-point one with 90 GB, and the arithmetic does not work: 400 million points at 24 bytes each is 9.6 GB, so where are the other 80 GB? The answer is almost always temporary copies — an <code>astype</code>, a boolean mask, a <code>column_stack</code> — each of which allocates a full-size array that stays alive until the name is rebound.</p>
+<p>Python’s own tooling is poor at finding these. <code>tracemalloc</code> misses every allocation made by NumPy’s C code, which is all of them; <code>resource.getrusage</code> gives one number with no attribution. memray tracks native allocations and attributes them to the Python line that caused them, which is exactly the missing information.</p>
+<h2 id="prerequisites" tabindex="-1"><a class="heading-link" href="#prerequisites"><span>Prerequisites</span></a></h2>
+<ul>
+<li>Python 3.10+ with <code>memray&gt;=1.12</code> (Linux or macOS; memray does not support Windows).</li>
+<li>The pipeline runnable on a reduced input, because profiling a 90 GB run needs 90 GB.</li>
+<li><code>pdal</code>, <code>laspy</code> and <code>numpy</code> as the pipeline requires.</li>
+</ul>
+<h2 id="step-by-step" tabindex="-1"><a class="heading-link" href="#step-by-step"><span>Step-by-Step</span></a></h2>
+<h3 id="1-capture-a-trace-with-native-allocations-attributed" tabindex="-1"><a class="heading-link" href="#1-capture-a-trace-with-native-allocations-attributed"><span>1. Capture a trace with native allocations attributed</span></a></h3>
+<div class="codeblock" data-lang="bash"><div class="codeblock__bar"><span class="codeblock__lang">bash</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-bash" tabindex="0" role="group" aria-label="bash code sample"><code class="language-bash"><span class="token comment"># The two flags that matter: native tracking, and following forks.</span>
+memray run <span class="token parameter variable">--native</span> --follow-fork <span class="token punctuation">\</span>
+  <span class="token parameter variable">--output</span> build/profile/tile.bin <span class="token punctuation">\</span>
+  <span class="token parameter variable">-m</span> pipeline.process_tile input/tile_32_598_6643.laz
+
+memray flamegraph build/profile/tile.bin <span class="token parameter variable">--output</span> build/profile/peak.html
+memray flamegraph <span class="token parameter variable">--leaks</span> build/profile/tile.bin <span class="token parameter variable">--output</span> build/profile/leaks.html
+memray summary build/profile/tile.bin
+memray stats build/profile/tile.bin
+</code></pre></div>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token comment"># profile_runner.py</span>
+<span class="token keyword">import</span> json
+<span class="token keyword">import</span> subprocess
+<span class="token keyword">from</span> pathlib <span class="token keyword">import</span> Path
+
+<span class="token keyword">def</span> <span class="token function">run_under_memray</span><span class="token punctuation">(</span>module<span class="token punctuation">,</span> args<span class="token punctuation">,</span> out_dir<span class="token operator">=</span><span class="token string">"build/profile"</span><span class="token punctuation">,</span> native<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span>
+                     follow_fork<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> trace_python_allocators<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    Path<span class="token punctuation">(</span>out_dir<span class="token punctuation">)</span><span class="token punctuation">.</span>mkdir<span class="token punctuation">(</span>parents<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> exist_ok<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+    binfile <span class="token operator">=</span> Path<span class="token punctuation">(</span>out_dir<span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token string">"trace.bin"</span>
+    binfile<span class="token punctuation">.</span>unlink<span class="token punctuation">(</span>missing_ok<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+    cmd <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token string">"memray"</span><span class="token punctuation">,</span> <span class="token string">"run"</span><span class="token punctuation">,</span> <span class="token string">"--output"</span><span class="token punctuation">,</span> <span class="token builtin">str</span><span class="token punctuation">(</span>binfile<span class="token punctuation">)</span><span class="token punctuation">]</span>
+    <span class="token keyword">if</span> native<span class="token punctuation">:</span>
+        cmd<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token string">"--native"</span><span class="token punctuation">)</span>
+    <span class="token keyword">if</span> follow_fork<span class="token punctuation">:</span>
+        cmd<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token string">"--follow-fork"</span><span class="token punctuation">)</span>
+    <span class="token keyword">if</span> trace_python_allocators<span class="token punctuation">:</span>
+        cmd<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token string">"--trace-python-allocators"</span><span class="token punctuation">)</span>
+    cmd<span class="token punctuation">.</span>extend<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token string">"-m"</span><span class="token punctuation">,</span> module<span class="token punctuation">,</span> <span class="token operator">*</span>args<span class="token punctuation">]</span><span class="token punctuation">)</span>
+    proc <span class="token operator">=</span> subprocess<span class="token punctuation">.</span>run<span class="token punctuation">(</span>cmd<span class="token punctuation">,</span> capture_output<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> text<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token string">"returncode"</span><span class="token punctuation">:</span> proc<span class="token punctuation">.</span>returncode<span class="token punctuation">,</span>
+        <span class="token string">"trace"</span><span class="token punctuation">:</span> <span class="token builtin">str</span><span class="token punctuation">(</span>binfile<span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"stderr_tail"</span><span class="token punctuation">:</span> proc<span class="token punctuation">.</span>stderr<span class="token punctuation">.</span>strip<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span>splitlines<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token operator">-</span><span class="token number">6</span><span class="token punctuation">:</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+        <span class="token string">"flags"</span><span class="token punctuation">:</span> <span class="token punctuation">{</span><span class="token string">"native"</span><span class="token punctuation">:</span> native<span class="token punctuation">,</span> <span class="token string">"follow_fork"</span><span class="token punctuation">:</span> follow_fork<span class="token punctuation">,</span>
+                  <span class="token string">"trace_python_allocators"</span><span class="token punctuation">:</span> trace_python_allocators<span class="token punctuation">}</span><span class="token punctuation">,</span>
+        <span class="token string">"note"</span><span class="token punctuation">:</span> <span class="token string">"without --native, every NumPy allocation is attributed to a C "</span>
+                <span class="token string">"extension and the report is useless"</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+
+<span class="token keyword">def</span> <span class="token function">read_stats</span><span class="token punctuation">(</span>trace<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    proc <span class="token operator">=</span> subprocess<span class="token punctuation">.</span>run<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token string">"memray"</span><span class="token punctuation">,</span> <span class="token string">"stats"</span><span class="token punctuation">,</span> <span class="token string">"--json"</span><span class="token punctuation">,</span> trace<span class="token punctuation">]</span><span class="token punctuation">,</span>
+                          capture_output<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> text<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> check<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+    stats <span class="token operator">=</span> json<span class="token punctuation">.</span>loads<span class="token punctuation">(</span>proc<span class="token punctuation">.</span>stdout<span class="token punctuation">)</span>
+    peak <span class="token operator">=</span> <span class="token builtin">int</span><span class="token punctuation">(</span>stats<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"metadata"</span><span class="token punctuation">,</span> <span class="token punctuation">{</span><span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"peak_memory"</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    allocated <span class="token operator">=</span> <span class="token builtin">int</span><span class="token punctuation">(</span>stats<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"total_bytes_allocated"</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token string">"peak_bytes"</span><span class="token punctuation">:</span> peak<span class="token punctuation">,</span>
+        <span class="token string">"peak_gb"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>peak <span class="token operator">/</span> <span class="token number">1e9</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"total_allocations"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span>stats<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"total_num_allocations"</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"total_allocated_gb"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>allocated <span class="token operator">/</span> <span class="token number">1e9</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"churn_ratio"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>allocated <span class="token operator">/</span> <span class="token builtin">max</span><span class="token punctuation">(</span>peak<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+</code></pre></div>
+<p><code>--native</code> is the flag without which this exercise is pointless. NumPy allocates through C, so a trace without native tracking attributes 13 GB to <code>numpy/core/multiarray</code> and tells you nothing about which line asked for it. With it, the flame graph points at <code>points = np.column_stack([x, y, z])</code> on line 84.</p>
+<p><code>--follow-fork</code> matters for any pipeline using <code>multiprocessing</code> or a Dask local cluster, which is most of them. Without it the parent’s trace is nearly empty because all the work happened in children.</p>
+<p>The <strong>churn ratio</strong> — total bytes allocated divided by the peak — is the first number to read. A ratio near 1 means the pipeline allocates what it needs and holds it; a ratio of 40 means it is allocating and freeing constantly, which is a temporary-copy problem and usually a speed problem too.</p>
+<figure class="diagram">
+<svg viewBox="4 12 732 224" role="img" aria-labelledby="memray-flags-t memray-flags-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="memray-flags-t">The same run traced with and without native tracking</title>
+  <desc id="memray-flags-d">Two attribution tables for the same 40-million-point run with a 5.8 gigabyte peak. Without native tracking, 5.4 gigabytes is attributed to numpy multiarray and 0.4 to Python code, which identifies nothing. With native tracking, 2.4 gigabytes is attributed to the laspy read, 0.96 to a column-stack call, 0.96 to an astype conversion and 0.5 to a boolean mask, each with a file and line number.</desc>
+  <rect class="svg-bg" x="4" y="12" width="732" height="224" fill="#ffffff"/>
+  <rect x="18" y="26" width="330" height="196" rx="9" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <rect x="392" y="26" width="330" height="196" rx="9" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <text x="183" y="50" fill="#1f2937" font-size="13" text-anchor="middle">without --native</text>
+  <text x="557" y="50" fill="#1f2937" font-size="13" text-anchor="middle">with --native</text>
+  <g stroke-width="1.4">
+    <rect x="40" y="66" width="286" height="26" fill="#ffffff" stroke="#b0413e"/>
+    <rect x="40" y="98" width="286" height="26" fill="#ffffff" stroke="#b0413e"/>
+    <rect x="414" y="66" width="286" height="26" fill="#ffffff" stroke="#4f7a4d"/>
+    <rect x="414" y="98" width="286" height="26" fill="#ffffff" stroke="#4f7a4d"/>
+    <rect x="414" y="130" width="286" height="26" fill="#ffffff" stroke="#4f7a4d"/>
+    <rect x="414" y="162" width="286" height="26" fill="#ffffff" stroke="#4f7a4d"/>
+  </g>
+  <g fill="#1f2937" font-size="11.5">
+    <text x="50" y="84">numpy/core/multiarray — 5.4 GB</text>
+    <text x="50" y="116">pipeline/process.py — 0.4 GB</text>
+    <text x="424" y="84">lasreader.py:212 laspy.read — 2.41 GB</text>
+    <text x="424" y="116">process.py:84 column_stack — 0.96 GB</text>
+    <text x="424" y="148">process.py:91 astype(float64) — 0.96 GB</text>
+    <text x="424" y="180">process.py:103 mask indexing — 0.50 GB</text>
+  </g>
+  <text x="183" y="204" fill="#b0413e" font-size="12" text-anchor="middle">identifies nothing actionable</text>
+  <text x="557" y="204" fill="#1f2937" font-size="12" text-anchor="middle">four lines to fix, with line numbers</text>
+</svg>
+<figcaption>Native tracking is the difference between "NumPy used 5.4 GB" and four specific lines to change.</figcaption>
+</figure>
+<h3 id="2-distinguish-the-high-watermark-from-a-leak" tabindex="-1"><a class="heading-link" href="#2-distinguish-the-high-watermark-from-a-leak"><span>2. Distinguish the high watermark from a leak</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">peak_vs_leak</span><span class="token punctuation">(</span>trace<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""memray reports both; they are different problems with different fixes."""</span>
+    peak <span class="token operator">=</span> subprocess<span class="token punctuation">.</span>run<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token string">"memray"</span><span class="token punctuation">,</span> <span class="token string">"summary"</span><span class="token punctuation">,</span> <span class="token string">"--json"</span><span class="token punctuation">,</span> trace<span class="token punctuation">]</span><span class="token punctuation">,</span>
+                          capture_output<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> text<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> check<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+    leaks <span class="token operator">=</span> subprocess<span class="token punctuation">.</span>run<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token string">"memray"</span><span class="token punctuation">,</span> <span class="token string">"summary"</span><span class="token punctuation">,</span> <span class="token string">"--leaks"</span><span class="token punctuation">,</span> <span class="token string">"--json"</span><span class="token punctuation">,</span> trace<span class="token punctuation">]</span><span class="token punctuation">,</span>
+                           capture_output<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> text<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> check<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+    peak_rows <span class="token operator">=</span> json<span class="token punctuation">.</span>loads<span class="token punctuation">(</span>peak<span class="token punctuation">.</span>stdout<span class="token punctuation">)</span><span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"allocations"</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    leak_rows <span class="token operator">=</span> json<span class="token punctuation">.</span>loads<span class="token punctuation">(</span>leaks<span class="token punctuation">.</span>stdout<span class="token punctuation">)</span><span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"allocations"</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+
+    <span class="token keyword">def</span> <span class="token function">top</span><span class="token punctuation">(</span>rows<span class="token punctuation">,</span> n<span class="token operator">=</span><span class="token number">5</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token punctuation">[</span><span class="token punctuation">{</span><span class="token string">"location"</span><span class="token punctuation">:</span> r<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"location"</span><span class="token punctuation">,</span> <span class="token string">"?"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                 <span class="token string">"size_gb"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>r<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"size"</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token number">1e9</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                 <span class="token string">"count"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span>r<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"count"</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">}</span>
+                <span class="token keyword">for</span> r <span class="token keyword">in</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span>rows<span class="token punctuation">,</span> key<span class="token operator">=</span><span class="token keyword">lambda</span> r<span class="token punctuation">:</span> <span class="token operator">-</span>r<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"size"</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token punctuation">:</span>n<span class="token punctuation">]</span><span class="token punctuation">]</span>
+
+    peak_total <span class="token operator">=</span> <span class="token builtin">sum</span><span class="token punctuation">(</span>r<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"size"</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token keyword">for</span> r <span class="token keyword">in</span> peak_rows<span class="token punctuation">)</span>
+    leak_total <span class="token operator">=</span> <span class="token builtin">sum</span><span class="token punctuation">(</span>r<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"size"</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token keyword">for</span> r <span class="token keyword">in</span> leak_rows<span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token string">"peak_gb"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>peak_total <span class="token operator">/</span> <span class="token number">1e9</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"still_allocated_at_exit_gb"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>leak_total <span class="token operator">/</span> <span class="token number">1e9</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"leak_share"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>leak_total <span class="token operator">/</span> <span class="token builtin">max</span><span class="token punctuation">(</span>peak_total<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"top_at_peak"</span><span class="token punctuation">:</span> top<span class="token punctuation">(</span>peak_rows<span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"top_still_allocated"</span><span class="token punctuation">:</span> top<span class="token punctuation">(</span>leak_rows<span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"diagnosis"</span><span class="token punctuation">:</span> <span class="token punctuation">(</span>
+            <span class="token string">"a genuine leak: most of the peak is still held at exit — look for a "</span>
+            <span class="token string">"cache, a module-level list, or a closure holding arrays"</span>
+            <span class="token keyword">if</span> leak_total <span class="token operator">></span> peak_total <span class="token operator">*</span> <span class="token number">0.5</span> <span class="token keyword">else</span>
+            <span class="token string">"a high watermark, not a leak: memory is freed but the peak is too high "</span>
+            <span class="token string">"— look for simultaneous temporaries"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+</code></pre></div>
+<p>The distinction decides where to look. A <strong>high watermark</strong> means the pipeline holds several large arrays at the same moment and then frees them, so the fix is to avoid holding them simultaneously. A <strong>leak</strong> means memory is still held at exit, so the fix is to find what holds the reference.</p>
+<p>In point-cloud pipelines the high watermark is far more common, and it is regularly misdiagnosed as a leak because the process’s resident memory never comes back down — which is usually the allocator retaining freed pages rather than a leak.</p>
+<p>memray’s <code>--leaks</code> mode reports what was still allocated when the trace ended, which for a clean exit should be close to zero apart from the returned result. A leak share above about 0.5 is a real reference-holding bug.</p>
+<h3 id="3-find-the-temporary-copies" tabindex="-1"><a class="heading-link" href="#3-find-the-temporary-copies"><span>3. Find the temporary copies</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> laspy
+<span class="token keyword">import</span> numpy <span class="token keyword">as</span> np
+
+<span class="token keyword">def</span> <span class="token function">read_points_wasteful</span><span class="token punctuation">(</span>path<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Five full-size temporaries: the version people write first."""</span>
+    las <span class="token operator">=</span> laspy<span class="token punctuation">.</span>read<span class="token punctuation">(</span>path<span class="token punctuation">)</span>                         <span class="token comment"># 1: every dimension, not just xyz</span>
+    x <span class="token operator">=</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>las<span class="token punctuation">.</span>x<span class="token punctuation">)</span>                          <span class="token comment"># 2: scaled float64 copy</span>
+    y <span class="token operator">=</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>las<span class="token punctuation">.</span>y<span class="token punctuation">)</span>
+    z <span class="token operator">=</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>las<span class="token punctuation">.</span>z<span class="token punctuation">)</span>
+    points <span class="token operator">=</span> np<span class="token punctuation">.</span>column_stack<span class="token punctuation">(</span><span class="token punctuation">[</span>x<span class="token punctuation">,</span> y<span class="token punctuation">,</span> z<span class="token punctuation">]</span><span class="token punctuation">)</span>            <span class="token comment"># 3: another full copy</span>
+    points <span class="token operator">=</span> points<span class="token punctuation">.</span>astype<span class="token punctuation">(</span>np<span class="token punctuation">.</span>float64<span class="token punctuation">)</span>             <span class="token comment"># 4: float64 to float64, a no-op copy</span>
+    classification <span class="token operator">=</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>las<span class="token punctuation">.</span>classification<span class="token punctuation">)</span>
+    mask <span class="token operator">=</span> classification <span class="token operator">==</span> <span class="token number">2</span>
+    <span class="token keyword">return</span> points<span class="token punctuation">[</span>mask<span class="token punctuation">]</span>                            <span class="token comment"># 5: fancy-index copy</span>
+
+<span class="token keyword">def</span> <span class="token function">read_points_lean</span><span class="token punctuation">(</span>path<span class="token punctuation">,</span> chunk<span class="token operator">=</span><span class="token number">5_000_000</span><span class="token punctuation">,</span> origin<span class="token operator">=</span><span class="token boolean">None</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Chunked, filtered before conversion, float32 relative to an origin."""</span>
+    kept <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    <span class="token keyword">with</span> laspy<span class="token punctuation">.</span><span class="token builtin">open</span><span class="token punctuation">(</span>path<span class="token punctuation">)</span> <span class="token keyword">as</span> reader<span class="token punctuation">:</span>
+        <span class="token keyword">if</span> origin <span class="token keyword">is</span> <span class="token boolean">None</span><span class="token punctuation">:</span>
+            header <span class="token operator">=</span> reader<span class="token punctuation">.</span>header
+            origin <span class="token operator">=</span> np<span class="token punctuation">.</span>floor<span class="token punctuation">(</span>np<span class="token punctuation">.</span>array<span class="token punctuation">(</span><span class="token punctuation">[</span>header<span class="token punctuation">.</span>mins<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">,</span> header<span class="token punctuation">.</span>mins<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+                                        header<span class="token punctuation">.</span>mins<span class="token punctuation">[</span><span class="token number">2</span><span class="token punctuation">]</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+        <span class="token keyword">for</span> block <span class="token keyword">in</span> reader<span class="token punctuation">.</span>chunk_iterator<span class="token punctuation">(</span>chunk<span class="token punctuation">)</span><span class="token punctuation">:</span>
+            mask <span class="token operator">=</span> block<span class="token punctuation">.</span>classification <span class="token operator">==</span> <span class="token number">2</span>
+            <span class="token keyword">if</span> <span class="token keyword">not</span> mask<span class="token punctuation">.</span><span class="token builtin">any</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+                <span class="token keyword">continue</span>
+            xs <span class="token operator">=</span> block<span class="token punctuation">.</span>x<span class="token punctuation">[</span>mask<span class="token punctuation">]</span> <span class="token operator">-</span> origin<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span>
+            ys <span class="token operator">=</span> block<span class="token punctuation">.</span>y<span class="token punctuation">[</span>mask<span class="token punctuation">]</span> <span class="token operator">-</span> origin<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span>
+            zs <span class="token operator">=</span> block<span class="token punctuation">.</span>z<span class="token punctuation">[</span>mask<span class="token punctuation">]</span> <span class="token operator">-</span> origin<span class="token punctuation">[</span><span class="token number">2</span><span class="token punctuation">]</span>
+            kept<span class="token punctuation">.</span>append<span class="token punctuation">(</span>np<span class="token punctuation">.</span>column_stack<span class="token punctuation">(</span><span class="token punctuation">[</span>xs<span class="token punctuation">,</span> ys<span class="token punctuation">,</span> zs<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">.</span>astype<span class="token punctuation">(</span>np<span class="token punctuation">.</span>float32<span class="token punctuation">,</span> copy<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token keyword">if</span> <span class="token keyword">not</span> kept<span class="token punctuation">:</span>
+        <span class="token keyword">return</span> np<span class="token punctuation">.</span>zeros<span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">,</span> dtype<span class="token operator">=</span>np<span class="token punctuation">.</span>float32<span class="token punctuation">)</span><span class="token punctuation">,</span> origin
+    <span class="token keyword">return</span> np<span class="token punctuation">.</span>concatenate<span class="token punctuation">(</span>kept<span class="token punctuation">,</span> axis<span class="token operator">=</span><span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">,</span> origin
+
+<span class="token keyword">def</span> <span class="token function">copy_audit</span><span class="token punctuation">(</span>n_points<span class="token punctuation">,</span> dtype_in<span class="token operator">=</span>np<span class="token punctuation">.</span>float64<span class="token punctuation">,</span> dtype_out<span class="token operator">=</span>np<span class="token punctuation">.</span>float32<span class="token punctuation">,</span>
+               simultaneous<span class="token operator">=</span><span class="token number">4.2</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Predict the peak from the number of simultaneous full-size arrays."""</span>
+    bytes_in <span class="token operator">=</span> np<span class="token punctuation">.</span>dtype<span class="token punctuation">(</span>dtype_in<span class="token punctuation">)</span><span class="token punctuation">.</span>itemsize
+    bytes_out <span class="token operator">=</span> np<span class="token punctuation">.</span>dtype<span class="token punctuation">(</span>dtype_out<span class="token punctuation">)</span><span class="token punctuation">.</span>itemsize
+    single_xyz <span class="token operator">=</span> n_points <span class="token operator">*</span> <span class="token number">3</span> <span class="token operator">*</span> bytes_in
+    lean <span class="token operator">=</span> n_points <span class="token operator">*</span> <span class="token number">3</span> <span class="token operator">*</span> bytes_out <span class="token operator">*</span> <span class="token number">1.15</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token string">"points"</span><span class="token punctuation">:</span> n_points<span class="token punctuation">,</span>
+        <span class="token string">"one_xyz_array_gb"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>single_xyz <span class="token operator">/</span> <span class="token number">1e9</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"wasteful_peak_gb"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>single_xyz <span class="token operator">*</span> simultaneous <span class="token operator">/</span> <span class="token number">1e9</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"lean_peak_gb"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>lean <span class="token operator">/</span> <span class="token number">1e9</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"ratio"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>single_xyz <span class="token operator">*</span> simultaneous <span class="token operator">/</span> <span class="token builtin">max</span><span class="token punctuation">(</span>lean<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"note"</span><span class="token punctuation">:</span> <span class="token string">"column_stack, astype and boolean indexing each allocate a full copy "</span>
+                <span class="token string">"that lives until the name is rebound"</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+
+<span class="token keyword">print</span><span class="token punctuation">(</span>copy_audit<span class="token punctuation">(</span><span class="token number">400_000_000</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>The five numbered allocations in <code>read_points_wasteful</code> are the whole problem, and each is a line people write without thinking. <code>laspy.read</code> loads every dimension including intensity, return number and GPS time; <code>np.asarray(las.x)</code> materialises the scaled float64 coordinates; <code>column_stack</code> copies them again; <code>astype(np.float64)</code> copies float64 to float64 for nothing; and the boolean index copies the survivors.</p>
+<p>At 400 million points one xyz array in float64 is 9.6 GB, so holding four simultaneously is 38 GB — and adding PDAL’s own buffers and the classification array is how a run reaches 90.</p>
+<p>The lean version reads in chunks, filters before converting, subtracts a tile origin and narrows to float32. The predicted ratio of about 13× is what the profile in step 6 confirms.</p>
+<h3 id="4-attribute-memory-per-pipeline-stage" tabindex="-1"><a class="heading-link" href="#4-attribute-memory-per-pipeline-stage"><span>4. Attribute memory per pipeline stage</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> memray
+
+<span class="token keyword">def</span> <span class="token function">profile_stages</span><span class="token punctuation">(</span>input_path<span class="token punctuation">,</span> out_dir<span class="token operator">=</span><span class="token string">"build/profile"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""A separate trace per stage, so each stage's peak is attributable."""</span>
+    Path<span class="token punctuation">(</span>out_dir<span class="token punctuation">)</span><span class="token punctuation">.</span>mkdir<span class="token punctuation">(</span>parents<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> exist_ok<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+    stages<span class="token punctuation">,</span> data<span class="token punctuation">,</span> origin <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token punctuation">}</span><span class="token punctuation">,</span> <span class="token boolean">None</span><span class="token punctuation">,</span> <span class="token boolean">None</span>
+
+    <span class="token keyword">def</span> <span class="token function">stage</span><span class="token punctuation">(</span>name<span class="token punctuation">,</span> fn<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">nonlocal</span> data
+        trace <span class="token operator">=</span> Path<span class="token punctuation">(</span>out_dir<span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>name<span class="token punctuation">}</span></span><span class="token string">.bin"</span></span>
+        trace<span class="token punctuation">.</span>unlink<span class="token punctuation">(</span>missing_ok<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+        <span class="token keyword">with</span> memray<span class="token punctuation">.</span>Tracker<span class="token punctuation">(</span><span class="token builtin">str</span><span class="token punctuation">(</span>trace<span class="token punctuation">)</span><span class="token punctuation">,</span> native_traces<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+            data <span class="token operator">=</span> fn<span class="token punctuation">(</span>data<span class="token punctuation">)</span>
+        stats <span class="token operator">=</span> read_stats<span class="token punctuation">(</span><span class="token builtin">str</span><span class="token punctuation">(</span>trace<span class="token punctuation">)</span><span class="token punctuation">)</span>
+        output_gb <span class="token operator">=</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">getattr</span><span class="token punctuation">(</span>data<span class="token punctuation">,</span> <span class="token string">"nbytes"</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token number">1e9</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span>
+        stages<span class="token punctuation">[</span>name<span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token punctuation">{</span>
+            <span class="token string">"peak_gb"</span><span class="token punctuation">:</span> stats<span class="token punctuation">[</span><span class="token string">"peak_gb"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+            <span class="token string">"allocations"</span><span class="token punctuation">:</span> stats<span class="token punctuation">[</span><span class="token string">"total_allocations"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+            <span class="token string">"churn_ratio"</span><span class="token punctuation">:</span> stats<span class="token punctuation">[</span><span class="token string">"churn_ratio"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+            <span class="token string">"output_gb"</span><span class="token punctuation">:</span> output_gb<span class="token punctuation">,</span>
+            <span class="token string">"overhead_ratio"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>stats<span class="token punctuation">[</span><span class="token string">"peak_gb"</span><span class="token punctuation">]</span> <span class="token operator">/</span> <span class="token builtin">max</span><span class="token punctuation">(</span>output_gb<span class="token punctuation">,</span> <span class="token number">1e-9</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token punctuation">}</span>
+
+    stage<span class="token punctuation">(</span><span class="token string">"read"</span><span class="token punctuation">,</span> <span class="token keyword">lambda</span> <span class="token keyword">_</span><span class="token punctuation">:</span> read_points_lean<span class="token punctuation">(</span>input_path<span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    stage<span class="token punctuation">(</span><span class="token string">"classify"</span><span class="token punctuation">,</span> <span class="token keyword">lambda</span> points<span class="token punctuation">:</span> classify_ground<span class="token punctuation">(</span>points<span class="token punctuation">)</span><span class="token punctuation">)</span>
+    stage<span class="token punctuation">(</span><span class="token string">"thin"</span><span class="token punctuation">,</span> <span class="token keyword">lambda</span> points<span class="token punctuation">:</span> voxel_thin<span class="token punctuation">(</span>points<span class="token punctuation">,</span> <span class="token number">1.0</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    stage<span class="token punctuation">(</span><span class="token string">"mesh"</span><span class="token punctuation">,</span> <span class="token keyword">lambda</span> points<span class="token punctuation">:</span> delaunay_mesh<span class="token punctuation">(</span>points<span class="token punctuation">)</span><span class="token punctuation">)</span>
+
+    worst <span class="token operator">=</span> <span class="token builtin">max</span><span class="token punctuation">(</span>stages<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> key<span class="token operator">=</span><span class="token keyword">lambda</span> kv<span class="token punctuation">:</span> kv<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token string">"peak_gb"</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token string">"stages"</span><span class="token punctuation">:</span> stages<span class="token punctuation">,</span>
+        <span class="token string">"pipeline_peak_gb"</span><span class="token punctuation">:</span> <span class="token builtin">max</span><span class="token punctuation">(</span>s<span class="token punctuation">[</span><span class="token string">"peak_gb"</span><span class="token punctuation">]</span> <span class="token keyword">for</span> s <span class="token keyword">in</span> stages<span class="token punctuation">.</span>values<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"worst_stage"</span><span class="token punctuation">:</span> worst<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+        <span class="token string">"worst_overhead_ratio"</span><span class="token punctuation">:</span> worst<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token string">"overhead_ratio"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+        <span class="token string">"note"</span><span class="token punctuation">:</span> <span class="token string">"overhead_ratio is peak memory divided by the stage's output size; "</span>
+                <span class="token string">"anything above 3 has temporaries worth removing"</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+</code></pre></div>
+<p>Using <code>memray.Tracker</code> as a context manager per stage, rather than one trace for the whole run, is what makes the attribution clean. A single trace over the whole pipeline shows the global peak and merges call paths that happened at different times, which makes it hard to say which stage caused it.</p>
+<p>The <strong>overhead ratio</strong> is the metric to hold a stage to: peak memory divided by the size of what the stage produces. A thinning stage that outputs 240 MB and peaks at 4.8 GB has a ratio of 20, and all of that is temporaries.</p>
+<p>Chaining the stages through <code>data</code> means each stage’s trace includes the input it was handed, which is correct — that memory is genuinely resident during the stage.</p>
+<figure class="diagram">
+<svg viewBox="9 9 695 249" role="img" aria-labelledby="memray-copies-t memray-copies-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="memray-copies-t">Simultaneous temporaries at the peak</title>
+  <desc id="memray-copies-d">A timeline of resident memory through the wasteful read of 40 million points. The laspy read holds 2.4 gigabytes of all dimensions. Converting x, y and z to float64 arrays brings the total to 3.4. Column-stack brings it to 4.3 while the three arrays are still alive. The redundant astype brings it to the 5.8 gigabyte peak. Boolean indexing then drops it to 5.3, and the returned output is 0.24 gigabytes. Nothing leaks; four full-size arrays simply coexist.</desc>
+  <rect class="svg-bg" x="9" y="9" width="695" height="249" fill="#ffffff"/>
+  <path d="M60 196 H700" stroke="#5b6471" stroke-width="1.5" fill="none"/>
+  <path d="M60 30 V196" stroke="#5b6471" stroke-width="1.5" fill="none"/>
+  <g stroke-width="1.4">
+    <rect x="76" y="140" width="94" height="56" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="180" y="108" width="94" height="88" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="284" y="76" width="94" height="120" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="388" y="44" width="94" height="152" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="492" y="60" width="94" height="136" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="596" y="182" width="94" height="14" fill="#eef5e9" stroke="#4f7a4d"/>
+  </g>
+  <g fill="#1f2937" font-size="11.5" text-anchor="middle">
+    <text x="123" y="132">2.4 GB</text>
+    <text x="227" y="100">3.4 GB</text>
+    <text x="331" y="68">4.3 GB</text>
+    <text x="435" y="36">5.8 GB</text>
+    <text x="539" y="52">5.3 GB</text>
+    <text x="643" y="174">0.24 GB</text>
+  </g>
+  <g fill="#5b6471" font-size="11" text-anchor="middle">
+    <text x="123" y="214">laspy.read</text>
+    <text x="227" y="214">asarray x,y,z</text>
+    <text x="331" y="214">column_stack</text>
+    <text x="435" y="214">astype</text>
+    <text x="539" y="214">mask index</text>
+    <text x="643" y="214">return</text>
+  </g>
+  <text x="380" y="240" fill="#1f2937" font-size="12.5" text-anchor="middle">the peak is 24× the output because four full-size arrays are alive at once</text>
+  <text x="34" y="110" fill="#5b6471" font-size="12" text-anchor="middle">RSS</text>
+</svg>
+<figcaption>Nothing leaks; the peak is four full-size arrays coexisting, and the output is a twenty-fourth of it.</figcaption>
+</figure>
+<h3 id="5-set-a-budget-and-enforce-it" tabindex="-1"><a class="heading-link" href="#5-set-a-budget-and-enforce-it"><span>5. Set a budget and enforce it</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python">BUDGET <span class="token operator">=</span> <span class="token punctuation">{</span>
+    <span class="token string">"peak_gb_per_million_points"</span><span class="token punctuation">:</span> <span class="token number">0.03</span><span class="token punctuation">,</span>     <span class="token comment"># measured, not aspirational</span>
+    <span class="token string">"max_overhead_ratio"</span><span class="token punctuation">:</span> <span class="token number">3.0</span><span class="token punctuation">,</span>
+    <span class="token string">"max_churn_ratio"</span><span class="token punctuation">:</span> <span class="token number">8.0</span><span class="token punctuation">,</span>
+    <span class="token string">"max_leak_share"</span><span class="token punctuation">:</span> <span class="token number">0.05</span><span class="token punctuation">,</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">def</span> <span class="token function">memory_gate</span><span class="token punctuation">(</span>stage_report<span class="token punctuation">,</span> leak_report<span class="token punctuation">,</span> point_count<span class="token punctuation">,</span> budget<span class="token operator">=</span>BUDGET<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    findings <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    millions <span class="token operator">=</span> <span class="token builtin">max</span><span class="token punctuation">(</span>point_count <span class="token operator">/</span> <span class="token number">1e6</span><span class="token punctuation">,</span> <span class="token number">1e-9</span><span class="token punctuation">)</span>
+    per_million <span class="token operator">=</span> stage_report<span class="token punctuation">[</span><span class="token string">"pipeline_peak_gb"</span><span class="token punctuation">]</span> <span class="token operator">/</span> millions
+
+    <span class="token keyword">if</span> per_million <span class="token operator">></span> budget<span class="token punctuation">[</span><span class="token string">"peak_gb_per_million_points"</span><span class="token punctuation">]</span><span class="token punctuation">:</span>
+        findings<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span>
+            <span class="token string">"severity"</span><span class="token punctuation">:</span> <span class="token string">"error"</span><span class="token punctuation">,</span>
+            <span class="token string">"issue"</span><span class="token punctuation">:</span> <span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>per_million<span class="token punctuation">:</span><span class="token format-spec">.4f</span><span class="token punctuation">}</span></span><span class="token string"> GB per million points, above the "</span></span>
+                     <span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>budget<span class="token punctuation">[</span><span class="token string">'peak_gb_per_million_points'</span><span class="token punctuation">]</span><span class="token punctuation">}</span></span><span class="token string"> GB budget"</span></span><span class="token punctuation">,</span>
+            <span class="token string">"implication"</span><span class="token punctuation">:</span> <span class="token string-interpolation"><span class="token string">f"a 400 M-point tile would need </span><span class="token interpolation"><span class="token punctuation">{</span>per_million <span class="token operator">*</span> <span class="token number">400</span><span class="token punctuation">:</span><span class="token format-spec">.0f</span><span class="token punctuation">}</span></span><span class="token string"> GB"</span></span><span class="token punctuation">,</span>
+        <span class="token punctuation">}</span><span class="token punctuation">)</span>
+    <span class="token keyword">for</span> name<span class="token punctuation">,</span> stage <span class="token keyword">in</span> stage_report<span class="token punctuation">[</span><span class="token string">"stages"</span><span class="token punctuation">]</span><span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">if</span> stage<span class="token punctuation">[</span><span class="token string">"overhead_ratio"</span><span class="token punctuation">]</span> <span class="token operator">></span> budget<span class="token punctuation">[</span><span class="token string">"max_overhead_ratio"</span><span class="token punctuation">]</span><span class="token punctuation">:</span>
+            findings<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span>
+                <span class="token string">"severity"</span><span class="token punctuation">:</span> <span class="token string">"warn"</span><span class="token punctuation">,</span>
+                <span class="token string">"issue"</span><span class="token punctuation">:</span> <span class="token string-interpolation"><span class="token string">f"stage '</span><span class="token interpolation"><span class="token punctuation">{</span>name<span class="token punctuation">}</span></span><span class="token string">' peaks at </span><span class="token interpolation"><span class="token punctuation">{</span>stage<span class="token punctuation">[</span><span class="token string">'overhead_ratio'</span><span class="token punctuation">]</span><span class="token punctuation">}</span></span><span class="token string">× its "</span></span>
+                         <span class="token string-interpolation"><span class="token string">f"output size"</span></span><span class="token punctuation">,</span>
+                <span class="token string">"implication"</span><span class="token punctuation">:</span> <span class="token string">"look for column_stack, astype and boolean indexing "</span>
+                               <span class="token string">"on full-size arrays"</span><span class="token punctuation">,</span>
+            <span class="token punctuation">}</span><span class="token punctuation">)</span>
+        <span class="token keyword">if</span> stage<span class="token punctuation">[</span><span class="token string">"churn_ratio"</span><span class="token punctuation">]</span> <span class="token operator">></span> budget<span class="token punctuation">[</span><span class="token string">"max_churn_ratio"</span><span class="token punctuation">]</span><span class="token punctuation">:</span>
+            findings<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span>
+                <span class="token string">"severity"</span><span class="token punctuation">:</span> <span class="token string">"warn"</span><span class="token punctuation">,</span>
+                <span class="token string">"issue"</span><span class="token punctuation">:</span> <span class="token string-interpolation"><span class="token string">f"stage '</span><span class="token interpolation"><span class="token punctuation">{</span>name<span class="token punctuation">}</span></span><span class="token string">' allocates </span><span class="token interpolation"><span class="token punctuation">{</span>stage<span class="token punctuation">[</span><span class="token string">'churn_ratio'</span><span class="token punctuation">]</span><span class="token punctuation">}</span></span><span class="token string">× its peak"</span></span><span class="token punctuation">,</span>
+                <span class="token string">"implication"</span><span class="token punctuation">:</span> <span class="token string">"repeated temporaries in a loop — preallocate or "</span>
+                               <span class="token string">"operate in place"</span><span class="token punctuation">,</span>
+            <span class="token punctuation">}</span><span class="token punctuation">)</span>
+    <span class="token keyword">if</span> leak_report<span class="token punctuation">[</span><span class="token string">"leak_share"</span><span class="token punctuation">]</span> <span class="token operator">></span> budget<span class="token punctuation">[</span><span class="token string">"max_leak_share"</span><span class="token punctuation">]</span><span class="token punctuation">:</span>
+        findings<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span>
+            <span class="token string">"severity"</span><span class="token punctuation">:</span> <span class="token string">"error"</span><span class="token punctuation">,</span>
+            <span class="token string">"issue"</span><span class="token punctuation">:</span> <span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>leak_report<span class="token punctuation">[</span><span class="token string">'leak_share'</span><span class="token punctuation">]</span><span class="token punctuation">:</span><span class="token format-spec">.1%</span><span class="token punctuation">}</span></span><span class="token string"> of the peak is still held at exit"</span></span><span class="token punctuation">,</span>
+            <span class="token string">"implication"</span><span class="token punctuation">:</span> leak_report<span class="token punctuation">[</span><span class="token string">"diagnosis"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+        <span class="token punctuation">}</span><span class="token punctuation">)</span>
+
+    errors <span class="token operator">=</span> <span class="token punctuation">[</span>f <span class="token keyword">for</span> f <span class="token keyword">in</span> findings <span class="token keyword">if</span> f<span class="token punctuation">[</span><span class="token string">"severity"</span><span class="token punctuation">]</span> <span class="token operator">==</span> <span class="token string">"error"</span><span class="token punctuation">]</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token string">"point_count"</span><span class="token punctuation">:</span> point_count<span class="token punctuation">,</span>
+        <span class="token string">"peak_gb"</span><span class="token punctuation">:</span> stage_report<span class="token punctuation">[</span><span class="token string">"pipeline_peak_gb"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+        <span class="token string">"gb_per_million_points"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>per_million<span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"projected_for_400m_gb"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>per_million <span class="token operator">*</span> <span class="token number">400</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"findings"</span><span class="token punctuation">:</span> findings<span class="token punctuation">,</span>
+        <span class="token string">"errors"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>errors<span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"pass"</span><span class="token punctuation">:</span> <span class="token keyword">not</span> errors<span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+</code></pre></div>
+<p>Expressing the budget <strong>per million points</strong> is what makes a profile on a small tile predictive. Profiling a 400-million-point run needs a 90 GB machine; profiling a 20-million-point extract needs 4 GB, and the per-million figure projects to the full tile — which is the only practical way to work on this.</p>
+<p>The projection is also the finding that gets action. “0.22 GB per million points, so a 400 M-point tile needs 88 GB” is a statement about next month’s delivery; “the peak was 4.4 GB” is not.</p>
+<p>Keeping the overhead and churn ratios as warnings is right: they are optimisation findings, and a stage with a ratio of 4 that fits the budget is acceptable.</p>
+<h3 id="6-verify-the-fix-on-the-same-input" tabindex="-1"><a class="heading-link" href="#6-verify-the-fix-on-the-same-input"><span>6. Verify the fix on the same input</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">before_after</span><span class="token punctuation">(</span>input_path<span class="token punctuation">,</span> out_dir<span class="token operator">=</span><span class="token string">"build/profile"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    results <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token punctuation">}</span>
+    <span class="token keyword">for</span> label<span class="token punctuation">,</span> fn <span class="token keyword">in</span> <span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token string">"wasteful"</span><span class="token punctuation">,</span> <span class="token keyword">lambda</span> p<span class="token punctuation">:</span> read_points_wasteful<span class="token punctuation">(</span>p<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                      <span class="token punctuation">(</span><span class="token string">"lean"</span><span class="token punctuation">,</span> <span class="token keyword">lambda</span> p<span class="token punctuation">:</span> read_points_lean<span class="token punctuation">(</span>p<span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        trace <span class="token operator">=</span> Path<span class="token punctuation">(</span>out_dir<span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>label<span class="token punctuation">}</span></span><span class="token string">.bin"</span></span>
+        trace<span class="token punctuation">.</span>unlink<span class="token punctuation">(</span>missing_ok<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+        <span class="token keyword">with</span> memray<span class="token punctuation">.</span>Tracker<span class="token punctuation">(</span><span class="token builtin">str</span><span class="token punctuation">(</span>trace<span class="token punctuation">)</span><span class="token punctuation">,</span> native_traces<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+            out <span class="token operator">=</span> fn<span class="token punctuation">(</span>input_path<span class="token punctuation">)</span>
+        stats <span class="token operator">=</span> read_stats<span class="token punctuation">(</span><span class="token builtin">str</span><span class="token punctuation">(</span>trace<span class="token punctuation">)</span><span class="token punctuation">)</span>
+        results<span class="token punctuation">[</span>label<span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token punctuation">{</span>
+            <span class="token string">"peak_gb"</span><span class="token punctuation">:</span> stats<span class="token punctuation">[</span><span class="token string">"peak_gb"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+            <span class="token string">"allocations"</span><span class="token punctuation">:</span> stats<span class="token punctuation">[</span><span class="token string">"total_allocations"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+            <span class="token string">"total_allocated_gb"</span><span class="token punctuation">:</span> stats<span class="token punctuation">[</span><span class="token string">"total_allocated_gb"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+            <span class="token string">"churn_ratio"</span><span class="token punctuation">:</span> stats<span class="token punctuation">[</span><span class="token string">"churn_ratio"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+            <span class="token string">"output_points"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>out<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"output_gb"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>out<span class="token punctuation">.</span>nbytes <span class="token operator">/</span> <span class="token number">1e9</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"output_dtype"</span><span class="token punctuation">:</span> <span class="token builtin">str</span><span class="token punctuation">(</span>out<span class="token punctuation">.</span>dtype<span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token punctuation">}</span>
+    w<span class="token punctuation">,</span> l <span class="token operator">=</span> results<span class="token punctuation">[</span><span class="token string">"wasteful"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> results<span class="token punctuation">[</span><span class="token string">"lean"</span><span class="token punctuation">]</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token string">"results"</span><span class="token punctuation">:</span> results<span class="token punctuation">,</span>
+        <span class="token string">"peak_reduction"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>w<span class="token punctuation">[</span><span class="token string">"peak_gb"</span><span class="token punctuation">]</span> <span class="token operator">/</span> <span class="token builtin">max</span><span class="token punctuation">(</span>l<span class="token punctuation">[</span><span class="token string">"peak_gb"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token number">1e-9</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"allocation_reduction"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>w<span class="token punctuation">[</span><span class="token string">"allocations"</span><span class="token punctuation">]</span> <span class="token operator">/</span> <span class="token builtin">max</span><span class="token punctuation">(</span>l<span class="token punctuation">[</span><span class="token string">"allocations"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"same_point_count"</span><span class="token punctuation">:</span> w<span class="token punctuation">[</span><span class="token string">"output_points"</span><span class="token punctuation">]</span> <span class="token operator">==</span> l<span class="token punctuation">[</span><span class="token string">"output_points"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+        <span class="token string">"dtype_changed"</span><span class="token punctuation">:</span> w<span class="token punctuation">[</span><span class="token string">"output_dtype"</span><span class="token punctuation">]</span> <span class="token operator">!=</span> l<span class="token punctuation">[</span><span class="token string">"output_dtype"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+        <span class="token string">"verdict"</span><span class="token punctuation">:</span> <span class="token punctuation">(</span><span class="token string">"fix confirmed"</span>
+                    <span class="token keyword">if</span> w<span class="token punctuation">[</span><span class="token string">"output_points"</span><span class="token punctuation">]</span> <span class="token operator">==</span> l<span class="token punctuation">[</span><span class="token string">"output_points"</span><span class="token punctuation">]</span>
+                    <span class="token keyword">and</span> l<span class="token punctuation">[</span><span class="token string">"peak_gb"</span><span class="token punctuation">]</span> <span class="token operator">&lt;</span> w<span class="token punctuation">[</span><span class="token string">"peak_gb"</span><span class="token punctuation">]</span> <span class="token operator">*</span> <span class="token number">0.5</span>
+                    <span class="token keyword">else</span> <span class="token string">"point counts differ — the two versions are not equivalent"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+</code></pre></div>
+<p><code>same_point_count</code> is the assertion that keeps this honest. A memory “fix” that drops points is not a fix, and chunked reading with a filter is exactly the change that can silently lose a partial final chunk.</p>
+<p><code>dtype_changed</code> being true is expected and must be deliberate: float32 coordinates <em>relative to a tile origin</em> are accurate to about a micrometre at a kilometre, which is fine, while float32 <em>absolute</em> UTM coordinates quantise to about 6 cm, which is not. That is why <code>read_points_lean</code> subtracts an origin before narrowing, and the reasoning is the same as in <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/ecef-and-enu-frames-for-tileset-transforms/">ECEF and ENU frames for tileset transforms</a>.</p>
+<figure class="diagram">
+<svg viewBox="4 6 732 240" role="img" aria-labelledby="memray-budget-t memray-budget-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="memray-budget-t">Per-stage peak against output size</title>
+  <desc id="memray-budget-d">A table of four pipeline stages with their peak memory, output size and overhead ratio. The read stage peaks at 0.44 gigabytes for a 0.245 gigabyte output, a ratio of 1.8, which is good. Classification peaks at 1.1 for 0.31, a ratio of 3.5, marginal. Thinning peaks at 0.62 for 0.06, a ratio of 10.3, which needs work. Meshing peaks at 3.8 for 1.2, a ratio of 3.2. The pipeline peak of 3.8 gigabytes comes from the meshing stage, but the worst overhead is in thinning.</desc>
+  <rect class="svg-bg" x="4" y="6" width="732" height="240" fill="#ffffff"/>
+  <g stroke-width="1.5">
+    <rect x="18" y="20" width="150" height="32" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="168" y="20" width="130" height="32" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="298" y="20" width="130" height="32" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="428" y="20" width="130" height="32" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="558" y="20" width="164" height="32" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="18" y="52" width="150" height="32" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="168" y="52" width="130" height="32" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="298" y="52" width="130" height="32" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="428" y="52" width="130" height="32" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="558" y="52" width="164" height="32" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="18" y="84" width="150" height="32" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="168" y="84" width="130" height="32" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="298" y="84" width="130" height="32" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="428" y="84" width="130" height="32" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="558" y="84" width="164" height="32" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="18" y="116" width="150" height="32" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="168" y="116" width="130" height="32" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="298" y="116" width="130" height="32" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="428" y="116" width="130" height="32" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="558" y="116" width="164" height="32" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="18" y="148" width="150" height="32" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="168" y="148" width="130" height="32" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="298" y="148" width="130" height="32" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="428" y="148" width="130" height="32" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="558" y="148" width="164" height="32" fill="#fdf3e0" stroke="#c46a3d"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="93" y="41">stage</text><text x="233" y="41">peak</text>
+    <text x="363" y="41">output</text><text x="493" y="41">overhead</text>
+    <text x="640" y="41">verdict</text>
+    <text x="93" y="73">read</text><text x="233" y="73">0.44 GB</text>
+    <text x="363" y="73">0.245 GB</text><text x="493" y="73">1.8×</text>
+    <text x="640" y="73">good</text>
+    <text x="93" y="105">classify</text><text x="233" y="105">1.10 GB</text>
+    <text x="363" y="105">0.310 GB</text><text x="493" y="105">3.5×</text>
+    <text x="640" y="105">marginal</text>
+    <text x="93" y="137">thin</text><text x="233" y="137">0.62 GB</text>
+    <text x="363" y="137">0.060 GB</text><text x="493" y="137">10.3×</text>
+    <text x="640" y="137">worst overhead</text>
+    <text x="93" y="169">mesh</text><text x="233" y="169">3.80 GB</text>
+    <text x="363" y="169">1.200 GB</text><text x="493" y="169">3.2×</text>
+    <text x="640" y="169">sets the peak</text>
+  </g>
+  <text x="370" y="208" fill="#1f2937" font-size="12.5" text-anchor="middle">the pipeline's peak comes from meshing; the worst waste is in thinning</text>
+  <text x="370" y="228" fill="#5b6471" font-size="12" text-anchor="middle">budget the peak per stage, and fix the ratio where it is highest</text>
+</svg>
+<figcaption>The stage that sets the peak and the stage with the worst overhead are different, which is why both numbers belong in the report.</figcaption>
+</figure>
+<h2 id="expected-output-verification" tabindex="-1"><a class="heading-link" href="#expected-output-verification"><span>Expected Output &amp; Verification</span></a></h2>
+<div class="codeblock" data-lang="text"><div class="codeblock__bar"><span class="codeblock__lang">text</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-text" tabindex="0" role="group" aria-label="text code sample"><code class="language-text">{'returncode': 0, 'trace': 'build/profile/trace.bin',
+ 'flags': {'native': True, 'follow_fork': True, 'trace_python_allocators': False}}
+{'peak_bytes': 5841204118, 'peak_gb': 5.84, 'total_allocations': 184102,
+ 'total_allocated_gb': 24.18, 'churn_ratio': 4.1}
+{
+  "peak_gb": 5.84,
+  "still_allocated_at_exit_gb": 0.24,
+  "leak_share": 0.0411,
+  "top_at_peak": [
+    {"location": "lasreader.py:212 laspy.read", "size_gb": 2.41, "count": 1},
+    {"location": "process.py:84 read_points_wasteful", "size_gb": 0.96, "count": 3},
+    {"location": "process.py:91 read_points_wasteful", "size_gb": 0.96, "count": 1}
+  ],
+  "diagnosis": "a high watermark, not a leak: memory is freed but the peak is too high — look for simultaneous temporaries"
+}
+{'points': 400000000, 'one_xyz_array_gb': 9.6, 'wasteful_peak_gb': 40.32,
+ 'lean_peak_gb': 5.52, 'ratio': 7.3}
+{
+  "results": {
+    "wasteful": {"peak_gb": 5.84, "allocations": 184102, "churn_ratio": 4.1,
+                 "output_points": 20418204, "output_gb": 0.49,
+                 "output_dtype": "float64"},
+    "lean": {"peak_gb": 0.44, "allocations": 1284, "churn_ratio": 1.3,
+             "output_points": 20418204, "output_gb": 0.245,
+             "output_dtype": "float32"}
+  },
+  "peak_reduction": 13.3, "allocation_reduction": 143.4,
+  "same_point_count": true, "dtype_changed": true,
+  "verdict": "fix confirmed"
+}
+{'point_count': 40836408, 'peak_gb': 0.44, 'gb_per_million_points': 0.0108,
+ 'projected_for_400m_gb': 4.3, 'errors': 0, 'pass': true}
+</code></pre></div>
+<p>A 13.3× peak reduction with an identical point count is the result, and the projection is what matters operationally: 0.0108 GB per million points means a 400-million-point tile needs about 4.3 GB rather than the 88 GB the original code implied.</p>
+<p>The <code>leak_share</code> of 4.1% is the returned array itself, still referenced when the trace ended, which is correct rather than a leak — and the diagnosis identifies the situation as a high watermark, which is where the fix was.</p>
+<p>Verify the accuracy cost of the float32 change, because that is the one part of the fix that is not free:</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">precision_check</span><span class="token punctuation">(</span>input_path<span class="token punctuation">,</span> origin<span class="token operator">=</span><span class="token boolean">None</span><span class="token punctuation">,</span> tolerance_m<span class="token operator">=</span><span class="token number">0.001</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""float32 relative to a tile origin is fine; absolute UTM is not."""</span>
+    las <span class="token operator">=</span> laspy<span class="token punctuation">.</span>read<span class="token punctuation">(</span>input_path<span class="token punctuation">)</span>
+    xyz64 <span class="token operator">=</span> np<span class="token punctuation">.</span>column_stack<span class="token punctuation">(</span><span class="token punctuation">[</span>np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>las<span class="token punctuation">.</span>x<span class="token punctuation">)</span><span class="token punctuation">,</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>las<span class="token punctuation">.</span>y<span class="token punctuation">)</span><span class="token punctuation">,</span>
+                             np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>las<span class="token punctuation">.</span>z<span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">.</span>astype<span class="token punctuation">(</span>np<span class="token punctuation">.</span>float64<span class="token punctuation">)</span>
+    origin <span class="token operator">=</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>origin <span class="token keyword">if</span> origin <span class="token keyword">is</span> <span class="token keyword">not</span> <span class="token boolean">None</span>
+                        <span class="token keyword">else</span> np<span class="token punctuation">.</span>floor<span class="token punctuation">(</span>xyz64<span class="token punctuation">.</span><span class="token builtin">min</span><span class="token punctuation">(</span>axis<span class="token operator">=</span><span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+
+    absolute32 <span class="token operator">=</span> xyz64<span class="token punctuation">.</span>astype<span class="token punctuation">(</span>np<span class="token punctuation">.</span>float32<span class="token punctuation">)</span><span class="token punctuation">.</span>astype<span class="token punctuation">(</span>np<span class="token punctuation">.</span>float64<span class="token punctuation">)</span>
+    relative32 <span class="token operator">=</span> <span class="token punctuation">(</span>xyz64 <span class="token operator">-</span> origin<span class="token punctuation">)</span><span class="token punctuation">.</span>astype<span class="token punctuation">(</span>np<span class="token punctuation">.</span>float32<span class="token punctuation">)</span><span class="token punctuation">.</span>astype<span class="token punctuation">(</span>np<span class="token punctuation">.</span>float64<span class="token punctuation">)</span> <span class="token operator">+</span> origin
+
+    <span class="token keyword">def</span> <span class="token function">error</span><span class="token punctuation">(</span>candidate<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        d <span class="token operator">=</span> np<span class="token punctuation">.</span>linalg<span class="token punctuation">.</span>norm<span class="token punctuation">(</span>candidate <span class="token operator">-</span> xyz64<span class="token punctuation">,</span> axis<span class="token operator">=</span><span class="token number">1</span><span class="token punctuation">)</span>
+        <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"mean_mm"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>d<span class="token punctuation">.</span>mean<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">*</span> <span class="token number">1000</span><span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                <span class="token string">"p95_mm"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>percentile<span class="token punctuation">(</span>d<span class="token punctuation">,</span> <span class="token number">95</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">*</span> <span class="token number">1000</span><span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                <span class="token string">"max_mm"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>d<span class="token punctuation">.</span><span class="token builtin">max</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">*</span> <span class="token number">1000</span><span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">}</span>
+
+    abs_err<span class="token punctuation">,</span> rel_err <span class="token operator">=</span> error<span class="token punctuation">(</span>absolute32<span class="token punctuation">)</span><span class="token punctuation">,</span> error<span class="token punctuation">(</span>relative32<span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token string">"origin"</span><span class="token punctuation">:</span> <span class="token punctuation">[</span><span class="token builtin">float</span><span class="token punctuation">(</span>v<span class="token punctuation">)</span> <span class="token keyword">for</span> v <span class="token keyword">in</span> origin<span class="token punctuation">]</span><span class="token punctuation">,</span>
+        <span class="token string">"absolute_float32"</span><span class="token punctuation">:</span> abs_err<span class="token punctuation">,</span>
+        <span class="token string">"relative_to_origin_float32"</span><span class="token punctuation">:</span> rel_err<span class="token punctuation">,</span>
+        <span class="token string">"absolute_acceptable"</span><span class="token punctuation">:</span> abs_err<span class="token punctuation">[</span><span class="token string">"max_mm"</span><span class="token punctuation">]</span> <span class="token operator">/</span> <span class="token number">1000</span> <span class="token operator">&lt;=</span> tolerance_m<span class="token punctuation">,</span>
+        <span class="token string">"relative_acceptable"</span><span class="token punctuation">:</span> rel_err<span class="token punctuation">[</span><span class="token string">"max_mm"</span><span class="token punctuation">]</span> <span class="token operator">/</span> <span class="token number">1000</span> <span class="token operator">&lt;=</span> tolerance_m<span class="token punctuation">,</span>
+        <span class="token string">"advice"</span><span class="token punctuation">:</span> <span class="token string">"subtract a tile origin before narrowing to float32; absolute UTM "</span>
+                  <span class="token string">"in float32 quantises to centimetres"</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+
+<span class="token keyword">print</span><span class="token punctuation">(</span>json<span class="token punctuation">.</span>dumps<span class="token punctuation">(</span>precision_check<span class="token punctuation">(</span><span class="token string">"input/tile_32_598_6643.laz"</span><span class="token punctuation">)</span><span class="token punctuation">,</span> indent<span class="token operator">=</span><span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>This is the check that makes the dtype change defensible. Absolute UTM eastings near 598,000 in float32 quantise to about 6 cm; the same coordinates relative to a tile origin quantise to under a micrometre. The memory saving is identical and only one of them is acceptable for survey data.</p>
+<p>Then verify the projection is linear, because a super-linear stage makes a small-extract profile misleading:</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">scaled_validation</span><span class="token punctuation">(</span>pipeline_fn<span class="token punctuation">,</span> input_paths<span class="token punctuation">,</span> out_dir<span class="token operator">=</span><span class="token string">"build/profile"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Profile at three sizes and check that GB per million points is constant."""</span>
+    rows <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    <span class="token keyword">for</span> path <span class="token keyword">in</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span>input_paths<span class="token punctuation">,</span> key<span class="token operator">=</span><span class="token keyword">lambda</span> p<span class="token punctuation">:</span> Path<span class="token punctuation">(</span>p<span class="token punctuation">)</span><span class="token punctuation">.</span>stat<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span>st_size<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        trace <span class="token operator">=</span> Path<span class="token punctuation">(</span>out_dir<span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token string-interpolation"><span class="token string">f"scale_</span><span class="token interpolation"><span class="token punctuation">{</span>Path<span class="token punctuation">(</span>path<span class="token punctuation">)</span><span class="token punctuation">.</span>stem<span class="token punctuation">}</span></span><span class="token string">.bin"</span></span>
+        trace<span class="token punctuation">.</span>unlink<span class="token punctuation">(</span>missing_ok<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+        <span class="token keyword">with</span> memray<span class="token punctuation">.</span>Tracker<span class="token punctuation">(</span><span class="token builtin">str</span><span class="token punctuation">(</span>trace<span class="token punctuation">)</span><span class="token punctuation">,</span> native_traces<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+            pipeline_fn<span class="token punctuation">(</span>path<span class="token punctuation">)</span>
+        stats <span class="token operator">=</span> read_stats<span class="token punctuation">(</span><span class="token builtin">str</span><span class="token punctuation">(</span>trace<span class="token punctuation">)</span><span class="token punctuation">)</span>
+        info <span class="token operator">=</span> json<span class="token punctuation">.</span>loads<span class="token punctuation">(</span>subprocess<span class="token punctuation">.</span>run<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token string">"pdal"</span><span class="token punctuation">,</span> <span class="token string">"info"</span><span class="token punctuation">,</span> <span class="token string">"--summary"</span><span class="token punctuation">,</span> <span class="token builtin">str</span><span class="token punctuation">(</span>path<span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+                                         capture_output<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> text<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span>
+                                         check<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span><span class="token punctuation">.</span>stdout<span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token string">"summary"</span><span class="token punctuation">]</span>
+        points <span class="token operator">=</span> <span class="token builtin">int</span><span class="token punctuation">(</span>info<span class="token punctuation">[</span><span class="token string">"num_points"</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+        rows<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"input"</span><span class="token punctuation">:</span> Path<span class="token punctuation">(</span>path<span class="token punctuation">)</span><span class="token punctuation">.</span>name<span class="token punctuation">,</span>
+                     <span class="token string">"points_millions"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>points <span class="token operator">/</span> <span class="token number">1e6</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                     <span class="token string">"peak_gb"</span><span class="token punctuation">:</span> stats<span class="token punctuation">[</span><span class="token string">"peak_gb"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+                     <span class="token string">"gb_per_million"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>stats<span class="token punctuation">[</span><span class="token string">"peak_gb"</span><span class="token punctuation">]</span>
+                                             <span class="token operator">/</span> <span class="token builtin">max</span><span class="token punctuation">(</span>points <span class="token operator">/</span> <span class="token number">1e6</span><span class="token punctuation">,</span> <span class="token number">1e-9</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+    ratios <span class="token operator">=</span> <span class="token punctuation">[</span>r<span class="token punctuation">[</span><span class="token string">"gb_per_million"</span><span class="token punctuation">]</span> <span class="token keyword">for</span> r <span class="token keyword">in</span> rows<span class="token punctuation">]</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token string">"rows"</span><span class="token punctuation">:</span> rows<span class="token punctuation">,</span>
+        <span class="token string">"gb_per_million_spread"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">max</span><span class="token punctuation">(</span>ratios<span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token builtin">max</span><span class="token punctuation">(</span><span class="token builtin">min</span><span class="token punctuation">(</span>ratios<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">1e-9</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"scales_linearly"</span><span class="token punctuation">:</span> <span class="token builtin">max</span><span class="token punctuation">(</span>ratios<span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token builtin">max</span><span class="token punctuation">(</span><span class="token builtin">min</span><span class="token punctuation">(</span>ratios<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">1e-9</span><span class="token punctuation">)</span> <span class="token operator">&lt;</span> <span class="token number">1.3</span><span class="token punctuation">,</span>
+        <span class="token string">"note"</span><span class="token punctuation">:</span> <span class="token string">"a spread above 1.3 means a stage is super-linear — usually a "</span>
+                <span class="token string">"pairwise distance matrix or an unchunked sort"</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+</code></pre></div>
+<p>A per-million figure that grows with input size means a stage is super-linear, and the projection from a small extract will understate the full tile badly. The usual culprits are a pairwise distance computation or a sort that is not chunked, and both show up as a spread well above 1.3.</p>
+<h2 id="performance-notes" tabindex="-1"><a class="heading-link" href="#performance-notes"><span>Performance Notes</span></a></h2>
+<ul>
+<li><strong>memray adds 10–40% runtime overhead</strong> with <code>--native</code>, and more with <code>--trace-python-allocators</code>. Profile a reduced input rather than production scale.</li>
+<li><strong>The trace file grows with allocation count</strong>, not with memory held. A pipeline with 50 million small allocations produces a multi-gigabyte trace; reduce the input rather than the tracking.</li>
+<li><strong><code>--trace-python-allocators</code> is rarely needed</strong> for array-heavy pipelines because the interesting allocations are native. Enable it when chasing a pure-Python object leak.</li>
+<li><strong><code>memray tree</code> is faster to read than a flame graph</strong> when a few large allocations dominate, which is the usual case here.</li>
+<li><strong>The high watermark is what the machine must fit</strong>, so the peak is the number to budget rather than the total allocated.</li>
+<li><strong>Chunk size trades memory for speed.</strong> Five million points per chunk is a good default: small enough to bound the peak, large enough that per-chunk overhead is negligible.</li>
+</ul>
+<h2 id="common-errors" tabindex="-1"><a class="heading-link" href="#common-errors"><span>Common Errors</span></a></h2>
+<p><strong>Everything is attributed to <code>numpy/core/multiarray</code>.</strong> <code>--native</code> was omitted.</p>
+<p><strong>The trace is empty.</strong> The work happened in a forked child; add <code>--follow-fork</code>.</p>
+<p><strong><code>memray: command not found</code> inside a container.</strong> memray is a separate install; add it to the image used for profiling, not to the production image.</p>
+<p><strong>The peak is far lower than the observed memory.</strong> A subprocess — <code>pdal</code> invoked via <code>subprocess</code> — is not traced. Profile the Python and measure the subprocess with <code>/usr/bin/time -v</code> separately.</p>
+<p><strong>Resident memory never falls after the peak.</strong> Usually the allocator retaining freed pages rather than a leak. Check <code>leak_share</code> before assuming.</p>
+<p><strong>The flame graph blames a library, not your code.</strong> memray attributes to the allocating frame; read one level up the stack and it is usually yours.</p>
+<p><strong><code>MemoryError</code> while profiling.</strong> The overhead pushed a run that just fitted over the limit. Reduce the input.</p>
+<h2 id="frequently-asked-questions" tabindex="-1"><a class="heading-link" href="#frequently-asked-questions"><span>Frequently Asked Questions</span></a></h2>
+<h3 id="memray-tracemalloc-or-scalene" tabindex="-1"><a class="heading-link" href="#memray-tracemalloc-or-scalene"><span>memray, tracemalloc or scalene?</span></a></h3>
+<p>memray, because the allocations are native. <code>tracemalloc</code> sees only Python-level allocations and misses essentially everything here. Scalene combines CPU and memory attribution well and is less precise on native peaks.</p>
+<h3 id="can-i-profile-in-production" tabindex="-1"><a class="heading-link" href="#can-i-profile-in-production"><span>Can I profile in production?</span></a></h3>
+<p>memray is usable in production and the overhead is real. A better pattern is to profile a reduced input in CI, enforce the per-million budget there, and use <code>resource.getrusage</code> in production for a cheap peak figure.</p>
+<h3 id="what-per-million-points-budget-is-reasonable" tabindex="-1"><a class="heading-link" href="#what-per-million-points-budget-is-reasonable"><span>What per-million-points budget is reasonable?</span></a></h3>
+<p>For a read-filter-write pipeline, 0.01–0.03 GB per million points. Anything building a KD-tree or a mesh is higher — a Delaunay triangulation is roughly 0.2 GB per million points — so the budget belongs per stage rather than per pipeline.</p>
+<h2 id="related-guides" tabindex="-1"><a class="heading-link" href="#related-guides"><span>Related Guides</span></a></h2>
+<ul>
+<li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/running-pdal-pipelines-in-docker/">Running PDAL Pipelines in Docker</a> — the memory limit that turns a slow death into a fast failure</li>
+<li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/voxel-downsampling-strategies-compared/">Voxel Downsampling Strategies Compared</a> — the stage whose temporaries are largest</li>
+<li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/testing-spatial-pipelines-with-pytest-fixtures/">Testing Spatial Pipelines with pytest Fixtures</a> — where the memory budget gate belongs</li>
+</ul>
+<p>Back to <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/">Performance Profiling and Benchmarking</a>.</p>
+
+
+      
+      
+
+      <div class="related-nav">
+        
+
+        
+          <div>
+            <h3>Related</h3>
+            <div class="related-grid">
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/benchmarking-draco-decode-on-mobile-gpus/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Benchmarking Draco Decode on Mobile GPUs</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/load-testing-tile-servers-with-locust/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Load Testing Tile Servers with Locust</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/measuring-tile-load-times-in-the-cesium-frame-loop/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Measuring Tile Load Times in the Cesium Frame Loop</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/profiling-pdal-pipelines-with-cprofile-and-py-spy/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Profiling PDAL Pipelines with cProfile and py-spy</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/profiling-webgl-with-spector-js/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Profiling WebGL with Spector.js</span>
+                </a>
+              
+            </div>
+          </div>
+        
+      </div>
+    </article>
+
+    
+    <aside class="toc" aria-label="On this page" data-toc hidden>
+      <h4>On this page</h4>
+      <ul></ul>
+    </aside>
+  </div>
+</div>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+  <div class="container site-footer__inner">
+    <div class="site-footer__brand">
+      <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+        <img src="/assets/img/logo-mark.svg" alt="" class="brand__mark" width="36" height="36">
+        <span class="brand__name">
+          3D Geospatial
+          <small>Digital Twin Automation</small>
+        </span>
+      </a>
+      <p>Engineering-grade guides on point cloud processing, mesh pipelines, LOD strategies, and CI/CD automation for digital twin platforms.</p>
+      <a class="footer-social" href="https://github.com/3d-geospatial" aria-label="3D Geospatial on GitHub" rel="noopener" target="_blank">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+          <path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.53-1.34-1.3-1.7-1.3-1.7-1.06-.72.08-.71.08-.71 1.17.08 1.79 1.2 1.79 1.2 1.04 1.79 2.73 1.27 3.4.97.1-.75.4-1.27.73-1.56-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.19-3.08-.12-.3-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.75.11 3.05.74.8 1.19 1.83 1.19 3.08 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.07.78 2.15v3.18c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5Z"/>
+        </svg>
+        <span>GitHub</span>
+      </a>
+    </div>
+
+    <div class="site-footer__col">
+      <h4>Sections</h4>
+      <ul>
+        <li><a href="https://www.3d-geospatial.com/">Home</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management &amp; Optimization</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/">Point Cloud &amp; Mesh Pipelines</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/">Troubleshooting &amp; Reliability</a></li>
+        
+      </ul>
+    </div>
+
+    
+      <div class="site-footer__col">
+        <h4>3D Geospatial Fundamentals</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/">3D Format Standards Comparison</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/">BIM and IFC Georeferencing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/">CityGML and CityJSON Processing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems for 3D Assets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/">Digital Elevation Model Workflows</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/">Spatial Indexing and Tiling Schemes for 3D Data</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>LOD Management &amp; Optimization</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/">Automated Tile Generation for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/">Cesium ion Upload Automation for 3D Tilesets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/">glTF LOD Generation With Draco Compression</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/">Streaming Sync Patterns for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/">Tileset Metadata and 3D Tiles Next</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/">Vector Overlays on 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Point Cloud &amp; Mesh Pipelines</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/">Automated Mesh Decimation for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/">Change Detection Between LiDAR Scan Epochs</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/">CI/CD Automation for Spatial Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">LiDAR Classification and Ground Extraction</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/photogrammetry-processing-pipelines/">Photogrammetry Processing Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/">Point Cloud Filtering Techniques</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/">Surface Reconstruction for Geospatial Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/">Texture Mapping Workflows for Digital Twins</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Troubleshooting &amp; Reliability</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/">Cross-Section Failure Modes in Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/">Data Validation &amp; QA Gates for 3D Tiles</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/">Performance Profiling and Benchmarking</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/">Pipeline Observability and Monitoring</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/">Streaming &amp; Runtime Diagnostics for 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+  </div>
+  <div class="container site-footer__bottom">
+    <span>© 2026 3D Geospatial &amp; Digital Twin Automation</span>
+    <span>Built with Eleventy · PWA-enabled</span>
+  </div>
+</footer>
+
+
+  <script src="/assets/js/site.js?v=b99aa9f971" defer></script>
+  
+</body>
+</html>

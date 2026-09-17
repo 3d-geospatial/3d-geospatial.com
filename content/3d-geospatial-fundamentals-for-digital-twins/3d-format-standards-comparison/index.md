@@ -350,5 +350,8 @@ Declare the EPSG code at each stage and verify it on the other side. Use `ogr2og
 - [Digital Elevation Model Workflows](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/) — terrain raster generation and registration
 - [Automated Tile Generation for 3D Geospatial](https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/) — turning canonical geometry into streamable tilesets
 - [Point Cloud & Mesh Processing Pipelines](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/) — producing the meshes these formats carry
+- [GeoPackage vs GeoParquet for Twin Attributes](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/geopackage-vs-geoparquet-for-twin-attributes/) — choose a store for a twin's attribute tables
+- [I3S vs 3D Tiles for Scene Delivery](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/i3s-vs-3d-tiles-for-scene-delivery/) — compare I3S and 3D Tiles for streaming a twin
+- [IFC vs CityGML for Building Twins](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/ifc-vs-citygml-for-building-twins/) — choose between IFC and CityGML for a building twin
 
 Back to [3D Geospatial Fundamentals for Digital Twins](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/).

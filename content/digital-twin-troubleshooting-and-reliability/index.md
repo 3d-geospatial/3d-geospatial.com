@@ -200,6 +200,16 @@ A single inverted error makes the client refine into coarser geometry — the "d
 <figcaption>Nothing about the fault changes across these bars. Only the amount of work that has been built on top of it does.</figcaption>
 </figure>
 
+## Pipeline Observability and Monitoring
+
+A twin pipeline that runs nightly for a year will fail in ways nobody predicted, and the difference between a two-hour recovery and a two-day one is whether the pipeline was emitting anything useful while it ran. [Pipeline Observability and Monitoring](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/) covers the four things worth instrumenting — what each stage did, how long it took, how fresh the published data is, and whether this delivery resembles the last one.
+
+The instrumentation divides into signals and contracts. [Structured logging for spatial pipelines](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/structured-logging-for-spatial-pipelines/), [exporting Prometheus metrics from tiling jobs](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/exporting-prometheus-metrics-from-tiling-jobs/) and [tracing pipeline stages with OpenTelemetry](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/tracing-pipeline-stages-with-opentelemetry/) are the signals; [monitoring twin data freshness SLOs](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/monitoring-twin-data-freshness-slos/), [alerting on tile error rates from CDN logs](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/alerting-on-tile-error-rates-from-cdn-logs/) and [detecting data drift between deliveries](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/detecting-data-drift-between-deliveries/) are the contracts that turn a signal into a page.
+
+**Key Practice:** Instrument the data's freshness, not only the job's success. A tiling job that exits zero every night while its input stopped updating three weeks ago is the failure mode monitoring exists to catch, and no job-level metric sees it.
+
+---
+
 ## Cross-Section Integration
 
 Reliability is the connective tissue across the whole twin, so every area here reaches back into the three source pipelines rather than standing apart from them.
@@ -271,5 +281,6 @@ None of this requires new infrastructure. Every check described across these thr
 - [3D Geospatial Fundamentals for Digital Twins](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/) — the CRS and mesh contracts every stage trusts
 - [LOD Management & Optimization Strategies](https://www.3d-geospatial.com/lod-management-optimization-strategies/) — the tiling and streaming this reliability layer guards
 - [Point Cloud & Mesh Processing Pipelines](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/) — the geometry whose topology and memory these checks protect
+- [Pipeline Observability and Monitoring](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/) — metrics, tracing, structured logs, freshness SLOs and drift detection
 
 Back to [Home](https://www.3d-geospatial.com/).

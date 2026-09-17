@@ -321,5 +321,8 @@ Both. Validate before decimation so you decimate a clean mesh, and again afterwa
 - [Digital Elevation Model Workflows](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/) — TIN generation and the winding artifacts it produces
 - [Surface Reconstruction for Geospatial Twins](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/) — how upstream meshing affects topology
 - [Automated Mesh Decimation for Digital Twins](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/) — re-validating topology after polygon reduction
+- [Auditing Meshes with Euler Characteristic and Genus](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/auditing-meshes-with-euler-characteristic-and-genus/) — use Euler characteristic and genus to audit twin meshes in trimesh
+- [Orienting Face Normals Consistently](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/orienting-face-normals-consistently/) — fix flipped faces in twin meshes
+- [Welding Vertices and Removing Duplicate Faces](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/welding-vertices-and-removing-duplicate-faces/) — clean up imported meshes safely
 
 Back to [3D Geospatial Fundamentals for Digital Twins](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/).

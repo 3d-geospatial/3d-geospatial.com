@@ -321,5 +321,8 @@ On every merge to the default branch, and on any pull request that touches the p
 - [Measuring Tile Load Times in the Cesium Frame Loop](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/measuring-tile-load-times-in-the-cesium-frame-loop/) — the client side in detail
 - [Benchmarking Draco Decode on Mobile GPUs](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/benchmarking-draco-decode-on-mobile-gpus/) — where the frame budget usually goes
 - [Streaming & Runtime Diagnostics](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/) — turning these measurements into a diagnosis
+- [Load Testing Tile Servers with Locust](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/load-testing-tile-servers-with-locust/) — load-test a tile server with a realistic request pattern
+- [Memory Profiling Python Pipelines with memray](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/memory-profiling-python-pipelines-with-memray/) — find why a point-cloud pipeline needs 90 GB
+- [Profiling WebGL with Spector.js](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/profiling-webgl-with-spector-js/) — capture and read a WebGL frame from a 3D Tiles viewer
 
 Back to [Digital Twin Troubleshooting & Reliability](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/).

@@ -1,0 +1,743 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <title>Classifying 3D Tiles with Polygon Volumes — 3D Geospatial</title>
+  <meta name="description" content="Paint building tiles by zone in CesiumJS: classification primitives, volume extents that cover the tallest roof, classification types">
+  <meta name="keywords" content="3D geospatial, digital twin, point cloud, mesh pipeline, LOD, 3D Tiles, Cesium, PDAL, Open3D, Python, CI/CD">
+  <meta name="author" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta name="theme-color" content="#1f6b8a" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f171d" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+
+  
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem("theme");
+        var theme = (stored === "dark" || stored === "light") ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    })();
+  </script>
+  <meta name="generator" content="Eleventy">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="googlebot" content="index,follow,max-image-preview:large">
+
+  
+  <link rel="canonical" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/classifying-3d-tiles-with-polygon-volumes/">
+  <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">
+
+  
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/icon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+
+  
+  <link rel="apple-touch-icon" href="/assets/img/icon-180.png">
+  <link rel="mask-icon" href="/assets/img/logo.svg" color="#1f6b8a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="3D Geospatial">
+  <meta name="application-name" content="3D Geospatial">
+
+  
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Classifying 3D Tiles with Polygon Volumes — 3D Geospatial">
+  <meta property="og:description" content="Paint building tiles by zone in CesiumJS: classification primitives, volume extents that cover the tallest roof, classification types">
+  <meta property="og:url" content="https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/classifying-3d-tiles-with-polygon-volumes/">
+  <meta property="og:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+  <meta property="og:site_name" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta property="og:locale" content="en_US">
+  
+  <meta property="article:published_time" content="2026-09-17T23:36:56.455Z">
+  <meta property="article:modified_time" content="2026-09-17T23:36:56.455Z">
+  <meta property="article:publisher" content="https://www.3d-geospatial.com/">
+  
+
+  
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Classifying 3D Tiles with Polygon Volumes — 3D Geospatial">
+  <meta name="twitter:description" content="Paint building tiles by zone in CesiumJS: classification primitives, volume extents that cover the tallest roof, classification types">
+  <meta name="twitter:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta name="twitter:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+
+  
+  <link rel="preload" href="/assets/css/styles.css?v=8c46394d6c" as="style">
+  
+
+  <link rel="stylesheet" href="/assets/css/styles.css?v=8c46394d6c">
+
+  
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.3d-geospatial.com/#organization",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "url": "https://www.3d-geospatial.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/icon-512.png",
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://www.3d-geospatial.com/#website",
+      "url": "https://www.3d-geospatial.com/",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "description": "Build reliable 3D spatial data pipelines for digital twins — point clouds, meshes, LOD strategies, Python processing, and CI/CD automation.",
+      "inLanguage": "en",
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      }
+    },
+    {
+      "@type": "TechArticle",
+      "@id": "https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/classifying-3d-tiles-with-polygon-volumes/#article",
+      "isPartOf": {
+        "@id": "https://www.3d-geospatial.com/#website"
+      },
+      "headline": "Classifying 3D Tiles with Polygon Volumes",
+      "name": "Classifying 3D Tiles with Polygon Volumes",
+      "description": "Paint building tiles by zone in CesiumJS: classification primitives, volume extents that cover the tallest roof, classification types",
+      "url": "https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/classifying-3d-tiles-with-polygon-volumes/",
+      "mainEntityOfPage": "https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/classifying-3d-tiles-with-polygon-volumes/",
+      "inLanguage": "en",
+      "datePublished": "2026-09-17T23:36:56.455Z",
+      "dateModified": "2026-09-17T23:36:56.455Z",
+      "author": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "image": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/og-cover.png",
+        "width": 1200,
+        "height": 630
+      },
+      "breadcrumb": {
+        "@id": "https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/classifying-3d-tiles-with-polygon-volumes/#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/classifying-3d-tiles-with-polygon-volumes/#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://www.3d-geospatial.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "LOD Management Optimization Strategies",
+          "item": "https://www.3d-geospatial.com/lod-management-optimization-strategies/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Vector Overlays On 3D Tiles",
+          "item": "https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "name": "Classifying 3D Tiles With Polygon Volumes",
+          "item": "https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/classifying-3d-tiles-with-polygon-volumes/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  
+<header class="site-header" role="banner">
+  <div class="container site-header__inner">
+    <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+      <img src="/assets/img/logo.svg" alt="" class="brand__mark" width="36" height="36">
+      <span class="brand__name">
+        3D Geospatial
+        <small>Digital Twin Automation</small>
+      </span>
+    </a>
+
+    <button class="theme-toggle" type="button" data-theme-toggle
+            aria-label="Switch to dark theme" title="Switch to dark theme">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4.2"/>
+        <path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/>
+      </svg>
+    </button>
+
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>
+      <span class="nav-toggle__icon" aria-hidden="true"><span></span></span>
+      Menu
+    </button>
+
+    <nav class="primary-nav" id="primary-nav" aria-label="Primary">
+      
+      <a href="https://www.3d-geospatial.com/" >
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/>
+        </svg>
+        Home
+      </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2 3 7l9 5 9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 17l9 5 9-5"/>
+            </svg>
+          
+          3D Geospatial Fundamentals
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/" aria-current="page">
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+          
+          LOD Management &amp; Optimization
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="6" cy="6" r="1.5"/><circle cx="12" cy="6" r="1.5"/><circle cx="18" cy="6" r="1.5"/>
+              <circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/>
+              <circle cx="6" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="18" cy="18" r="1.5"/>
+            </svg>
+          
+          Point Cloud &amp; Mesh Pipelines
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <path d="M12 9v4"/><path d="M12 17h.01"/>
+            </svg>
+          
+          Troubleshooting &amp; Reliability
+        </a>
+      
+    </nav>
+  </div>
+</header>
+
+
+  <main id="main">
+    
+
+
+<div class="container">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    
+      
+        <a href="https://www.3d-geospatial.com/">Home</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management Optimization Strategies</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/">Vector Overlays On 3D Tiles</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <span class="current">Classifying 3D Tiles With Polygon Volumes</span>
+      
+    
+  </nav>
+
+  <div class="content-page">
+    <article class="article">
+      <h1 id="classifying-3d-tiles-with-polygon-volumes" tabindex="-1"><a class="heading-link" href="#classifying-3d-tiles-with-polygon-volumes"><span>Classifying 3D Tiles with Polygon Volumes</span></a></h1>
+<p>This page colours existing 3D Tiles content by zone without touching the tiles — building extruded classification volumes from polygons, sizing them so they cover the tallest building in their footprint, choosing what each volume is allowed to paint, keeping per-feature picking, and moving to a classification tileset when the number of volumes outgrows a primitive.</p>
+<h2 id="why-you-hit-this" tabindex="-1"><a class="heading-link" href="#why-you-hit-this"><span>Why you hit this</span></a></h2>
+<p>The most common request after a twin’s buildings are on screen is “colour them by something”: zoning, ownership, energy class, survey status. Rebuilding the tileset with the attribute baked in takes hours and has to be repeated whenever the attribute changes. Classification does it at render time — the volume is a shadow-volume geometry and the buildings keep their own textures, so switching from zoning to energy class is one style change. What goes wrong is geometric: a volume that does not fully contain the buildings paints only part of them, and the result looks like a rendering bug. The choice between this and the other overlay strategies is in <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/">vector overlays on 3D Tiles</a>.</p>
+<h2 id="prerequisites" tabindex="-1"><a class="heading-link" href="#prerequisites"><span>Prerequisites</span></a></h2>
+<ul>
+<li>CesiumJS 1.110+ with a stencil buffer — <code>viewer.scene.context.stencilBuffer</code> must be true, which it is on all current desktop and mobile browsers with WebGL 2.</li>
+<li>A loaded 3D Tiles tileset of buildings, and polygons in EPSG:4326 with a zone attribute and a stable identifier.</li>
+<li>Height information for the footprints the volumes cover: a <code>height_m</code> column, the building tileset’s own metadata, or a DSM to sample.</li>
+</ul>
+<h2 id="step-by-step" tabindex="-1"><a class="heading-link" href="#step-by-step"><span>Step-by-Step</span></a></h2>
+<h3 id="1-size-the-volumes-from-the-buildings-they-must-cover" tabindex="-1"><a class="heading-link" href="#1-size-the-volumes-from-the-buildings-they-must-cover"><span>1. Size the volumes from the buildings they must cover</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> geopandas <span class="token keyword">as</span> gpd
+<span class="token keyword">import</span> numpy <span class="token keyword">as</span> np
+<span class="token keyword">import</span> rasterio
+
+zones <span class="token operator">=</span> gpd<span class="token punctuation">.</span>read_file<span class="token punctuation">(</span><span class="token string">"zoning.gpkg"</span><span class="token punctuation">)</span><span class="token punctuation">.</span>to_crs<span class="token punctuation">(</span><span class="token number">25832</span><span class="token punctuation">)</span>
+buildings <span class="token operator">=</span> gpd<span class="token punctuation">.</span>read_file<span class="token punctuation">(</span><span class="token string">"footprints.gpkg"</span><span class="token punctuation">)</span><span class="token punctuation">.</span>to_crs<span class="token punctuation">(</span><span class="token number">25832</span><span class="token punctuation">)</span>      <span class="token comment"># with height_m and base_z</span>
+
+joined <span class="token operator">=</span> gpd<span class="token punctuation">.</span>sjoin<span class="token punctuation">(</span>buildings<span class="token punctuation">[</span><span class="token punctuation">[</span><span class="token string">"geometry"</span><span class="token punctuation">,</span> <span class="token string">"height_m"</span><span class="token punctuation">,</span> <span class="token string">"base_z"</span><span class="token punctuation">]</span><span class="token punctuation">]</span><span class="token punctuation">,</span> zones<span class="token punctuation">[</span><span class="token punctuation">[</span><span class="token string">"geometry"</span><span class="token punctuation">,</span> <span class="token string">"zone_id"</span><span class="token punctuation">]</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+                   how<span class="token operator">=</span><span class="token string">"inner"</span><span class="token punctuation">,</span> predicate<span class="token operator">=</span><span class="token string">"intersects"</span><span class="token punctuation">)</span>
+tops <span class="token operator">=</span> joined<span class="token punctuation">.</span>groupby<span class="token punctuation">(</span><span class="token string">"zone_id"</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">apply</span><span class="token punctuation">(</span><span class="token keyword">lambda</span> g<span class="token punctuation">:</span> <span class="token builtin">float</span><span class="token punctuation">(</span><span class="token punctuation">(</span>g<span class="token punctuation">[</span><span class="token string">"base_z"</span><span class="token punctuation">]</span> <span class="token operator">+</span> g<span class="token punctuation">[</span><span class="token string">"height_m"</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">max</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+bottoms <span class="token operator">=</span> joined<span class="token punctuation">.</span>groupby<span class="token punctuation">(</span><span class="token string">"zone_id"</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">apply</span><span class="token punctuation">(</span><span class="token keyword">lambda</span> g<span class="token punctuation">:</span> <span class="token builtin">float</span><span class="token punctuation">(</span>g<span class="token punctuation">[</span><span class="token string">"base_z"</span><span class="token punctuation">]</span><span class="token punctuation">.</span><span class="token builtin">min</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+
+zones <span class="token operator">=</span> zones<span class="token punctuation">.</span>merge<span class="token punctuation">(</span>tops<span class="token punctuation">.</span>rename<span class="token punctuation">(</span><span class="token string">"top_z"</span><span class="token punctuation">)</span><span class="token punctuation">,</span> on<span class="token operator">=</span><span class="token string">"zone_id"</span><span class="token punctuation">)</span><span class="token punctuation">.</span>merge<span class="token punctuation">(</span>bottoms<span class="token punctuation">.</span>rename<span class="token punctuation">(</span><span class="token string">"bottom_z"</span><span class="token punctuation">)</span><span class="token punctuation">,</span> on<span class="token operator">=</span><span class="token string">"zone_id"</span><span class="token punctuation">)</span>
+zones<span class="token punctuation">[</span><span class="token string">"top_z"</span><span class="token punctuation">]</span> <span class="token operator">=</span> zones<span class="token punctuation">[</span><span class="token string">"top_z"</span><span class="token punctuation">]</span> <span class="token operator">+</span> <span class="token number">10.0</span>            <span class="token comment"># clearance above the tallest roof</span>
+zones<span class="token punctuation">[</span><span class="token string">"bottom_z"</span><span class="token punctuation">]</span> <span class="token operator">=</span> zones<span class="token punctuation">[</span><span class="token string">"bottom_z"</span><span class="token punctuation">]</span> <span class="token operator">-</span> <span class="token number">20.0</span>      <span class="token comment"># below the lowest terrain in the zone</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span>zones<span class="token punctuation">[</span><span class="token punctuation">[</span><span class="token string">"zone_id"</span><span class="token punctuation">,</span> <span class="token string">"bottom_z"</span><span class="token punctuation">,</span> <span class="token string">"top_z"</span><span class="token punctuation">]</span><span class="token punctuation">]</span><span class="token punctuation">.</span>describe<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span>loc<span class="token punctuation">[</span><span class="token punctuation">[</span><span class="token string">"min"</span><span class="token punctuation">,</span> <span class="token string">"max"</span><span class="token punctuation">]</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+zones<span class="token punctuation">.</span>to_crs<span class="token punctuation">(</span><span class="token number">4326</span><span class="token punctuation">)</span><span class="token punctuation">.</span>to_file<span class="token punctuation">(</span><span class="token string">"web/zones_4326.geojson"</span><span class="token punctuation">,</span> driver<span class="token operator">=</span><span class="token string">"GeoJSON"</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>The extents come from the data, not from a round number. A zone containing a 60 m tower needs a volume that reaches above it, and a zone on a hillside needs a base below the lowest ground in its own footprint — otherwise the lower storeys of the downhill buildings sit outside the volume and stay unpainted. The generous margins cost nothing: a classification volume is invisible, so making it 10 m taller than necessary has no visual effect at all.</p>
+<figure class="diagram">
+<svg viewBox="36 30 668 254" role="img" aria-labelledby="cls-extent-t cls-extent-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="cls-extent-t">A classification volume that is too short</title>
+  <desc id="cls-extent-d">Two zones over the same street. On the left the volume is extruded to twenty metres, so a sixty metre tower is coloured only up to twenty metres and the rest keeps its original appearance, which looks like a bug. On the right the volume reaches ten metres above the tallest roof and twenty metres below the lowest terrain, so every building in the zone is coloured in full.</desc>
+  <rect class="svg-bg" x="36" y="30" width="668" height="254" fill="#ffffff"/>
+  <path d="M30 220 H360" fill="none" stroke="#4f7a4d" stroke-width="2.5"/>
+  <rect x="70" y="150" width="50" height="70" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="150" y="60" width="60" height="160" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="240" y="170" width="50" height="50" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <path d="M50 160 h270 v60 h-270 Z" fill="#f7dfdc" stroke="#b0413e" stroke-width="2" fill-opacity="0.55"/>
+  <text x="185" y="248" fill="#b0413e" font-size="12.5" text-anchor="middle">volume to 20 m: tower half painted</text>
+  <path d="M400 220 H730" fill="none" stroke="#4f7a4d" stroke-width="2.5"/>
+  <rect x="440" y="150" width="50" height="70" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="520" y="60" width="60" height="160" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="610" y="170" width="50" height="50" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <path d="M420 44 h270 v192 h-270 Z" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2" fill-opacity="0.45"/>
+  <text x="555" y="248" fill="#4f7a4d" font-size="12.5" text-anchor="middle">volume above the tallest roof: all painted</text>
+  <text x="380" y="266" fill="#15384a" font-size="12.5" text-anchor="middle">The volume is invisible, so there is no cost to making it generous.</text>
+</svg>
+<figcaption>Classification paints what is inside the volume. Sizing it from the tallest roof and the lowest ground is the whole trick.</figcaption>
+</figure>
+<h3 id="2-build-one-batched-classification-primitive" tabindex="-1"><a class="heading-link" href="#2-build-one-batched-classification-primitive"><span>2. Build one batched classification primitive</span></a></h3>
+<div class="codeblock" data-lang="javascript"><div class="codeblock__bar"><span class="codeblock__lang">javascript</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-javascript" tabindex="0" role="group" aria-label="javascript code sample"><code class="language-javascript"><span class="token keyword">async</span> <span class="token keyword">function</span> <span class="token function">classifyZones</span><span class="token punctuation">(</span><span class="token parameter">url<span class="token punctuation">,</span> scene<span class="token punctuation">,</span> colorFor</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+  <span class="token keyword">const</span> fc <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token punctuation">(</span><span class="token keyword">await</span> <span class="token function">fetch</span><span class="token punctuation">(</span>url<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">json</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">const</span> instances <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+
+  <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">const</span> f <span class="token keyword">of</span> fc<span class="token punctuation">.</span>features<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> polys <span class="token operator">=</span> f<span class="token punctuation">.</span>geometry<span class="token punctuation">.</span>type <span class="token operator">===</span> <span class="token string">"Polygon"</span> <span class="token operator">?</span> <span class="token punctuation">[</span>f<span class="token punctuation">.</span>geometry<span class="token punctuation">.</span>coordinates<span class="token punctuation">]</span> <span class="token operator">:</span> f<span class="token punctuation">.</span>geometry<span class="token punctuation">.</span>coordinates<span class="token punctuation">;</span>
+    <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">const</span> rings <span class="token keyword">of</span> polys<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      instances<span class="token punctuation">.</span><span class="token function">push</span><span class="token punctuation">(</span><span class="token keyword">new</span> <span class="token class-name">Cesium<span class="token punctuation">.</span>GeometryInstance</span><span class="token punctuation">(</span><span class="token punctuation">{</span>
+        <span class="token literal-property property">geometry</span><span class="token operator">:</span> <span class="token keyword">new</span> <span class="token class-name">Cesium<span class="token punctuation">.</span>PolygonGeometry</span><span class="token punctuation">(</span><span class="token punctuation">{</span>
+          <span class="token literal-property property">polygonHierarchy</span><span class="token operator">:</span> <span class="token keyword">new</span> <span class="token class-name">Cesium<span class="token punctuation">.</span>PolygonHierarchy</span><span class="token punctuation">(</span>
+            Cesium<span class="token punctuation">.</span>Cartesian3<span class="token punctuation">.</span><span class="token function">fromDegreesArray</span><span class="token punctuation">(</span>rings<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">.</span><span class="token function">flat</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            rings<span class="token punctuation">.</span><span class="token function">slice</span><span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">map</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">r</span><span class="token punctuation">)</span> <span class="token operator">=></span> <span class="token keyword">new</span> <span class="token class-name">Cesium<span class="token punctuation">.</span>PolygonHierarchy</span><span class="token punctuation">(</span>Cesium<span class="token punctuation">.</span>Cartesian3<span class="token punctuation">.</span><span class="token function">fromDegreesArray</span><span class="token punctuation">(</span>r<span class="token punctuation">.</span><span class="token function">flat</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+          <span class="token punctuation">)</span><span class="token punctuation">,</span>
+          <span class="token literal-property property">height</span><span class="token operator">:</span> f<span class="token punctuation">.</span>properties<span class="token punctuation">.</span>bottom_z<span class="token punctuation">,</span>
+          <span class="token literal-property property">extrudedHeight</span><span class="token operator">:</span> f<span class="token punctuation">.</span>properties<span class="token punctuation">.</span>top_z<span class="token punctuation">,</span>
+          <span class="token literal-property property">vertexFormat</span><span class="token operator">:</span> Cesium<span class="token punctuation">.</span>VertexFormat<span class="token punctuation">.</span><span class="token constant">POSITION_ONLY</span><span class="token punctuation">,</span>
+        <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token literal-property property">attributes</span><span class="token operator">:</span> <span class="token punctuation">{</span>
+          <span class="token literal-property property">color</span><span class="token operator">:</span> Cesium<span class="token punctuation">.</span>ColorGeometryInstanceAttribute<span class="token punctuation">.</span><span class="token function">fromColor</span><span class="token punctuation">(</span><span class="token function">colorFor</span><span class="token punctuation">(</span>f<span class="token punctuation">.</span>properties<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+          <span class="token literal-property property">show</span><span class="token operator">:</span> <span class="token keyword">new</span> <span class="token class-name">Cesium<span class="token punctuation">.</span>ShowGeometryInstanceAttribute</span><span class="token punctuation">(</span><span class="token boolean">true</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token punctuation">}</span><span class="token punctuation">,</span>
+        <span class="token literal-property property">id</span><span class="token operator">:</span> f<span class="token punctuation">.</span>properties<span class="token punctuation">.</span>zone_id<span class="token punctuation">,</span>
+      <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+  <span class="token punctuation">}</span>
+
+  <span class="token keyword">const</span> primitive <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Cesium<span class="token punctuation">.</span>ClassificationPrimitive</span><span class="token punctuation">(</span><span class="token punctuation">{</span>
+    <span class="token literal-property property">geometryInstances</span><span class="token operator">:</span> instances<span class="token punctuation">,</span>
+    <span class="token literal-property property">classificationType</span><span class="token operator">:</span> Cesium<span class="token punctuation">.</span>ClassificationType<span class="token punctuation">.</span><span class="token constant">CESIUM_3D_TILE</span><span class="token punctuation">,</span>
+    <span class="token literal-property property">asynchronous</span><span class="token operator">:</span> <span class="token boolean">true</span><span class="token punctuation">,</span>
+  <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  scene<span class="token punctuation">.</span>primitives<span class="token punctuation">.</span><span class="token function">add</span><span class="token punctuation">(</span>primitive<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">await</span> primitive<span class="token punctuation">.</span>readyPromise<span class="token punctuation">;</span>
+  <span class="token keyword">return</span> primitive<span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">const</span> zonePalette <span class="token operator">=</span> <span class="token punctuation">{</span>
+  <span class="token literal-property property">residential</span><span class="token operator">:</span> Cesium<span class="token punctuation">.</span>Color<span class="token punctuation">.</span><span class="token function">fromCssColorString</span><span class="token punctuation">(</span><span class="token string">"#1f6b8a"</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">withAlpha</span><span class="token punctuation">(</span><span class="token number">0.45</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+  <span class="token literal-property property">mixed</span><span class="token operator">:</span> Cesium<span class="token punctuation">.</span>Color<span class="token punctuation">.</span><span class="token function">fromCssColorString</span><span class="token punctuation">(</span><span class="token string">"#c46a3d"</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">withAlpha</span><span class="token punctuation">(</span><span class="token number">0.45</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+  <span class="token literal-property property">industrial</span><span class="token operator">:</span> Cesium<span class="token punctuation">.</span>Color<span class="token punctuation">.</span><span class="token function">fromCssColorString</span><span class="token punctuation">(</span><span class="token string">"#5b6471"</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">withAlpha</span><span class="token punctuation">(</span><span class="token number">0.45</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+  <span class="token keyword">protected</span><span class="token operator">:</span> Cesium<span class="token punctuation">.</span>Color<span class="token punctuation">.</span><span class="token function">fromCssColorString</span><span class="token punctuation">(</span><span class="token string">"#4f7a4d"</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">withAlpha</span><span class="token punctuation">(</span><span class="token number">0.45</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+<span class="token punctuation">}</span><span class="token punctuation">;</span>
+<span class="token keyword">const</span> zoneLayer <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token function">classifyZones</span><span class="token punctuation">(</span><span class="token string">"/web/zones_4326.geojson"</span><span class="token punctuation">,</span> viewer<span class="token punctuation">.</span>scene<span class="token punctuation">,</span>
+  <span class="token punctuation">(</span><span class="token parameter">p</span><span class="token punctuation">)</span> <span class="token operator">=></span> zonePalette<span class="token punctuation">[</span>p<span class="token punctuation">.</span>zone<span class="token punctuation">]</span> <span class="token operator">??</span> Cesium<span class="token punctuation">.</span>Color<span class="token punctuation">.</span><span class="token constant">GRAY</span><span class="token punctuation">.</span><span class="token function">withAlpha</span><span class="token punctuation">(</span><span class="token number">0.35</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+</code></pre></div>
+<p><code>ClassificationPrimitive</code> requires every instance to carry a colour attribute — it has no appearance of its own — and batches them into one draw. The heights come from the data prepared in step 1, in metres above the ellipsoid; if the source heights are orthometric, convert them first, because a 47 m geoid separation puts the base of every volume above the ground.</p>
+<h3 id="3-choose-what-each-layer-paints" tabindex="-1"><a class="heading-link" href="#3-choose-what-each-layer-paints"><span>3. Choose what each layer paints</span></a></h3>
+<div class="codeblock" data-lang="javascript"><div class="codeblock__bar"><span class="codeblock__lang">javascript</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-javascript" tabindex="0" role="group" aria-label="javascript code sample"><code class="language-javascript">zoneLayer<span class="token punctuation">.</span>classificationType <span class="token operator">=</span> Cesium<span class="token punctuation">.</span>ClassificationType<span class="token punctuation">.</span><span class="token constant">CESIUM_3D_TILE</span><span class="token punctuation">;</span>   <span class="token comment">// buildings only</span>
+<span class="token comment">// TERRAIN for a ground-plane zone, BOTH for a volume that covers everything inside it</span>
+</code></pre></div>
+<p>The three options answer three different questions. Zoning that regulates buildings should paint buildings, so the street between them keeps its own appearance and the zone boundary stays legible. A flood extent should paint <code>BOTH</code>, because water covers the ground and the lower storeys alike. A soil or noise map belongs on <code>TERRAIN</code>.</p>
+<figure class="diagram">
+<svg viewBox="6 6 748 234" role="img" aria-labelledby="cls-type-t cls-type-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="cls-type-t">What each classification type paints</title>
+  <desc id="cls-type-d">A table of the three classification types against terrain, building tiles and point clouds. TERRAIN paints terrain only. CESIUM_3D_TILE paints building tile surfaces only. BOTH paints terrain and tiles. None of them paint point clouds, which have no surfaces to classify.</desc>
+  <rect class="svg-bg" x="6" y="6" width="748" height="234" fill="#ffffff"/>
+  <g stroke-width="1.5">
+    <rect x="20" y="20" width="230" height="38" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="250" y="20" width="160" height="38" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="410" y="20" width="170" height="38" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="580" y="20" width="160" height="38" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="20" y="58" width="230" height="44" fill="#ffffff" stroke="#5b6471"/>
+    <rect x="250" y="58" width="160" height="44" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="410" y="58" width="170" height="44" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="580" y="58" width="160" height="44" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="20" y="102" width="230" height="44" fill="#ffffff" stroke="#5b6471"/>
+    <rect x="250" y="102" width="160" height="44" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="410" y="102" width="170" height="44" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="580" y="102" width="160" height="44" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="20" y="146" width="230" height="44" fill="#ffffff" stroke="#5b6471"/>
+    <rect x="250" y="146" width="160" height="44" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="410" y="146" width="170" height="44" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="580" y="146" width="160" height="44" fill="#f7dfdc" stroke="#b0413e"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="135" y="44">classificationType</text>
+    <text x="330" y="44">terrain</text>
+    <text x="495" y="44">building tiles</text>
+    <text x="660" y="44">point clouds</text>
+    <text x="135" y="86">TERRAIN</text><text x="330" y="86">painted</text><text x="495" y="86">untouched</text><text x="660" y="86">untouched</text>
+    <text x="135" y="130">CESIUM_3D_TILE</text><text x="330" y="130">untouched</text><text x="495" y="130">painted</text><text x="660" y="130">untouched</text>
+    <text x="135" y="174">BOTH</text><text x="330" y="174">painted</text><text x="495" y="174">painted</text><text x="660" y="174">untouched</text>
+  </g>
+  <text x="380" y="222" fill="#15384a" font-size="12.5" text-anchor="middle">To colour a point cloud, style the point cloud itself — classification needs surfaces.</text>
+</svg>
+<figcaption>The type is a property of the layer's meaning, not a setting to try until something appears.</figcaption>
+</figure>
+<h3 id="4-pick-filter-and-restyle-without-rebuilding" tabindex="-1"><a class="heading-link" href="#4-pick-filter-and-restyle-without-rebuilding"><span>4. Pick, filter and restyle without rebuilding</span></a></h3>
+<div class="codeblock" data-lang="javascript"><div class="codeblock__bar"><span class="codeblock__lang">javascript</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-javascript" tabindex="0" role="group" aria-label="javascript code sample"><code class="language-javascript"><span class="token keyword">const</span> handler <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Cesium<span class="token punctuation">.</span>ScreenSpaceEventHandler</span><span class="token punctuation">(</span>viewer<span class="token punctuation">.</span>canvas<span class="token punctuation">)</span><span class="token punctuation">;</span>
+handler<span class="token punctuation">.</span><span class="token function">setInputAction</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">m</span><span class="token punctuation">)</span> <span class="token operator">=></span> <span class="token punctuation">{</span>
+  <span class="token keyword">const</span> picked <span class="token operator">=</span> viewer<span class="token punctuation">.</span>scene<span class="token punctuation">.</span><span class="token function">pick</span><span class="token punctuation">(</span>m<span class="token punctuation">.</span>position<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>Cesium<span class="token punctuation">.</span><span class="token function">defined</span><span class="token punctuation">(</span>picked<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token keyword">return</span><span class="token punctuation">;</span>
+  <span class="token comment">// A click on a classified building can return either the zone instance or the building feature</span>
+  <span class="token keyword">if</span> <span class="token punctuation">(</span>picked <span class="token keyword">instanceof</span> <span class="token class-name">Cesium<span class="token punctuation">.</span>Cesium3DTileFeature</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    console<span class="token punctuation">.</span><span class="token function">log</span><span class="token punctuation">(</span><span class="token string">"building"</span><span class="token punctuation">,</span> picked<span class="token punctuation">.</span><span class="token function">getProperty</span><span class="token punctuation">(</span><span class="token string">"building_id"</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span> <span class="token keyword">else</span> <span class="token keyword">if</span> <span class="token punctuation">(</span>Cesium<span class="token punctuation">.</span><span class="token function">defined</span><span class="token punctuation">(</span>picked<span class="token punctuation">.</span>id<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    console<span class="token punctuation">.</span><span class="token function">log</span><span class="token punctuation">(</span><span class="token string">"zone"</span><span class="token punctuation">,</span> picked<span class="token punctuation">.</span>id<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span><span class="token punctuation">,</span> Cesium<span class="token punctuation">.</span>ScreenSpaceEventType<span class="token punctuation">.</span><span class="token constant">LEFT_CLICK</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token keyword">function</span> <span class="token function">showOnly</span><span class="token punctuation">(</span><span class="token parameter">zoneIds</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+  <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">const</span> f <span class="token keyword">of</span> allZoneIds<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> attrs <span class="token operator">=</span> zoneLayer<span class="token punctuation">.</span><span class="token function">getGeometryInstanceAttributes</span><span class="token punctuation">(</span>f<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    attrs<span class="token punctuation">.</span>show <span class="token operator">=</span> Cesium<span class="token punctuation">.</span>ShowGeometryInstanceAttribute<span class="token punctuation">.</span><span class="token function">toValue</span><span class="token punctuation">(</span>zoneIds<span class="token punctuation">.</span><span class="token function">has</span><span class="token punctuation">(</span>f<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span>
+</code></pre></div>
+<p>Picking over classified geometry is ambiguous by nature: the pixel belongs to a building <em>and</em> to a zone. Deciding which one a click means — usually the building, with the zone shown as context — is an application decision worth making once and documenting, because users will otherwise get different behaviour depending on which pixel they hit.</p>
+<h3 id="5-move-to-a-classification-tileset-when-the-layer-is-large" tabindex="-1"><a class="heading-link" href="#5-move-to-a-classification-tileset-when-the-layer-is-large"><span>5. Move to a classification tileset when the layer is large</span></a></h3>
+<p>A primitive holds its geometry in memory all the time. Past a few thousand volumes, the same geometry belongs in a tileset with <code>classificationType</code> set, so it streams and culls.</p>
+<div class="codeblock" data-lang="javascript"><div class="codeblock__bar"><span class="codeblock__lang">javascript</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-javascript" tabindex="0" role="group" aria-label="javascript code sample"><code class="language-javascript"><span class="token keyword">const</span> zoneTiles <span class="token operator">=</span> <span class="token keyword">await</span> Cesium<span class="token punctuation">.</span>Cesium3DTileset<span class="token punctuation">.</span><span class="token function">fromUrl</span><span class="token punctuation">(</span><span class="token string">"/tiles/zone_volumes/tileset.json"</span><span class="token punctuation">,</span> <span class="token punctuation">{</span>
+  <span class="token literal-property property">classificationType</span><span class="token operator">:</span> Cesium<span class="token punctuation">.</span>ClassificationType<span class="token punctuation">.</span><span class="token constant">CESIUM_3D_TILE</span><span class="token punctuation">,</span>
+<span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+viewer<span class="token punctuation">.</span>scene<span class="token punctuation">.</span>primitives<span class="token punctuation">.</span><span class="token function">add</span><span class="token punctuation">(</span>zoneTiles<span class="token punctuation">)</span><span class="token punctuation">;</span>
+zoneTiles<span class="token punctuation">.</span>style <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Cesium<span class="token punctuation">.</span>Cesium3DTileStyle</span><span class="token punctuation">(</span><span class="token punctuation">{</span>
+  <span class="token literal-property property">color</span><span class="token operator">:</span> <span class="token punctuation">{</span>
+    <span class="token literal-property property">conditions</span><span class="token operator">:</span> <span class="token punctuation">[</span>
+      <span class="token punctuation">[</span><span class="token string">"${zone} === 'protected'"</span><span class="token punctuation">,</span> <span class="token string">"color('#4f7a4d', 0.45)"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+      <span class="token punctuation">[</span><span class="token string">"${zone} === 'industrial'"</span><span class="token punctuation">,</span> <span class="token string">"color('#5b6471', 0.45)"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+      <span class="token punctuation">[</span><span class="token string">"true"</span><span class="token punctuation">,</span> <span class="token string">"color('#1f6b8a', 0.4)"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+    <span class="token punctuation">]</span><span class="token punctuation">,</span>
+  <span class="token punctuation">}</span><span class="token punctuation">,</span>
+<span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+</code></pre></div>
+<p>The volumes are built exactly like the prisms in <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/extruding-footprints-into-lod1-tiles/">extruding footprints into LOD1 tiles</a>, with the base and top from step 1 instead of a building height, and with the zone attribute carried as feature metadata so the style expression above can read it.</p>
+<h2 id="expected-output-verification" tabindex="-1"><a class="heading-link" href="#expected-output-verification"><span>Expected Output &amp; Verification</span></a></h2>
+<div class="codeblock" data-lang="text"><div class="codeblock__bar"><span class="codeblock__lang">text</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-text" tabindex="0" role="group" aria-label="text code sample"><code class="language-text">        bottom_z   top_z
+min       478.20  521.40
+max       502.66  578.10
+</code></pre></div>
+<p>Verify coverage rather than appearance, by sampling the classified result along the height of the tallest building in each zone:</p>
+<div class="codeblock" data-lang="javascript"><div class="codeblock__bar"><span class="codeblock__lang">javascript</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-javascript" tabindex="0" role="group" aria-label="javascript code sample"><code class="language-javascript"><span class="token keyword">async</span> <span class="token keyword">function</span> <span class="token function">verifyCoverage</span><span class="token punctuation">(</span><span class="token parameter">tallestByZone</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+  <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">const</span> <span class="token punctuation">[</span>zoneId<span class="token punctuation">,</span> <span class="token punctuation">{</span> lon<span class="token punctuation">,</span> lat<span class="token punctuation">,</span> base<span class="token punctuation">,</span> top <span class="token punctuation">}</span><span class="token punctuation">]</span> <span class="token keyword">of</span> Object<span class="token punctuation">.</span><span class="token function">entries</span><span class="token punctuation">(</span>tallestByZone<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> heights <span class="token operator">=</span> <span class="token punctuation">[</span>base <span class="token operator">+</span> <span class="token number">1</span><span class="token punctuation">,</span> <span class="token punctuation">(</span>base <span class="token operator">+</span> top<span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token number">2</span><span class="token punctuation">,</span> top <span class="token operator">-</span> <span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+    <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">const</span> h <span class="token keyword">of</span> heights<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      <span class="token keyword">const</span> world <span class="token operator">=</span> Cesium<span class="token punctuation">.</span>Cartesian3<span class="token punctuation">.</span><span class="token function">fromDegrees</span><span class="token punctuation">(</span>lon<span class="token punctuation">,</span> lat<span class="token punctuation">,</span> h<span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token keyword">const</span> win <span class="token operator">=</span> Cesium<span class="token punctuation">.</span>SceneTransforms<span class="token punctuation">.</span><span class="token function">worldToWindowCoordinates</span><span class="token punctuation">(</span>viewer<span class="token punctuation">.</span>scene<span class="token punctuation">,</span> world<span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token keyword">const</span> picked <span class="token operator">=</span> win <span class="token operator">&amp;&amp;</span> viewer<span class="token punctuation">.</span>scene<span class="token punctuation">.</span><span class="token function">pick</span><span class="token punctuation">(</span>win<span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>picked<span class="token punctuation">)</span> console<span class="token punctuation">.</span><span class="token function">warn</span><span class="token punctuation">(</span><span class="token template-string"><span class="token template-punctuation string">`</span><span class="token string">zone </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>zoneId<span class="token interpolation-punctuation punctuation">}</span></span><span class="token string">: nothing picked at </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>h<span class="token punctuation">.</span><span class="token function">toFixed</span><span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token interpolation-punctuation punctuation">}</span></span><span class="token string"> m</span><span class="token template-punctuation string">`</span></span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+  <span class="token punctuation">}</span>
+<span class="token punctuation">}</span>
+</code></pre></div>
+<p>Checking near the base, the middle and just under the roof is what catches a volume that is too short or whose base is above the terrain. A zone where the top sample misses is the classic under-extruded volume; one where the base sample misses has its bottom above the ground, usually from orthometric heights used as ellipsoidal.</p>
+<p>Also confirm the hardware supports the technique at all, and that the layer is one primitive:</p>
+<div class="codeblock" data-lang="javascript"><div class="codeblock__bar"><span class="codeblock__lang">javascript</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-javascript" tabindex="0" role="group" aria-label="javascript code sample"><code class="language-javascript">console<span class="token punctuation">.</span><span class="token function">log</span><span class="token punctuation">(</span><span class="token string">"stencil buffer:"</span><span class="token punctuation">,</span> viewer<span class="token punctuation">.</span>scene<span class="token punctuation">.</span>context<span class="token punctuation">.</span>stencilBuffer<span class="token punctuation">)</span><span class="token punctuation">;</span>
+console<span class="token punctuation">.</span><span class="token function">log</span><span class="token punctuation">(</span><span class="token string">"primitives:"</span><span class="token punctuation">,</span> viewer<span class="token punctuation">.</span>scene<span class="token punctuation">.</span>primitives<span class="token punctuation">.</span>length<span class="token punctuation">)</span><span class="token punctuation">;</span>
+</code></pre></div>
+<figure class="diagram">
+<svg viewBox="6 6 748 186" role="img" aria-labelledby="cls-scale-t cls-scale-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="cls-scale-t">Classification primitive against classification tileset</title>
+  <desc id="cls-scale-d">A comparison table. A classification primitive holds all volumes in memory, is built once at load, styles through instance attributes and suits up to a few thousand volumes. A classification tileset streams and culls volumes, is built offline, styles through a tile style expression and suits tens of thousands or more.</desc>
+  <rect class="svg-bg" x="6" y="6" width="748" height="186" fill="#ffffff"/>
+  <g stroke-width="1.5">
+    <rect x="20" y="20" width="200" height="38" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="220" y="20" width="260" height="38" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="480" y="20" width="260" height="38" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="20" y="58" width="200" height="40" fill="#ffffff" stroke="#5b6471"/>
+    <rect x="220" y="58" width="260" height="40" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="480" y="58" width="260" height="40" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="20" y="98" width="200" height="40" fill="#ffffff" stroke="#5b6471"/>
+    <rect x="220" y="98" width="260" height="40" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="480" y="98" width="260" height="40" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="20" y="138" width="200" height="40" fill="#ffffff" stroke="#5b6471"/>
+    <rect x="220" y="138" width="260" height="40" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="480" y="138" width="260" height="40" fill="#eef5e9" stroke="#4f7a4d"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="120" y="44">property</text>
+    <text x="350" y="44">ClassificationPrimitive</text>
+    <text x="610" y="44">classification tileset</text>
+    <text x="120" y="83">build</text><text x="350" y="83">in the browser, at load</text><text x="610" y="83">offline, in the pipeline</text>
+    <text x="120" y="123">styling</text><text x="350" y="123">instance attributes, instant</text><text x="610" y="123">tile style expressions</text>
+    <text x="120" y="163">scale</text><text x="350" y="163">up to a few thousand</text><text x="610" y="163">tens of thousands and up</text>
+  </g>
+</svg>
+<figcaption>The same rendering technique, two delivery mechanisms. The crossover is where in-browser build time and memory start to be felt.</figcaption>
+</figure>
+<h2 id="performance-notes" tabindex="-1"><a class="heading-link" href="#performance-notes"><span>Performance Notes</span></a></h2>
+<ul>
+<li><strong>Volumes are shadow geometry</strong>, so their cost is proportional to vertex count and to the height range they span. Simplify polygons and avoid volumes that span a whole valley.</li>
+<li><strong>One primitive per layer, restyled through attributes.</strong> Rebuilding to change a colour is the mistake that makes classification feel slow.</li>
+<li><strong>Overlapping volumes multiply fragment work.</strong> Where zones overlap, ship non-overlapping volumes from the pipeline rather than letting the renderer blend them.</li>
+<li><strong>Hide rather than remove.</strong> <code>show</code> on an instance attribute costs nothing; removing and re-adding a primitive rebuilds geometry.</li>
+<li><strong>Watch memory alongside the tileset’s.</strong> Classification geometry counts against the same budget as tile content, which is sized in <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/tuning-tileset-cache-bytes-for-memory-constrained-clients/">tuning tileset cache bytes</a>.</li>
+</ul>
+<h2 id="common-errors" tabindex="-1"><a class="heading-link" href="#common-errors"><span>Common Errors</span></a></h2>
+<p><strong>Nothing is coloured, and no error appears.</strong> Either the stencil buffer is unavailable, or <code>classificationType</code> is <code>TERRAIN</code> while the target is a tileset, or the volume’s height range does not intersect the buildings. Check all three in that order.</p>
+<p><strong>Only the ground floor of every building is coloured.</strong> The volume’s <code>extrudedHeight</code> is below the roofs. Recompute the top from the maximum of base plus height in the zone, as step 1 does.</p>
+<p><strong>The colour is applied to the terrain as well and swamps the scene.</strong> <code>BOTH</code> was set on a layer that only needed buildings. Zoning almost never wants <code>BOTH</code>.</p>
+<p><strong>Volumes appear to shift as the camera moves closer.</strong> The building tiles are refining, and classification paints whatever level of detail is loaded. This is inherent; explain it rather than fighting it.</p>
+<h2 id="frequently-asked-questions" tabindex="-1"><a class="heading-link" href="#frequently-asked-questions"><span>Frequently Asked Questions</span></a></h2>
+<h3 id="can-i-classify-with-a-polygon-that-has-holes" tabindex="-1"><a class="heading-link" href="#can-i-classify-with-a-polygon-that-has-holes"><span>Can I classify with a polygon that has holes?</span></a></h3>
+<p>Yes — pass the inner rings in the <code>PolygonHierarchy</code>, as in step 2. Holes are the right way to model a zone with an excluded parcel, and they cost nothing extra.</p>
+<h3 id="does-classification-change-the-tilesets-own-styling" tabindex="-1"><a class="heading-link" href="#does-classification-change-the-tilesets-own-styling"><span>Does classification change the tileset’s own styling?</span></a></h3>
+<p>No. The tileset keeps its style and its textures; classification draws over the fragments inside the volume. Both are visible at once, which is why alpha around 0.4–0.5 works better than an opaque colour.</p>
+<h3 id="is-there-a-limit-on-the-number-of-volumes-in-one-primitive" tabindex="-1"><a class="heading-link" href="#is-there-a-limit-on-the-number-of-volumes-in-one-primitive"><span>Is there a limit on the number of volumes in one primitive?</span></a></h3>
+<p>No hard limit, but each instance adds geometry to the batch, and build time and memory grow linearly. Several thousand is comfortable; beyond that, the tileset route is the answer.</p>
+<h2 id="related-guides" tabindex="-1"><a class="heading-link" href="#related-guides"><span>Related Guides</span></a></h2>
+<ul>
+<li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/">Vector Overlays on 3D Tiles</a> — how classification compares with draping and imagery</li>
+<li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/extruding-footprints-into-lod1-tiles/">Extruding Footprints into LOD1 Tiles</a> — building the volumes as a tileset</li>
+<li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/styling-tiles-by-metadata-with-cesium3dtilestyle/">Styling Tiles by Metadata with Cesium3DTileStyle</a> — styling the buildings directly when the attribute is already in the tiles</li>
+</ul>
+<p>Back to <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/">Vector Overlays on 3D Tiles</a>.</p>
+
+
+      
+      
+
+      <div class="related-nav">
+        
+
+        
+          <div>
+            <h3>Related</h3>
+            <div class="related-grid">
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/clamping-polylines-to-terrain-and-buildings/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Clamping Polylines to Terrain and Buildings</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/draping-geojson-polygons-on-3d-tiles/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Draping GeoJSON Polygons on 3D Tiles</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/extruding-footprints-into-lod1-tiles/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Extruding Footprints into LOD1 Tiles</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/rendering-thousands-of-labels-and-billboards/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Rendering Thousands of Labels and Billboards</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/serving-vector-tiles-as-imagery-over-terrain/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Serving Vector Tiles as Imagery over Terrain</span>
+                </a>
+              
+            </div>
+          </div>
+        
+      </div>
+    </article>
+
+    
+    <aside class="toc" aria-label="On this page" data-toc hidden>
+      <h4>On this page</h4>
+      <ul></ul>
+    </aside>
+  </div>
+</div>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+  <div class="container site-footer__inner">
+    <div class="site-footer__brand">
+      <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+        <img src="/assets/img/logo-mark.svg" alt="" class="brand__mark" width="36" height="36">
+        <span class="brand__name">
+          3D Geospatial
+          <small>Digital Twin Automation</small>
+        </span>
+      </a>
+      <p>Engineering-grade guides on point cloud processing, mesh pipelines, LOD strategies, and CI/CD automation for digital twin platforms.</p>
+      <a class="footer-social" href="https://github.com/3d-geospatial" aria-label="3D Geospatial on GitHub" rel="noopener" target="_blank">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+          <path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.53-1.34-1.3-1.7-1.3-1.7-1.06-.72.08-.71.08-.71 1.17.08 1.79 1.2 1.79 1.2 1.04 1.79 2.73 1.27 3.4.97.1-.75.4-1.27.73-1.56-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.19-3.08-.12-.3-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.75.11 3.05.74.8 1.19 1.83 1.19 3.08 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.07.78 2.15v3.18c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5Z"/>
+        </svg>
+        <span>GitHub</span>
+      </a>
+    </div>
+
+    <div class="site-footer__col">
+      <h4>Sections</h4>
+      <ul>
+        <li><a href="https://www.3d-geospatial.com/">Home</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management &amp; Optimization</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/">Point Cloud &amp; Mesh Pipelines</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/">Troubleshooting &amp; Reliability</a></li>
+        
+      </ul>
+    </div>
+
+    
+      <div class="site-footer__col">
+        <h4>3D Geospatial Fundamentals</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/">3D Format Standards Comparison</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/">BIM and IFC Georeferencing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/">CityGML and CityJSON Processing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems for 3D Assets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/">Digital Elevation Model Workflows</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/">Spatial Indexing and Tiling Schemes for 3D Data</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>LOD Management &amp; Optimization</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/">Automated Tile Generation for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/">Cesium ion Upload Automation for 3D Tilesets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/">glTF LOD Generation With Draco Compression</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/">Streaming Sync Patterns for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/">Tileset Metadata and 3D Tiles Next</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/">Vector Overlays on 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Point Cloud &amp; Mesh Pipelines</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/">Automated Mesh Decimation for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/">Change Detection Between LiDAR Scan Epochs</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/">CI/CD Automation for Spatial Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">LiDAR Classification and Ground Extraction</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/photogrammetry-processing-pipelines/">Photogrammetry Processing Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/">Point Cloud Filtering Techniques</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/">Surface Reconstruction for Geospatial Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/">Texture Mapping Workflows for Digital Twins</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Troubleshooting &amp; Reliability</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/">Cross-Section Failure Modes in Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/">Data Validation &amp; QA Gates for 3D Tiles</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/">Performance Profiling and Benchmarking</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/">Pipeline Observability and Monitoring</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/">Streaming &amp; Runtime Diagnostics for 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+  </div>
+  <div class="container site-footer__bottom">
+    <span>© 2026 3D Geospatial &amp; Digital Twin Automation</span>
+    <span>Built with Eleventy · PWA-enabled</span>
+  </div>
+</footer>
+
+
+  <script src="/assets/js/site.js?v=b99aa9f971" defer></script>
+  
+</body>
+</html>

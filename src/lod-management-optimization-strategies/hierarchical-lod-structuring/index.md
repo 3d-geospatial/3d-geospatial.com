@@ -344,5 +344,7 @@ Let the `max_per_leaf` density threshold decide depth rather than forcing a fixe
 - [Automated Tile Generation for 3D Geospatial](https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/) — serializing this tree to a 3D Tiles tileset
 - [Streaming Sync Patterns for 3D Geospatial](https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/) — runtime cache eviction and request batching for the tiles produced here
 - [3D Format Standards Comparison](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/) — how glTF and 3D Tiles carry the geometry each node holds
+- [Balancing Tile Content Size Across Levels](https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/balancing-tile-content-size-across-levels/) — diagnose and fix a tileset whose tiles range from 8 KB to 40 MB
+- [Octree vs Quadtree Subdivision for Tall Buildings](https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/octree-vs-quadtree-subdivision-for-tall-buildings/) — when vertical subdivision pays
 
 Back to [LOD Management & Optimization Strategies](https://www.3d-geospatial.com/lod-management-optimization-strategies/).

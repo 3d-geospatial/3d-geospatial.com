@@ -1,0 +1,779 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <title>Tracing Pipeline Stages with OpenTelemetry — 3D Geospatial</title>
+  <meta name="description" content="Trace a multi-hour spatial pipeline: spans per stage and shard, context propagation across processes, spatial span attributes">
+  <meta name="keywords" content="3D geospatial, digital twin, point cloud, mesh pipeline, LOD, 3D Tiles, Cesium, PDAL, Open3D, Python, CI/CD">
+  <meta name="author" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta name="theme-color" content="#1f6b8a" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f171d" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+
+  
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem("theme");
+        var theme = (stored === "dark" || stored === "light") ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    })();
+  </script>
+  <meta name="generator" content="Eleventy">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="googlebot" content="index,follow,max-image-preview:large">
+
+  
+  <link rel="canonical" href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/tracing-pipeline-stages-with-opentelemetry/">
+  <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">
+
+  
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/icon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+
+  
+  <link rel="apple-touch-icon" href="/assets/img/icon-180.png">
+  <link rel="mask-icon" href="/assets/img/logo.svg" color="#1f6b8a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="3D Geospatial">
+  <meta name="application-name" content="3D Geospatial">
+
+  
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Tracing Pipeline Stages with OpenTelemetry — 3D Geospatial">
+  <meta property="og:description" content="Trace a multi-hour spatial pipeline: spans per stage and shard, context propagation across processes, spatial span attributes">
+  <meta property="og:url" content="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/tracing-pipeline-stages-with-opentelemetry/">
+  <meta property="og:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+  <meta property="og:site_name" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta property="og:locale" content="en_US">
+  
+  <meta property="article:published_time" content="2026-09-17T23:36:56.452Z">
+  <meta property="article:modified_time" content="2026-09-17T23:36:56.452Z">
+  <meta property="article:publisher" content="https://www.3d-geospatial.com/">
+  
+
+  
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Tracing Pipeline Stages with OpenTelemetry — 3D Geospatial">
+  <meta name="twitter:description" content="Trace a multi-hour spatial pipeline: spans per stage and shard, context propagation across processes, spatial span attributes">
+  <meta name="twitter:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta name="twitter:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+
+  
+  <link rel="preload" href="/assets/css/styles.css?v=8c46394d6c" as="style">
+  
+
+  <link rel="stylesheet" href="/assets/css/styles.css?v=8c46394d6c">
+
+  
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.3d-geospatial.com/#organization",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "url": "https://www.3d-geospatial.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/icon-512.png",
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://www.3d-geospatial.com/#website",
+      "url": "https://www.3d-geospatial.com/",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "description": "Build reliable 3D spatial data pipelines for digital twins — point clouds, meshes, LOD strategies, Python processing, and CI/CD automation.",
+      "inLanguage": "en",
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      }
+    },
+    {
+      "@type": "TechArticle",
+      "@id": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/tracing-pipeline-stages-with-opentelemetry/#article",
+      "isPartOf": {
+        "@id": "https://www.3d-geospatial.com/#website"
+      },
+      "headline": "Tracing Pipeline Stages with OpenTelemetry",
+      "name": "Tracing Pipeline Stages with OpenTelemetry",
+      "description": "Trace a multi-hour spatial pipeline: spans per stage and shard, context propagation across processes, spatial span attributes",
+      "url": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/tracing-pipeline-stages-with-opentelemetry/",
+      "mainEntityOfPage": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/tracing-pipeline-stages-with-opentelemetry/",
+      "inLanguage": "en",
+      "datePublished": "2026-09-17T23:36:56.452Z",
+      "dateModified": "2026-09-17T23:36:56.452Z",
+      "author": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "image": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/og-cover.png",
+        "width": 1200,
+        "height": 630
+      },
+      "breadcrumb": {
+        "@id": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/tracing-pipeline-stages-with-opentelemetry/#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/tracing-pipeline-stages-with-opentelemetry/#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://www.3d-geospatial.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Digital Twin Troubleshooting And Reliability",
+          "item": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Pipeline Observability And Monitoring",
+          "item": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "name": "Tracing Pipeline Stages With Opentelemetry",
+          "item": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/tracing-pipeline-stages-with-opentelemetry/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  
+<header class="site-header" role="banner">
+  <div class="container site-header__inner">
+    <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+      <img src="/assets/img/logo.svg" alt="" class="brand__mark" width="36" height="36">
+      <span class="brand__name">
+        3D Geospatial
+        <small>Digital Twin Automation</small>
+      </span>
+    </a>
+
+    <button class="theme-toggle" type="button" data-theme-toggle
+            aria-label="Switch to dark theme" title="Switch to dark theme">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4.2"/>
+        <path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/>
+      </svg>
+    </button>
+
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>
+      <span class="nav-toggle__icon" aria-hidden="true"><span></span></span>
+      Menu
+    </button>
+
+    <nav class="primary-nav" id="primary-nav" aria-label="Primary">
+      
+      <a href="https://www.3d-geospatial.com/" >
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/>
+        </svg>
+        Home
+      </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2 3 7l9 5 9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 17l9 5 9-5"/>
+            </svg>
+          
+          3D Geospatial Fundamentals
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+          
+          LOD Management &amp; Optimization
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="6" cy="6" r="1.5"/><circle cx="12" cy="6" r="1.5"/><circle cx="18" cy="6" r="1.5"/>
+              <circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/>
+              <circle cx="6" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="18" cy="18" r="1.5"/>
+            </svg>
+          
+          Point Cloud &amp; Mesh Pipelines
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/" aria-current="page">
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <path d="M12 9v4"/><path d="M12 17h.01"/>
+            </svg>
+          
+          Troubleshooting &amp; Reliability
+        </a>
+      
+    </nav>
+  </div>
+</header>
+
+
+  <main id="main">
+    
+
+
+<div class="container">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    
+      
+        <a href="https://www.3d-geospatial.com/">Home</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/">Digital Twin Troubleshooting And Reliability</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/">Pipeline Observability And Monitoring</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <span class="current">Tracing Pipeline Stages With Opentelemetry</span>
+      
+    
+  </nav>
+
+  <div class="content-page">
+    <article class="article">
+      <h1 id="tracing-pipeline-stages-with-opentelemetry" tabindex="-1"><a class="heading-link" href="#tracing-pipeline-stages-with-opentelemetry"><span>Tracing Pipeline Stages with OpenTelemetry</span></a></h1>
+<p>This page traces a spatial pipeline that spans several processes and hours — one span per run, per stage and per shard, context propagated across process and scheduler boundaries, spatial keys and delivery identifiers as span attributes, failures recorded as span status, and trace identifiers written into the structured logs so the two views join.</p>
+<h2 id="why-you-hit-this" tabindex="-1"><a class="heading-link" href="#why-you-hit-this"><span>Why you hit this</span></a></h2>
+<p>Metrics tell you a stage took forty minutes. Logs tell you which shards it processed. Neither tells you that thirty of those minutes were one shard waiting on an object-store read, inside a worker started by a different process, on a run triggered by Monday’s delivery. A trace does, and for a pipeline whose stages run as separate jobs it is the only artefact that shows the whole shape of a run. The division of labour between the three signals is in <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/">pipeline observability and monitoring</a>.</p>
+<h2 id="prerequisites" tabindex="-1"><a class="heading-link" href="#prerequisites"><span>Prerequisites</span></a></h2>
+<ul>
+<li>Python 3.10+ with <code>opentelemetry-sdk&gt;=1.25</code>, <code>opentelemetry-exporter-otlp&gt;=1.25</code>, and <code>opentelemetry-instrumentation-requests</code> if the pipeline calls HTTP APIs.</li>
+<li>A collector endpoint: an OpenTelemetry Collector forwarding to Tempo, Jaeger or a hosted backend. A local Jaeger container is enough to start.</li>
+<li>The structured logging from <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/structured-logging-for-spatial-pipelines/">structured logging for spatial pipelines</a>, so trace identifiers can be added to log events.</li>
+</ul>
+<h2 id="step-by-step" tabindex="-1"><a class="heading-link" href="#step-by-step"><span>Step-by-Step</span></a></h2>
+<h3 id="1-set-up-the-tracer-with-resource-attributes" tabindex="-1"><a class="heading-link" href="#1-set-up-the-tracer-with-resource-attributes"><span>1. Set up the tracer with resource attributes</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> os
+<span class="token keyword">from</span> opentelemetry <span class="token keyword">import</span> trace
+<span class="token keyword">from</span> opentelemetry<span class="token punctuation">.</span>sdk<span class="token punctuation">.</span>resources <span class="token keyword">import</span> Resource
+<span class="token keyword">from</span> opentelemetry<span class="token punctuation">.</span>sdk<span class="token punctuation">.</span>trace <span class="token keyword">import</span> TracerProvider
+<span class="token keyword">from</span> opentelemetry<span class="token punctuation">.</span>sdk<span class="token punctuation">.</span>trace<span class="token punctuation">.</span>export <span class="token keyword">import</span> BatchSpanProcessor
+<span class="token keyword">from</span> opentelemetry<span class="token punctuation">.</span>exporter<span class="token punctuation">.</span>otlp<span class="token punctuation">.</span>proto<span class="token punctuation">.</span>grpc<span class="token punctuation">.</span>trace_exporter <span class="token keyword">import</span> OTLPSpanExporter
+
+<span class="token keyword">def</span> <span class="token function">init_tracing</span><span class="token punctuation">(</span>service_name<span class="token punctuation">,</span> dataset<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    resource <span class="token operator">=</span> Resource<span class="token punctuation">.</span>create<span class="token punctuation">(</span><span class="token punctuation">{</span>
+        <span class="token string">"service.name"</span><span class="token punctuation">:</span> service_name<span class="token punctuation">,</span>                 <span class="token comment"># "twin-tiler", "twin-classifier"</span>
+        <span class="token string">"service.version"</span><span class="token punctuation">:</span> os<span class="token punctuation">.</span>environ<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"GIT_SHA"</span><span class="token punctuation">,</span> <span class="token string">"dev"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"deployment.environment"</span><span class="token punctuation">:</span> os<span class="token punctuation">.</span>environ<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"ENV"</span><span class="token punctuation">,</span> <span class="token string">"prod"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"twin.dataset"</span><span class="token punctuation">:</span> dataset<span class="token punctuation">,</span>
+    <span class="token punctuation">}</span><span class="token punctuation">)</span>
+    provider <span class="token operator">=</span> TracerProvider<span class="token punctuation">(</span>resource<span class="token operator">=</span>resource<span class="token punctuation">)</span>
+    provider<span class="token punctuation">.</span>add_span_processor<span class="token punctuation">(</span>BatchSpanProcessor<span class="token punctuation">(</span>OTLPSpanExporter<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span>   <span class="token comment"># endpoint from OTEL_EXPORTER_OTLP_ENDPOINT</span>
+    trace<span class="token punctuation">.</span>set_tracer_provider<span class="token punctuation">(</span>provider<span class="token punctuation">)</span>
+    <span class="token keyword">return</span> trace<span class="token punctuation">.</span>get_tracer<span class="token punctuation">(</span>service_name<span class="token punctuation">)</span>
+
+tracer <span class="token operator">=</span> init_tracing<span class="token punctuation">(</span><span class="token string">"twin-tiler"</span><span class="token punctuation">,</span> <span class="token string">"city"</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Resource attributes describe the <em>process</em>, so they belong here rather than on every span: the service, its version and the dataset it works on. Putting the pipeline’s git SHA in <code>service.version</code> is what lets a backend answer “did runs get slower after the deploy on Tuesday”, which is one of the few questions traces answer better than metrics.</p>
+<p>A batch processor is the right exporter for a pipeline: spans are buffered and sent in the background, so instrumentation never blocks the work, and a flush at exit sends what is left.</p>
+<h3 id="2-one-span-per-level-that-matters" tabindex="-1"><a class="heading-link" href="#2-one-span-per-level-that-matters"><span>2. One span per level that matters</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">run_pipeline</span><span class="token punctuation">(</span>dataset<span class="token punctuation">,</span> delivery<span class="token punctuation">,</span> shards<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">with</span> tracer<span class="token punctuation">.</span>start_as_current_span<span class="token punctuation">(</span><span class="token string">"pipeline.run"</span><span class="token punctuation">)</span> <span class="token keyword">as</span> run<span class="token punctuation">:</span>
+        run<span class="token punctuation">.</span>set_attribute<span class="token punctuation">(</span><span class="token string">"twin.dataset"</span><span class="token punctuation">,</span> dataset<span class="token punctuation">)</span>
+        run<span class="token punctuation">.</span>set_attribute<span class="token punctuation">(</span><span class="token string">"twin.delivery_id"</span><span class="token punctuation">,</span> delivery<span class="token punctuation">[</span><span class="token string">"id"</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+        run<span class="token punctuation">.</span>set_attribute<span class="token punctuation">(</span><span class="token string">"twin.delivery_captured"</span><span class="token punctuation">,</span> delivery<span class="token punctuation">[</span><span class="token string">"captured"</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+        run<span class="token punctuation">.</span>set_attribute<span class="token punctuation">(</span><span class="token string">"twin.crs"</span><span class="token punctuation">,</span> <span class="token string">"EPSG:25832+7837"</span><span class="token punctuation">)</span>
+        run<span class="token punctuation">.</span>set_attribute<span class="token punctuation">(</span><span class="token string">"twin.shards_planned"</span><span class="token punctuation">,</span> <span class="token builtin">len</span><span class="token punctuation">(</span>shards<span class="token punctuation">)</span><span class="token punctuation">)</span>
+
+        classified <span class="token operator">=</span> stage_classify<span class="token punctuation">(</span>dataset<span class="token punctuation">,</span> delivery<span class="token punctuation">)</span>
+        meshed <span class="token operator">=</span> stage_mesh<span class="token punctuation">(</span>dataset<span class="token punctuation">,</span> classified<span class="token punctuation">)</span>
+        written <span class="token operator">=</span> stage_tile<span class="token punctuation">(</span>dataset<span class="token punctuation">,</span> meshed<span class="token punctuation">,</span> shards<span class="token punctuation">)</span>
+
+        run<span class="token punctuation">.</span>set_attribute<span class="token punctuation">(</span><span class="token string">"twin.shards_written"</span><span class="token punctuation">,</span> written<span class="token punctuation">)</span>
+        <span class="token keyword">return</span> written
+
+<span class="token keyword">def</span> <span class="token function">stage_tile</span><span class="token punctuation">(</span>dataset<span class="token punctuation">,</span> meshes<span class="token punctuation">,</span> shards<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">with</span> tracer<span class="token punctuation">.</span>start_as_current_span<span class="token punctuation">(</span><span class="token string">"stage.tile"</span><span class="token punctuation">)</span> <span class="token keyword">as</span> stage<span class="token punctuation">:</span>
+        stage<span class="token punctuation">.</span>set_attribute<span class="token punctuation">(</span><span class="token string">"twin.stage"</span><span class="token punctuation">,</span> <span class="token string">"tile"</span><span class="token punctuation">)</span>
+        written <span class="token operator">=</span> <span class="token number">0</span>
+        <span class="token keyword">for</span> shard <span class="token keyword">in</span> shards<span class="token punctuation">:</span>
+            <span class="token keyword">with</span> tracer<span class="token punctuation">.</span>start_as_current_span<span class="token punctuation">(</span><span class="token string">"shard.tile"</span><span class="token punctuation">)</span> <span class="token keyword">as</span> s<span class="token punctuation">:</span>
+                s<span class="token punctuation">.</span>set_attribute<span class="token punctuation">(</span><span class="token string">"twin.shard"</span><span class="token punctuation">,</span> shard<span class="token punctuation">)</span>
+                <span class="token keyword">try</span><span class="token punctuation">:</span>
+                    res <span class="token operator">=</span> tile_shard<span class="token punctuation">(</span>shard<span class="token punctuation">,</span> meshes<span class="token punctuation">)</span>
+                <span class="token keyword">except</span> Exception <span class="token keyword">as</span> exc<span class="token punctuation">:</span>
+                    s<span class="token punctuation">.</span>record_exception<span class="token punctuation">(</span>exc<span class="token punctuation">)</span>
+                    s<span class="token punctuation">.</span>set_status<span class="token punctuation">(</span>trace<span class="token punctuation">.</span>Status<span class="token punctuation">(</span>trace<span class="token punctuation">.</span>StatusCode<span class="token punctuation">.</span>ERROR<span class="token punctuation">,</span> <span class="token builtin">str</span><span class="token punctuation">(</span>exc<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+                    <span class="token keyword">continue</span>
+                s<span class="token punctuation">.</span>set_attribute<span class="token punctuation">(</span><span class="token string">"twin.triangles"</span><span class="token punctuation">,</span> res<span class="token punctuation">.</span>triangles<span class="token punctuation">)</span>
+                s<span class="token punctuation">.</span>set_attribute<span class="token punctuation">(</span><span class="token string">"twin.bytes"</span><span class="token punctuation">,</span> res<span class="token punctuation">.</span><span class="token builtin">bytes</span><span class="token punctuation">)</span>
+                written <span class="token operator">+=</span> <span class="token number">1</span>
+        stage<span class="token punctuation">.</span>set_attribute<span class="token punctuation">(</span><span class="token string">"twin.shards_written"</span><span class="token punctuation">,</span> written<span class="token punctuation">)</span>
+        <span class="token keyword">return</span> written
+</code></pre></div>
+<p>Three levels — run, stage, unit of work — is the structure that makes a trace readable. Deeper nesting is tempting and rarely pays off; a span per PDAL filter inside a shard produces a trace nobody can scan.</p>
+<p><code>record_exception</code> plus <code>set_status</code> is the pair that makes failures visible in a backend’s UI, where an errored span is highlighted and searchable. Setting only the status loses the stack; recording only the exception leaves the span looking successful.</p>
+<figure class="diagram">
+<svg viewBox="6 12 738 226" role="img" aria-labelledby="otel-tree-t otel-tree-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="otel-tree-t">A run trace, three levels deep</title>
+  <desc id="otel-tree-d">A Gantt-style span tree. The run span covers the whole duration. Under it, classify, mesh and tile stages run in sequence. Under the tile stage, shard spans run in parallel across workers, and one of them is marked as errored and much longer than its siblings, which is what a trace makes immediately visible.</desc>
+  <rect class="svg-bg" x="6" y="12" width="738" height="226" fill="#ffffff"/>
+  <g stroke-width="1.5">
+    <rect x="130" y="26" width="600" height="24" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="150" y="58" width="130" height="22" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="285" y="58" width="180" height="22" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="470" y="58" width="250" height="22" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="475" y="90" width="60" height="18" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="475" y="114" width="52" height="18" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="540" y="90" width="58" height="18" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="532" y="114" width="64" height="18" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="600" y="90" width="55" height="18" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="475" y="138" width="230" height="18" fill="#f7dfdc" stroke="#b0413e"/>
+  </g>
+  <g fill="#1f2937" font-size="12" text-anchor="start">
+    <text x="20" y="43">pipeline.run</text>
+    <text x="20" y="74">stages</text>
+    <text x="20" y="104">shard.tile</text>
+    <text x="20" y="151">errored shard</text>
+    <text x="160" y="74">classify</text>
+    <text x="295" y="74">mesh</text>
+    <text x="480" y="74">tile</text>
+  </g>
+  <text x="475" y="174" fill="#b0413e" font-size="12">retried three times, then failed</text>
+  <text x="380" y="196" fill="#15384a" font-size="12.5" text-anchor="middle">The long red span is invisible in metrics — the stage total barely moved — and obvious here.</text>
+  <text x="380" y="220" fill="#5b6471" font-size="12" text-anchor="middle">time →</text>
+</svg>
+<figcaption>A trace shows distribution and concurrency, which is exactly what an average duration hides.</figcaption>
+</figure>
+<h3 id="3-propagate-context-across-processes" tabindex="-1"><a class="heading-link" href="#3-propagate-context-across-processes"><span>3. Propagate context across processes</span></a></h3>
+<p>Stages usually run as separate jobs, so the trace has to be carried between them. OpenTelemetry does that with a text carrier — in a pipeline, an environment variable or a field in the job payload.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">from</span> opentelemetry<span class="token punctuation">.</span>propagate <span class="token keyword">import</span> inject<span class="token punctuation">,</span> extract
+
+<span class="token keyword">def</span> <span class="token function">launch_next_stage</span><span class="token punctuation">(</span>stage_cmd<span class="token punctuation">,</span> env<span class="token operator">=</span><span class="token boolean">None</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    carrier <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token punctuation">}</span>
+    inject<span class="token punctuation">(</span>carrier<span class="token punctuation">)</span>                                   <span class="token comment"># writes "traceparent" from the current span</span>
+    env <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token operator">**</span><span class="token punctuation">(</span>env <span class="token keyword">or</span> os<span class="token punctuation">.</span>environ<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token operator">**</span><span class="token punctuation">{</span><span class="token string-interpolation"><span class="token string">f"OTEL_CARRIER_</span><span class="token interpolation"><span class="token punctuation">{</span>k<span class="token punctuation">.</span>upper<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">:</span> v <span class="token keyword">for</span> k<span class="token punctuation">,</span> v <span class="token keyword">in</span> carrier<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">}</span><span class="token punctuation">}</span>
+    subprocess<span class="token punctuation">.</span>run<span class="token punctuation">(</span>stage_cmd<span class="token punctuation">,</span> env<span class="token operator">=</span>env<span class="token punctuation">,</span> check<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+
+<span class="token keyword">def</span> <span class="token function">resume_trace</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    carrier <span class="token operator">=</span> <span class="token punctuation">{</span>k<span class="token punctuation">[</span><span class="token builtin">len</span><span class="token punctuation">(</span><span class="token string">"OTEL_CARRIER_"</span><span class="token punctuation">)</span><span class="token punctuation">:</span><span class="token punctuation">]</span><span class="token punctuation">.</span>lower<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span> v
+               <span class="token keyword">for</span> k<span class="token punctuation">,</span> v <span class="token keyword">in</span> os<span class="token punctuation">.</span>environ<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">if</span> k<span class="token punctuation">.</span>startswith<span class="token punctuation">(</span><span class="token string">"OTEL_CARRIER_"</span><span class="token punctuation">)</span><span class="token punctuation">}</span>
+    <span class="token keyword">return</span> extract<span class="token punctuation">(</span>carrier<span class="token punctuation">)</span>                           <span class="token comment"># a Context to use as the parent</span>
+
+<span class="token comment"># in the child process:</span>
+parent <span class="token operator">=</span> resume_trace<span class="token punctuation">(</span><span class="token punctuation">)</span>
+<span class="token keyword">with</span> tracer<span class="token punctuation">.</span>start_as_current_span<span class="token punctuation">(</span><span class="token string">"stage.tile"</span><span class="token punctuation">,</span> context<span class="token operator">=</span>parent<span class="token punctuation">)</span> <span class="token keyword">as</span> stage<span class="token punctuation">:</span>
+    <span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span>
+</code></pre></div>
+<p><code>traceparent</code> is the W3C header that carries the trace and span identifiers, and injecting it into the child’s environment is the pipeline equivalent of an HTTP header. Without propagation each job produces its own disconnected trace, which is still useful and loses the ability to see a whole run.</p>
+<p>For a scheduler that passes JSON payloads — Airflow, Argo, a queue — put the carrier in the payload instead; it is two string fields and survives retries.</p>
+<figure class="diagram">
+<svg viewBox="6 26 748 182" role="img" aria-labelledby="otel-prop-t otel-prop-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="otel-prop-t">Carrying trace context between jobs</title>
+  <desc id="otel-prop-d">The first job creates the run span and injects a traceparent value into the environment or payload it passes on. Each subsequent job extracts it and starts its stage span as a child, so all three jobs appear in one trace. Without the carrier, each job produces a separate trace with no link between them.</desc>
+  <rect class="svg-bg" x="6" y="26" width="748" height="182" fill="#ffffff"/>
+  <defs>
+    <marker id="otel-prop-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
+    </marker>
+  </defs>
+  <rect x="20" y="40" width="190" height="66" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="285" y="40" width="190" height="66" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="550" y="40" width="190" height="66" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <g stroke="#5b6471" stroke-width="2" fill="none" marker-end="url(#otel-prop-arrow)">
+    <path d="M210 73 H283"/><path d="M475 73 H548"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="115" y="66">job 1: classify</text><text x="115" y="88">creates the run span</text>
+    <text x="380" y="66">job 2: mesh</text><text x="380" y="88">extracts, starts a child</text>
+    <text x="645" y="66">job 3: tile</text><text x="645" y="88">extracts, starts a child</text>
+  </g>
+  <g fill="#5b6471" font-size="11.5">
+    <text x="214" y="62">traceparent</text>
+    <text x="479" y="62">traceparent</text>
+  </g>
+  <rect x="20" y="150" width="720" height="44" rx="8" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <text x="380" y="170" fill="#1f2937" font-size="12.5" text-anchor="middle">without the carrier: three unrelated traces, no way to see the run as one thing</text>
+  <text x="380" y="188" fill="#1f2937" font-size="12.5" text-anchor="middle">and no way to attribute the run's total duration to its stages</text>
+</svg>
+<figcaption>Propagation is two string fields passed along with the work; it is the difference between three traces and one run.</figcaption>
+</figure>
+<h3 id="4-put-the-trace-identifier-in-the-logs" tabindex="-1"><a class="heading-link" href="#4-put-the-trace-identifier-in-the-logs"><span>4. Put the trace identifier in the logs</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> structlog
+<span class="token keyword">from</span> opentelemetry <span class="token keyword">import</span> trace <span class="token keyword">as</span> otel_trace
+
+<span class="token keyword">def</span> <span class="token function">add_trace_ids</span><span class="token punctuation">(</span>logger<span class="token punctuation">,</span> method_name<span class="token punctuation">,</span> event_dict<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    span <span class="token operator">=</span> otel_trace<span class="token punctuation">.</span>get_current_span<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    ctx <span class="token operator">=</span> span<span class="token punctuation">.</span>get_span_context<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    <span class="token keyword">if</span> ctx <span class="token keyword">and</span> ctx<span class="token punctuation">.</span>is_valid<span class="token punctuation">:</span>
+        event_dict<span class="token punctuation">[</span><span class="token string">"trace_id"</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token builtin">format</span><span class="token punctuation">(</span>ctx<span class="token punctuation">.</span>trace_id<span class="token punctuation">,</span> <span class="token string">"032x"</span><span class="token punctuation">)</span>
+        event_dict<span class="token punctuation">[</span><span class="token string">"span_id"</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token builtin">format</span><span class="token punctuation">(</span>ctx<span class="token punctuation">.</span>span_id<span class="token punctuation">,</span> <span class="token string">"016x"</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> event_dict
+
+structlog<span class="token punctuation">.</span>configure<span class="token punctuation">(</span>processors<span class="token operator">=</span><span class="token punctuation">[</span>
+    structlog<span class="token punctuation">.</span>contextvars<span class="token punctuation">.</span>merge_contextvars<span class="token punctuation">,</span>
+    add_trace_ids<span class="token punctuation">,</span>
+    structlog<span class="token punctuation">.</span>processors<span class="token punctuation">.</span>add_log_level<span class="token punctuation">,</span>
+    structlog<span class="token punctuation">.</span>processors<span class="token punctuation">.</span>TimeStamper<span class="token punctuation">(</span>fmt<span class="token operator">=</span><span class="token string">"iso"</span><span class="token punctuation">,</span> utc<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    structlog<span class="token punctuation">.</span>processors<span class="token punctuation">.</span>JSONRenderer<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+<span class="token punctuation">]</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>This single processor is what makes the two systems one. From a slow span in the trace UI, the <code>trace_id</code> filters the logs to exactly that unit of work; from a suspicious log line, the same identifier opens the trace. Without it, correlating them means comparing timestamps across machines.</p>
+<figure class="diagram">
+<svg viewBox="6 6 748 234" role="img" aria-labelledby="otel-attr-t otel-attr-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="otel-attr-t">Where each piece of context belongs</title>
+  <desc id="otel-attr-d">A table. The service name, version and environment belong on the resource, set once per process. The dataset, delivery identifier and CRS belong on the run span. The stage name belongs on the stage span. The shard key, triangle count and byte count belong on the unit-of-work span. Retries and cache misses belong on span events rather than on new spans.</desc>
+  <rect class="svg-bg" x="6" y="6" width="748" height="234" fill="#ffffff"/>
+  <g stroke-width="1.5">
+    <rect x="20" y="20" width="200" height="36" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="220" y="20" width="520" height="36" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="20" y="56" width="200" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="220" y="56" width="520" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="20" y="90" width="200" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="220" y="90" width="520" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="20" y="124" width="200" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="220" y="124" width="520" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="20" y="158" width="200" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="220" y="158" width="520" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="20" y="192" width="200" height="34" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="220" y="192" width="520" height="34" fill="#fdf3e0" stroke="#c46a3d"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="120" y="43">carrier</text>
+    <text x="480" y="43">what goes there</text>
+    <text x="120" y="78">resource</text><text x="480" y="78">service.name, service.version, deployment.environment</text>
+    <text x="120" y="112">run span</text><text x="480" y="112">twin.dataset, twin.delivery_id, twin.crs, shards planned</text>
+    <text x="120" y="146">stage span</text><text x="480" y="146">twin.stage, shards written by that stage</text>
+    <text x="120" y="180">unit span</text><text x="480" y="180">twin.shard, triangles, bytes, status</text>
+    <text x="120" y="214">span events</text><text x="480" y="214">retries, cache misses, fallbacks — not new spans</text>
+  </g>
+</svg>
+<figcaption>Putting context at the right level keeps span counts low and makes every attribute searchable at the granularity it belongs to.</figcaption>
+</figure>
+<h3 id="5-add-span-events-for-things-that-are-not-spans" tabindex="-1"><a class="heading-link" href="#5-add-span-events-for-things-that-are-not-spans"><span>5. Add span events for things that are not spans</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">tile_shard_with_retries</span><span class="token punctuation">(</span>shard<span class="token punctuation">,</span> meshes<span class="token punctuation">,</span> attempts<span class="token operator">=</span><span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    span <span class="token operator">=</span> otel_trace<span class="token punctuation">.</span>get_current_span<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    <span class="token keyword">for</span> attempt <span class="token keyword">in</span> <span class="token builtin">range</span><span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">,</span> attempts <span class="token operator">+</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">try</span><span class="token punctuation">:</span>
+            <span class="token keyword">return</span> tile_shard<span class="token punctuation">(</span>shard<span class="token punctuation">,</span> meshes<span class="token punctuation">)</span>
+        <span class="token keyword">except</span> TransientStorageError <span class="token keyword">as</span> exc<span class="token punctuation">:</span>
+            span<span class="token punctuation">.</span>add_event<span class="token punctuation">(</span><span class="token string">"retry"</span><span class="token punctuation">,</span> <span class="token punctuation">{</span><span class="token string">"attempt"</span><span class="token punctuation">:</span> attempt<span class="token punctuation">,</span> <span class="token string">"reason"</span><span class="token punctuation">:</span> <span class="token builtin">type</span><span class="token punctuation">(</span>exc<span class="token punctuation">)</span><span class="token punctuation">.</span>__name__<span class="token punctuation">}</span><span class="token punctuation">)</span>
+            time<span class="token punctuation">.</span>sleep<span class="token punctuation">(</span><span class="token number">2</span> <span class="token operator">**</span> attempt<span class="token punctuation">)</span>
+    span<span class="token punctuation">.</span>set_status<span class="token punctuation">(</span>otel_trace<span class="token punctuation">.</span>Status<span class="token punctuation">(</span>otel_trace<span class="token punctuation">.</span>StatusCode<span class="token punctuation">.</span>ERROR<span class="token punctuation">,</span> <span class="token string">"exhausted retries"</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token keyword">raise</span> RuntimeError<span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>shard<span class="token punctuation">}</span></span><span class="token string">: exhausted retries"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Span events are timestamped annotations inside a span — retries, cache misses, a fallback path taken. They keep the span count low while preserving the detail that explains a long span, which is usually “it retried twice against object storage”.</p>
+<h3 id="6-flush-before-the-process-exits" tabindex="-1"><a class="heading-link" href="#6-flush-before-the-process-exits"><span>6. Flush before the process exits</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> atexit
+
+<span class="token keyword">def</span> <span class="token function">flush_tracing</span><span class="token punctuation">(</span>timeout_ms<span class="token operator">=</span><span class="token number">30_000</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    provider <span class="token operator">=</span> otel_trace<span class="token punctuation">.</span>get_tracer_provider<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    <span class="token keyword">if</span> <span class="token builtin">hasattr</span><span class="token punctuation">(</span>provider<span class="token punctuation">,</span> <span class="token string">"force_flush"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        provider<span class="token punctuation">.</span>force_flush<span class="token punctuation">(</span>timeout_ms<span class="token punctuation">)</span>
+    <span class="token keyword">if</span> <span class="token builtin">hasattr</span><span class="token punctuation">(</span>provider<span class="token punctuation">,</span> <span class="token string">"shutdown"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        provider<span class="token punctuation">.</span>shutdown<span class="token punctuation">(</span><span class="token punctuation">)</span>
+
+atexit<span class="token punctuation">.</span>register<span class="token punctuation">(</span>flush_tracing<span class="token punctuation">)</span>
+</code></pre></div>
+<p>A batch processor holds spans in memory for a few seconds. A pipeline job that exits immediately after its last span loses them, which produces traces that end abruptly and stages that appear to have no children. Flushing at exit is one line and the most common omission in batch tracing.</p>
+<h2 id="expected-output-verification" tabindex="-1"><a class="heading-link" href="#expected-output-verification"><span>Expected Output &amp; Verification</span></a></h2>
+<div class="codeblock" data-lang="text"><div class="codeblock__bar"><span class="codeblock__lang">text</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-text" tabindex="0" role="group" aria-label="text code sample"><code class="language-text">pipeline.run            2h 14m   twin.dataset=city  twin.delivery_id=DLV-2026-0915  twin.shards_planned=4096
+├─ stage.classify         18m    twin.stage=classify
+├─ stage.mesh             41m    twin.stage=mesh
+└─ stage.tile           1h 13m   twin.stage=tile  twin.shards_written=4096
+   ├─ shard.tile          4.2s   twin.shard=120210233010  twin.triangles=12408
+   ├─ shard.tile          4.8s   twin.shard=120210233011
+   └─ shard.tile         42.0s   twin.shard=120210233012  events: retry×2   ERROR
+</code></pre></div>
+<p>Verify the trace is complete and connected, which is the property that breaks silently:</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">from</span> collections <span class="token keyword">import</span> Counter
+
+<span class="token keyword">import</span> requests
+
+<span class="token keyword">def</span> <span class="token function">trace_summary</span><span class="token punctuation">(</span>tempo_url<span class="token punctuation">,</span> trace_id<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    r <span class="token operator">=</span> requests<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>tempo_url<span class="token punctuation">}</span></span><span class="token string">/api/traces/</span><span class="token interpolation"><span class="token punctuation">{</span>trace_id<span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">,</span> timeout<span class="token operator">=</span><span class="token number">20</span><span class="token punctuation">)</span>
+    r<span class="token punctuation">.</span>raise_for_status<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    spans <span class="token operator">=</span> <span class="token punctuation">[</span>s <span class="token keyword">for</span> batch <span class="token keyword">in</span> r<span class="token punctuation">.</span>json<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token string">"batches"</span><span class="token punctuation">]</span> <span class="token keyword">for</span> ss <span class="token keyword">in</span> batch<span class="token punctuation">[</span><span class="token string">"scopeSpans"</span><span class="token punctuation">]</span> <span class="token keyword">for</span> s <span class="token keyword">in</span> ss<span class="token punctuation">[</span><span class="token string">"spans"</span><span class="token punctuation">]</span><span class="token punctuation">]</span>
+    names <span class="token operator">=</span> Counter<span class="token punctuation">(</span>s<span class="token punctuation">[</span><span class="token string">"name"</span><span class="token punctuation">]</span> <span class="token keyword">for</span> s <span class="token keyword">in</span> spans<span class="token punctuation">)</span>
+    roots <span class="token operator">=</span> <span class="token punctuation">[</span>s <span class="token keyword">for</span> s <span class="token keyword">in</span> spans <span class="token keyword">if</span> <span class="token keyword">not</span> s<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"parentSpanId"</span><span class="token punctuation">)</span><span class="token punctuation">]</span>
+    errored <span class="token operator">=</span> <span class="token punctuation">[</span>s <span class="token keyword">for</span> s <span class="token keyword">in</span> spans <span class="token keyword">if</span> s<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"status"</span><span class="token punctuation">,</span> <span class="token punctuation">{</span><span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"code"</span><span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token number">2</span><span class="token punctuation">]</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"spans"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>spans<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"names"</span><span class="token punctuation">:</span> <span class="token builtin">dict</span><span class="token punctuation">(</span>names<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"roots"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>roots<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"errors"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>errored<span class="token punctuation">)</span><span class="token punctuation">}</span>
+
+summary <span class="token operator">=</span> trace_summary<span class="token punctuation">(</span><span class="token string">"http://tempo:3200"</span><span class="token punctuation">,</span> trace_id<span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span>summary<span class="token punctuation">)</span>
+<span class="token keyword">assert</span> summary<span class="token punctuation">[</span><span class="token string">"roots"</span><span class="token punctuation">]</span> <span class="token operator">==</span> <span class="token number">1</span><span class="token punctuation">,</span> <span class="token string">"more than one root span: context was not propagated"</span>
+<span class="token keyword">assert</span> summary<span class="token punctuation">[</span><span class="token string">"names"</span><span class="token punctuation">]</span><span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"stage.tile"</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token number">1</span><span class="token punctuation">,</span> <span class="token string">"the tiling stage is missing from the trace"</span>
+</code></pre></div>
+<p>Exactly one root span is the test that propagation worked. Three roots means each job traced itself, which is the default failure and is invisible unless asserted. The error count gives the run’s failed shards without touching the logs.</p>
+<h2 id="performance-notes" tabindex="-1"><a class="heading-link" href="#performance-notes"><span>Performance Notes</span></a></h2>
+<ul>
+<li><strong>Span creation is sub-microsecond</strong>; the export is asynchronous. A span per shard on four thousand shards is negligible against the tiling itself.</li>
+<li><strong>Do not span per feature.</strong> Forty thousand spans in a run make traces unusable and start to cost real memory in the batch queue. Use span events or metrics for that granularity.</li>
+<li><strong>Sample everything.</strong> Pipelines produce a handful of traces a day, so head sampling at 100% is correct — the sampling defaults tuned for web traffic would throw away the only trace you have.</li>
+<li><strong>Bound the attribute values.</strong> An attribute holding a list of four thousand shard identifiers is a span that no backend will render; put the count on the span and the identities in logs.</li>
+<li><strong>Flush at exit</strong>, and set a timeout so a collector outage delays the job by seconds rather than blocking it.</li>
+</ul>
+<h2 id="common-errors" tabindex="-1"><a class="heading-link" href="#common-errors"><span>Common Errors</span></a></h2>
+<p><strong>Each job appears as its own trace.</strong> The carrier was not injected, or the child read it before <code>init_tracing</code> ran. Extract first, then start the span with that context.</p>
+<p><strong>Spans disappear for short-lived jobs.</strong> No flush at exit. Register <code>atexit</code>, and prefer <code>force_flush</code> over relying on interpreter shutdown ordering.</p>
+<p><strong>The trace has thousands of spans and the UI will not open it.</strong> A span per feature or per file. Collapse to one span per unit of work and use events.</p>
+<p><strong>Attributes are dropped by the backend.</strong> Most backends limit attribute count and value length. Keep to a dozen short attributes per span; anything larger belongs in logs or the run summary.</p>
+<p><strong><code>OTEL_EXPORTER_OTLP_ENDPOINT</code> is set and nothing arrives.</strong> The exporter defaults to gRPC on port 4317 while the collector listens for HTTP on 4318, or TLS is expected. Try the HTTP exporter explicitly when in doubt.</p>
+<h2 id="frequently-asked-questions" tabindex="-1"><a class="heading-link" href="#frequently-asked-questions"><span>Frequently Asked Questions</span></a></h2>
+<h3 id="is-tracing-worth-it-for-a-nightly-batch-pipeline" tabindex="-1"><a class="heading-link" href="#is-tracing-worth-it-for-a-nightly-batch-pipeline"><span>Is tracing worth it for a nightly batch pipeline?</span></a></h3>
+<p>Yes, for two specific questions: where a long run spent its time, and what happened to one shard. Both are painful with logs alone and immediate with a trace. It is not worth instrumenting below the unit of work.</p>
+<h3 id="jaeger-tempo-or-a-hosted-backend" tabindex="-1"><a class="heading-link" href="#jaeger-tempo-or-a-hosted-backend"><span>Jaeger, Tempo or a hosted backend?</span></a></h3>
+<p>Any of them; the instrumentation is identical because it is OTLP. Tempo is convenient when Grafana is already in place, Jaeger is the simplest to run locally, and a hosted backend saves operating it. Retention of a few weeks is plenty.</p>
+<h3 id="can-traces-replace-the-run-summary" tabindex="-1"><a class="heading-link" href="#can-traces-replace-the-run-summary"><span>Can traces replace the run summary?</span></a></h3>
+<p>No. A backend’s retention is weeks, and the run summary has to answer questions months later. They serve different time horizons; keep both.</p>
+<h3 id="how-do-traces-interact-with-retries-at-the-scheduler-level" tabindex="-1"><a class="heading-link" href="#how-do-traces-interact-with-retries-at-the-scheduler-level"><span>How do traces interact with retries at the scheduler level?</span></a></h3>
+<p>A retried job re-extracts the same carrier and produces a second set of stage spans under the same run, which is exactly what you want to see. Tag the attempt number as a span attribute so the two are distinguishable.</p>
+<h2 id="related-guides" tabindex="-1"><a class="heading-link" href="#related-guides"><span>Related Guides</span></a></h2>
+<ul>
+<li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/structured-logging-for-spatial-pipelines/">Structured Logging for Spatial Pipelines</a> — the per-unit detail traces link to</li>
+<li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/exporting-prometheus-metrics-from-tiling-jobs/">Exporting Prometheus Metrics from Tiling Jobs</a> — the aggregate view</li>
+<li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/profiling-pdal-pipelines-with-cprofile-and-py-spy/">Profiling PDAL Pipelines with cProfile and py-spy</a> — when a span says where but not why</li>
+</ul>
+<p>Back to <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/">Pipeline Observability and Monitoring</a>.</p>
+
+
+      
+      
+
+      <div class="related-nav">
+        
+
+        
+          <div>
+            <h3>Related</h3>
+            <div class="related-grid">
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/alerting-on-tile-error-rates-from-cdn-logs/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Alerting on Tile Error Rates from CDN Logs</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/detecting-data-drift-between-deliveries/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Detecting Data Drift Between Deliveries</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/exporting-prometheus-metrics-from-tiling-jobs/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Exporting Prometheus Metrics from Tiling Jobs</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/monitoring-twin-data-freshness-slos/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Monitoring Twin Data Freshness SLOs</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/structured-logging-for-spatial-pipelines/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Structured Logging for Spatial Pipelines</span>
+                </a>
+              
+            </div>
+          </div>
+        
+      </div>
+    </article>
+
+    
+    <aside class="toc" aria-label="On this page" data-toc hidden>
+      <h4>On this page</h4>
+      <ul></ul>
+    </aside>
+  </div>
+</div>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+  <div class="container site-footer__inner">
+    <div class="site-footer__brand">
+      <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+        <img src="/assets/img/logo-mark.svg" alt="" class="brand__mark" width="36" height="36">
+        <span class="brand__name">
+          3D Geospatial
+          <small>Digital Twin Automation</small>
+        </span>
+      </a>
+      <p>Engineering-grade guides on point cloud processing, mesh pipelines, LOD strategies, and CI/CD automation for digital twin platforms.</p>
+      <a class="footer-social" href="https://github.com/3d-geospatial" aria-label="3D Geospatial on GitHub" rel="noopener" target="_blank">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+          <path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.53-1.34-1.3-1.7-1.3-1.7-1.06-.72.08-.71.08-.71 1.17.08 1.79 1.2 1.79 1.2 1.04 1.79 2.73 1.27 3.4.97.1-.75.4-1.27.73-1.56-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.19-3.08-.12-.3-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.75.11 3.05.74.8 1.19 1.83 1.19 3.08 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.07.78 2.15v3.18c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5Z"/>
+        </svg>
+        <span>GitHub</span>
+      </a>
+    </div>
+
+    <div class="site-footer__col">
+      <h4>Sections</h4>
+      <ul>
+        <li><a href="https://www.3d-geospatial.com/">Home</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management &amp; Optimization</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/">Point Cloud &amp; Mesh Pipelines</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/">Troubleshooting &amp; Reliability</a></li>
+        
+      </ul>
+    </div>
+
+    
+      <div class="site-footer__col">
+        <h4>3D Geospatial Fundamentals</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/">3D Format Standards Comparison</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/">BIM and IFC Georeferencing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/">CityGML and CityJSON Processing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems for 3D Assets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/">Digital Elevation Model Workflows</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/">Spatial Indexing and Tiling Schemes for 3D Data</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>LOD Management &amp; Optimization</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/">Automated Tile Generation for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/">Cesium ion Upload Automation for 3D Tilesets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/">glTF LOD Generation With Draco Compression</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/">Streaming Sync Patterns for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/">Tileset Metadata and 3D Tiles Next</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/">Vector Overlays on 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Point Cloud &amp; Mesh Pipelines</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/">Automated Mesh Decimation for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/">Change Detection Between LiDAR Scan Epochs</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/">CI/CD Automation for Spatial Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">LiDAR Classification and Ground Extraction</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/photogrammetry-processing-pipelines/">Photogrammetry Processing Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/">Point Cloud Filtering Techniques</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/">Surface Reconstruction for Geospatial Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/">Texture Mapping Workflows for Digital Twins</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Troubleshooting &amp; Reliability</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/">Cross-Section Failure Modes in Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/">Data Validation &amp; QA Gates for 3D Tiles</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/">Performance Profiling and Benchmarking</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/">Pipeline Observability and Monitoring</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/">Streaming &amp; Runtime Diagnostics for 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+  </div>
+  <div class="container site-footer__bottom">
+    <span>© 2026 3D Geospatial &amp; Digital Twin Automation</span>
+    <span>Built with Eleventy · PWA-enabled</span>
+  </div>
+</footer>
+
+
+  <script src="/assets/js/site.js?v=b99aa9f971" defer></script>
+  
+</body>
+</html>

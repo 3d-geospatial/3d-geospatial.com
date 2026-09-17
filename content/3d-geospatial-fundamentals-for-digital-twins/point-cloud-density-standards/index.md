@@ -349,5 +349,8 @@ Uniform oversampling bloats storage, slows every downstream stage, and can intro
 - [Digital Elevation Model Workflows](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/) — where density gaps surface as interpolation artifacts
 - [Point Cloud Filtering Techniques](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/) — cleaning and decimation that change density
 - [USGS 3DEP Lidar Base Specification](https://pubs.usgs.gov/tm/11b4/) — the authoritative Quality Level definitions
+- [Mapping Density Coverage Gaps with PDAL](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/mapping-density-coverage-gaps-with-pdal/) — find where a LiDAR delivery is too thin
+- [Thinning Point Clouds to a Target Density](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/thinning-point-clouds-to-a-target-density/) — reduce a dense cloud to a target density without losing structure
+- [Validating Density Against USGS Quality Levels](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/validating-density-against-usgs-quality-levels/) — check a LiDAR delivery against 3DEP quality levels
 
 Back to [3D Geospatial Fundamentals for Digital Twins](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/).

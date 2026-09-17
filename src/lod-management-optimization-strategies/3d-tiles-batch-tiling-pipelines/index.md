@@ -414,5 +414,9 @@ Yes. Persist only two small artifacts between runs: `manifest.prev.json` and the
 - [Implementing Quadtree LOD for Urban Models](https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/implementing-quadtree-lod-for-urban-models/) — the within-shard tree each external tileset carries
 - [CI/CD Automation for Spatial Pipelines](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/) — running the batch as cached, sharded jobs in CI
 - [Coordinate Reference Systems for 3D Assets](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/) — the EPSG:32618+5703 → EPSG:4979 → EPSG:4978 chain the assembly depends on
+- [Choosing Shard Sizes for City-Scale Tiling](https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/choosing-shard-sizes-for-city-scale-tiling/) — pick the shard grid for a city tiling job
+- [Making Tile Output Deterministic](https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/making-tile-output-deterministic/) — get byte-identical tiles from identical inputs
+- [Orchestrating Tiling Jobs with Dask](https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/orchestrating-tiling-jobs-with-dask/) — run a city tiling job across cores and machines with Dask
+- [Resuming Failed Tiling Runs from Checkpoints](https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/resuming-failed-tiling-runs-from-checkpoints/) — restart a half-finished city tiling run without redoing completed work
 
 Back to [LOD Management & Optimization Strategies](https://www.3d-geospatial.com/lod-management-optimization-strategies/).

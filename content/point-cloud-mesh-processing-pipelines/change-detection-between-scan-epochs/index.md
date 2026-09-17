@@ -379,5 +379,8 @@ M3C2 measures along the local normal, so a wall that moved sideways is detected 
 - [Flagging Changed Buildings for Retiling](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/flagging-changed-buildings-for-retiling/) — from change polygons to a rebuild list
 - [Registering Multi-Epoch Scans with ICP](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/registering-multi-epoch-scans-with-icp/) — the alignment every comparison depends on
 - [Incremental Retiling of Changed City Blocks](https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/incremental-retiling-of-changed-city-blocks/) — where detected change becomes new tiles
+- [DSM Differencing for Volume Change](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/dsm-differencing-for-volume-change/) — compute earthwork volumes from two epochs of surface models
+- [Excluding Vegetation from Change Detection](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/excluding-vegetation-from-change-detection/) — stop seasonal growth appearing as earthworks
+- [Reporting Stockpile Volumes with Uncertainty](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/reporting-stockpile-volumes-with-uncertainty/) — measure a stockpile properly
 
 Back to [Point Cloud & Mesh Processing Pipelines](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/).

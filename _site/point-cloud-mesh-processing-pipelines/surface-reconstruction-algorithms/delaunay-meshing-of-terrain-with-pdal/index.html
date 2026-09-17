@@ -1,0 +1,975 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <title>Delaunay Meshing of Terrain with PDAL — 3D Geospatial</title>
+  <meta name="description" content="Build a TIN from ground points with filters.delaunay and filters.poisson: thinning first, breakline handling, long-edge removal">
+  <meta name="keywords" content="3D geospatial, digital twin, point cloud, mesh pipeline, LOD, 3D Tiles, Cesium, PDAL, Open3D, Python, CI/CD">
+  <meta name="author" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta name="theme-color" content="#1f6b8a" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f171d" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+
+  
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem("theme");
+        var theme = (stored === "dark" || stored === "light") ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    })();
+  </script>
+  <meta name="generator" content="Eleventy">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="googlebot" content="index,follow,max-image-preview:large">
+
+  
+  <link rel="canonical" href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/delaunay-meshing-of-terrain-with-pdal/">
+  <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">
+
+  
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/icon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+
+  
+  <link rel="apple-touch-icon" href="/assets/img/icon-180.png">
+  <link rel="mask-icon" href="/assets/img/logo.svg" color="#1f6b8a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="3D Geospatial">
+  <meta name="application-name" content="3D Geospatial">
+
+  
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Delaunay Meshing of Terrain with PDAL — 3D Geospatial">
+  <meta property="og:description" content="Build a TIN from ground points with filters.delaunay and filters.poisson: thinning first, breakline handling, long-edge removal">
+  <meta property="og:url" content="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/delaunay-meshing-of-terrain-with-pdal/">
+  <meta property="og:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+  <meta property="og:site_name" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta property="og:locale" content="en_US">
+  
+  <meta property="article:published_time" content="2026-09-17T23:36:56.458Z">
+  <meta property="article:modified_time" content="2026-09-17T23:36:56.458Z">
+  <meta property="article:publisher" content="https://www.3d-geospatial.com/">
+  
+
+  
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Delaunay Meshing of Terrain with PDAL — 3D Geospatial">
+  <meta name="twitter:description" content="Build a TIN from ground points with filters.delaunay and filters.poisson: thinning first, breakline handling, long-edge removal">
+  <meta name="twitter:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta name="twitter:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+
+  
+  <link rel="preload" href="/assets/css/styles.css?v=8c46394d6c" as="style">
+  
+
+  <link rel="stylesheet" href="/assets/css/styles.css?v=8c46394d6c">
+
+  
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.3d-geospatial.com/#organization",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "url": "https://www.3d-geospatial.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/icon-512.png",
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://www.3d-geospatial.com/#website",
+      "url": "https://www.3d-geospatial.com/",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "description": "Build reliable 3D spatial data pipelines for digital twins — point clouds, meshes, LOD strategies, Python processing, and CI/CD automation.",
+      "inLanguage": "en",
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      }
+    },
+    {
+      "@type": "TechArticle",
+      "@id": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/delaunay-meshing-of-terrain-with-pdal/#article",
+      "isPartOf": {
+        "@id": "https://www.3d-geospatial.com/#website"
+      },
+      "headline": "Delaunay Meshing of Terrain with PDAL",
+      "name": "Delaunay Meshing of Terrain with PDAL",
+      "description": "Build a TIN from ground points with filters.delaunay and filters.poisson: thinning first, breakline handling, long-edge removal",
+      "url": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/delaunay-meshing-of-terrain-with-pdal/",
+      "mainEntityOfPage": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/delaunay-meshing-of-terrain-with-pdal/",
+      "inLanguage": "en",
+      "datePublished": "2026-09-17T23:36:56.458Z",
+      "dateModified": "2026-09-17T23:36:56.458Z",
+      "author": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "image": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/og-cover.png",
+        "width": 1200,
+        "height": 630
+      },
+      "breadcrumb": {
+        "@id": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/delaunay-meshing-of-terrain-with-pdal/#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/delaunay-meshing-of-terrain-with-pdal/#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://www.3d-geospatial.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Point Cloud Mesh Processing Pipelines",
+          "item": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Surface Reconstruction Algorithms",
+          "item": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "name": "Delaunay Meshing Of Terrain With Pdal",
+          "item": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/delaunay-meshing-of-terrain-with-pdal/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  
+<header class="site-header" role="banner">
+  <div class="container site-header__inner">
+    <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+      <img src="/assets/img/logo.svg" alt="" class="brand__mark" width="36" height="36">
+      <span class="brand__name">
+        3D Geospatial
+        <small>Digital Twin Automation</small>
+      </span>
+    </a>
+
+    <button class="theme-toggle" type="button" data-theme-toggle
+            aria-label="Switch to dark theme" title="Switch to dark theme">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4.2"/>
+        <path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/>
+      </svg>
+    </button>
+
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>
+      <span class="nav-toggle__icon" aria-hidden="true"><span></span></span>
+      Menu
+    </button>
+
+    <nav class="primary-nav" id="primary-nav" aria-label="Primary">
+      
+      <a href="https://www.3d-geospatial.com/" >
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/>
+        </svg>
+        Home
+      </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2 3 7l9 5 9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 17l9 5 9-5"/>
+            </svg>
+          
+          3D Geospatial Fundamentals
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+          
+          LOD Management &amp; Optimization
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/" aria-current="page">
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="6" cy="6" r="1.5"/><circle cx="12" cy="6" r="1.5"/><circle cx="18" cy="6" r="1.5"/>
+              <circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/>
+              <circle cx="6" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="18" cy="18" r="1.5"/>
+            </svg>
+          
+          Point Cloud &amp; Mesh Pipelines
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <path d="M12 9v4"/><path d="M12 17h.01"/>
+            </svg>
+          
+          Troubleshooting &amp; Reliability
+        </a>
+      
+    </nav>
+  </div>
+</header>
+
+
+  <main id="main">
+    
+
+
+<div class="container">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    
+      
+        <a href="https://www.3d-geospatial.com/">Home</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/">Point Cloud Mesh Processing Pipelines</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/">Surface Reconstruction Algorithms</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <span class="current">Delaunay Meshing Of Terrain With Pdal</span>
+      
+    
+  </nav>
+
+  <div class="content-page">
+    <article class="article">
+      <h1 id="delaunay-meshing-of-terrain-with-pdal" tabindex="-1"><a class="heading-link" href="#delaunay-meshing-of-terrain-with-pdal"><span>Delaunay Meshing of Terrain with PDAL</span></a></h1>
+<p>This page builds a triangulated irregular network from a ground-classified point cloud using PDAL’s <code>filters.delaunay</code> — thinning the input so the TIN is usable, removing the long triangles that span data gaps and the convex hull’s concavities, respecting breaklines where the terrain has a sharp edge, and verifying the surface against control points.</p>
+<h2 id="why-you-hit-this" tabindex="-1"><a class="heading-link" href="#why-you-hit-this"><span>Why you hit this</span></a></h2>
+<p>A TIN is the standard terrain deliverable and the honest one: its vertices are the measured points, so the surface interpolates observations rather than smoothing them. A raster DTM is easier to consume and has already made an interpolation decision on your behalf.</p>
+<p>The two things that go wrong are both about what Delaunay triangulation does at the edges of the data. It triangulates the <strong>convex hull</strong> of the input, so a river, a building footprint or a survey boundary that is concave gets bridged by long thin triangles spanning the gap — and those triangles look like terrain, get exported, and end up in a volume calculation.</p>
+<h2 id="prerequisites" tabindex="-1"><a class="heading-link" href="#prerequisites"><span>Prerequisites</span></a></h2>
+<ul>
+<li>PDAL 2.6+ with <code>filters.delaunay</code>; Python 3.10+ with <code>numpy</code>, <code>trimesh</code>, <code>shapely</code>, <code>scipy</code>.</li>
+<li>A ground-classified cloud — see <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/ground-classification-with-pdal-pmf/">ground classification with PDAL PMF</a>.</li>
+<li>Breaklines and a survey boundary, if they exist, as a vector layer.</li>
+</ul>
+<h2 id="step-by-step" tabindex="-1"><a class="heading-link" href="#step-by-step"><span>Step-by-Step</span></a></h2>
+<h3 id="1-thin-the-ground-points-before-triangulating" tabindex="-1"><a class="heading-link" href="#1-thin-the-ground-points-before-triangulating"><span>1. Thin the ground points before triangulating</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> json
+<span class="token keyword">import</span> math
+<span class="token keyword">import</span> subprocess
+<span class="token keyword">from</span> pathlib <span class="token keyword">import</span> Path
+
+<span class="token keyword">import</span> numpy <span class="token keyword">as</span> np
+
+<span class="token keyword">def</span> <span class="token function">thin_ground</span><span class="token punctuation">(</span>las_path<span class="token punctuation">,</span> out_path<span class="token punctuation">,</span> cell_m<span class="token operator">=</span><span class="token number">1.0</span><span class="token punctuation">,</span> method<span class="token operator">=</span><span class="token string">"voxelcentroidnearestneighbor"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""A TIN from every ground point has a triangle per point; thin to the terrain's scale."""</span>
+    stages <span class="token operator">=</span> <span class="token punctuation">[</span>
+        <span class="token builtin">str</span><span class="token punctuation">(</span>las_path<span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"filters.range"</span><span class="token punctuation">,</span> <span class="token string">"limits"</span><span class="token punctuation">:</span> <span class="token string">"Classification[2:2]"</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+        <span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string-interpolation"><span class="token string">f"filters.</span><span class="token interpolation"><span class="token punctuation">{</span>method<span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">,</span> <span class="token string">"cell"</span><span class="token punctuation">:</span> <span class="token builtin">float</span><span class="token punctuation">(</span>cell_m<span class="token punctuation">)</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+        <span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"writers.las"</span><span class="token punctuation">,</span> <span class="token string">"filename"</span><span class="token punctuation">:</span> <span class="token builtin">str</span><span class="token punctuation">(</span>out_path<span class="token punctuation">)</span><span class="token punctuation">,</span>
+         <span class="token string">"compression"</span><span class="token punctuation">:</span> <span class="token string">"laszip"</span><span class="token punctuation">,</span> <span class="token string">"forward"</span><span class="token punctuation">:</span> <span class="token string">"all"</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+    <span class="token punctuation">]</span>
+    spec <span class="token operator">=</span> Path<span class="token punctuation">(</span>out_path<span class="token punctuation">)</span><span class="token punctuation">.</span>with_suffix<span class="token punctuation">(</span><span class="token string">".pipeline.json"</span><span class="token punctuation">)</span>
+    spec<span class="token punctuation">.</span>write_text<span class="token punctuation">(</span>json<span class="token punctuation">.</span>dumps<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"pipeline"</span><span class="token punctuation">:</span> stages<span class="token punctuation">}</span><span class="token punctuation">,</span> indent<span class="token operator">=</span><span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    meta <span class="token operator">=</span> Path<span class="token punctuation">(</span>out_path<span class="token punctuation">)</span><span class="token punctuation">.</span>with_suffix<span class="token punctuation">(</span><span class="token string">".meta.json"</span><span class="token punctuation">)</span>
+    subprocess<span class="token punctuation">.</span>run<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token string">"pdal"</span><span class="token punctuation">,</span> <span class="token string">"pipeline"</span><span class="token punctuation">,</span> <span class="token builtin">str</span><span class="token punctuation">(</span>spec<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"--metadata"</span><span class="token punctuation">,</span> <span class="token builtin">str</span><span class="token punctuation">(</span>meta<span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+                   check<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> capture_output<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+    summary <span class="token operator">=</span> json<span class="token punctuation">.</span>loads<span class="token punctuation">(</span>subprocess<span class="token punctuation">.</span>run<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token string">"pdal"</span><span class="token punctuation">,</span> <span class="token string">"info"</span><span class="token punctuation">,</span> <span class="token string">"--summary"</span><span class="token punctuation">,</span> <span class="token builtin">str</span><span class="token punctuation">(</span>out_path<span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+                                        capture_output<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> text<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span>
+                                        check<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span><span class="token punctuation">.</span>stdout<span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token string">"summary"</span><span class="token punctuation">]</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"path"</span><span class="token punctuation">:</span> <span class="token builtin">str</span><span class="token punctuation">(</span>out_path<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"points"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span>summary<span class="token punctuation">[</span><span class="token string">"num_points"</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"cell_m"</span><span class="token punctuation">:</span> cell_m<span class="token punctuation">,</span>
+            <span class="token string">"triangles_expected"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span>summary<span class="token punctuation">[</span><span class="token string">"num_points"</span><span class="token punctuation">]</span> <span class="token operator">*</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">}</span>
+
+<span class="token keyword">def</span> <span class="token function">thinning_target</span><span class="token punctuation">(</span>density_per_m2<span class="token punctuation">,</span> terrain_detail_m<span class="token operator">=</span><span class="token number">1.0</span><span class="token punctuation">,</span> max_triangles<span class="token operator">=</span><span class="token number">4_000_000</span><span class="token punctuation">,</span>
+                    area_m2<span class="token operator">=</span><span class="token number">1_000_000</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Pick a cell size from the terrain's detail scale and a triangle budget."""</span>
+    by_detail <span class="token operator">=</span> terrain_detail_m <span class="token operator">/</span> <span class="token number">2.0</span>
+    points_at_detail <span class="token operator">=</span> area_m2 <span class="token operator">/</span> <span class="token punctuation">(</span>by_detail <span class="token operator">**</span> <span class="token number">2</span><span class="token punctuation">)</span>
+    by_budget <span class="token operator">=</span> math<span class="token punctuation">.</span>sqrt<span class="token punctuation">(</span>area_m2 <span class="token operator">/</span> <span class="token punctuation">(</span>max_triangles <span class="token operator">/</span> <span class="token number">2.0</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    cell <span class="token operator">=</span> <span class="token builtin">max</span><span class="token punctuation">(</span>by_detail<span class="token punctuation">,</span> by_budget<span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"cell_from_detail_m"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>by_detail<span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"cell_from_budget_m"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>by_budget<span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"chosen_cell_m"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>cell<span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"expected_points"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span>area_m2 <span class="token operator">/</span> cell <span class="token operator">**</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"expected_triangles"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span><span class="token number">2</span> <span class="token operator">*</span> area_m2 <span class="token operator">/</span> cell <span class="token operator">**</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"limited_by"</span><span class="token punctuation">:</span> <span class="token string">"triangle budget"</span> <span class="token keyword">if</span> by_budget <span class="token operator">></span> by_detail <span class="token keyword">else</span> <span class="token string">"terrain detail"</span><span class="token punctuation">}</span>
+</code></pre></div>
+<p>Triangulating every ground point is the mistake to avoid. A 1 km tile at 40 points/m² has 22 million ground points, which produces about 44 million triangles — a mesh nothing will open, describing a surface whose real information content is a few hundred thousand triangles.</p>
+<p><code>filters.voxelcentroidnearestneighbor</code> is the right thinner here because it keeps original points, as discussed in <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/voxel-downsampling-strategies-compared/">voxel downsampling strategies compared</a> — a TIN whose vertices are synthetic averages is no longer an interpolation of observations.</p>
+<p>The cell size should come from the terrain’s own detail scale, not from a triangle budget, whenever the budget allows it. Terrain features of interest at 1 m need a 0.5 m cell; a flat floodplain is fully described at 2 m and a 0.5 m cell just adds noise-level triangles.</p>
+<figure class="diagram">
+<svg viewBox="4 6 732 226" role="img" aria-labelledby="tin-thin-t tin-thin-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="tin-thin-t">Thinning cell against TIN size and fidelity</title>
+  <desc id="tin-thin-d">A table of four thinning cell sizes on a one square kilometre tile with 40 points per square metre. No thinning gives 22 million points and 44 million triangles, unusable, with a vertical accuracy of 2 centimetres. A 0.5 metre cell gives 4 million points and 8 million triangles at 2.4 centimetres. A 1 metre cell gives 1 million points and 2 million triangles at 3.1 centimetres. A 2 metre cell gives 250 thousand points and 500 thousand triangles at 6.8 centimetres, which starts to lose kerbs and ditches.</desc>
+  <rect class="svg-bg" x="4" y="6" width="732" height="226" fill="#ffffff"/>
+  <g stroke-width="1.5">
+    <rect x="18" y="20" width="150" height="32" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="168" y="20" width="126" height="32" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="294" y="20" width="126" height="32" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="420" y="20" width="140" height="32" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="560" y="20" width="162" height="32" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="18" y="52" width="150" height="34" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="168" y="52" width="126" height="34" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="294" y="52" width="126" height="34" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="420" y="52" width="140" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="560" y="52" width="162" height="34" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="18" y="86" width="150" height="34" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="168" y="86" width="126" height="34" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="294" y="86" width="126" height="34" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="420" y="86" width="140" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="560" y="86" width="162" height="34" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="18" y="120" width="150" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="168" y="120" width="126" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="294" y="120" width="126" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="420" y="120" width="140" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="560" y="120" width="162" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="18" y="154" width="150" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="168" y="154" width="126" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="294" y="154" width="126" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="420" y="154" width="140" height="34" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="560" y="154" width="162" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="93" y="41">thinning cell</text><text x="231" y="41">points</text>
+    <text x="357" y="41">triangles</text><text x="490" y="41">vertical RMSE</text>
+    <text x="641" y="41">usable?</text>
+    <text x="93" y="74">none</text><text x="231" y="74">22.0 M</text>
+    <text x="357" y="74">44.0 M</text><text x="490" y="74">2.0 cm</text><text x="641" y="74">no</text>
+    <text x="93" y="108">0.5 m</text><text x="231" y="108">4.0 M</text>
+    <text x="357" y="108">8.0 M</text><text x="490" y="108">2.4 cm</text><text x="641" y="108">heavy</text>
+    <text x="93" y="142">1.0 m</text><text x="231" y="142">1.0 M</text>
+    <text x="357" y="142">2.0 M</text><text x="490" y="142">3.1 cm</text><text x="641" y="142">yes</text>
+    <text x="93" y="176">2.0 m</text><text x="231" y="176">250 k</text>
+    <text x="357" y="176">500 k</text><text x="490" y="176">6.8 cm</text>
+    <text x="641" y="176">yes, loses kerbs</text>
+  </g>
+  <text x="370" y="214" fill="#5b6471" font-size="12" text-anchor="middle">22× fewer triangles for 1.1 cm of accuracy — the unthinned TIN's extra points describe noise</text>
+</svg>
+<figcaption>The unthinned TIN is 22 times larger and 1 cm more accurate, and the 1 cm is the survey's own noise.</figcaption>
+</figure>
+<h3 id="2-triangulate" tabindex="-1"><a class="heading-link" href="#2-triangulate"><span>2. Triangulate</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">delaunay_mesh</span><span class="token punctuation">(</span>thinned_las<span class="token punctuation">,</span> out_ply<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    stages <span class="token operator">=</span> <span class="token punctuation">[</span>
+        <span class="token builtin">str</span><span class="token punctuation">(</span>thinned_las<span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"filters.delaunay"</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+        <span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"writers.ply"</span><span class="token punctuation">,</span> <span class="token string">"filename"</span><span class="token punctuation">:</span> <span class="token builtin">str</span><span class="token punctuation">(</span>out_ply<span class="token punctuation">)</span><span class="token punctuation">,</span>
+         <span class="token string">"faces"</span><span class="token punctuation">:</span> <span class="token boolean">True</span><span class="token punctuation">,</span> <span class="token string">"storage_mode"</span><span class="token punctuation">:</span> <span class="token string">"little endian"</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+    <span class="token punctuation">]</span>
+    spec <span class="token operator">=</span> Path<span class="token punctuation">(</span>out_ply<span class="token punctuation">)</span><span class="token punctuation">.</span>with_suffix<span class="token punctuation">(</span><span class="token string">".pipeline.json"</span><span class="token punctuation">)</span>
+    spec<span class="token punctuation">.</span>write_text<span class="token punctuation">(</span>json<span class="token punctuation">.</span>dumps<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"pipeline"</span><span class="token punctuation">:</span> stages<span class="token punctuation">}</span><span class="token punctuation">,</span> indent<span class="token operator">=</span><span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    proc <span class="token operator">=</span> subprocess<span class="token punctuation">.</span>run<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token string">"pdal"</span><span class="token punctuation">,</span> <span class="token string">"pipeline"</span><span class="token punctuation">,</span> <span class="token builtin">str</span><span class="token punctuation">(</span>spec<span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+                          capture_output<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> text<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+    <span class="token keyword">if</span> proc<span class="token punctuation">.</span>returncode <span class="token operator">!=</span> <span class="token number">0</span><span class="token punctuation">:</span>
+        <span class="token keyword">raise</span> RuntimeError<span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"pdal failed: </span><span class="token interpolation"><span class="token punctuation">{</span>proc<span class="token punctuation">.</span>stderr<span class="token punctuation">[</span><span class="token operator">-</span><span class="token number">400</span><span class="token punctuation">:</span><span class="token format-spec">]</span><span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+    <span class="token keyword">import</span> trimesh
+    mesh <span class="token operator">=</span> trimesh<span class="token punctuation">.</span>load<span class="token punctuation">(</span>out_ply<span class="token punctuation">,</span> process<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">,</span> force<span class="token operator">=</span><span class="token string">"mesh"</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"path"</span><span class="token punctuation">:</span> <span class="token builtin">str</span><span class="token punctuation">(</span>out_ply<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"vertices"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>mesh<span class="token punctuation">.</span>vertices<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"faces"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>mesh<span class="token punctuation">.</span>faces<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"bbox_m"</span><span class="token punctuation">:</span> <span class="token punctuation">[</span><span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>v<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span> <span class="token keyword">for</span> v <span class="token keyword">in</span>
+                       <span class="token punctuation">(</span>mesh<span class="token punctuation">.</span>vertices<span class="token punctuation">.</span><span class="token builtin">max</span><span class="token punctuation">(</span>axis<span class="token operator">=</span><span class="token number">0</span><span class="token punctuation">)</span> <span class="token operator">-</span> mesh<span class="token punctuation">.</span>vertices<span class="token punctuation">.</span><span class="token builtin">min</span><span class="token punctuation">(</span>axis<span class="token operator">=</span><span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">}</span>
+</code></pre></div>
+<p><code>filters.delaunay</code> triangulates in the XY plane and lifts the result to Z, which is exactly right for terrain: the triangulation is 2D, so there is no ambiguity about which points connect, and the surface is single-valued in Z by construction.</p>
+<p><code>faces: True</code> on the PLY writer is required; without it the output is a point cloud in PLY clothing and the triangulation is discarded silently.</p>
+<p>The count of faces should be close to twice the vertex count for a planar triangulation — a 1-million-vertex TIN has about 2 million triangles — and a figure far from that means the input had duplicate XY positions, which Delaunay handles by dropping them.</p>
+<h3 id="3-remove-the-long-triangles" tabindex="-1"><a class="heading-link" href="#3-remove-the-long-triangles"><span>3. Remove the long triangles</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> trimesh
+
+<span class="token keyword">def</span> <span class="token function">edge_length_stats</span><span class="token punctuation">(</span>mesh<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    tri <span class="token operator">=</span> mesh<span class="token punctuation">.</span>vertices<span class="token punctuation">[</span>mesh<span class="token punctuation">.</span>faces<span class="token punctuation">]</span>
+    e <span class="token operator">=</span> np<span class="token punctuation">.</span>stack<span class="token punctuation">(</span><span class="token punctuation">[</span>
+        np<span class="token punctuation">.</span>linalg<span class="token punctuation">.</span>norm<span class="token punctuation">(</span>tri<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">,</span> <span class="token punctuation">:</span><span class="token number">2</span><span class="token punctuation">]</span> <span class="token operator">-</span> tri<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token punctuation">:</span><span class="token number">2</span><span class="token punctuation">]</span><span class="token punctuation">,</span> axis<span class="token operator">=</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        np<span class="token punctuation">.</span>linalg<span class="token punctuation">.</span>norm<span class="token punctuation">(</span>tri<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">,</span> <span class="token punctuation">:</span><span class="token number">2</span><span class="token punctuation">]</span> <span class="token operator">-</span> tri<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">,</span> <span class="token punctuation">:</span><span class="token number">2</span><span class="token punctuation">]</span><span class="token punctuation">,</span> axis<span class="token operator">=</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        np<span class="token punctuation">.</span>linalg<span class="token punctuation">.</span>norm<span class="token punctuation">(</span>tri<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token punctuation">:</span><span class="token number">2</span><span class="token punctuation">]</span> <span class="token operator">-</span> tri<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">,</span> <span class="token punctuation">:</span><span class="token number">2</span><span class="token punctuation">]</span><span class="token punctuation">,</span> axis<span class="token operator">=</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token punctuation">]</span><span class="token punctuation">,</span> axis<span class="token operator">=</span><span class="token number">1</span><span class="token punctuation">)</span>
+    longest <span class="token operator">=</span> e<span class="token punctuation">.</span><span class="token builtin">max</span><span class="token punctuation">(</span>axis<span class="token operator">=</span><span class="token number">1</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token string">"faces"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>mesh<span class="token punctuation">.</span>faces<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"median_longest_edge_m"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>median<span class="token punctuation">(</span>longest<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"p95_longest_edge_m"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>percentile<span class="token punctuation">(</span>longest<span class="token punctuation">,</span> <span class="token number">95</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"p999_longest_edge_m"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>percentile<span class="token punctuation">(</span>longest<span class="token punctuation">,</span> <span class="token number">99.9</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"max_longest_edge_m"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>longest<span class="token punctuation">.</span><span class="token builtin">max</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"_longest"</span><span class="token punctuation">:</span> longest<span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+
+<span class="token keyword">def</span> <span class="token function">remove_long_triangles</span><span class="token punctuation">(</span>mesh<span class="token punctuation">,</span> max_edge_m<span class="token operator">=</span><span class="token boolean">None</span><span class="token punctuation">,</span> percentile<span class="token operator">=</span><span class="token number">99.5</span><span class="token punctuation">,</span> factor<span class="token operator">=</span><span class="token number">4.0</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Two thresholds: an absolute one, or a multiple of the typical edge."""</span>
+    stats <span class="token operator">=</span> edge_length_stats<span class="token punctuation">(</span>mesh<span class="token punctuation">)</span>
+    longest <span class="token operator">=</span> stats<span class="token punctuation">[</span><span class="token string">"_longest"</span><span class="token punctuation">]</span>
+    <span class="token keyword">if</span> max_edge_m <span class="token keyword">is</span> <span class="token boolean">None</span><span class="token punctuation">:</span>
+        max_edge_m <span class="token operator">=</span> <span class="token builtin">max</span><span class="token punctuation">(</span>stats<span class="token punctuation">[</span><span class="token string">"median_longest_edge_m"</span><span class="token punctuation">]</span> <span class="token operator">*</span> factor<span class="token punctuation">,</span>
+                         <span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>percentile<span class="token punctuation">(</span>longest<span class="token punctuation">,</span> percentile<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    keep <span class="token operator">=</span> longest <span class="token operator">&lt;=</span> max_edge_m
+    trimmed <span class="token operator">=</span> mesh<span class="token punctuation">.</span>submesh<span class="token punctuation">(</span><span class="token punctuation">[</span>np<span class="token punctuation">.</span>flatnonzero<span class="token punctuation">(</span>keep<span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">,</span> append<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> repair<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">)</span>
+    trimmed<span class="token punctuation">.</span>remove_unreferenced_vertices<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> trimmed<span class="token punctuation">,</span> <span class="token punctuation">{</span>
+        <span class="token string">"threshold_m"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>max_edge_m<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"faces_before"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>mesh<span class="token punctuation">.</span>faces<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"faces_after"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>trimmed<span class="token punctuation">.</span>faces<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"faces_removed"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token operator">~</span>keep<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"removed_fraction"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token operator">~</span>keep<span class="token punctuation">)</span><span class="token punctuation">.</span>mean<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">5</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"removed_area_m2"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>mesh<span class="token punctuation">.</span>area_faces<span class="token punctuation">[</span><span class="token operator">~</span>keep<span class="token punctuation">]</span><span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+</code></pre></div>
+<p>Removing triangles by longest <strong>horizontal</strong> edge, not by 3D edge length, is the detail that makes this work on sloped terrain. A steep embankment has genuinely long 3D edges and short horizontal ones; a gap-spanning triangle has a long horizontal edge whatever its slope.</p>
+<p>A threshold of four times the median edge is a reasonable automatic choice and errs towards keeping triangles. The absolute alternative — “no edge longer than 8 m” — is better when the thinning cell is known, because a 1 m cell means a legitimate triangle has edges of about 1–2 m and anything over 6 m spans a gap.</p>
+<p>The <code>removed_area_m2</code> figure is the one to report: it is the area of the surface that was a fiction, and on a tile with a river it can be tens of thousands of square metres.</p>
+<h3 id="4-trim-to-the-real-boundary-not-the-convex-hull" tabindex="-1"><a class="heading-link" href="#4-trim-to-the-real-boundary-not-the-convex-hull"><span>4. Trim to the real boundary, not the convex hull</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">from</span> shapely<span class="token punctuation">.</span>geometry <span class="token keyword">import</span> MultiPoint<span class="token punctuation">,</span> Point<span class="token punctuation">,</span> Polygon
+<span class="token keyword">from</span> shapely<span class="token punctuation">.</span>prepared <span class="token keyword">import</span> prep
+
+<span class="token keyword">def</span> <span class="token function">concave_boundary</span><span class="token punctuation">(</span>points_xy<span class="token punctuation">,</span> alpha_m<span class="token operator">=</span><span class="token number">3.0</span><span class="token punctuation">,</span> simplify_m<span class="token operator">=</span><span class="token number">0.5</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Morphological closing gives a concave hull with holes."""</span>
+    mp <span class="token operator">=</span> MultiPoint<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token builtin">tuple</span><span class="token punctuation">(</span>p<span class="token punctuation">)</span> <span class="token keyword">for</span> p <span class="token keyword">in</span> points_xy<span class="token punctuation">]</span><span class="token punctuation">)</span>
+    hull <span class="token operator">=</span> mp<span class="token punctuation">.</span><span class="token builtin">buffer</span><span class="token punctuation">(</span>alpha_m<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">buffer</span><span class="token punctuation">(</span><span class="token operator">-</span>alpha_m<span class="token punctuation">)</span>
+    <span class="token keyword">if</span> hull<span class="token punctuation">.</span>is_empty<span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token boolean">None</span>
+    <span class="token keyword">if</span> hull<span class="token punctuation">.</span>geom_type <span class="token operator">==</span> <span class="token string">"MultiPolygon"</span><span class="token punctuation">:</span>
+        hull <span class="token operator">=</span> <span class="token builtin">max</span><span class="token punctuation">(</span>hull<span class="token punctuation">.</span>geoms<span class="token punctuation">,</span> key<span class="token operator">=</span><span class="token keyword">lambda</span> g<span class="token punctuation">:</span> g<span class="token punctuation">.</span>area<span class="token punctuation">)</span>
+    <span class="token keyword">return</span> hull<span class="token punctuation">.</span>simplify<span class="token punctuation">(</span>simplify_m<span class="token punctuation">,</span> preserve_topology<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+
+<span class="token keyword">def</span> <span class="token function">trim_to_boundary</span><span class="token punctuation">(</span>mesh<span class="token punctuation">,</span> boundary_polygon<span class="token punctuation">,</span> sample_centroids<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    centroids <span class="token operator">=</span> mesh<span class="token punctuation">.</span>triangles_center<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token punctuation">:</span><span class="token number">2</span><span class="token punctuation">]</span>
+    prepared <span class="token operator">=</span> prep<span class="token punctuation">(</span>boundary_polygon<span class="token punctuation">)</span>
+    inside <span class="token operator">=</span> np<span class="token punctuation">.</span>array<span class="token punctuation">(</span><span class="token punctuation">[</span>prepared<span class="token punctuation">.</span>contains<span class="token punctuation">(</span>Point<span class="token punctuation">(</span>c<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token keyword">for</span> c <span class="token keyword">in</span> centroids<span class="token punctuation">]</span><span class="token punctuation">)</span>
+    trimmed <span class="token operator">=</span> mesh<span class="token punctuation">.</span>submesh<span class="token punctuation">(</span><span class="token punctuation">[</span>np<span class="token punctuation">.</span>flatnonzero<span class="token punctuation">(</span>inside<span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">,</span> append<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> repair<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">)</span>
+    trimmed<span class="token punctuation">.</span>remove_unreferenced_vertices<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> trimmed<span class="token punctuation">,</span> <span class="token punctuation">{</span>
+        <span class="token string">"faces_before"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>mesh<span class="token punctuation">.</span>faces<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"faces_after"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>trimmed<span class="token punctuation">.</span>faces<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"faces_outside_boundary"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token operator">~</span>inside<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"boundary_area_m2"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>boundary_polygon<span class="token punctuation">.</span>area<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"hull_area_m2"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>MultiPoint<span class="token punctuation">(</span>
+            <span class="token punctuation">[</span><span class="token builtin">tuple</span><span class="token punctuation">(</span>p<span class="token punctuation">)</span> <span class="token keyword">for</span> p <span class="token keyword">in</span> mesh<span class="token punctuation">.</span>vertices<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token punctuation">:</span><span class="token number">2</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">:</span><span class="token number">100</span><span class="token punctuation">]</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">.</span>convex_hull<span class="token punctuation">.</span>area<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+
+<span class="token keyword">def</span> <span class="token function">trim_to_supplied_boundary</span><span class="token punctuation">(</span>mesh<span class="token punctuation">,</span> boundary_gpkg<span class="token punctuation">,</span> layer<span class="token operator">=</span><span class="token boolean">None</span><span class="token punctuation">,</span> buffer_m<span class="token operator">=</span><span class="token number">0.0</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">import</span> geopandas <span class="token keyword">as</span> gpd
+    gdf <span class="token operator">=</span> gpd<span class="token punctuation">.</span>read_file<span class="token punctuation">(</span>boundary_gpkg<span class="token punctuation">,</span> layer<span class="token operator">=</span>layer<span class="token punctuation">)</span>
+    poly <span class="token operator">=</span> gdf<span class="token punctuation">.</span>geometry<span class="token punctuation">.</span>union_all<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    <span class="token keyword">if</span> buffer_m<span class="token punctuation">:</span>
+        poly <span class="token operator">=</span> poly<span class="token punctuation">.</span><span class="token builtin">buffer</span><span class="token punctuation">(</span>buffer_m<span class="token punctuation">)</span>
+    <span class="token keyword">return</span> trim_to_boundary<span class="token punctuation">(</span>mesh<span class="token punctuation">,</span> poly<span class="token punctuation">)</span>
+</code></pre></div>
+<p>The convex hull problem is the main reason a raw Delaunay TIN is not a deliverable. A survey following a road produces an L-shaped or crescent-shaped point set, and the convex hull fills in the concavity with triangles that interpolate across ground nobody surveyed.</p>
+<p>Where a survey boundary exists, use it — it is authoritative and the recipient expects the deliverable to match it. Where one does not, the morphological closing produces a concave hull that follows the data, and the <code>alpha_m</code> parameter controls how tightly: 3 m follows the outline of a 1 m-thinned cloud closely, and 20 m produces something near the convex hull.</p>
+<p>Testing the triangle <strong>centroid</strong> rather than its vertices keeps the result clean at the boundary: a triangle with two vertices inside and one outside is a boundary triangle, and whether to keep it is decided by where most of it lies.</p>
+<h3 id="5-respect-the-breaklines" tabindex="-1"><a class="heading-link" href="#5-respect-the-breaklines"><span>5. Respect the breaklines</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">constrained_triangulation</span><span class="token punctuation">(</span>points_xyz<span class="token punctuation">,</span> breaklines<span class="token punctuation">,</span> boundary<span class="token operator">=</span><span class="token boolean">None</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Delaunay honours no edges; a constrained triangulation does."""</span>
+    <span class="token keyword">import</span> triangle <span class="token keyword">as</span> tr
+    <span class="token keyword">import</span> geopandas <span class="token keyword">as</span> gpd
+    <span class="token keyword">from</span> shapely<span class="token punctuation">.</span>geometry <span class="token keyword">import</span> LineString
+
+    vertices <span class="token operator">=</span> <span class="token builtin">list</span><span class="token punctuation">(</span>points_xyz<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token punctuation">:</span><span class="token number">2</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    z_values <span class="token operator">=</span> <span class="token builtin">list</span><span class="token punctuation">(</span>points_xyz<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    segments <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+
+    <span class="token keyword">for</span> line <span class="token keyword">in</span> breaklines<span class="token punctuation">:</span>
+        coords <span class="token operator">=</span> <span class="token builtin">list</span><span class="token punctuation">(</span>line<span class="token punctuation">.</span>coords<span class="token punctuation">)</span>
+        start <span class="token operator">=</span> <span class="token builtin">len</span><span class="token punctuation">(</span>vertices<span class="token punctuation">)</span>
+        <span class="token keyword">for</span> i<span class="token punctuation">,</span> <span class="token punctuation">(</span>x<span class="token punctuation">,</span> y<span class="token punctuation">,</span> <span class="token operator">*</span>rest<span class="token punctuation">)</span> <span class="token keyword">in</span> <span class="token builtin">enumerate</span><span class="token punctuation">(</span>
+                <span class="token punctuation">(</span>c <span class="token keyword">if</span> <span class="token builtin">len</span><span class="token punctuation">(</span>c<span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token number">3</span> <span class="token keyword">else</span> <span class="token punctuation">(</span>c<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">,</span> c<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">,</span> np<span class="token punctuation">.</span>nan<span class="token punctuation">)</span> <span class="token keyword">for</span> c <span class="token keyword">in</span> coords<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+            vertices<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">(</span>x<span class="token punctuation">,</span> y<span class="token punctuation">)</span><span class="token punctuation">)</span>
+            z_values<span class="token punctuation">.</span>append<span class="token punctuation">(</span>rest<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span> <span class="token keyword">if</span> rest <span class="token keyword">else</span> np<span class="token punctuation">.</span>nan<span class="token punctuation">)</span>
+            <span class="token keyword">if</span> i <span class="token operator">></span> <span class="token number">0</span><span class="token punctuation">:</span>
+                segments<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">(</span>start <span class="token operator">+</span> i <span class="token operator">-</span> <span class="token number">1</span><span class="token punctuation">,</span> start <span class="token operator">+</span> i<span class="token punctuation">)</span><span class="token punctuation">)</span>
+
+    spec <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token string">"vertices"</span><span class="token punctuation">:</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>vertices<span class="token punctuation">,</span> dtype<span class="token operator">=</span>np<span class="token punctuation">.</span>float64<span class="token punctuation">)</span><span class="token punctuation">}</span>
+    <span class="token keyword">if</span> segments<span class="token punctuation">:</span>
+        spec<span class="token punctuation">[</span><span class="token string">"segments"</span><span class="token punctuation">]</span> <span class="token operator">=</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>segments<span class="token punctuation">,</span> dtype<span class="token operator">=</span>np<span class="token punctuation">.</span>int32<span class="token punctuation">)</span>
+    result <span class="token operator">=</span> tr<span class="token punctuation">.</span>triangulate<span class="token punctuation">(</span>spec<span class="token punctuation">,</span> <span class="token string">"p"</span> <span class="token keyword">if</span> segments <span class="token keyword">else</span> <span class="token string">""</span><span class="token punctuation">)</span>
+
+    verts2d <span class="token operator">=</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>result<span class="token punctuation">[</span><span class="token string">"vertices"</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    faces <span class="token operator">=</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>result<span class="token punctuation">[</span><span class="token string">"triangles"</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    z <span class="token operator">=</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>z_values<span class="token punctuation">,</span> dtype<span class="token operator">=</span>np<span class="token punctuation">.</span>float64<span class="token punctuation">)</span>
+    <span class="token keyword">if</span> <span class="token builtin">len</span><span class="token punctuation">(</span>z<span class="token punctuation">)</span> <span class="token operator">&lt;</span> <span class="token builtin">len</span><span class="token punctuation">(</span>verts2d<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        z <span class="token operator">=</span> np<span class="token punctuation">.</span>concatenate<span class="token punctuation">(</span><span class="token punctuation">[</span>z<span class="token punctuation">,</span> np<span class="token punctuation">.</span>full<span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>verts2d<span class="token punctuation">)</span> <span class="token operator">-</span> <span class="token builtin">len</span><span class="token punctuation">(</span>z<span class="token punctuation">)</span><span class="token punctuation">,</span> np<span class="token punctuation">.</span>nan<span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    missing <span class="token operator">=</span> <span class="token operator">~</span>np<span class="token punctuation">.</span>isfinite<span class="token punctuation">(</span>z<span class="token punctuation">)</span>
+    <span class="token keyword">if</span> missing<span class="token punctuation">.</span><span class="token builtin">any</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">from</span> scipy<span class="token punctuation">.</span>interpolate <span class="token keyword">import</span> griddata
+        known <span class="token operator">=</span> np<span class="token punctuation">.</span>isfinite<span class="token punctuation">(</span>z<span class="token punctuation">)</span>
+        z<span class="token punctuation">[</span>missing<span class="token punctuation">]</span> <span class="token operator">=</span> griddata<span class="token punctuation">(</span>verts2d<span class="token punctuation">[</span>known<span class="token punctuation">]</span><span class="token punctuation">,</span> z<span class="token punctuation">[</span>known<span class="token punctuation">]</span><span class="token punctuation">,</span> verts2d<span class="token punctuation">[</span>missing<span class="token punctuation">]</span><span class="token punctuation">,</span>
+                             method<span class="token operator">=</span><span class="token string">"linear"</span><span class="token punctuation">)</span>
+        still <span class="token operator">=</span> <span class="token operator">~</span>np<span class="token punctuation">.</span>isfinite<span class="token punctuation">(</span>z<span class="token punctuation">)</span>
+        <span class="token keyword">if</span> still<span class="token punctuation">.</span><span class="token builtin">any</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+            z<span class="token punctuation">[</span>still<span class="token punctuation">]</span> <span class="token operator">=</span> griddata<span class="token punctuation">(</span>verts2d<span class="token punctuation">[</span>known<span class="token punctuation">]</span><span class="token punctuation">,</span> z<span class="token punctuation">[</span>known<span class="token punctuation">]</span><span class="token punctuation">,</span> verts2d<span class="token punctuation">[</span>still<span class="token punctuation">]</span><span class="token punctuation">,</span>
+                                method<span class="token operator">=</span><span class="token string">"nearest"</span><span class="token punctuation">)</span>
+    verts3d <span class="token operator">=</span> np<span class="token punctuation">.</span>column_stack<span class="token punctuation">(</span><span class="token punctuation">[</span>verts2d<span class="token punctuation">,</span> z<span class="token punctuation">]</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> trimesh<span class="token punctuation">.</span>Trimesh<span class="token punctuation">(</span>vertices<span class="token operator">=</span>verts3d<span class="token punctuation">,</span> faces<span class="token operator">=</span>faces<span class="token punctuation">,</span> process<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token punctuation">{</span>
+        <span class="token string">"input_points"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>points_xyz<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"breakline_vertices"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>vertices<span class="token punctuation">)</span> <span class="token operator">-</span> <span class="token builtin">len</span><span class="token punctuation">(</span>points_xyz<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"segments_enforced"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>segments<span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"faces"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>faces<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+</code></pre></div>
+<p>A plain Delaunay triangulation has no concept of a required edge, so a kerb line running diagonally across the point pattern gets triangulated <em>across</em>, rounding the kerb into a ramp. A constrained triangulation forces the breakline’s segments to appear as mesh edges, which preserves the discontinuity.</p>
+<p>Breaklines matter most for exactly the features a terrain model is used to check: kerbs, retaining walls, ditch inverts, top and toe of embankments. Without them the TIN’s own vertical accuracy can be 3 cm while a kerb is 8 cm out of position.</p>
+<p>PDAL’s <code>filters.delaunay</code> does not accept constraints, which is why this step drops to the <code>triangle</code> library. That is a reasonable trade for the small number of tiles where breaklines exist.</p>
+<figure class="diagram">
+<svg viewBox="4 6 732 210" role="img" aria-labelledby="tin-trim-t tin-trim-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="tin-trim-t">Two trimming steps and what each removes</title>
+  <desc id="tin-trim-d">A table of three trimming approaches for a Delaunay TIN. Long-edge removal by horizontal edge length removes most of the convex-hull fill and also removes genuine triangles across data gaps. Trimming to a supplied survey boundary removes exactly the invented area. A concave hull from morphological closing is the fallback when no boundary exists, and its tightness is controlled by the alpha value.</desc>
+  <rect class="svg-bg" x="4" y="6" width="732" height="210" fill="#ffffff"/>
+  <g stroke-width="1.5">
+    <rect x="18" y="20" width="244" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="262" y="20" width="248" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="510" y="20" width="212" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="18" y="54" width="244" height="34" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="262" y="54" width="248" height="34" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="510" y="54" width="212" height="34" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="18" y="88" width="244" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="262" y="88" width="248" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="510" y="88" width="212" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="18" y="122" width="244" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="262" y="122" width="248" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="510" y="122" width="212" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="140" y="42">step</text><text x="386" y="42">removes</text><text x="616" y="42">leaves behind</text>
+    <text x="140" y="76">long horizontal edges</text><text x="386" y="76">most hull fill and gap spans</text><text x="616" y="76">a fringe at the concavity</text>
+    <text x="140" y="110">supplied survey boundary</text><text x="386" y="110">exactly the invented area</text><text x="616" y="110">nothing — it is authoritative</text>
+    <text x="140" y="144">concave hull, alpha closing</text><text x="386" y="144">area the data does not cover</text><text x="616" y="144">depends on the alpha value</text>
+  </g>
+  <text x="20" y="176" fill="#1f2937" font-size="12.5">Test the triangle centroid rather than its vertices, so boundary triangles are decided by where most of them lie.</text>
+  <text x="20" y="198" fill="#5b6471" font-size="12">Remove by horizontal edge length, not 3D length: a steep embankment has long 3D edges legitimately.</text>
+</svg>
+<figcaption>Long-edge removal gets most of the way; only a real boundary gets the extent exactly right.</figcaption>
+</figure>
+<h3 id="6-verify-against-control-and-against-the-points" tabindex="-1"><a class="heading-link" href="#6-verify-against-control-and-against-the-points"><span>6. Verify against control and against the points</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">vertical_accuracy</span><span class="token punctuation">(</span>mesh<span class="token punctuation">,</span> control_points<span class="token punctuation">,</span> tolerance_m<span class="token operator">=</span><span class="token number">0.10</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Sample the TIN at surveyed positions."""</span>
+    origins <span class="token operator">=</span> np<span class="token punctuation">.</span>array<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token punctuation">[</span>cp<span class="token punctuation">[</span><span class="token string">"x"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> cp<span class="token punctuation">[</span><span class="token string">"y"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token number">1e5</span><span class="token punctuation">]</span> <span class="token keyword">for</span> cp <span class="token keyword">in</span> control_points<span class="token punctuation">]</span><span class="token punctuation">)</span>
+    directions <span class="token operator">=</span> np<span class="token punctuation">.</span>tile<span class="token punctuation">(</span>np<span class="token punctuation">.</span>array<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token number">0.0</span><span class="token punctuation">,</span> <span class="token number">0.0</span><span class="token punctuation">,</span> <span class="token operator">-</span><span class="token number">1.0</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>control_points<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    locations<span class="token punctuation">,</span> index_ray<span class="token punctuation">,</span> _ <span class="token operator">=</span> mesh<span class="token punctuation">.</span>ray<span class="token punctuation">.</span>intersects_location<span class="token punctuation">(</span>origins<span class="token punctuation">,</span> directions<span class="token punctuation">,</span>
+                                                           multiple_hits<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">)</span>
+    rows <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    hit <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token builtin">int</span><span class="token punctuation">(</span>i<span class="token punctuation">)</span><span class="token punctuation">:</span> loc <span class="token keyword">for</span> i<span class="token punctuation">,</span> loc <span class="token keyword">in</span> <span class="token builtin">zip</span><span class="token punctuation">(</span>index_ray<span class="token punctuation">,</span> locations<span class="token punctuation">)</span><span class="token punctuation">}</span>
+    <span class="token keyword">for</span> i<span class="token punctuation">,</span> cp <span class="token keyword">in</span> <span class="token builtin">enumerate</span><span class="token punctuation">(</span>control_points<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">if</span> i <span class="token keyword">not</span> <span class="token keyword">in</span> hit<span class="token punctuation">:</span>
+            rows<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"id"</span><span class="token punctuation">:</span> cp<span class="token punctuation">[</span><span class="token string">"id"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token string">"status"</span><span class="token punctuation">:</span> <span class="token string">"outside the TIN"</span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+            <span class="token keyword">continue</span>
+        z <span class="token operator">=</span> <span class="token builtin">float</span><span class="token punctuation">(</span>hit<span class="token punctuation">[</span>i<span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token number">2</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+        rows<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"id"</span><span class="token punctuation">:</span> cp<span class="token punctuation">[</span><span class="token string">"id"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token string">"tin_m"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>z<span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"control_m"</span><span class="token punctuation">:</span> cp<span class="token punctuation">[</span><span class="token string">"z"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+                     <span class="token string">"residual_m"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>z <span class="token operator">-</span> cp<span class="token punctuation">[</span><span class="token string">"z"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+    resid <span class="token operator">=</span> np<span class="token punctuation">.</span>array<span class="token punctuation">(</span><span class="token punctuation">[</span>r<span class="token punctuation">[</span><span class="token string">"residual_m"</span><span class="token punctuation">]</span> <span class="token keyword">for</span> r <span class="token keyword">in</span> rows <span class="token keyword">if</span> <span class="token string">"residual_m"</span> <span class="token keyword">in</span> r<span class="token punctuation">]</span><span class="token punctuation">)</span>
+    <span class="token keyword">if</span> resid<span class="token punctuation">.</span>size <span class="token operator">==</span> <span class="token number">0</span><span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"measurable"</span><span class="token punctuation">:</span> <span class="token boolean">False</span><span class="token punctuation">,</span> <span class="token string">"rows"</span><span class="token punctuation">:</span> rows<span class="token punctuation">}</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token string">"measurable"</span><span class="token punctuation">:</span> <span class="token boolean">True</span><span class="token punctuation">,</span> <span class="token string">"points"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>rows<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"with_value"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span>resid<span class="token punctuation">.</span>size<span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"mean_m"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>resid<span class="token punctuation">.</span>mean<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"rmse_m"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>sqrt<span class="token punctuation">(</span><span class="token punctuation">(</span>resid <span class="token operator">**</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">.</span>mean<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"p95_abs_m"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>percentile<span class="token punctuation">(</span>np<span class="token punctuation">.</span><span class="token builtin">abs</span><span class="token punctuation">(</span>resid<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">95</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"within_tolerance"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span><span class="token builtin">abs</span><span class="token punctuation">(</span>resid<span class="token punctuation">)</span> <span class="token operator">&lt;=</span> tolerance_m<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"worst"</span><span class="token punctuation">:</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span><span class="token punctuation">(</span>r <span class="token keyword">for</span> r <span class="token keyword">in</span> rows <span class="token keyword">if</span> <span class="token string">"residual_m"</span> <span class="token keyword">in</span> r<span class="token punctuation">)</span><span class="token punctuation">,</span>
+                        key<span class="token operator">=</span><span class="token keyword">lambda</span> r<span class="token punctuation">:</span> <span class="token operator">-</span><span class="token builtin">abs</span><span class="token punctuation">(</span>r<span class="token punctuation">[</span><span class="token string">"residual_m"</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token number">3</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+
+<span class="token keyword">def</span> <span class="token function">fidelity_to_input</span><span class="token punctuation">(</span>mesh<span class="token punctuation">,</span> original_ground_points<span class="token punctuation">,</span> samples<span class="token operator">=</span><span class="token number">100_000</span><span class="token punctuation">,</span> seed<span class="token operator">=</span><span class="token number">7</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""The TIN must be close to the points it was thinned from, not just its own vertices."""</span>
+    <span class="token keyword">from</span> scipy<span class="token punctuation">.</span>spatial <span class="token keyword">import</span> cKDTree
+    rng <span class="token operator">=</span> np<span class="token punctuation">.</span>random<span class="token punctuation">.</span>default_rng<span class="token punctuation">(</span>seed<span class="token punctuation">)</span>
+    pick <span class="token operator">=</span> rng<span class="token punctuation">.</span>choice<span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>original_ground_points<span class="token punctuation">)</span><span class="token punctuation">,</span>
+                      size<span class="token operator">=</span><span class="token builtin">min</span><span class="token punctuation">(</span>samples<span class="token punctuation">,</span> <span class="token builtin">len</span><span class="token punctuation">(</span>original_ground_points<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> replace<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">)</span>
+    pts <span class="token operator">=</span> original_ground_points<span class="token punctuation">[</span>pick<span class="token punctuation">]</span>
+    origins <span class="token operator">=</span> np<span class="token punctuation">.</span>column_stack<span class="token punctuation">(</span><span class="token punctuation">[</span>pts<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">,</span> pts<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">,</span> np<span class="token punctuation">.</span>full<span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>pts<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">1e5</span><span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    directions <span class="token operator">=</span> np<span class="token punctuation">.</span>tile<span class="token punctuation">(</span>np<span class="token punctuation">.</span>array<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token number">0.0</span><span class="token punctuation">,</span> <span class="token number">0.0</span><span class="token punctuation">,</span> <span class="token operator">-</span><span class="token number">1.0</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>pts<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    locations<span class="token punctuation">,</span> index_ray<span class="token punctuation">,</span> _ <span class="token operator">=</span> mesh<span class="token punctuation">.</span>ray<span class="token punctuation">.</span>intersects_location<span class="token punctuation">(</span>origins<span class="token punctuation">,</span> directions<span class="token punctuation">,</span>
+                                                           multiple_hits<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">)</span>
+    resid <span class="token operator">=</span> np<span class="token punctuation">.</span>full<span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>pts<span class="token punctuation">)</span><span class="token punctuation">,</span> np<span class="token punctuation">.</span>nan<span class="token punctuation">)</span>
+    <span class="token keyword">for</span> i<span class="token punctuation">,</span> loc <span class="token keyword">in</span> <span class="token builtin">zip</span><span class="token punctuation">(</span>index_ray<span class="token punctuation">,</span> locations<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        resid<span class="token punctuation">[</span>i<span class="token punctuation">]</span> <span class="token operator">=</span> loc<span class="token punctuation">[</span><span class="token number">2</span><span class="token punctuation">]</span> <span class="token operator">-</span> pts<span class="token punctuation">[</span>i<span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">]</span>
+    valid <span class="token operator">=</span> np<span class="token punctuation">.</span>isfinite<span class="token punctuation">(</span>resid<span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token string">"sampled"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>pts<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"hit"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span>valid<span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"missed_fraction"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token operator">~</span>valid<span class="token punctuation">)</span><span class="token punctuation">.</span>mean<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"mean_m"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>resid<span class="token punctuation">[</span>valid<span class="token punctuation">]</span><span class="token punctuation">.</span>mean<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"rmse_m"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>sqrt<span class="token punctuation">(</span><span class="token punctuation">(</span>resid<span class="token punctuation">[</span>valid<span class="token punctuation">]</span> <span class="token operator">**</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">.</span>mean<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"p95_abs_m"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>percentile<span class="token punctuation">(</span>np<span class="token punctuation">.</span><span class="token builtin">abs</span><span class="token punctuation">(</span>resid<span class="token punctuation">[</span>valid<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">95</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"max_abs_m"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span><span class="token builtin">abs</span><span class="token punctuation">(</span>resid<span class="token punctuation">[</span>valid<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">max</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+</code></pre></div>
+<p>Checking the TIN against the <strong>full</strong> ground cloud, not only against control, is what quantifies the thinning’s cost. The control points say whether the surface is correct where it was measured independently; the full-cloud residual says how much detail the thinning discarded, and the two answer different questions.</p>
+<p>The <code>missed_fraction</code> from the ray casting is a useful by-product: a ground point with no TIN above or below it is in a region the trimming removed, which is either correct — the point was outside the boundary — or a sign the trimming was too aggressive.</p>
+<figure class="diagram">
+<svg viewBox="4 16 732 246" role="img" aria-labelledby="tin-hull-t tin-hull-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="tin-hull-t">Convex hull, long-edge removal and boundary trimming</title>
+  <desc id="tin-hull-d">Three plan views of an L-shaped road survey. The raw Delaunay triangulation fills the concave notch of the L with long triangles, adding 14200 square metres of invented surface. Removing triangles with a horizontal edge over six metres removes most of the notch but leaves a fringe and also removes genuine triangles across a data gap in the road. Trimming to the supplied survey boundary removes exactly the invented area and keeps everything inside it.</desc>
+  <rect class="svg-bg" x="4" y="16" width="732" height="246" fill="#ffffff"/>
+  <g stroke-width="1.5">
+    <rect x="18" y="30" width="224" height="196" rx="8" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="258" y="30" width="224" height="196" rx="8" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="498" y="30" width="224" height="196" rx="8" fill="#eef5e9" stroke="#4f7a4d"/>
+  </g>
+  <g font-size="12.5" text-anchor="middle" fill="#1f2937">
+    <text x="130" y="52">raw Delaunay</text>
+    <text x="370" y="52">long-edge removal</text>
+    <text x="610" y="52">boundary trim</text>
+  </g>
+  <path d="M46 196 H214 V150 H120 V72 H46 Z" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="1.8"/>
+  <path d="M120 72 L214 150" stroke="#b0413e" stroke-width="1.6" fill="none"/>
+  <path d="M120 72 L214 196" stroke="#b0413e" stroke-width="1.6" fill="none"/>
+  <path d="M46 72 L214 150" stroke="#b0413e" stroke-width="1.6" fill="none"/>
+  <path d="M286 196 H454 V150 H360 V72 H286 Z" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="1.8"/>
+  <path d="M360 100 L392 132" stroke="#c46a3d" stroke-width="1.6" fill="none"/>
+  <path d="M526 196 H694 V150 H600 V72 H526 Z" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="1.8"/>
+  <g fill="#1f2937" font-size="12" text-anchor="middle">
+    <text x="130" y="244">+14,200 m² invented</text>
+    <text x="370" y="244">+340 m² fringe left</text>
+    <text x="610" y="244">exact — 0 m² invented</text>
+  </g>
+  <text x="182" y="120" fill="#b0413e" font-size="11.5" text-anchor="middle">hull fill</text>
+  <text x="404" y="124" fill="#9a4f26" font-size="11.5" text-anchor="middle">fringe</text>
+</svg>
+<figcaption>Long-edge removal gets most of the way; only a real boundary gets the extent exactly right.</figcaption>
+</figure>
+<h2 id="expected-output-verification" tabindex="-1"><a class="heading-link" href="#expected-output-verification"><span>Expected Output &amp; Verification</span></a></h2>
+<div class="codeblock" data-lang="text"><div class="codeblock__bar"><span class="codeblock__lang">text</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-text" tabindex="0" role="group" aria-label="text code sample"><code class="language-text">{'cell_from_detail_m': 0.5, 'cell_from_budget_m': 0.707, 'chosen_cell_m': 0.707,
+ 'expected_points': 2000000, 'expected_triangles': 4000000,
+ 'limited_by': 'triangle budget'}
+{'path': 'work/ground_thin.laz', 'points': 1004182, 'cell_m': 1.0,
+ 'triangles_expected': 2008364}
+{'path': 'work/tin_raw.ply', 'vertices': 1004182, 'faces': 2008218,
+ 'bbox_m': [1000.02, 1000.04, 84.12]}
+{'threshold_m': 6.412, 'faces_before': 2008218, 'faces_after': 1984104,
+ 'faces_removed': 24114, 'removed_fraction': 0.01201, 'removed_area_m2': 14842.4}
+{'faces_before': 1984104, 'faces_after': 1978842, 'faces_outside_boundary': 5262,
+ 'boundary_area_m2': 984218.4, 'hull_area_m2': 999104.2}
+{
+  "measurable": true, "points": 34, "with_value": 34,
+  "mean_m": -0.0084, "rmse_m": 0.0312, "p95_abs_m": 0.0588,
+  "within_tolerance": 34
+}
+{'sampled': 100000, 'hit': 99418, 'missed_fraction': 0.0058,
+ 'mean_m': 0.0012, 'rmse_m': 0.0308, 'p95_abs_m': 0.0604, 'max_abs_m': 0.3812}
+</code></pre></div>
+<p>Removing 1.2% of the faces recovered 14,842 m² of invented surface, which is 1.5% of the tile — and that is the number worth quoting, because it would otherwise have contributed to any area or volume computed from this TIN.</p>
+<p>The 3.1 cm RMSE against control and the 3.1 cm RMSE against the full ground cloud agreeing closely is a good sign: the thinning cost roughly the same as the survey’s own noise, so the TIN is as accurate as its input allows.</p>
+<p>Verify the mesh is topologically sound, since a TIN with duplicate or degenerate faces breaks downstream consumers:</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">topology_check</span><span class="token punctuation">(</span>mesh<span class="token punctuation">,</span> min_area_m2<span class="token operator">=</span><span class="token number">1e-6</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    areas <span class="token operator">=</span> mesh<span class="token punctuation">.</span>area_faces
+    tri <span class="token operator">=</span> mesh<span class="token punctuation">.</span>vertices<span class="token punctuation">[</span>mesh<span class="token punctuation">.</span>faces<span class="token punctuation">]</span>
+    e <span class="token operator">=</span> np<span class="token punctuation">.</span>stack<span class="token punctuation">(</span><span class="token punctuation">[</span>
+        np<span class="token punctuation">.</span>linalg<span class="token punctuation">.</span>norm<span class="token punctuation">(</span>tri<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">]</span> <span class="token operator">-</span> tri<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">,</span> axis<span class="token operator">=</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        np<span class="token punctuation">.</span>linalg<span class="token punctuation">.</span>norm<span class="token punctuation">(</span>tri<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">]</span> <span class="token operator">-</span> tri<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">,</span> axis<span class="token operator">=</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        np<span class="token punctuation">.</span>linalg<span class="token punctuation">.</span>norm<span class="token punctuation">(</span>tri<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">]</span> <span class="token operator">-</span> tri<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">]</span><span class="token punctuation">,</span> axis<span class="token operator">=</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token punctuation">]</span><span class="token punctuation">,</span> axis<span class="token operator">=</span><span class="token number">1</span><span class="token punctuation">)</span>
+    s <span class="token operator">=</span> e<span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span>axis<span class="token operator">=</span><span class="token number">1</span><span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token number">2.0</span>
+    inradius <span class="token operator">=</span> np<span class="token punctuation">.</span>divide<span class="token punctuation">(</span>areas<span class="token punctuation">,</span> np<span class="token punctuation">.</span>maximum<span class="token punctuation">(</span>s<span class="token punctuation">,</span> <span class="token number">1e-12</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    aspect <span class="token operator">=</span> e<span class="token punctuation">.</span><span class="token builtin">max</span><span class="token punctuation">(</span>axis<span class="token operator">=</span><span class="token number">1</span><span class="token punctuation">)</span> <span class="token operator">/</span> np<span class="token punctuation">.</span>maximum<span class="token punctuation">(</span>inradius <span class="token operator">*</span> <span class="token number">2.0</span><span class="token punctuation">,</span> <span class="token number">1e-12</span><span class="token punctuation">)</span>
+
+    vertical <span class="token operator">=</span> np<span class="token punctuation">.</span><span class="token builtin">abs</span><span class="token punctuation">(</span>mesh<span class="token punctuation">.</span>face_normals<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token operator">&lt;</span> <span class="token number">1e-6</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token string">"faces"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>mesh<span class="token punctuation">.</span>faces<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"degenerate_faces"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span><span class="token punctuation">(</span>areas <span class="token operator">&lt;</span> min_area_m2<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"vertical_faces"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span>vertical<span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"duplicate_faces"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>mesh<span class="token punctuation">.</span>faces<span class="token punctuation">)</span>
+                               <span class="token operator">-</span> <span class="token builtin">len</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>unique<span class="token punctuation">(</span>np<span class="token punctuation">.</span>sort<span class="token punctuation">(</span>mesh<span class="token punctuation">.</span>faces<span class="token punctuation">,</span> axis<span class="token operator">=</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span> axis<span class="token operator">=</span><span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"unreferenced_vertices"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>mesh<span class="token punctuation">.</span>vertices<span class="token punctuation">)</span>
+                                     <span class="token operator">-</span> <span class="token builtin">len</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>unique<span class="token punctuation">(</span>mesh<span class="token punctuation">.</span>faces<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"worst_aspect_ratio"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>aspect<span class="token punctuation">.</span><span class="token builtin">max</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"slivers_over_50"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span><span class="token punctuation">(</span>aspect <span class="token operator">></span> <span class="token number">50</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"components"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span>mesh<span class="token punctuation">.</span>body_count<span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"clean"</span><span class="token punctuation">:</span> <span class="token builtin">bool</span><span class="token punctuation">(</span><span class="token punctuation">(</span>areas <span class="token operator">>=</span> min_area_m2<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">all</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">and</span> vertical<span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+
+<span class="token keyword">print</span><span class="token punctuation">(</span>json<span class="token punctuation">.</span>dumps<span class="token punctuation">(</span>topology_check<span class="token punctuation">(</span>tin<span class="token punctuation">)</span><span class="token punctuation">,</span> indent<span class="token operator">=</span><span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>A <strong>vertical</strong> face in a terrain TIN is impossible by construction — the triangulation is 2D in XY — so any face with a zero Z normal component means two of its vertices share an XY position, which happens when the thinning left duplicate horizontal coordinates at different heights. Those faces break contouring and volume calculation.</p>
+<p>Then verify the TIN’s own consistency as a height field, which a TIN can violate after trimming:</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">height_field_check</span><span class="token punctuation">(</span>mesh<span class="token punctuation">,</span> samples<span class="token operator">=</span><span class="token number">50_000</span><span class="token punctuation">,</span> seed<span class="token operator">=</span><span class="token number">7</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""A terrain TIN must be single-valued: one Z per XY."""</span>
+    rng <span class="token operator">=</span> np<span class="token punctuation">.</span>random<span class="token punctuation">.</span>default_rng<span class="token punctuation">(</span>seed<span class="token punctuation">)</span>
+    lo <span class="token operator">=</span> mesh<span class="token punctuation">.</span>vertices<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token punctuation">:</span><span class="token number">2</span><span class="token punctuation">]</span><span class="token punctuation">.</span><span class="token builtin">min</span><span class="token punctuation">(</span>axis<span class="token operator">=</span><span class="token number">0</span><span class="token punctuation">)</span>
+    hi <span class="token operator">=</span> mesh<span class="token punctuation">.</span>vertices<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token punctuation">:</span><span class="token number">2</span><span class="token punctuation">]</span><span class="token punctuation">.</span><span class="token builtin">max</span><span class="token punctuation">(</span>axis<span class="token operator">=</span><span class="token number">0</span><span class="token punctuation">)</span>
+    xy <span class="token operator">=</span> rng<span class="token punctuation">.</span>uniform<span class="token punctuation">(</span>lo<span class="token punctuation">,</span> hi<span class="token punctuation">,</span> size<span class="token operator">=</span><span class="token punctuation">(</span>samples<span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    origins <span class="token operator">=</span> np<span class="token punctuation">.</span>column_stack<span class="token punctuation">(</span><span class="token punctuation">[</span>xy<span class="token punctuation">,</span> np<span class="token punctuation">.</span>full<span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>xy<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">1e5</span><span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    directions <span class="token operator">=</span> np<span class="token punctuation">.</span>tile<span class="token punctuation">(</span>np<span class="token punctuation">.</span>array<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token number">0.0</span><span class="token punctuation">,</span> <span class="token number">0.0</span><span class="token punctuation">,</span> <span class="token operator">-</span><span class="token number">1.0</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>xy<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    locations<span class="token punctuation">,</span> index_ray<span class="token punctuation">,</span> _ <span class="token operator">=</span> mesh<span class="token punctuation">.</span>ray<span class="token punctuation">.</span>intersects_location<span class="token punctuation">(</span>origins<span class="token punctuation">,</span> directions<span class="token punctuation">,</span>
+                                                           multiple_hits<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+    counts <span class="token operator">=</span> np<span class="token punctuation">.</span>bincount<span class="token punctuation">(</span>index_ray<span class="token punctuation">,</span> minlength<span class="token operator">=</span><span class="token builtin">len</span><span class="token punctuation">(</span>xy<span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token string">"sampled"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>xy<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"no_hit"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span><span class="token punctuation">(</span>counts <span class="token operator">==</span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"single_hit"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span><span class="token punctuation">(</span>counts <span class="token operator">==</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"multiple_hits"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span><span class="token punctuation">(</span>counts <span class="token operator">></span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"single_valued"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span><span class="token punctuation">(</span>counts <span class="token operator">></span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token number">0</span><span class="token punctuation">,</span>
+        <span class="token string">"note"</span><span class="token punctuation">:</span> <span class="token string">"multiple hits mean overlapping triangles — usually duplicate XY "</span>
+                <span class="token string">"points or a merge of two TINs"</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+</code></pre></div>
+<p>Multiple ray hits at one XY position mean the surface folds over itself, which for terrain is always an error. It appears after merging two tiles’ TINs without removing the overlap, and it makes every downstream height query ambiguous.</p>
+<h2 id="performance-notes" tabindex="-1"><a class="heading-link" href="#performance-notes"><span>Performance Notes</span></a></h2>
+<ul>
+<li><strong><code>filters.delaunay</code> is fast</strong> — about 1–2 million points per second — so the triangulation is rarely the bottleneck.</li>
+<li><strong>Thinning is the important performance decision.</strong> A 1 m cell on a 1 km tile gives a 2-million-triangle TIN that loads anywhere; no thinning gives 44 million and does not.</li>
+<li><strong>PLY with <code>faces: True</code> is the only PDAL writer that emits triangles.</strong> Converting to another format afterwards is a <code>trimesh</code> call.</li>
+<li><strong>Ray casting for verification is the slow step</strong> at roughly 20,000 rays per second on a 2-million-face mesh. Sample rather than testing every point.</li>
+<li><strong>Constrained triangulation via <code>triangle</code> is C</strong> and handles a million points in seconds, but it holds everything in memory.</li>
+<li><strong>Tile with overlap and merge after trimming</strong>, so triangles near a tile edge are formed with the neighbour’s points rather than against a straight boundary.</li>
+</ul>
+<h2 id="common-errors" tabindex="-1"><a class="heading-link" href="#common-errors"><span>Common Errors</span></a></h2>
+<p><strong>The PLY has no faces.</strong> <code>faces: True</code> missing on the writer.</p>
+<p><strong>Long thin triangles across a river.</strong> The convex hull. Remove long edges and trim to a boundary.</p>
+<p><strong>A kerb is rounded off.</strong> No breakline constraint. Use a constrained triangulation.</p>
+<p><strong>Vertical faces in the output.</strong> Duplicate XY coordinates at different heights. The thinner should have removed them; <code>filters.merge</code> plus a voxel thin does.</p>
+<p><strong>44 million triangles.</strong> No thinning.</p>
+<p><strong>The TIN is missing a district.</strong> Boundary trimming with a boundary in the wrong CRS, or an over-tight <code>alpha_m</code>.</p>
+<p><strong>Multiple ray hits.</strong> Two TINs merged with overlapping extents. Trim each to its own tile before merging.</p>
+<h2 id="frequently-asked-questions" tabindex="-1"><a class="heading-link" href="#frequently-asked-questions"><span>Frequently Asked Questions</span></a></h2>
+<h3 id="tin-or-raster-dtm" tabindex="-1"><a class="heading-link" href="#tin-or-raster-dtm"><span>TIN or raster DTM?</span></a></h3>
+<p>TIN where the deliverable must interpolate measured points and where breaklines matter — engineering and survey work. Raster where the consumer wants a grid, which is most GIS analysis. Producing both from the same thinned ground class is straightforward and avoids the argument.</p>
+<h3 id="how-does-this-compare-to-poisson-reconstruction" tabindex="-1"><a class="heading-link" href="#how-does-this-compare-to-poisson-reconstruction"><span>How does this compare to Poisson reconstruction?</span></a></h3>
+<p>Poisson produces a smooth, watertight surface and is right for objects; Delaunay produces an interpolating height field and is right for terrain. A Poisson surface does not pass through the input points, which makes it unsuitable for a survey deliverable.</p>
+<h3 id="should-i-keep-the-tin-or-a-set-of-contours" tabindex="-1"><a class="heading-link" href="#should-i-keep-the-tin-or-a-set-of-contours"><span>Should I keep the TIN or a set of contours?</span></a></h3>
+<p>Keep the TIN as the primary; contours are derived and can be regenerated at any interval. Contours from a raster and from a TIN differ slightly, and the TIN’s are the ones that follow the measurements.</p>
+<h2 id="related-guides" tabindex="-1"><a class="heading-link" href="#related-guides"><span>Related Guides</span></a></h2>
+<ul>
+<li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/alpha-shape-reconstruction-with-open3d/">Alpha Shape Reconstruction with Open3D</a> — the concave-hull technique used here for boundaries</li>
+<li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/trimming-poisson-meshes-by-density/">Trimming Poisson Meshes by Density</a> — the equivalent problem for the other reconstruction family</li>
+<li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/ground-classification-with-pdal-pmf/">Ground Classification with PDAL PMF</a> — producing the input this needs</li>
+</ul>
+<p>Back to <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/">Surface Reconstruction Algorithms</a>.</p>
+
+
+      
+      
+
+      <div class="related-nav">
+        
+
+        
+          <div>
+            <h3>Related</h3>
+            <div class="related-grid">
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/alpha-shape-reconstruction-with-open3d/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Alpha Shape Reconstruction with Open3D</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/ball-pivoting-reconstruction-for-building-facades/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Ball Pivoting Reconstruction for Building Facades</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/poisson-surface-reconstruction-parameters/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Poisson Surface Reconstruction Parameters</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/poisson-vs-delaunay-surface-reconstruction-trade-offs/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Poisson vs Delaunay Surface Reconstruction</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/trimming-poisson-meshes-by-density/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Trimming Poisson Meshes by Density</span>
+                </a>
+              
+            </div>
+          </div>
+        
+      </div>
+    </article>
+
+    
+    <aside class="toc" aria-label="On this page" data-toc hidden>
+      <h4>On this page</h4>
+      <ul></ul>
+    </aside>
+  </div>
+</div>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+  <div class="container site-footer__inner">
+    <div class="site-footer__brand">
+      <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+        <img src="/assets/img/logo-mark.svg" alt="" class="brand__mark" width="36" height="36">
+        <span class="brand__name">
+          3D Geospatial
+          <small>Digital Twin Automation</small>
+        </span>
+      </a>
+      <p>Engineering-grade guides on point cloud processing, mesh pipelines, LOD strategies, and CI/CD automation for digital twin platforms.</p>
+      <a class="footer-social" href="https://github.com/3d-geospatial" aria-label="3D Geospatial on GitHub" rel="noopener" target="_blank">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+          <path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.53-1.34-1.3-1.7-1.3-1.7-1.06-.72.08-.71.08-.71 1.17.08 1.79 1.2 1.79 1.2 1.04 1.79 2.73 1.27 3.4.97.1-.75.4-1.27.73-1.56-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.19-3.08-.12-.3-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.75.11 3.05.74.8 1.19 1.83 1.19 3.08 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.07.78 2.15v3.18c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5Z"/>
+        </svg>
+        <span>GitHub</span>
+      </a>
+    </div>
+
+    <div class="site-footer__col">
+      <h4>Sections</h4>
+      <ul>
+        <li><a href="https://www.3d-geospatial.com/">Home</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management &amp; Optimization</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/">Point Cloud &amp; Mesh Pipelines</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/">Troubleshooting &amp; Reliability</a></li>
+        
+      </ul>
+    </div>
+
+    
+      <div class="site-footer__col">
+        <h4>3D Geospatial Fundamentals</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/">3D Format Standards Comparison</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/">BIM and IFC Georeferencing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/">CityGML and CityJSON Processing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems for 3D Assets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/">Digital Elevation Model Workflows</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/">Spatial Indexing and Tiling Schemes for 3D Data</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>LOD Management &amp; Optimization</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/">Automated Tile Generation for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/">Cesium ion Upload Automation for 3D Tilesets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/">glTF LOD Generation With Draco Compression</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/">Streaming Sync Patterns for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/">Tileset Metadata and 3D Tiles Next</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/">Vector Overlays on 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Point Cloud &amp; Mesh Pipelines</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/">Automated Mesh Decimation for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/">Change Detection Between LiDAR Scan Epochs</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/">CI/CD Automation for Spatial Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">LiDAR Classification and Ground Extraction</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/photogrammetry-processing-pipelines/">Photogrammetry Processing Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/">Point Cloud Filtering Techniques</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/">Surface Reconstruction for Geospatial Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/">Texture Mapping Workflows for Digital Twins</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Troubleshooting &amp; Reliability</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/">Cross-Section Failure Modes in Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/">Data Validation &amp; QA Gates for 3D Tiles</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/">Performance Profiling and Benchmarking</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/">Pipeline Observability and Monitoring</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/">Streaming &amp; Runtime Diagnostics for 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+  </div>
+  <div class="container site-footer__bottom">
+    <span>© 2026 3D Geospatial &amp; Digital Twin Automation</span>
+    <span>Built with Eleventy · PWA-enabled</span>
+  </div>
+</footer>
+
+
+  <script src="/assets/js/site.js?v=b99aa9f971" defer></script>
+  
+</body>
+</html>

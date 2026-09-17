@@ -1,0 +1,771 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <title>Orienting Face Normals Consistently — 3D Geospatial</title>
+  <meta name="description" content="Fix flipped faces in twin meshes: winding versus normals, per-component repair with trimesh, orienting open surfaces by a reference direction and verifying">
+  <meta name="keywords" content="3D geospatial, digital twin, point cloud, mesh pipeline, LOD, 3D Tiles, Cesium, PDAL, Open3D, Python, CI/CD">
+  <meta name="author" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta name="theme-color" content="#1f6b8a" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f171d" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+
+  
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem("theme");
+        var theme = (stored === "dark" || stored === "light") ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    })();
+  </script>
+  <meta name="generator" content="Eleventy">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="googlebot" content="index,follow,max-image-preview:large">
+
+  
+  <link rel="canonical" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/orienting-face-normals-consistently/">
+  <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">
+
+  
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/icon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+
+  
+  <link rel="apple-touch-icon" href="/assets/img/icon-180.png">
+  <link rel="mask-icon" href="/assets/img/logo.svg" color="#1f6b8a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="3D Geospatial">
+  <meta name="application-name" content="3D Geospatial">
+
+  
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Orienting Face Normals Consistently — 3D Geospatial">
+  <meta property="og:description" content="Fix flipped faces in twin meshes: winding versus normals, per-component repair with trimesh, orienting open surfaces by a reference direction and verifying">
+  <meta property="og:url" content="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/orienting-face-normals-consistently/">
+  <meta property="og:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+  <meta property="og:site_name" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta property="og:locale" content="en_US">
+  
+  <meta property="article:published_time" content="2026-09-17T23:36:56.450Z">
+  <meta property="article:modified_time" content="2026-09-17T23:36:56.450Z">
+  <meta property="article:publisher" content="https://www.3d-geospatial.com/">
+  
+
+  
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Orienting Face Normals Consistently — 3D Geospatial">
+  <meta name="twitter:description" content="Fix flipped faces in twin meshes: winding versus normals, per-component repair with trimesh, orienting open surfaces by a reference direction and verifying">
+  <meta name="twitter:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta name="twitter:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+
+  
+  <link rel="preload" href="/assets/css/styles.css?v=8c46394d6c" as="style">
+  
+
+  <link rel="stylesheet" href="/assets/css/styles.css?v=8c46394d6c">
+
+  
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.3d-geospatial.com/#organization",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "url": "https://www.3d-geospatial.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/icon-512.png",
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://www.3d-geospatial.com/#website",
+      "url": "https://www.3d-geospatial.com/",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "description": "Build reliable 3D spatial data pipelines for digital twins — point clouds, meshes, LOD strategies, Python processing, and CI/CD automation.",
+      "inLanguage": "en",
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      }
+    },
+    {
+      "@type": "TechArticle",
+      "@id": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/orienting-face-normals-consistently/#article",
+      "isPartOf": {
+        "@id": "https://www.3d-geospatial.com/#website"
+      },
+      "headline": "Orienting Face Normals Consistently",
+      "name": "Orienting Face Normals Consistently",
+      "description": "Fix flipped faces in twin meshes: winding versus normals, per-component repair with trimesh, orienting open surfaces by a reference direction and verifying",
+      "url": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/orienting-face-normals-consistently/",
+      "mainEntityOfPage": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/orienting-face-normals-consistently/",
+      "inLanguage": "en",
+      "datePublished": "2026-09-17T23:36:56.450Z",
+      "dateModified": "2026-09-17T23:36:56.450Z",
+      "author": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "image": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/og-cover.png",
+        "width": 1200,
+        "height": 630
+      },
+      "breadcrumb": {
+        "@id": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/orienting-face-normals-consistently/#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/orienting-face-normals-consistently/#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://www.3d-geospatial.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "3D Geospatial Fundamentals For Digital Twins",
+          "item": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Mesh Topology Basics",
+          "item": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "name": "Orienting Face Normals Consistently",
+          "item": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/orienting-face-normals-consistently/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  
+<header class="site-header" role="banner">
+  <div class="container site-header__inner">
+    <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+      <img src="/assets/img/logo.svg" alt="" class="brand__mark" width="36" height="36">
+      <span class="brand__name">
+        3D Geospatial
+        <small>Digital Twin Automation</small>
+      </span>
+    </a>
+
+    <button class="theme-toggle" type="button" data-theme-toggle
+            aria-label="Switch to dark theme" title="Switch to dark theme">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4.2"/>
+        <path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/>
+      </svg>
+    </button>
+
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>
+      <span class="nav-toggle__icon" aria-hidden="true"><span></span></span>
+      Menu
+    </button>
+
+    <nav class="primary-nav" id="primary-nav" aria-label="Primary">
+      
+      <a href="https://www.3d-geospatial.com/" >
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/>
+        </svg>
+        Home
+      </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/" aria-current="page">
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2 3 7l9 5 9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 17l9 5 9-5"/>
+            </svg>
+          
+          3D Geospatial Fundamentals
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+          
+          LOD Management &amp; Optimization
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="6" cy="6" r="1.5"/><circle cx="12" cy="6" r="1.5"/><circle cx="18" cy="6" r="1.5"/>
+              <circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/>
+              <circle cx="6" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="18" cy="18" r="1.5"/>
+            </svg>
+          
+          Point Cloud &amp; Mesh Pipelines
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <path d="M12 9v4"/><path d="M12 17h.01"/>
+            </svg>
+          
+          Troubleshooting &amp; Reliability
+        </a>
+      
+    </nav>
+  </div>
+</header>
+
+
+  <main id="main">
+    
+
+
+<div class="container">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    
+      
+        <a href="https://www.3d-geospatial.com/">Home</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals For Digital Twins</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <span class="current">Orienting Face Normals Consistently</span>
+      
+    
+  </nav>
+
+  <div class="content-page">
+    <article class="article">
+      <h1 id="orienting-face-normals-consistently" tabindex="-1"><a class="heading-link" href="#orienting-face-normals-consistently"><span>Orienting Face Normals Consistently</span></a></h1>
+<p>This page repairs inconsistent face orientation in meshes destined for a twin — the difference between winding and normals, making neighbouring faces agree, turning a closed shell’s normals outward, orienting open surfaces such as terrain and facades by a reference direction, and verifying the result rather than trusting the fix, on meshes in EPSG:32633.</p>
+<h2 id="why-you-hit-this" tabindex="-1"><a class="heading-link" href="#why-you-hit-this"><span>Why you hit this</span></a></h2>
+<p>A flipped face is invisible in a wireframe and obvious the moment a renderer culls back faces: the building develops holes you can see through, and rotating the camera moves them. Less obviously, orientation decides the sign of a volume, the direction a texture is projected from, which side of a wall a ray hits, and whether a normal-based classification calls a surface a roof or a floor. Reconstruction, boolean operations and format conversion all produce inconsistencies, and every one of them is cheap to fix and expensive to leave. The topology this rests on is in <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">mesh topology basics for digital twins</a>.</p>
+<h2 id="prerequisites" tabindex="-1"><a class="heading-link" href="#prerequisites"><span>Prerequisites</span></a></h2>
+<ul>
+<li>Python 3.10+ with <code>trimesh&gt;=4.0</code>, <code>numpy&gt;=1.24</code>.</li>
+<li>Meshes already welded, because orientation propagates across shared edges and an unwelded mesh has none — see <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/welding-vertices-and-removing-duplicate-faces/">welding vertices and removing duplicate faces</a>.</li>
+<li>For open surfaces, a reference direction: up for terrain, the street or scanner position for facades.</li>
+</ul>
+<h2 id="winding-and-normals-are-not-the-same-thing" tabindex="-1"><a class="heading-link" href="#winding-and-normals-are-not-the-same-thing"><span>Winding and Normals Are Not the Same Thing</span></a></h2>
+<p>A triangle’s <strong>winding</strong> is the order of its three vertices. Its <strong>normal</strong> is derived from that order by the right-hand rule, so flipping two vertices flips the normal. Two adjacent triangles are <em>consistently wound</em> when they traverse their shared edge in opposite directions — which is what makes their normals point to the same side of the surface.</p>
+<p>That distinction matters because the two defects are different. Inconsistent winding is a local disagreement between neighbours and can be repaired by propagation. A <em>consistently</em> wound closed mesh whose normals all point inward is globally inverted and needs one flip of everything. A mesh can have both problems at once, and fixing them in the wrong order achieves nothing.</p>
+<p>Formats also disagree about whether normals are stored at all. glTF and OBJ can carry explicit per-vertex normals that contradict the winding; PLY and STL usually rely on winding alone. When both exist and disagree, renderers differ in which they believe, which is how a mesh looks correct in one viewer and inside-out in another.</p>
+<figure class="diagram">
+<svg viewBox="46 46 668 198" role="img" aria-labelledby="norm-wind-t norm-wind-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="norm-wind-t">Consistent and inconsistent winding across a shared edge</title>
+  <desc id="norm-wind-d">Two triangles sharing an edge. On the left both traverse the shared edge in opposite directions, so their normals point the same way out of the surface and the pair is consistently wound. On the right both traverse it in the same direction, so one normal points into the surface, which a renderer shows as a hole when back faces are culled.</desc>
+  <rect class="svg-bg" x="46" y="46" width="668" height="198" fill="#ffffff"/>
+  <defs>
+    <marker id="norm-wind-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
+    </marker>
+  </defs>
+  <path d="M60 170 L170 60 L280 170 Z" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <path d="M170 60 L280 170 L330 60 Z" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <path d="M196 86 L254 144" fill="none" stroke="#5b6471" stroke-width="2" marker-end="url(#norm-wind-arrow)"/>
+  <path d="M258 140 L200 82" fill="none" stroke="#5b6471" stroke-width="2" marker-end="url(#norm-wind-arrow)"/>
+  <path d="M150 120 V80" fill="none" stroke="#1f6b8a" stroke-width="2.5" marker-end="url(#norm-wind-arrow)"/>
+  <path d="M290 110 V70" fill="none" stroke="#1f6b8a" stroke-width="2.5" marker-end="url(#norm-wind-arrow)"/>
+  <text x="195" y="204" fill="#4f7a4d" font-size="12.5" text-anchor="middle">shared edge traversed both ways</text>
+  <text x="195" y="226" fill="#4f7a4d" font-size="12.5" text-anchor="middle">normals agree</text>
+  <path d="M430 170 L540 60 L650 170 Z" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <path d="M540 60 L650 170 L700 60 Z" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <path d="M566 86 L624 144" fill="none" stroke="#5b6471" stroke-width="2" marker-end="url(#norm-wind-arrow)"/>
+  <path d="M570 82 L628 140" fill="none" stroke="#5b6471" stroke-width="2" marker-end="url(#norm-wind-arrow)"/>
+  <path d="M520 120 V80" fill="none" stroke="#1f6b8a" stroke-width="2.5" marker-end="url(#norm-wind-arrow)"/>
+  <path d="M660 130 V170" fill="none" stroke="#b0413e" stroke-width="2.5" marker-end="url(#norm-wind-arrow)"/>
+  <text x="565" y="204" fill="#b0413e" font-size="12.5" text-anchor="middle">traversed the same way</text>
+  <text x="565" y="226" fill="#b0413e" font-size="12.5" text-anchor="middle">one normal points inward</text>
+</svg>
+<figcaption>Consistency is a property of a pair of neighbours, which is why it can be propagated across a connected surface.</figcaption>
+</figure>
+<h2 id="step-by-step" tabindex="-1"><a class="heading-link" href="#step-by-step"><span>Step-by-Step</span></a></h2>
+<h3 id="1-measure-what-is-wrong-per-component" tabindex="-1"><a class="heading-link" href="#1-measure-what-is-wrong-per-component"><span>1. Measure what is wrong, per component</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> numpy <span class="token keyword">as</span> np
+<span class="token keyword">import</span> trimesh
+
+<span class="token keyword">def</span> <span class="token function">orientation_report</span><span class="token punctuation">(</span>path<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    mesh <span class="token operator">=</span> trimesh<span class="token punctuation">.</span>load<span class="token punctuation">(</span>path<span class="token punctuation">,</span> force<span class="token operator">=</span><span class="token string">"mesh"</span><span class="token punctuation">,</span> process<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">)</span>
+    mesh<span class="token punctuation">.</span>merge_vertices<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    mesh<span class="token punctuation">.</span>update_faces<span class="token punctuation">(</span>mesh<span class="token punctuation">.</span>nondegenerate_faces<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    rows <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    <span class="token keyword">for</span> i<span class="token punctuation">,</span> part <span class="token keyword">in</span> <span class="token builtin">enumerate</span><span class="token punctuation">(</span>mesh<span class="token punctuation">.</span>split<span class="token punctuation">(</span>only_watertight<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        nz <span class="token operator">=</span> part<span class="token punctuation">.</span>face_normals<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">]</span>
+        rows<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span>
+            <span class="token string">"component"</span><span class="token punctuation">:</span> i<span class="token punctuation">,</span>
+            <span class="token string">"faces"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>part<span class="token punctuation">.</span>faces<span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"winding_consistent"</span><span class="token punctuation">:</span> <span class="token builtin">bool</span><span class="token punctuation">(</span>part<span class="token punctuation">.</span>is_winding_consistent<span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"watertight"</span><span class="token punctuation">:</span> <span class="token builtin">bool</span><span class="token punctuation">(</span>part<span class="token punctuation">.</span>is_watertight<span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"is_volume"</span><span class="token punctuation">:</span> <span class="token builtin">bool</span><span class="token punctuation">(</span>part<span class="token punctuation">.</span>is_volume<span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"signed_volume_m3"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>part<span class="token punctuation">.</span>volume<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"share_normals_up"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span><span class="token punctuation">(</span>nz <span class="token operator">></span> <span class="token number">0.1</span><span class="token punctuation">)</span><span class="token punctuation">.</span>mean<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"share_normals_down"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span><span class="token punctuation">(</span>nz <span class="token operator">&lt;</span> <span class="token operator">-</span><span class="token number">0.1</span><span class="token punctuation">)</span><span class="token punctuation">.</span>mean<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token punctuation">}</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> mesh<span class="token punctuation">,</span> rows
+
+mesh<span class="token punctuation">,</span> rows <span class="token operator">=</span> orientation_report<span class="token punctuation">(</span><span class="token string">"meshes/block_07.ply"</span><span class="token punctuation">)</span>
+<span class="token keyword">for</span> r <span class="token keyword">in</span> rows<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token number">6</span><span class="token punctuation">]</span><span class="token punctuation">:</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span>r<span class="token punctuation">)</span>
+</code></pre></div>
+<p>Four fields separate the cases. <code>winding_consistent</code> false means neighbours disagree — a local repair. <code>winding_consistent</code> true with a negative <code>signed_volume_m3</code> means the whole shell is inverted — a global flip. <code>is_volume</code> true means both are already right. And for open surfaces the share of normals pointing up is the only usable signal, because there is no inside to be outside of.</p>
+<h3 id="2-repair-closed-meshes-propagate-then-invert-if-needed" tabindex="-1"><a class="heading-link" href="#2-repair-closed-meshes-propagate-then-invert-if-needed"><span>2. Repair closed meshes: propagate, then invert if needed</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">fix_closed</span><span class="token punctuation">(</span>part<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    actions <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    <span class="token keyword">if</span> <span class="token keyword">not</span> part<span class="token punctuation">.</span>is_winding_consistent<span class="token punctuation">:</span>
+        trimesh<span class="token punctuation">.</span>repair<span class="token punctuation">.</span>fix_winding<span class="token punctuation">(</span>part<span class="token punctuation">)</span>                 <span class="token comment"># breadth-first over face adjacency</span>
+        actions<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token string">"fix_winding"</span><span class="token punctuation">)</span>
+    <span class="token keyword">if</span> part<span class="token punctuation">.</span>is_watertight <span class="token keyword">and</span> part<span class="token punctuation">.</span>volume <span class="token operator">&lt;</span> <span class="token number">0</span><span class="token punctuation">:</span>
+        part<span class="token punctuation">.</span>invert<span class="token punctuation">(</span><span class="token punctuation">)</span>
+        actions<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token string">"invert"</span><span class="token punctuation">)</span>
+    trimesh<span class="token punctuation">.</span>repair<span class="token punctuation">.</span>fix_normals<span class="token punctuation">(</span>part<span class="token punctuation">,</span> multibody<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">)</span>    <span class="token comment"># recompute normals from the winding</span>
+    actions<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token string">"fix_normals"</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> part<span class="token punctuation">,</span> actions
+
+<span class="token keyword">for</span> part <span class="token keyword">in</span> mesh<span class="token punctuation">.</span>split<span class="token punctuation">(</span>only_watertight<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">if</span> part<span class="token punctuation">.</span>is_watertight<span class="token punctuation">:</span>
+        part<span class="token punctuation">,</span> actions <span class="token operator">=</span> fix_closed<span class="token punctuation">(</span>part<span class="token punctuation">)</span>
+        <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span><span class="token builtin">len</span><span class="token punctuation">(</span>part<span class="token punctuation">.</span>faces<span class="token punctuation">)</span><span class="token punctuation">:</span><span class="token format-spec">>8,</span><span class="token punctuation">}</span></span><span class="token string"> faces  volume </span><span class="token interpolation"><span class="token punctuation">{</span>part<span class="token punctuation">.</span>volume<span class="token punctuation">:</span><span class="token format-spec">>12,.2f</span><span class="token punctuation">}</span></span><span class="token string">  </span><span class="token interpolation"><span class="token punctuation">{</span>actions<span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p><code>fix_winding</code> walks the face adjacency graph and flips faces until every pair of neighbours agrees, which is a linear pass over the surface. It cannot decide <em>which</em> global orientation is correct, because both are locally consistent — that is what the volume sign is for. A closed, consistently wound mesh has a positive volume exactly when its normals point outward, so the sign is a reliable global test and <code>invert</code> is the one-line fix.</p>
+<p>Order matters: inverting a mesh whose winding is inconsistent flips some faces into agreement and others out of it, leaving the same problem with a different distribution.</p>
+<h3 id="3-repair-open-surfaces-orient-by-a-reference-direction" tabindex="-1"><a class="heading-link" href="#3-repair-open-surfaces-orient-by-a-reference-direction"><span>3. Repair open surfaces: orient by a reference direction</span></a></h3>
+<p>An open surface has no inside, so “outward” is undefined and the fix has to come from the data’s meaning.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">orient_open_by_reference</span><span class="token punctuation">(</span>part<span class="token punctuation">,</span> reference<span class="token operator">=</span>np<span class="token punctuation">.</span>array<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token number">0.0</span><span class="token punctuation">,</span> <span class="token number">0.0</span><span class="token punctuation">,</span> <span class="token number">1.0</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">,</span> min_agreement<span class="token operator">=</span><span class="token number">0.6</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Make a surface's normals agree with a reference direction (up for terrain)."""</span>
+    <span class="token keyword">if</span> <span class="token keyword">not</span> part<span class="token punctuation">.</span>is_winding_consistent<span class="token punctuation">:</span>
+        trimesh<span class="token punctuation">.</span>repair<span class="token punctuation">.</span>fix_winding<span class="token punctuation">(</span>part<span class="token punctuation">)</span>
+    agree <span class="token operator">=</span> <span class="token builtin">float</span><span class="token punctuation">(</span><span class="token punctuation">(</span>part<span class="token punctuation">.</span>face_normals @ reference <span class="token operator">></span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">.</span>mean<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token keyword">if</span> agree <span class="token operator">&lt;</span> <span class="token number">0.5</span><span class="token punctuation">:</span>
+        part<span class="token punctuation">.</span>invert<span class="token punctuation">(</span><span class="token punctuation">)</span>
+        agree <span class="token operator">=</span> <span class="token number">1.0</span> <span class="token operator">-</span> agree
+    <span class="token keyword">return</span> part<span class="token punctuation">,</span> <span class="token punctuation">{</span><span class="token string">"agreement"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>agree<span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"flipped"</span><span class="token punctuation">:</span> agree <span class="token operator">></span> <span class="token number">0.5</span> <span class="token keyword">and</span> agree <span class="token operator">!=</span> <span class="token number">1.0</span><span class="token punctuation">,</span>
+                  <span class="token string">"confident"</span><span class="token punctuation">:</span> agree <span class="token operator">>=</span> min_agreement<span class="token punctuation">}</span>
+
+<span class="token keyword">def</span> <span class="token function">orient_facade_towards</span><span class="token punctuation">(</span>part<span class="token punctuation">,</span> viewpoint<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Facades: normals should point towards the street or the scanner, not into the building."""</span>
+    <span class="token keyword">if</span> <span class="token keyword">not</span> part<span class="token punctuation">.</span>is_winding_consistent<span class="token punctuation">:</span>
+        trimesh<span class="token punctuation">.</span>repair<span class="token punctuation">.</span>fix_winding<span class="token punctuation">(</span>part<span class="token punctuation">)</span>
+    centres <span class="token operator">=</span> part<span class="token punctuation">.</span>triangles_center
+    to_view <span class="token operator">=</span> viewpoint <span class="token operator">-</span> centres
+    to_view <span class="token operator">/=</span> np<span class="token punctuation">.</span>linalg<span class="token punctuation">.</span>norm<span class="token punctuation">(</span>to_view<span class="token punctuation">,</span> axis<span class="token operator">=</span><span class="token number">1</span><span class="token punctuation">,</span> keepdims<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+    agree <span class="token operator">=</span> <span class="token builtin">float</span><span class="token punctuation">(</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>einsum<span class="token punctuation">(</span><span class="token string">"ij,ij->i"</span><span class="token punctuation">,</span> part<span class="token punctuation">.</span>face_normals<span class="token punctuation">,</span> to_view<span class="token punctuation">)</span> <span class="token operator">></span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">.</span>mean<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token keyword">if</span> agree <span class="token operator">&lt;</span> <span class="token number">0.5</span><span class="token punctuation">:</span>
+        part<span class="token punctuation">.</span>invert<span class="token punctuation">(</span><span class="token punctuation">)</span>
+        agree <span class="token operator">=</span> <span class="token number">1.0</span> <span class="token operator">-</span> agree
+    <span class="token keyword">return</span> part<span class="token punctuation">,</span> <span class="token punctuation">{</span><span class="token string">"agreement"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>agree<span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">}</span>
+
+terrain <span class="token operator">=</span> trimesh<span class="token punctuation">.</span>load<span class="token punctuation">(</span><span class="token string">"meshes/terrain_patch.ply"</span><span class="token punctuation">,</span> force<span class="token operator">=</span><span class="token string">"mesh"</span><span class="token punctuation">)</span>
+terrain<span class="token punctuation">,</span> info <span class="token operator">=</span> orient_open_by_reference<span class="token punctuation">(</span>terrain<span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"terrain:"</span><span class="token punctuation">,</span> info<span class="token punctuation">)</span>
+
+facade <span class="token operator">=</span> trimesh<span class="token punctuation">.</span>load<span class="token punctuation">(</span><span class="token string">"meshes/facade_42.ply"</span><span class="token punctuation">,</span> force<span class="token operator">=</span><span class="token string">"mesh"</span><span class="token punctuation">)</span>
+facade<span class="token punctuation">,</span> info <span class="token operator">=</span> orient_facade_towards<span class="token punctuation">(</span>facade<span class="token punctuation">,</span> viewpoint<span class="token operator">=</span>np<span class="token punctuation">.</span>array<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token number">412700.0</span><span class="token punctuation">,</span> <span class="token number">5335820.0</span><span class="token punctuation">,</span> <span class="token number">12.0</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"facade:"</span><span class="token punctuation">,</span> info<span class="token punctuation">)</span>
+</code></pre></div>
+<p>The pattern is the same in both cases: make the surface internally consistent first, then decide the global sense by a majority vote against a reference. For terrain the reference is up and the agreement should be near 1.0, since a height field has almost no downward faces. For a facade it is the direction of the street, and the agreement is lower — 0.8 to 0.95 — because window reveals and balconies genuinely face sideways.</p>
+<p>The agreement figure is worth keeping rather than discarding. A terrain patch with 0.55 agreement is not a surface that needed flipping; it is a surface with a topological problem, and flipping it produces a confidently wrong result.</p>
+<figure class="diagram">
+<svg viewBox="26 62 688 162" role="img" aria-labelledby="norm-open-t norm-open-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="norm-open-t">Orienting an open surface by a reference direction</title>
+  <desc id="norm-open-d">A terrain profile whose faces are consistently wound but pointing downward. A majority vote against the up direction gives an agreement of about 0.05, so the surface is inverted and the agreement becomes 0.95. A facade is oriented the same way against the direction of the street rather than against up, because its faces are vertical.</desc>
+  <rect class="svg-bg" x="26" y="62" width="688" height="162" fill="#ffffff"/>
+  <defs>
+    <marker id="norm-open-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
+    </marker>
+  </defs>
+  <path d="M40 120 C110 90 170 130 240 110 C290 96 320 110 340 106" fill="none" stroke="#4f7a4d" stroke-width="2.5"/>
+  <g stroke="#b0413e" stroke-width="1.6" fill="none" marker-end="url(#norm-open-arrow)">
+    <path d="M80 104 V140"/><path d="M150 110 V146"/><path d="M220 116 V152"/><path d="M300 104 V140"/>
+  </g>
+  <text x="190" y="184" fill="#b0413e" font-size="12.5" text-anchor="middle">consistent, but agreement with up = 0.05</text>
+  <text x="190" y="206" fill="#4f7a4d" font-size="12.5" text-anchor="middle">→ invert once: agreement 0.95</text>
+  <path d="M470 40 V200" fill="none" stroke="#1f6b8a" stroke-width="2.5"/>
+  <g stroke="#4f7a4d" stroke-width="1.6" fill="none" marker-end="url(#norm-open-arrow)">
+    <path d="M474 70 H520"/><path d="M474 110 H520"/><path d="M474 150 H520"/>
+  </g>
+  <circle cx="620" cy="110" r="8" fill="#1f2937"/>
+  <text x="620" y="90" fill="#1f2937" font-size="12.5" text-anchor="middle">street / scanner</text>
+  <text x="600" y="184" fill="#1f2937" font-size="12.5" text-anchor="middle">facade: reference is the viewpoint,</text>
+  <text x="600" y="206" fill="#1f2937" font-size="12.5" text-anchor="middle">agreement 0.8–0.95 with reveals</text>
+</svg>
+<figcaption>Open surfaces need an external reference; which reference depends on what the surface represents.</figcaption>
+</figure>
+<h3 id="4-handle-the-mixed-case-a-mesh-that-is-both" tabindex="-1"><a class="heading-link" href="#4-handle-the-mixed-case-a-mesh-that-is-both"><span>4. Handle the mixed case: a mesh that is both</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">repair_all</span><span class="token punctuation">(</span>path<span class="token punctuation">,</span> terrain_up<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> viewpoint<span class="token operator">=</span><span class="token boolean">None</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    mesh <span class="token operator">=</span> trimesh<span class="token punctuation">.</span>load<span class="token punctuation">(</span>path<span class="token punctuation">,</span> force<span class="token operator">=</span><span class="token string">"mesh"</span><span class="token punctuation">,</span> process<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">)</span>
+    mesh<span class="token punctuation">.</span>merge_vertices<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    mesh<span class="token punctuation">.</span>update_faces<span class="token punctuation">(</span>mesh<span class="token punctuation">.</span>nondegenerate_faces<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    repaired<span class="token punctuation">,</span> log <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    <span class="token keyword">for</span> i<span class="token punctuation">,</span> part <span class="token keyword">in</span> <span class="token builtin">enumerate</span><span class="token punctuation">(</span>mesh<span class="token punctuation">.</span>split<span class="token punctuation">(</span>only_watertight<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">if</span> part<span class="token punctuation">.</span>is_watertight<span class="token punctuation">:</span>
+            part<span class="token punctuation">,</span> actions <span class="token operator">=</span> fix_closed<span class="token punctuation">(</span>part<span class="token punctuation">)</span>
+            log<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">(</span>i<span class="token punctuation">,</span> <span class="token string">"closed"</span><span class="token punctuation">,</span> actions<span class="token punctuation">,</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>part<span class="token punctuation">.</span>volume<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+        <span class="token keyword">elif</span> viewpoint <span class="token keyword">is</span> <span class="token keyword">not</span> <span class="token boolean">None</span> <span class="token keyword">and</span> <span class="token builtin">abs</span><span class="token punctuation">(</span>part<span class="token punctuation">.</span>face_normals<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">.</span>mean<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">&lt;</span> <span class="token number">0.4</span><span class="token punctuation">:</span>
+            part<span class="token punctuation">,</span> info <span class="token operator">=</span> orient_facade_towards<span class="token punctuation">(</span>part<span class="token punctuation">,</span> viewpoint<span class="token punctuation">)</span>
+            log<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">(</span>i<span class="token punctuation">,</span> <span class="token string">"facade"</span><span class="token punctuation">,</span> info<span class="token punctuation">,</span> <span class="token boolean">None</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+        <span class="token keyword">else</span><span class="token punctuation">:</span>
+            part<span class="token punctuation">,</span> info <span class="token operator">=</span> orient_open_by_reference<span class="token punctuation">(</span>part<span class="token punctuation">)</span>
+            log<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">(</span>i<span class="token punctuation">,</span> <span class="token string">"open"</span><span class="token punctuation">,</span> info<span class="token punctuation">,</span> <span class="token boolean">None</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+        repaired<span class="token punctuation">.</span>append<span class="token punctuation">(</span>part<span class="token punctuation">)</span>
+    <span class="token keyword">return</span> trimesh<span class="token punctuation">.</span>util<span class="token punctuation">.</span>concatenate<span class="token punctuation">(</span>repaired<span class="token punctuation">)</span><span class="token punctuation">,</span> log
+
+fixed<span class="token punctuation">,</span> log <span class="token operator">=</span> repair_all<span class="token punctuation">(</span><span class="token string">"meshes/block_07.ply"</span><span class="token punctuation">,</span>
+                        viewpoint<span class="token operator">=</span>np<span class="token punctuation">.</span>array<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token number">412700.0</span><span class="token punctuation">,</span> <span class="token number">5335820.0</span><span class="token punctuation">,</span> <span class="token number">12.0</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+<span class="token keyword">for</span> row <span class="token keyword">in</span> log<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token number">8</span><span class="token punctuation">]</span><span class="token punctuation">:</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span>row<span class="token punctuation">)</span>
+</code></pre></div>
+<p>Classifying each component before repairing it is what makes a mixed file tractable. The mean absolute z-component of the normals is a cheap classifier: near 1 means a height field, near 0 means vertical surfaces, and in between means a general closed shell. Applying the terrain rule to a facade is the mistake to avoid, because an up-reference vote on vertical faces is a coin toss.</p>
+<h3 id="5-verify-do-not-trust" tabindex="-1"><a class="heading-link" href="#5-verify-do-not-trust"><span>5. Verify, do not trust</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">verify_orientation</span><span class="token punctuation">(</span>part<span class="token punctuation">,</span> kind<span class="token punctuation">,</span> reference<span class="token operator">=</span>np<span class="token punctuation">.</span>array<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token number">0.0</span><span class="token punctuation">,</span> <span class="token number">0.0</span><span class="token punctuation">,</span> <span class="token number">1.0</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    checks <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token string">"kind"</span><span class="token punctuation">:</span> kind<span class="token punctuation">,</span> <span class="token string">"winding_consistent"</span><span class="token punctuation">:</span> <span class="token builtin">bool</span><span class="token punctuation">(</span>part<span class="token punctuation">.</span>is_winding_consistent<span class="token punctuation">)</span><span class="token punctuation">}</span>
+    <span class="token keyword">if</span> kind <span class="token operator">==</span> <span class="token string">"closed"</span><span class="token punctuation">:</span>
+        checks<span class="token punctuation">[</span><span class="token string">"is_volume"</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token builtin">bool</span><span class="token punctuation">(</span>part<span class="token punctuation">.</span>is_volume<span class="token punctuation">)</span>
+        checks<span class="token punctuation">[</span><span class="token string">"volume_positive"</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token builtin">bool</span><span class="token punctuation">(</span>part<span class="token punctuation">.</span>volume <span class="token operator">></span> <span class="token number">0</span><span class="token punctuation">)</span>
+        <span class="token comment"># a ray from far outside must enter through a front face</span>
+        origin <span class="token operator">=</span> part<span class="token punctuation">.</span>bounds<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span> <span class="token operator">+</span> np<span class="token punctuation">.</span>array<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token number">0.0</span><span class="token punctuation">,</span> <span class="token number">0.0</span><span class="token punctuation">,</span> <span class="token number">50.0</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+        direction <span class="token operator">=</span> np<span class="token punctuation">.</span>array<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token punctuation">[</span><span class="token number">0.0</span><span class="token punctuation">,</span> <span class="token number">0.0</span><span class="token punctuation">,</span> <span class="token operator">-</span><span class="token number">1.0</span><span class="token punctuation">]</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+        locs<span class="token punctuation">,</span> idx_ray<span class="token punctuation">,</span> idx_tri <span class="token operator">=</span> part<span class="token punctuation">.</span>ray<span class="token punctuation">.</span>intersects_location<span class="token punctuation">(</span><span class="token punctuation">[</span>origin<span class="token punctuation">]</span><span class="token punctuation">,</span> direction<span class="token punctuation">)</span>
+        <span class="token keyword">if</span> <span class="token builtin">len</span><span class="token punctuation">(</span>idx_tri<span class="token punctuation">)</span><span class="token punctuation">:</span>
+            first <span class="token operator">=</span> idx_tri<span class="token punctuation">[</span>np<span class="token punctuation">.</span>argmax<span class="token punctuation">(</span>locs<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">]</span>
+            checks<span class="token punctuation">[</span><span class="token string">"first_hit_faces_camera"</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token builtin">bool</span><span class="token punctuation">(</span>part<span class="token punctuation">.</span>face_normals<span class="token punctuation">[</span>first<span class="token punctuation">]</span> @ np<span class="token punctuation">.</span>array<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token operator">></span> <span class="token number">0</span><span class="token punctuation">)</span>
+    <span class="token keyword">else</span><span class="token punctuation">:</span>
+        checks<span class="token punctuation">[</span><span class="token string">"agreement_with_reference"</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span><span class="token punctuation">(</span>part<span class="token punctuation">.</span>face_normals @ reference <span class="token operator">></span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">.</span>mean<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> checks
+
+<span class="token keyword">for</span> part<span class="token punctuation">,</span> <span class="token punctuation">(</span>i<span class="token punctuation">,</span> kind<span class="token punctuation">,</span> <span class="token operator">*</span>_rest<span class="token punctuation">)</span> <span class="token keyword">in</span> <span class="token builtin">zip</span><span class="token punctuation">(</span>fixed<span class="token punctuation">.</span>split<span class="token punctuation">(</span>only_watertight<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">)</span><span class="token punctuation">,</span> log<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span>verify_orientation<span class="token punctuation">(</span>part<span class="token punctuation">,</span> <span class="token string">"closed"</span> <span class="token keyword">if</span> kind <span class="token operator">==</span> <span class="token string">"closed"</span> <span class="token keyword">else</span> <span class="token string">"open"</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>The ray test is the check that matters for closed shells, because it tests the property a renderer actually uses: shoot a ray from above the mesh downward, take the highest intersection, and confirm that face’s normal points back towards the ray’s origin. A shell whose volume is positive but whose normals were recomputed from a stale cache can still fail this, and the failure is exactly what a viewer would show.</p>
+<figure class="diagram">
+<svg viewBox="6 6 748 212" role="img" aria-labelledby="norm-effect-t norm-effect-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="norm-effect-t">What a flipped face costs downstream</title>
+  <desc id="norm-effect-d">A table of consequences. With back-face culling the surface disappears and the viewer sees through the building. Shading uses the wrong normal so lighting is inverted. A closed mesh's volume comes out negative. Texture projection samples from behind the surface. Normal-based classification labels a roof as a floor. Ray tests report the wrong side of a wall.</desc>
+  <rect class="svg-bg" x="6" y="6" width="748" height="212" fill="#ffffff"/>
+  <g stroke-width="1.5">
+    <rect x="20" y="20" width="250" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="270" y="20" width="470" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="20" y="54" width="250" height="30" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="270" y="54" width="470" height="30" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="20" y="84" width="250" height="30" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="270" y="84" width="470" height="30" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="20" y="114" width="250" height="30" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="270" y="114" width="470" height="30" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="20" y="144" width="250" height="30" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="270" y="144" width="470" height="30" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="20" y="174" width="250" height="30" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="270" y="174" width="470" height="30" fill="#fdf3e0" stroke="#c46a3d"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="145" y="43">consumer</text><text x="505" y="43">what a flipped face does</text>
+    <text x="145" y="74">renderer, culling on</text><text x="505" y="74">the surface vanishes; you see inside the building</text>
+    <text x="145" y="104">shading</text><text x="505" y="104">lighting inverted; the wall looks lit from inside</text>
+    <text x="145" y="134">volume computation</text><text x="505" y="134">sign wrong, or partially cancelled</text>
+    <text x="145" y="164">texture projection</text><text x="505" y="164">samples from behind the surface</text>
+    <text x="145" y="194">normal-based classification</text><text x="505" y="194">a roof is labelled a floor</text>
+  </g>
+</svg>
+<figcaption>One property, five consumers, five different symptoms — which is why flipped normals are so often diagnosed as five separate bugs.</figcaption>
+</figure>
+<h2 id="expected-output-verification" tabindex="-1"><a class="heading-link" href="#expected-output-verification"><span>Expected Output &amp; Verification</span></a></h2>
+<div class="codeblock" data-lang="text"><div class="codeblock__bar"><span class="codeblock__lang">text</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-text" tabindex="0" role="group" aria-label="text code sample"><code class="language-text">{'component': 0, 'faces': 18402, 'winding_consistent': False, 'watertight': True, 'is_volume': False, 'signed_volume_m3': 11204.88, 'share_normals_up': 0.31, 'share_normals_down': 0.29}
+{'component': 1, 'faces': 9204, 'winding_consistent': True, 'watertight': True, 'is_volume': False, 'signed_volume_m3': -4820.14, 'share_normals_up': 0.24, 'share_normals_down': 0.26}
+{'component': 2, 'faces': 24118, 'winding_consistent': True, 'watertight': False, 'is_volume': False, 'signed_volume_m3': 0.0, 'share_normals_up': 0.04, 'share_normals_down': 0.94}
+  18,402 faces  volume    14,208.42  ['fix_winding', 'fix_normals']
+   9,204 faces  volume     4,820.14  ['invert', 'fix_normals']
+terrain: {'agreement': 0.962, 'flipped': True, 'confident': True}
+facade: {'agreement': 0.884}
+{'kind': 'closed', 'winding_consistent': True, 'is_volume': True, 'volume_positive': True, 'first_hit_faces_camera': True}
+{'kind': 'open', 'winding_consistent': True, 'agreement_with_reference': 0.962}
+</code></pre></div>
+<p>Three distinct cases in one file, which is typical: component 0 had inconsistent winding, component 1 was consistently inverted, component 2 was an open surface with 94% of its normals pointing down. Note that component 0’s volume changed from 11,204 to 14,208 after the winding repair — the original figure was a partial cancellation of correctly and incorrectly oriented faces, which is the most dangerous outcome of all because it looks like a plausible number.</p>
+<p>Verify the repair on a fixture with a known answer:</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python">box <span class="token operator">=</span> trimesh<span class="token punctuation">.</span>creation<span class="token punctuation">.</span>box<span class="token punctuation">(</span>extents<span class="token operator">=</span><span class="token punctuation">(</span><span class="token number">2</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+<span class="token keyword">assert</span> box<span class="token punctuation">.</span>is_volume <span class="token keyword">and</span> box<span class="token punctuation">.</span>volume <span class="token operator">></span> <span class="token number">0</span>
+
+broken <span class="token operator">=</span> box<span class="token punctuation">.</span>copy<span class="token punctuation">(</span><span class="token punctuation">)</span>
+faces <span class="token operator">=</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>broken<span class="token punctuation">.</span>faces<span class="token punctuation">)</span><span class="token punctuation">.</span>copy<span class="token punctuation">(</span><span class="token punctuation">)</span>
+faces<span class="token punctuation">[</span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">,</span> <span class="token number">7</span><span class="token punctuation">]</span><span class="token punctuation">]</span> <span class="token operator">=</span> faces<span class="token punctuation">[</span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">,</span> <span class="token number">7</span><span class="token punctuation">]</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token punctuation">:</span><span class="token punctuation">:</span><span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">]</span>            <span class="token comment"># flip three faces</span>
+broken<span class="token punctuation">.</span>faces <span class="token operator">=</span> faces
+<span class="token keyword">assert</span> <span class="token keyword">not</span> broken<span class="token punctuation">.</span>is_winding_consistent
+
+trimesh<span class="token punctuation">.</span>repair<span class="token punctuation">.</span>fix_winding<span class="token punctuation">(</span>broken<span class="token punctuation">)</span>
+trimesh<span class="token punctuation">.</span>repair<span class="token punctuation">.</span>fix_normals<span class="token punctuation">(</span>broken<span class="token punctuation">)</span>
+<span class="token keyword">assert</span> broken<span class="token punctuation">.</span>is_volume<span class="token punctuation">,</span> <span class="token string">"repair did not restore a valid volume"</span>
+<span class="token keyword">assert</span> <span class="token builtin">abs</span><span class="token punctuation">(</span>broken<span class="token punctuation">.</span>volume <span class="token operator">-</span> <span class="token number">24.0</span><span class="token punctuation">)</span> <span class="token operator">&lt;</span> <span class="token number">1e-9</span><span class="token punctuation">,</span> <span class="token string-interpolation"><span class="token string">f"volume </span><span class="token interpolation"><span class="token punctuation">{</span>broken<span class="token punctuation">.</span>volume<span class="token punctuation">}</span></span><span class="token string"> should be 24"</span></span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"winding repair restores volume 24.0 on a box with three flipped faces"</span><span class="token punctuation">)</span>
+</code></pre></div>
+<h2 id="performance-notes" tabindex="-1"><a class="heading-link" href="#performance-notes"><span>Performance Notes</span></a></h2>
+<ul>
+<li><strong>Winding repair is a graph traversal</strong> over face adjacency and runs in a second or two on a few million faces; the adjacency computation dominates.</li>
+<li><strong>Repair per component, not per file.</strong> A global <code>fix_normals(multibody=True)</code> works and is slower, and it hides which component had the problem.</li>
+<li><strong>Cache nothing across the repair.</strong> Face normals, area and volume are cached properties in trimesh; mutating faces invalidates them, but code that captured <code>face_normals</code> in a local variable beforehand will use stale values.</li>
+<li><strong>Do the repair once, early, after welding.</strong> Every later stage depends on it, and repeating it costs the adjacency computation again.</li>
+<li><strong>Strip contradictory stored normals</strong> on import when the winding is authoritative, rather than repairing winding and leaving old per-vertex normals in place.</li>
+</ul>
+<h2 id="common-errors" tabindex="-1"><a class="heading-link" href="#common-errors"><span>Common Errors</span></a></h2>
+<p><strong><code>fix_normals</code> appears to do nothing.</strong> It recomputes normals from the winding, so on a mesh with inconsistent winding it produces consistent-with-the-winding nonsense. Repair the winding first.</p>
+<p><strong>A mesh is inverted after a boolean operation.</strong> Several boolean implementations return the complement’s orientation for one operand. Check the volume sign after every boolean, not at the end of the pipeline.</p>
+<p><strong>Terrain flips back and forth between runs.</strong> The agreement is near 0.5, so the majority vote is unstable — usually a surface with a topological fault, or one that includes both a terrain patch and a vertical retaining wall as one component. Split it and orient the parts separately.</p>
+<p><strong>A viewer shows holes and the checks all pass.</strong> The mesh is fine and the <em>stored</em> per-vertex normals contradict it, or the renderer has two-sided lighting off and the material is single-sided. Export without stored normals and let the runtime derive them.</p>
+<h2 id="frequently-asked-questions" tabindex="-1"><a class="heading-link" href="#frequently-asked-questions"><span>Frequently Asked Questions</span></a></h2>
+<h3 id="should-normals-be-stored-in-the-exported-tile-or-computed-at-runtime" tabindex="-1"><a class="heading-link" href="#should-normals-be-stored-in-the-exported-tile-or-computed-at-runtime"><span>Should normals be stored in the exported tile or computed at runtime?</span></a></h3>
+<p>Store them when smooth shading matters — a runtime cannot know which edges are creases — and make sure they agree with the winding. For hard-edged building geometry, letting the runtime compute flat normals from the winding is smaller and less error-prone.</p>
+<h3 id="does-orientation-matter-for-point-clouds" tabindex="-1"><a class="heading-link" href="#does-orientation-matter-for-point-clouds"><span>Does orientation matter for point clouds?</span></a></h3>
+<p>Yes, for reconstruction rather than rendering: Poisson and ball pivoting both need oriented normals, and a cloud with normals pointing inward reconstructs an inside-out surface. The orientation step for clouds is a separate problem, handled during estimation as in <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/ball-pivoting-reconstruction-for-building-facades/">ball pivoting reconstruction for building facades</a>.</p>
+<h3 id="can-i-just-enable-two-sided-rendering-and-ignore-this" tabindex="-1"><a class="heading-link" href="#can-i-just-enable-two-sided-rendering-and-ignore-this"><span>Can I just enable two-sided rendering and ignore this?</span></a></h3>
+<p>It hides the visual symptom and leaves the volume, texture projection and classification errors in place. It is also more expensive to render. Fix the geometry.</p>
+<h2 id="related-guides" tabindex="-1"><a class="heading-link" href="#related-guides"><span>Related Guides</span></a></h2>
+<ul>
+<li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/welding-vertices-and-removing-duplicate-faces/">Welding Vertices and Removing Duplicate Faces</a> — the prerequisite for propagation</li>
+<li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/auditing-meshes-with-euler-characteristic-and-genus/">Auditing Meshes with Euler Characteristic and Genus</a> — the audit that assumes orientability</li>
+<li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/diagnosing-inverted-normals-across-pipeline-stages/">Diagnosing Inverted Normals Across Pipeline Stages</a> — finding which stage flipped them</li>
+</ul>
+<p>Back to <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics for Digital Twins</a>.</p>
+
+
+      
+      
+
+      <div class="related-nav">
+        
+
+        
+          <div>
+            <h3>Related</h3>
+            <div class="related-grid">
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/auditing-meshes-with-euler-characteristic-and-genus/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Auditing Meshes with Euler Characteristic and Genus</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/detecting-and-repairing-self-intersecting-geometry/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Detecting and Repairing Self-Intersecting Geometry</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/fixing-non-manifold-edges-in-3d-meshes/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Fixing Non-Manifold Edges in 3D Meshes</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/making-meshes-watertight-for-volume-calculations/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Making Meshes Watertight for Volume Calculations</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/welding-vertices-and-removing-duplicate-faces/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Welding Vertices and Removing Duplicate Faces</span>
+                </a>
+              
+            </div>
+          </div>
+        
+      </div>
+    </article>
+
+    
+    <aside class="toc" aria-label="On this page" data-toc hidden>
+      <h4>On this page</h4>
+      <ul></ul>
+    </aside>
+  </div>
+</div>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+  <div class="container site-footer__inner">
+    <div class="site-footer__brand">
+      <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+        <img src="/assets/img/logo-mark.svg" alt="" class="brand__mark" width="36" height="36">
+        <span class="brand__name">
+          3D Geospatial
+          <small>Digital Twin Automation</small>
+        </span>
+      </a>
+      <p>Engineering-grade guides on point cloud processing, mesh pipelines, LOD strategies, and CI/CD automation for digital twin platforms.</p>
+      <a class="footer-social" href="https://github.com/3d-geospatial" aria-label="3D Geospatial on GitHub" rel="noopener" target="_blank">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+          <path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.53-1.34-1.3-1.7-1.3-1.7-1.06-.72.08-.71.08-.71 1.17.08 1.79 1.2 1.79 1.2 1.04 1.79 2.73 1.27 3.4.97.1-.75.4-1.27.73-1.56-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.19-3.08-.12-.3-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.75.11 3.05.74.8 1.19 1.83 1.19 3.08 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.07.78 2.15v3.18c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5Z"/>
+        </svg>
+        <span>GitHub</span>
+      </a>
+    </div>
+
+    <div class="site-footer__col">
+      <h4>Sections</h4>
+      <ul>
+        <li><a href="https://www.3d-geospatial.com/">Home</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management &amp; Optimization</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/">Point Cloud &amp; Mesh Pipelines</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/">Troubleshooting &amp; Reliability</a></li>
+        
+      </ul>
+    </div>
+
+    
+      <div class="site-footer__col">
+        <h4>3D Geospatial Fundamentals</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/">3D Format Standards Comparison</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/">BIM and IFC Georeferencing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/">CityGML and CityJSON Processing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems for 3D Assets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/">Digital Elevation Model Workflows</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/">Spatial Indexing and Tiling Schemes for 3D Data</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>LOD Management &amp; Optimization</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/">Automated Tile Generation for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/">Cesium ion Upload Automation for 3D Tilesets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/">glTF LOD Generation With Draco Compression</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/">Streaming Sync Patterns for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/">Tileset Metadata and 3D Tiles Next</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/">Vector Overlays on 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Point Cloud &amp; Mesh Pipelines</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/">Automated Mesh Decimation for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/">Change Detection Between LiDAR Scan Epochs</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/">CI/CD Automation for Spatial Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">LiDAR Classification and Ground Extraction</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/photogrammetry-processing-pipelines/">Photogrammetry Processing Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/">Point Cloud Filtering Techniques</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/">Surface Reconstruction for Geospatial Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/">Texture Mapping Workflows for Digital Twins</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Troubleshooting &amp; Reliability</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/">Cross-Section Failure Modes in Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/">Data Validation &amp; QA Gates for 3D Tiles</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/">Performance Profiling and Benchmarking</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/">Pipeline Observability and Monitoring</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/">Streaming &amp; Runtime Diagnostics for 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+  </div>
+  <div class="container site-footer__bottom">
+    <span>© 2026 3D Geospatial &amp; Digital Twin Automation</span>
+    <span>Built with Eleventy · PWA-enabled</span>
+  </div>
+</footer>
+
+
+  <script src="/assets/js/site.js?v=b99aa9f971" defer></script>
+  
+</body>
+</html>

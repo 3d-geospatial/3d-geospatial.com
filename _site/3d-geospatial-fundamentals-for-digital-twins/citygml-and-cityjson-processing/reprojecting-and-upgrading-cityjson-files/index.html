@@ -1,0 +1,734 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <title>Reprojecting and Upgrading CityJSON Files — 3D Geospatial</title>
+  <meta name="description" content="Move CityJSON models between CRSs and versions safely: upgrade to 2.0, assign a compound CRS, reproject with cjio">
+  <meta name="keywords" content="3D geospatial, digital twin, point cloud, mesh pipeline, LOD, 3D Tiles, Cesium, PDAL, Open3D, Python, CI/CD">
+  <meta name="author" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta name="theme-color" content="#1f6b8a" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f171d" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+
+  
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem("theme");
+        var theme = (stored === "dark" || stored === "light") ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    })();
+  </script>
+  <meta name="generator" content="Eleventy">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="googlebot" content="index,follow,max-image-preview:large">
+
+  
+  <link rel="canonical" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/reprojecting-and-upgrading-cityjson-files/">
+  <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">
+
+  
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/icon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+
+  
+  <link rel="apple-touch-icon" href="/assets/img/icon-180.png">
+  <link rel="mask-icon" href="/assets/img/logo.svg" color="#1f6b8a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="3D Geospatial">
+  <meta name="application-name" content="3D Geospatial">
+
+  
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Reprojecting and Upgrading CityJSON Files — 3D Geospatial">
+  <meta property="og:description" content="Move CityJSON models between CRSs and versions safely: upgrade to 2.0, assign a compound CRS, reproject with cjio">
+  <meta property="og:url" content="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/reprojecting-and-upgrading-cityjson-files/">
+  <meta property="og:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+  <meta property="og:site_name" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta property="og:locale" content="en_US">
+  
+  <meta property="article:published_time" content="2026-09-17T23:36:56.449Z">
+  <meta property="article:modified_time" content="2026-09-17T23:36:56.449Z">
+  <meta property="article:publisher" content="https://www.3d-geospatial.com/">
+  
+
+  
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Reprojecting and Upgrading CityJSON Files — 3D Geospatial">
+  <meta name="twitter:description" content="Move CityJSON models between CRSs and versions safely: upgrade to 2.0, assign a compound CRS, reproject with cjio">
+  <meta name="twitter:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta name="twitter:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+
+  
+  <link rel="preload" href="/assets/css/styles.css?v=8c46394d6c" as="style">
+  
+
+  <link rel="stylesheet" href="/assets/css/styles.css?v=8c46394d6c">
+
+  
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.3d-geospatial.com/#organization",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "url": "https://www.3d-geospatial.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/icon-512.png",
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://www.3d-geospatial.com/#website",
+      "url": "https://www.3d-geospatial.com/",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "description": "Build reliable 3D spatial data pipelines for digital twins — point clouds, meshes, LOD strategies, Python processing, and CI/CD automation.",
+      "inLanguage": "en",
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      }
+    },
+    {
+      "@type": "TechArticle",
+      "@id": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/reprojecting-and-upgrading-cityjson-files/#article",
+      "isPartOf": {
+        "@id": "https://www.3d-geospatial.com/#website"
+      },
+      "headline": "Reprojecting and Upgrading CityJSON Files",
+      "name": "Reprojecting and Upgrading CityJSON Files",
+      "description": "Move CityJSON models between CRSs and versions safely: upgrade to 2.0, assign a compound CRS, reproject with cjio",
+      "url": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/reprojecting-and-upgrading-cityjson-files/",
+      "mainEntityOfPage": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/reprojecting-and-upgrading-cityjson-files/",
+      "inLanguage": "en",
+      "datePublished": "2026-09-17T23:36:56.449Z",
+      "dateModified": "2026-09-17T23:36:56.449Z",
+      "author": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "image": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/og-cover.png",
+        "width": 1200,
+        "height": 630
+      },
+      "breadcrumb": {
+        "@id": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/reprojecting-and-upgrading-cityjson-files/#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/reprojecting-and-upgrading-cityjson-files/#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://www.3d-geospatial.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "3D Geospatial Fundamentals For Digital Twins",
+          "item": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Citygml And Cityjson Processing",
+          "item": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "name": "Reprojecting And Upgrading Cityjson Files",
+          "item": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/reprojecting-and-upgrading-cityjson-files/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  
+<header class="site-header" role="banner">
+  <div class="container site-header__inner">
+    <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+      <img src="/assets/img/logo.svg" alt="" class="brand__mark" width="36" height="36">
+      <span class="brand__name">
+        3D Geospatial
+        <small>Digital Twin Automation</small>
+      </span>
+    </a>
+
+    <button class="theme-toggle" type="button" data-theme-toggle
+            aria-label="Switch to dark theme" title="Switch to dark theme">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4.2"/>
+        <path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/>
+      </svg>
+    </button>
+
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>
+      <span class="nav-toggle__icon" aria-hidden="true"><span></span></span>
+      Menu
+    </button>
+
+    <nav class="primary-nav" id="primary-nav" aria-label="Primary">
+      
+      <a href="https://www.3d-geospatial.com/" >
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/>
+        </svg>
+        Home
+      </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/" aria-current="page">
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2 3 7l9 5 9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 17l9 5 9-5"/>
+            </svg>
+          
+          3D Geospatial Fundamentals
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+          
+          LOD Management &amp; Optimization
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="6" cy="6" r="1.5"/><circle cx="12" cy="6" r="1.5"/><circle cx="18" cy="6" r="1.5"/>
+              <circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/>
+              <circle cx="6" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="18" cy="18" r="1.5"/>
+            </svg>
+          
+          Point Cloud &amp; Mesh Pipelines
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <path d="M12 9v4"/><path d="M12 17h.01"/>
+            </svg>
+          
+          Troubleshooting &amp; Reliability
+        </a>
+      
+    </nav>
+  </div>
+</header>
+
+
+  <main id="main">
+    
+
+
+<div class="container">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    
+      
+        <a href="https://www.3d-geospatial.com/">Home</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals For Digital Twins</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/">Citygml And Cityjson Processing</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <span class="current">Reprojecting And Upgrading Cityjson Files</span>
+      
+    
+  </nav>
+
+  <div class="content-page">
+    <article class="article">
+      <h1 id="reprojecting-and-upgrading-cityjson-files" tabindex="-1"><a class="heading-link" href="#reprojecting-and-upgrading-cityjson-files"><span>Reprojecting and Upgrading CityJSON Files</span></a></h1>
+<p>This page moves CityJSON city models between coordinate reference systems and between format versions without losing precision or heights — upgrading an older file to CityJSON 2.0, assigning a compound CRS so the vertical datum is explicit, reprojecting from EPSG:25832+7837 to the twin’s frame, choosing an appropriate <code>transform</code> scale for the target units, and verifying the result against control points.</p>
+<h2 id="why-you-hit-this" tabindex="-1"><a class="heading-link" href="#why-you-hit-this"><span>Why you hit this</span></a></h2>
+<p>City models arrive in the CRS of the agency that made them and in whatever CityJSON version was current when the pipeline that produced them was written. A twin has one internal frame, so every delivery needs a conversion, and two things go wrong reliably. Heights get treated as ellipsoidal when they are orthometric, which sinks or lifts a whole city by the geoid separation. And the integer vertex grid, which was millimetres in a metric CRS, becomes something absurd after a change of units — a millimetre scale in degrees is a grid 100 m across. Both are silent: the file stays valid, the buildings stay where they look right on a flat map, and the error shows up when the model is draped on terrain. The data model is described in <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/">CityGML and CityJSON processing for digital twins</a>.</p>
+<h2 id="prerequisites" tabindex="-1"><a class="heading-link" href="#prerequisites"><span>Prerequisites</span></a></h2>
+<ul>
+<li>Python 3.10+ with <code>cjio&gt;=0.9</code>, <code>pyproj&gt;=3.6</code> on PROJ 9.3+, <code>numpy&gt;=1.24</code>.</li>
+<li>The geoid grid for the source heights available to PROJ — <code>de_bkg_gcg2016.tif</code> for DHHN2016 in the examples — either through <code>PROJ_NETWORK=ON</code> or a local copy.</li>
+<li>A few control points on the model with known coordinates in both the source and target CRS, for the verification step.</li>
+</ul>
+<h2 id="step-by-step" tabindex="-1"><a class="heading-link" href="#step-by-step"><span>Step-by-Step</span></a></h2>
+<h3 id="1-read-the-version-and-crs-before-anything-else" tabindex="-1"><a class="heading-link" href="#1-read-the-version-and-crs-before-anything-else"><span>1. Read the version and CRS before anything else</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> json
+<span class="token keyword">from</span> pathlib <span class="token keyword">import</span> Path
+
+src <span class="token operator">=</span> Path<span class="token punctuation">(</span><span class="token string">"delivery/lod2_tile_11.city.json"</span><span class="token punctuation">)</span>
+cj <span class="token operator">=</span> json<span class="token punctuation">.</span>loads<span class="token punctuation">(</span>src<span class="token punctuation">.</span>read_text<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"version:"</span><span class="token punctuation">,</span> cj<span class="token punctuation">[</span><span class="token string">"version"</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"referenceSystem:"</span><span class="token punctuation">,</span> cj<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"metadata"</span><span class="token punctuation">,</span> <span class="token punctuation">{</span><span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"referenceSystem"</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"transform:"</span><span class="token punctuation">,</span> cj<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"transform"</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"extent:"</span><span class="token punctuation">,</span> cj<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"metadata"</span><span class="token punctuation">,</span> <span class="token punctuation">{</span><span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"geographicalExtent"</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Three answers decide the work. The version decides whether an upgrade comes first. The reference system decides whether a vertical datum has to be assigned. The transform’s scale decides how much precision the integers can carry, and it has to be revisited after any change of units.</p>
+<figure class="diagram">
+<svg viewBox="6 6 748 216" role="img" aria-labelledby="cjup-ver-t cjup-ver-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="cjup-ver-t">What changes between CityJSON versions</title>
+  <desc id="cjup-ver-d">A table of versions. In 1.0 the transform was optional and the reference system was written as an EPSG string, with a large metadata block. In 1.1 the transform became mandatory, the reference system moved to an OGC definition URL, and metadata was simplified. In 2.0 the line-delimited CityJSONSeq form and further object types arrived, with extensions handled by URL.</desc>
+  <rect class="svg-bg" x="6" y="6" width="748" height="216" fill="#ffffff"/>
+  <g stroke-width="1.5">
+    <rect x="20" y="20" width="120" height="38" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="140" y="20" width="300" height="38" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="440" y="20" width="300" height="38" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="20" y="58" width="120" height="50" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="140" y="58" width="300" height="50" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="440" y="58" width="300" height="50" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="20" y="108" width="120" height="50" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="140" y="108" width="300" height="50" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="440" y="108" width="300" height="50" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="20" y="158" width="120" height="50" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="140" y="158" width="300" height="50" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="440" y="158" width="300" height="50" fill="#eef5e9" stroke="#4f7a4d"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="80" y="44">version</text>
+    <text x="290" y="44">coordinates and CRS</text>
+    <text x="590" y="44">structure</text>
+    <text x="80" y="88">1.0</text>
+    <text x="290" y="80">transform optional, floats allowed</text>
+    <text x="290" y="98">CRS as "EPSG:25832"</text>
+    <text x="590" y="88">large metadata block</text>
+    <text x="80" y="138">1.1</text>
+    <text x="290" y="130">transform mandatory, integers</text>
+    <text x="590" y="130">metadata simplified,</text>
+    <text x="590" y="148">extended metadata separated</text>
+    <text x="290" y="148">CRS as an OGC definition URL</text>
+    <text x="80" y="188">2.0</text>
+    <text x="290" y="180">unchanged from 1.1</text>
+    <text x="590" y="180">CityJSONSeq (.city.jsonl),</text>
+    <text x="590" y="198">more object types</text>
+  </g>
+</svg>
+<figcaption>The jump that affects code is 1.0 to 1.1: coordinates become integers behind a mandatory transform, and the CRS string becomes a URL.</figcaption>
+</figure>
+<h3 id="2-upgrade-to-the-current-version" tabindex="-1"><a class="heading-link" href="#2-upgrade-to-the-current-version"><span>2. Upgrade to the current version</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> subprocess
+
+subprocess<span class="token punctuation">.</span>run<span class="token punctuation">(</span><span class="token punctuation">[</span>
+    <span class="token string">"cjio"</span><span class="token punctuation">,</span> <span class="token builtin">str</span><span class="token punctuation">(</span>src<span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token string">"upgrade"</span><span class="token punctuation">,</span>
+    <span class="token string">"save"</span><span class="token punctuation">,</span> <span class="token string">"work/tile_11_v2.city.json"</span><span class="token punctuation">,</span>
+<span class="token punctuation">]</span><span class="token punctuation">,</span> check<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+
+up <span class="token operator">=</span> json<span class="token punctuation">.</span>loads<span class="token punctuation">(</span>Path<span class="token punctuation">(</span><span class="token string">"work/tile_11_v2.city.json"</span><span class="token punctuation">)</span><span class="token punctuation">.</span>read_text<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"version:"</span><span class="token punctuation">,</span> up<span class="token punctuation">[</span><span class="token string">"version"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token string">"| transform present:"</span><span class="token punctuation">,</span> <span class="token string">"transform"</span> <span class="token keyword">in</span> up<span class="token punctuation">,</span>
+      <span class="token string">"| CRS:"</span><span class="token punctuation">,</span> up<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"metadata"</span><span class="token punctuation">,</span> <span class="token punctuation">{</span><span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"referenceSystem"</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p><code>upgrade</code> rewrites the file to the version the installed <code>cjio</code> targets: it adds a <code>transform</code> and quantises float coordinates if the source was 1.0, converts the reference system to URL form, and moves metadata fields that no longer exist in the current schema. Upgrade before reprojecting, so the reprojection operates on one known structure, and keep the original — upgrading is not reversible without information loss in the metadata.</p>
+<h3 id="3-make-the-vertical-datum-explicit" tabindex="-1"><a class="heading-link" href="#3-make-the-vertical-datum-explicit"><span>3. Make the vertical datum explicit</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python">NEEDS_VERTICAL <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token string">"25832"</span><span class="token punctuation">:</span> <span class="token string">"7837"</span><span class="token punctuation">,</span> <span class="token string">"32618"</span><span class="token punctuation">:</span> <span class="token string">"5703"</span><span class="token punctuation">,</span> <span class="token string">"28992"</span><span class="token punctuation">:</span> <span class="token string">"5709"</span><span class="token punctuation">}</span>   <span class="token comment"># horizontal → vertical EPSG</span>
+
+crs <span class="token operator">=</span> up<span class="token punctuation">[</span><span class="token string">"metadata"</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token string">"referenceSystem"</span><span class="token punctuation">]</span>
+code <span class="token operator">=</span> crs<span class="token punctuation">.</span>rstrip<span class="token punctuation">(</span><span class="token string">"/"</span><span class="token punctuation">)</span><span class="token punctuation">.</span>split<span class="token punctuation">(</span><span class="token string">"/"</span><span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">]</span>
+<span class="token keyword">if</span> code <span class="token keyword">in</span> NEEDS_VERTICAL<span class="token punctuation">:</span>
+    compound <span class="token operator">=</span> <span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>code<span class="token punctuation">}</span></span><span class="token string">+</span><span class="token interpolation"><span class="token punctuation">{</span>NEEDS_VERTICAL<span class="token punctuation">[</span>code<span class="token punctuation">]</span><span class="token punctuation">}</span></span><span class="token string">"</span></span>
+    subprocess<span class="token punctuation">.</span>run<span class="token punctuation">(</span><span class="token punctuation">[</span>
+        <span class="token string">"cjio"</span><span class="token punctuation">,</span> <span class="token string">"work/tile_11_v2.city.json"</span><span class="token punctuation">,</span>
+        <span class="token string">"crs_assign"</span><span class="token punctuation">,</span> compound<span class="token punctuation">,</span>
+        <span class="token string">"save"</span><span class="token punctuation">,</span> <span class="token string">"work/tile_11_compound.city.json"</span><span class="token punctuation">,</span>
+    <span class="token punctuation">]</span><span class="token punctuation">,</span> check<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"assigned"</span><span class="token punctuation">,</span> compound<span class="token punctuation">)</span>
+</code></pre></div>
+<p><code>crs_assign</code> changes the declared CRS without touching a single coordinate, which is exactly right here: the heights were always DHHN2016, the file simply failed to say so. Assigning is a statement about what the data already is, and it must come from the delivery documentation rather than a guess. Reprojecting a file whose CRS is only horizontal treats its heights as ellipsoidal, and in Bavaria that is a 47 m error in every building.</p>
+<p>The distinction is worth stating plainly, because the two commands look similar and do opposite things. <code>crs_assign</code> relabels; <code>crs_reproject</code> transforms. Using assign when you meant reproject leaves the geometry in the old frame with a new label — the worst outcome, because everything downstream now trusts a wrong declaration.</p>
+<figure class="diagram">
+<svg viewBox="6 6 748 204" role="img" aria-labelledby="cjup-ar-t cjup-ar-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="cjup-ar-t">crs_assign against crs_reproject</title>
+  <desc id="cjup-ar-d">Two paths from the same file. crs_assign leaves every vertex unchanged and only rewrites the declared reference system, which is correct when the declaration was incomplete or missing. crs_reproject transforms every vertex through PROJ and rewrites both the vertices and the declaration, which is what moving between frames requires.</desc>
+  <rect class="svg-bg" x="6" y="6" width="748" height="204" fill="#ffffff"/>
+  <defs>
+    <marker id="cjup-ar-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
+    </marker>
+  </defs>
+  <rect x="20" y="80" width="140" height="56" rx="8" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <rect x="280" y="20" width="200" height="56" rx="8" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <rect x="280" y="140" width="200" height="56" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="560" y="20" width="180" height="56" rx="8" fill="#ffffff" stroke="#5b6471" stroke-width="1.5"/>
+  <rect x="560" y="140" width="180" height="56" rx="8" fill="#ffffff" stroke="#5b6471" stroke-width="1.5"/>
+  <g stroke="#5b6471" stroke-width="2" fill="none" marker-end="url(#cjup-ar-arrow)">
+    <path d="M160 96 L278 56"/>
+    <path d="M160 120 L278 162"/>
+    <path d="M480 48 H558"/>
+    <path d="M480 168 H558"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="90" y="104">tile_11</text><text x="90" y="122">CRS: 25832</text>
+    <text x="380" y="42">crs_assign 25832+7837</text><text x="380" y="62">vertices untouched</text>
+    <text x="380" y="162">crs_reproject 4978</text><text x="380" y="182">every vertex through PROJ</text>
+    <text x="650" y="42">same geometry,</text><text x="650" y="62">honest declaration</text>
+    <text x="650" y="162">new geometry,</text><text x="650" y="182">new declaration</text>
+  </g>
+</svg>
+<figcaption>Assign fixes a declaration; reproject moves the data. Doing the first when you needed the second is undetectable inside the file.</figcaption>
+</figure>
+<h3 id="4-reproject-then-fix-the-transform-scale" tabindex="-1"><a class="heading-link" href="#4-reproject-then-fix-the-transform-scale"><span>4. Reproject, then fix the transform scale</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python">subprocess<span class="token punctuation">.</span>run<span class="token punctuation">(</span><span class="token punctuation">[</span>
+    <span class="token string">"cjio"</span><span class="token punctuation">,</span> <span class="token string">"work/tile_11_compound.city.json"</span><span class="token punctuation">,</span>
+    <span class="token string">"crs_reproject"</span><span class="token punctuation">,</span> <span class="token string">"4978"</span><span class="token punctuation">,</span>
+    <span class="token string">"save"</span><span class="token punctuation">,</span> <span class="token string">"work/tile_11_ecef.city.json"</span><span class="token punctuation">,</span>
+<span class="token punctuation">]</span><span class="token punctuation">,</span> check<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+
+out <span class="token operator">=</span> json<span class="token punctuation">.</span>loads<span class="token punctuation">(</span>Path<span class="token punctuation">(</span><span class="token string">"work/tile_11_ecef.city.json"</span><span class="token punctuation">)</span><span class="token punctuation">.</span>read_text<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"CRS:"</span><span class="token punctuation">,</span> out<span class="token punctuation">[</span><span class="token string">"metadata"</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token string">"referenceSystem"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token string">"| scale:"</span><span class="token punctuation">,</span> out<span class="token punctuation">[</span><span class="token string">"transform"</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token string">"scale"</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>After reprojection the target units decide whether the existing scale is still sensible. The rule is one line of arithmetic: the grid spacing is <code>scale</code>, in target units, so a scale of 0.001 is a millimetre grid in EPSG:4978 (metres) and roughly a 110 m grid in EPSG:4326 (degrees). If a pipeline must produce a geographic CityJSON, set the scale to 1e-9 or finer.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">rescale_transform</span><span class="token punctuation">(</span>path<span class="token punctuation">,</span> new_scale<span class="token punctuation">,</span> out_path<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    d <span class="token operator">=</span> json<span class="token punctuation">.</span>loads<span class="token punctuation">(</span>Path<span class="token punctuation">(</span>path<span class="token punctuation">)</span><span class="token punctuation">.</span>read_text<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    s_old<span class="token punctuation">,</span> t_old <span class="token operator">=</span> d<span class="token punctuation">[</span><span class="token string">"transform"</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token string">"scale"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> d<span class="token punctuation">[</span><span class="token string">"transform"</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token string">"translate"</span><span class="token punctuation">]</span>
+    verts <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">[</span>v<span class="token punctuation">[</span>i<span class="token punctuation">]</span> <span class="token operator">*</span> s_old<span class="token punctuation">[</span>i<span class="token punctuation">]</span> <span class="token operator">+</span> t_old<span class="token punctuation">[</span>i<span class="token punctuation">]</span> <span class="token keyword">for</span> i <span class="token keyword">in</span> <span class="token builtin">range</span><span class="token punctuation">(</span><span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">]</span> <span class="token keyword">for</span> v <span class="token keyword">in</span> d<span class="token punctuation">[</span><span class="token string">"vertices"</span><span class="token punctuation">]</span><span class="token punctuation">]</span>
+    lo <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token builtin">min</span><span class="token punctuation">(</span>v<span class="token punctuation">[</span>i<span class="token punctuation">]</span> <span class="token keyword">for</span> v <span class="token keyword">in</span> verts<span class="token punctuation">)</span> <span class="token keyword">for</span> i <span class="token keyword">in</span> <span class="token builtin">range</span><span class="token punctuation">(</span><span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">]</span>
+    d<span class="token punctuation">[</span><span class="token string">"vertices"</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">[</span><span class="token builtin">round</span><span class="token punctuation">(</span><span class="token punctuation">(</span>v<span class="token punctuation">[</span>i<span class="token punctuation">]</span> <span class="token operator">-</span> lo<span class="token punctuation">[</span>i<span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token operator">/</span> new_scale<span class="token punctuation">[</span>i<span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token keyword">for</span> i <span class="token keyword">in</span> <span class="token builtin">range</span><span class="token punctuation">(</span><span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">]</span> <span class="token keyword">for</span> v <span class="token keyword">in</span> verts<span class="token punctuation">]</span>
+    d<span class="token punctuation">[</span><span class="token string">"transform"</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token string">"scale"</span><span class="token punctuation">:</span> <span class="token builtin">list</span><span class="token punctuation">(</span>new_scale<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"translate"</span><span class="token punctuation">:</span> lo<span class="token punctuation">}</span>
+    Path<span class="token punctuation">(</span>out_path<span class="token punctuation">)</span><span class="token punctuation">.</span>write_text<span class="token punctuation">(</span>json<span class="token punctuation">.</span>dumps<span class="token punctuation">(</span>d<span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token builtin">max</span><span class="token punctuation">(</span><span class="token builtin">abs</span><span class="token punctuation">(</span>verts<span class="token punctuation">[</span>k<span class="token punctuation">]</span><span class="token punctuation">[</span>i<span class="token punctuation">]</span> <span class="token operator">-</span> <span class="token punctuation">(</span>d<span class="token punctuation">[</span><span class="token string">"vertices"</span><span class="token punctuation">]</span><span class="token punctuation">[</span>k<span class="token punctuation">]</span><span class="token punctuation">[</span>i<span class="token punctuation">]</span> <span class="token operator">*</span> new_scale<span class="token punctuation">[</span>i<span class="token punctuation">]</span> <span class="token operator">+</span> lo<span class="token punctuation">[</span>i<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+               <span class="token keyword">for</span> k <span class="token keyword">in</span> <span class="token builtin">range</span><span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>verts<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token keyword">for</span> i <span class="token keyword">in</span> <span class="token builtin">range</span><span class="token punctuation">(</span><span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+
+err <span class="token operator">=</span> rescale_transform<span class="token punctuation">(</span><span class="token string">"work/tile_11_ecef.city.json"</span><span class="token punctuation">,</span> <span class="token punctuation">(</span><span class="token number">0.001</span><span class="token punctuation">,</span> <span class="token number">0.001</span><span class="token punctuation">,</span> <span class="token number">0.001</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                        <span class="token string">"work/tile_11_ecef_mm.city.json"</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"worst coordinate change from rescaling: </span><span class="token interpolation"><span class="token punctuation">{</span>err <span class="token operator">*</span> <span class="token number">1000</span><span class="token punctuation">:</span><span class="token format-spec">.3f</span><span class="token punctuation">}</span></span><span class="token string"> mm"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Recomputing the translate from the data’s own minimum keeps the integers small, which matters because JSON integers are text: a translate near the data means five-digit integers instead of ten-digit ones and a noticeably smaller file.</p>
+<h3 id="5-update-the-extent-and-validate" tabindex="-1"><a class="heading-link" href="#5-update-the-extent-and-validate"><span>5. Update the extent and validate</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python">subprocess<span class="token punctuation">.</span>run<span class="token punctuation">(</span><span class="token punctuation">[</span>
+    <span class="token string">"cjio"</span><span class="token punctuation">,</span> <span class="token string">"work/tile_11_ecef_mm.city.json"</span><span class="token punctuation">,</span>
+    <span class="token string">"vertices_clean"</span><span class="token punctuation">,</span>
+    <span class="token string">"save"</span><span class="token punctuation">,</span> <span class="token string">"out/tile_11_ready.city.json"</span><span class="token punctuation">,</span>
+<span class="token punctuation">]</span><span class="token punctuation">,</span> check<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+subprocess<span class="token punctuation">.</span>run<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token string">"cjval"</span><span class="token punctuation">,</span> <span class="token string">"out/tile_11_ready.city.json"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> check<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+
+ready <span class="token operator">=</span> json<span class="token punctuation">.</span>loads<span class="token punctuation">(</span>Path<span class="token punctuation">(</span><span class="token string">"out/tile_11_ready.city.json"</span><span class="token punctuation">)</span><span class="token punctuation">.</span>read_text<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"extent:"</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token builtin">round</span><span class="token punctuation">(</span>v<span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span> <span class="token keyword">for</span> v <span class="token keyword">in</span> ready<span class="token punctuation">[</span><span class="token string">"metadata"</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token string">"geographicalExtent"</span><span class="token punctuation">]</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p><code>cjval</code> catches a mismatch between the declared extent and the vertices, which is the usual leftover after manual transform surgery. The details of what else it checks are in <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/validating-cityjson-with-cjval/">validating CityJSON with cjval</a>.</p>
+<h3 id="6-verify-against-control-points" tabindex="-1"><a class="heading-link" href="#6-verify-against-control-points"><span>6. Verify against control points</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> numpy <span class="token keyword">as</span> np
+<span class="token keyword">from</span> pyproj <span class="token keyword">import</span> Transformer
+
+<span class="token comment"># A surveyed corner, in the source compound CRS and independently in the target frame</span>
+control_src <span class="token operator">=</span> np<span class="token punctuation">.</span>array<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token number">691204.412</span><span class="token punctuation">,</span> <span class="token number">5335818.221</span><span class="token punctuation">,</span> <span class="token number">519.31</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+tf <span class="token operator">=</span> Transformer<span class="token punctuation">.</span>from_crs<span class="token punctuation">(</span><span class="token string">"EPSG:25832+7837"</span><span class="token punctuation">,</span> <span class="token string">"EPSG:4978"</span><span class="token punctuation">,</span> always_xy<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+expected <span class="token operator">=</span> np<span class="token punctuation">.</span>array<span class="token punctuation">(</span>tf<span class="token punctuation">.</span>transform<span class="token punctuation">(</span><span class="token operator">*</span>control_src<span class="token punctuation">)</span><span class="token punctuation">)</span>
+
+d <span class="token operator">=</span> json<span class="token punctuation">.</span>loads<span class="token punctuation">(</span>Path<span class="token punctuation">(</span><span class="token string">"out/tile_11_ready.city.json"</span><span class="token punctuation">)</span><span class="token punctuation">.</span>read_text<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+V <span class="token operator">=</span> <span class="token punctuation">(</span>np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>d<span class="token punctuation">[</span><span class="token string">"vertices"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> dtype<span class="token operator">=</span>np<span class="token punctuation">.</span>float64<span class="token punctuation">)</span> <span class="token operator">*</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>d<span class="token punctuation">[</span><span class="token string">"transform"</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token string">"scale"</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+     <span class="token operator">+</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>d<span class="token punctuation">[</span><span class="token string">"transform"</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token string">"translate"</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+nearest <span class="token operator">=</span> V<span class="token punctuation">[</span>np<span class="token punctuation">.</span>argmin<span class="token punctuation">(</span>np<span class="token punctuation">.</span>linalg<span class="token punctuation">.</span>norm<span class="token punctuation">(</span>V <span class="token operator">-</span> expected<span class="token punctuation">,</span> axis<span class="token operator">=</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">]</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"residual (mm):"</span><span class="token punctuation">,</span> <span class="token punctuation">(</span><span class="token punctuation">(</span>nearest <span class="token operator">-</span> expected<span class="token punctuation">)</span> <span class="token operator">*</span> <span class="token number">1000</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">round</span><span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+<span class="token keyword">assert</span> np<span class="token punctuation">.</span>linalg<span class="token punctuation">.</span>norm<span class="token punctuation">(</span>nearest <span class="token operator">-</span> expected<span class="token punctuation">)</span> <span class="token operator">&lt;</span> <span class="token number">0.05</span>
+</code></pre></div>
+<p>Comparing against a transformation you computed separately with <code>pyproj</code> is what makes this a test rather than a tautology. A residual of tens of metres means the vertical datum was not applied; a residual of a few metres means the horizontal CRS was mislabelled; a residual of a few millimetres is the quantisation grid and is expected.</p>
+<h2 id="expected-output-verification" tabindex="-1"><a class="heading-link" href="#expected-output-verification"><span>Expected Output &amp; Verification</span></a></h2>
+<div class="codeblock" data-lang="text"><div class="codeblock__bar"><span class="codeblock__lang">text</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-text" tabindex="0" role="group" aria-label="text code sample"><code class="language-text">version: 1.1
+referenceSystem: https://www.opengis.net/def/crs/EPSG/0/25832
+transform: {'scale': [0.001, 0.001, 0.001], 'translate': [691000.0, 5335000.0, 310.0]}
+version: 2.0 | transform present: True | CRS: https://www.opengis.net/def/crs/EPSG/0/25832
+assigned 25832+7837
+CRS: https://www.opengis.net/def/crs/EPSG/0/4978 | scale: [0.001, 0.001, 0.001]
+worst coordinate change from rescaling: 0.500 mm
+extent: [4176533.41, 833224.58, 4726108.2, 4177298.77, 833951.02, 4726699.63]
+residual (mm): [ 0.4 -0.3  0.5]
+</code></pre></div>
+<p>An ECEF extent with values in the millions on all three axes is the signature of a correct reprojection; an extent that still shows 691,000 and 5,335,000 means <code>crs_reproject</code> did not run or was given the same CRS it already had.</p>
+<figure class="diagram">
+<svg viewBox="6 6 748 208" role="img" aria-labelledby="cjup-prec-t cjup-prec-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="cjup-prec-t">Transform scale and the resulting grid in different target CRSs</title>
+  <desc id="cjup-prec-d">A table of transform scale values against the grid they produce. A scale of one thousandth gives a millimetre grid in a metric projected CRS and in Earth-centred coordinates, but about a 110 metre grid in degrees. A scale of one billionth gives about a tenth of a millimetre in degrees and sub-nanometre precision, with larger integers, in metric systems.</desc>
+  <rect class="svg-bg" x="6" y="6" width="748" height="208" fill="#ffffff"/>
+  <g stroke-width="1.5">
+    <rect x="20" y="20" width="160" height="38" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="180" y="20" width="190" height="38" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="370" y="20" width="180" height="38" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="550" y="20" width="190" height="38" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="20" y="58" width="160" height="46" fill="#ffffff" stroke="#5b6471"/>
+    <rect x="180" y="58" width="190" height="46" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="370" y="58" width="180" height="46" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="550" y="58" width="190" height="46" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="20" y="104" width="160" height="46" fill="#ffffff" stroke="#5b6471"/>
+    <rect x="180" y="104" width="190" height="46" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="370" y="104" width="180" height="46" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="550" y="104" width="190" height="46" fill="#eef5e9" stroke="#4f7a4d"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="100" y="44">scale</text>
+    <text x="275" y="44">projected, metres</text>
+    <text x="460" y="44">EPSG:4978, metres</text>
+    <text x="645" y="44">EPSG:4326, degrees</text>
+    <text x="100" y="86">0.001</text><text x="275" y="86">1 mm</text><text x="460" y="86">1 mm</text><text x="645" y="86">≈ 110 m</text>
+    <text x="100" y="132">1e-9</text><text x="275" y="132">1 nm, long integers</text><text x="460" y="132">1 nm, long integers</text><text x="645" y="132">≈ 0.1 mm</text>
+  </g>
+  <text x="380" y="196" fill="#15384a" font-size="12.5" text-anchor="middle">Choose the scale from the target CRS units, then let the translate keep the integers short.</text>
+</svg>
+<figcaption>One scale cannot serve both metric and angular targets. Reprojection is the moment to reconsider it.</figcaption>
+</figure>
+<h2 id="performance-notes" tabindex="-1"><a class="heading-link" href="#performance-notes"><span>Performance Notes</span></a></h2>
+<ul>
+<li><strong>Reprojection cost is per vertex and PROJ is fast</strong>; the JSON parse and write dominate. A 40 MB tile with 1.8 million vertices takes seconds, so tiling the work by delivery tile is enough parallelism.</li>
+<li><strong>Quantisation is the only lossy step.</strong> Doing it once, at the end, keeps the total error at half a grid cell; rescaling twice doubles it.</li>
+<li><strong>Batch tiles with one process per tile</strong> and assert the CRS of each output, because a mixed-CRS collection of tiles is far harder to notice later than a failure now.</li>
+<li><strong>Cache the geoid grid locally</strong> in CI. Network grid access adds a round trip per transformation batch, and a CI runner without network grids silently falls back to a ballpark vertical transformation.</li>
+</ul>
+<h2 id="common-errors" tabindex="-1"><a class="heading-link" href="#common-errors"><span>Common Errors</span></a></h2>
+<p><strong>Every building is 40–50 m out vertically.</strong> The source CRS was horizontal-only when <code>crs_reproject</code> ran. Assign the compound code first; the underlying theory is in <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/handling-vertical-datums-and-geoid-separation/">handling vertical datums and geoid separation</a>.</p>
+<p><strong>The model collapses to a handful of distinct coordinates.</strong> A millimetre scale survived a reprojection into degrees. Rescale the transform as in step 4.</p>
+<p><strong><code>cjio</code> reports the CRS cannot be found.</strong> The EPSG code was passed with a prefix (<code>EPSG:4978</code>) where the operator expects the bare code, or the compound code is not in the PROJ database for the installed version. Try <code>projinfo</code> on the same code to confirm PROJ knows it.</p>
+<p><strong><code>upgrade</code> drops metadata fields.</strong> Several 1.0 metadata members do not exist in 1.1 and later. Copy anything you need into <code>+metadata-extended</code> or into your own sidecar before upgrading.</p>
+<h2 id="frequently-asked-questions" tabindex="-1"><a class="heading-link" href="#frequently-asked-questions"><span>Frequently Asked Questions</span></a></h2>
+<h3 id="should-city-models-be-stored-in-ecef" tabindex="-1"><a class="heading-link" href="#should-city-models-be-stored-in-ecef"><span>Should city models be stored in ECEF?</span></a></h3>
+<p>No. Keep the semantic source in a projected compound CRS, where areas and heights are directly meaningful, and convert to EPSG:4978 only as part of producing tiles for a viewer.</p>
+<h3 id="is-it-safe-to-reproject-twice" tabindex="-1"><a class="heading-link" href="#is-it-safe-to-reproject-twice"><span>Is it safe to reproject twice?</span></a></h3>
+<p>Geometrically yes, but each pass quantises. If a pipeline needs both a projected and an ECEF product, generate both from the original rather than chaining one from the other.</p>
+<h3 id="can-i-reproject-a-cityjsonseq-file" tabindex="-1"><a class="heading-link" href="#can-i-reproject-a-cityjsonseq-file"><span>Can I reproject a CityJSONSeq file?</span></a></h3>
+<p>Not with the operators above, which load a whole model. Process the features line by line with <code>pyproj</code> in a small script, keeping each feature’s own transform consistent, or reproject the CityJSON before exporting to JSONL.</p>
+<h2 id="related-guides" tabindex="-1"><a class="heading-link" href="#related-guides"><span>Related Guides</span></a></h2>
+<ul>
+<li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/validating-cityjson-with-cjval/">Validating CityJSON with cjval</a> — the check after every transformation</li>
+<li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/reading-and-filtering-cityjson-with-cjio/">Reading and Filtering CityJSON with cjio</a> — subsetting before reprojecting</li>
+<li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/transforming-between-epoch-based-datums/">Transforming Between Epoch-Based Datums</a> — when the source and target realisations differ in time</li>
+</ul>
+<p>Back to <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/">CityGML and CityJSON Processing for Digital Twins</a>.</p>
+
+
+      
+      
+
+      <div class="related-nav">
+        
+
+        
+          <div>
+            <h3>Related</h3>
+            <div class="related-grid">
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/computing-building-heights-and-volumes-from-cityjson/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Computing Building Heights and Volumes from CityJSON</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/converting-citygml-to-cityjson-with-citygml-tools/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Converting CityGML to CityJSON with citygml-tools</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/extracting-lod2-roof-surfaces-from-cityjson/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Extracting LOD2 Roof Surfaces from CityJSON</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/reading-and-filtering-cityjson-with-cjio/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Reading and Filtering CityJSON with cjio</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/validating-cityjson-with-cjval/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Validating CityJSON with cjval</span>
+                </a>
+              
+            </div>
+          </div>
+        
+      </div>
+    </article>
+
+    
+    <aside class="toc" aria-label="On this page" data-toc hidden>
+      <h4>On this page</h4>
+      <ul></ul>
+    </aside>
+  </div>
+</div>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+  <div class="container site-footer__inner">
+    <div class="site-footer__brand">
+      <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+        <img src="/assets/img/logo-mark.svg" alt="" class="brand__mark" width="36" height="36">
+        <span class="brand__name">
+          3D Geospatial
+          <small>Digital Twin Automation</small>
+        </span>
+      </a>
+      <p>Engineering-grade guides on point cloud processing, mesh pipelines, LOD strategies, and CI/CD automation for digital twin platforms.</p>
+      <a class="footer-social" href="https://github.com/3d-geospatial" aria-label="3D Geospatial on GitHub" rel="noopener" target="_blank">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+          <path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.53-1.34-1.3-1.7-1.3-1.7-1.06-.72.08-.71.08-.71 1.17.08 1.79 1.2 1.79 1.2 1.04 1.79 2.73 1.27 3.4.97.1-.75.4-1.27.73-1.56-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.19-3.08-.12-.3-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.75.11 3.05.74.8 1.19 1.83 1.19 3.08 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.07.78 2.15v3.18c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5Z"/>
+        </svg>
+        <span>GitHub</span>
+      </a>
+    </div>
+
+    <div class="site-footer__col">
+      <h4>Sections</h4>
+      <ul>
+        <li><a href="https://www.3d-geospatial.com/">Home</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management &amp; Optimization</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/">Point Cloud &amp; Mesh Pipelines</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/">Troubleshooting &amp; Reliability</a></li>
+        
+      </ul>
+    </div>
+
+    
+      <div class="site-footer__col">
+        <h4>3D Geospatial Fundamentals</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/">3D Format Standards Comparison</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/">BIM and IFC Georeferencing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/">CityGML and CityJSON Processing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems for 3D Assets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/">Digital Elevation Model Workflows</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/">Spatial Indexing and Tiling Schemes for 3D Data</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>LOD Management &amp; Optimization</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/">Automated Tile Generation for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/">Cesium ion Upload Automation for 3D Tilesets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/">glTF LOD Generation With Draco Compression</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/">Streaming Sync Patterns for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/">Tileset Metadata and 3D Tiles Next</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/">Vector Overlays on 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Point Cloud &amp; Mesh Pipelines</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/">Automated Mesh Decimation for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/">Change Detection Between LiDAR Scan Epochs</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/">CI/CD Automation for Spatial Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">LiDAR Classification and Ground Extraction</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/photogrammetry-processing-pipelines/">Photogrammetry Processing Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/">Point Cloud Filtering Techniques</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/">Surface Reconstruction for Geospatial Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/">Texture Mapping Workflows for Digital Twins</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Troubleshooting &amp; Reliability</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/">Cross-Section Failure Modes in Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/">Data Validation &amp; QA Gates for 3D Tiles</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/">Performance Profiling and Benchmarking</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/">Pipeline Observability and Monitoring</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/">Streaming &amp; Runtime Diagnostics for 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+  </div>
+  <div class="container site-footer__bottom">
+    <span>© 2026 3D Geospatial &amp; Digital Twin Automation</span>
+    <span>Built with Eleventy · PWA-enabled</span>
+  </div>
+</footer>
+
+
+  <script src="/assets/js/site.js?v=b99aa9f971" defer></script>
+  
+</body>
+</html>

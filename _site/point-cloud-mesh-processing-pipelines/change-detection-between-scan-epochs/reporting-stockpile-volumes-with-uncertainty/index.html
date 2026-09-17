@@ -1,0 +1,980 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <title>Reporting Stockpile Volumes with Uncertainty — 3D Geospatial</title>
+  <meta name="description" content="Measure a stockpile properly: toe delineation, base surface choice, prism integration, an error budget covering base, surface noise and toe">
+  <meta name="keywords" content="3D geospatial, digital twin, point cloud, mesh pipeline, LOD, 3D Tiles, Cesium, PDAL, Open3D, Python, CI/CD">
+  <meta name="author" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta name="theme-color" content="#1f6b8a" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f171d" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+
+  
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem("theme");
+        var theme = (stored === "dark" || stored === "light") ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    })();
+  </script>
+  <meta name="generator" content="Eleventy">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="googlebot" content="index,follow,max-image-preview:large">
+
+  
+  <link rel="canonical" href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/reporting-stockpile-volumes-with-uncertainty/">
+  <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">
+
+  
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/icon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+
+  
+  <link rel="apple-touch-icon" href="/assets/img/icon-180.png">
+  <link rel="mask-icon" href="/assets/img/logo.svg" color="#1f6b8a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="3D Geospatial">
+  <meta name="application-name" content="3D Geospatial">
+
+  
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Reporting Stockpile Volumes with Uncertainty — 3D Geospatial">
+  <meta property="og:description" content="Measure a stockpile properly: toe delineation, base surface choice, prism integration, an error budget covering base, surface noise and toe">
+  <meta property="og:url" content="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/reporting-stockpile-volumes-with-uncertainty/">
+  <meta property="og:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+  <meta property="og:site_name" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta property="og:locale" content="en_US">
+  
+  <meta property="article:published_time" content="2026-09-17T23:36:56.456Z">
+  <meta property="article:modified_time" content="2026-09-17T23:36:56.456Z">
+  <meta property="article:publisher" content="https://www.3d-geospatial.com/">
+  
+
+  
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Reporting Stockpile Volumes with Uncertainty — 3D Geospatial">
+  <meta name="twitter:description" content="Measure a stockpile properly: toe delineation, base surface choice, prism integration, an error budget covering base, surface noise and toe">
+  <meta name="twitter:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta name="twitter:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+
+  
+  <link rel="preload" href="/assets/css/styles.css?v=8c46394d6c" as="style">
+  
+
+  <link rel="stylesheet" href="/assets/css/styles.css?v=8c46394d6c">
+
+  
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.3d-geospatial.com/#organization",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "url": "https://www.3d-geospatial.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/icon-512.png",
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://www.3d-geospatial.com/#website",
+      "url": "https://www.3d-geospatial.com/",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "description": "Build reliable 3D spatial data pipelines for digital twins — point clouds, meshes, LOD strategies, Python processing, and CI/CD automation.",
+      "inLanguage": "en",
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      }
+    },
+    {
+      "@type": "TechArticle",
+      "@id": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/reporting-stockpile-volumes-with-uncertainty/#article",
+      "isPartOf": {
+        "@id": "https://www.3d-geospatial.com/#website"
+      },
+      "headline": "Reporting Stockpile Volumes with Uncertainty",
+      "name": "Reporting Stockpile Volumes with Uncertainty",
+      "description": "Measure a stockpile properly: toe delineation, base surface choice, prism integration, an error budget covering base, surface noise and toe",
+      "url": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/reporting-stockpile-volumes-with-uncertainty/",
+      "mainEntityOfPage": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/reporting-stockpile-volumes-with-uncertainty/",
+      "inLanguage": "en",
+      "datePublished": "2026-09-17T23:36:56.456Z",
+      "dateModified": "2026-09-17T23:36:56.456Z",
+      "author": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "image": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/og-cover.png",
+        "width": 1200,
+        "height": 630
+      },
+      "breadcrumb": {
+        "@id": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/reporting-stockpile-volumes-with-uncertainty/#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/reporting-stockpile-volumes-with-uncertainty/#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://www.3d-geospatial.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Point Cloud Mesh Processing Pipelines",
+          "item": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Change Detection Between Scan Epochs",
+          "item": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "name": "Reporting Stockpile Volumes With Uncertainty",
+          "item": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/reporting-stockpile-volumes-with-uncertainty/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  
+<header class="site-header" role="banner">
+  <div class="container site-header__inner">
+    <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+      <img src="/assets/img/logo.svg" alt="" class="brand__mark" width="36" height="36">
+      <span class="brand__name">
+        3D Geospatial
+        <small>Digital Twin Automation</small>
+      </span>
+    </a>
+
+    <button class="theme-toggle" type="button" data-theme-toggle
+            aria-label="Switch to dark theme" title="Switch to dark theme">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4.2"/>
+        <path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/>
+      </svg>
+    </button>
+
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>
+      <span class="nav-toggle__icon" aria-hidden="true"><span></span></span>
+      Menu
+    </button>
+
+    <nav class="primary-nav" id="primary-nav" aria-label="Primary">
+      
+      <a href="https://www.3d-geospatial.com/" >
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/>
+        </svg>
+        Home
+      </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2 3 7l9 5 9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 17l9 5 9-5"/>
+            </svg>
+          
+          3D Geospatial Fundamentals
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+          
+          LOD Management &amp; Optimization
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/" aria-current="page">
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="6" cy="6" r="1.5"/><circle cx="12" cy="6" r="1.5"/><circle cx="18" cy="6" r="1.5"/>
+              <circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/>
+              <circle cx="6" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="18" cy="18" r="1.5"/>
+            </svg>
+          
+          Point Cloud &amp; Mesh Pipelines
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <path d="M12 9v4"/><path d="M12 17h.01"/>
+            </svg>
+          
+          Troubleshooting &amp; Reliability
+        </a>
+      
+    </nav>
+  </div>
+</header>
+
+
+  <main id="main">
+    
+
+
+<div class="container">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    
+      
+        <a href="https://www.3d-geospatial.com/">Home</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/">Point Cloud Mesh Processing Pipelines</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/">Change Detection Between Scan Epochs</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <span class="current">Reporting Stockpile Volumes With Uncertainty</span>
+      
+    
+  </nav>
+
+  <div class="content-page">
+    <article class="article">
+      <h1 id="reporting-stockpile-volumes-with-uncertainty" tabindex="-1"><a class="heading-link" href="#reporting-stockpile-volumes-with-uncertainty"><span>Reporting Stockpile Volumes with Uncertainty</span></a></h1>
+<p>This page measures the volume of a stockpile from a drone survey and reports it with a defensible uncertainty — delineating the toe, choosing and justifying a base surface, integrating by prisms, building an error budget from the base, the surface noise, the toe position and the density assumption, and producing a report a quantity surveyor will accept.</p>
+<h2 id="why-you-hit-this" tabindex="-1"><a class="heading-link" href="#why-you-hit-this"><span>Why you hit this</span></a></h2>
+<p>A stockpile volume is a payment quantity. Someone is invoicing on it, so the number needs an uncertainty and the uncertainty needs a derivation — “about 4,200 cubic metres” is not a measurement, and “4,218.43 m³” is worse because the two decimal places are a claim of millimetre accuracy nobody can support.</p>
+<p>The dominant error source is almost never the survey’s point accuracy. It is the base surface: what the ground under the pile is assumed to be. A 2 cm error in the assumed base over a 1,400 m² footprint is 28 m³; a 20 cm error is 280 m³, which is 7% of a 4,000 m³ pile and typically much larger than everything else combined.</p>
+<h2 id="prerequisites" tabindex="-1"><a class="heading-link" href="#prerequisites"><span>Prerequisites</span></a></h2>
+<ul>
+<li>A point cloud of the pile, from drone photogrammetry or a scanner, with a known CRS and vertical datum.</li>
+<li>Python 3.10+ with <code>numpy</code>, <code>rasterio</code>, <code>scipy</code>, <code>shapely</code>, <code>pdal</code>.</li>
+<li>Ideally a pre-stockpile survey of the same ground, or surveyed spot heights around the toe.</li>
+</ul>
+<h2 id="step-by-step" tabindex="-1"><a class="heading-link" href="#step-by-step"><span>Step-by-Step</span></a></h2>
+<h3 id="1-delineate-the-toe" tabindex="-1"><a class="heading-link" href="#1-delineate-the-toe"><span>1. Delineate the toe</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> json
+<span class="token keyword">import</span> math
+<span class="token keyword">import</span> subprocess
+<span class="token keyword">from</span> pathlib <span class="token keyword">import</span> Path
+
+<span class="token keyword">import</span> numpy <span class="token keyword">as</span> np
+<span class="token keyword">import</span> rasterio
+<span class="token keyword">from</span> scipy <span class="token keyword">import</span> ndimage
+
+<span class="token keyword">def</span> <span class="token function">surface_grid</span><span class="token punctuation">(</span>las_path<span class="token punctuation">,</span> out_tif<span class="token punctuation">,</span> cell_m<span class="token operator">=</span><span class="token number">0.10</span><span class="token punctuation">,</span> statistic<span class="token operator">=</span><span class="token string">"max"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    pipeline <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token string">"pipeline"</span><span class="token punctuation">:</span> <span class="token punctuation">[</span>
+        <span class="token builtin">str</span><span class="token punctuation">(</span>las_path<span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"filters.range"</span><span class="token punctuation">,</span> <span class="token string">"limits"</span><span class="token punctuation">:</span> <span class="token string">"Classification![7:7]"</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+        <span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"writers.gdal"</span><span class="token punctuation">,</span> <span class="token string">"filename"</span><span class="token punctuation">:</span> <span class="token builtin">str</span><span class="token punctuation">(</span>out_tif<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"gdaldriver"</span><span class="token punctuation">:</span> <span class="token string">"GTiff"</span><span class="token punctuation">,</span>
+         <span class="token string">"output_type"</span><span class="token punctuation">:</span> statistic<span class="token punctuation">,</span> <span class="token string">"resolution"</span><span class="token punctuation">:</span> cell_m<span class="token punctuation">,</span> <span class="token string">"radius"</span><span class="token punctuation">:</span> cell_m <span class="token operator">*</span> <span class="token number">1.5</span><span class="token punctuation">,</span>
+         <span class="token string">"nodata"</span><span class="token punctuation">:</span> <span class="token operator">-</span><span class="token number">9999.0</span><span class="token punctuation">,</span> <span class="token string">"data_type"</span><span class="token punctuation">:</span> <span class="token string">"float32"</span><span class="token punctuation">,</span>
+         <span class="token string">"gdalopts"</span><span class="token punctuation">:</span> <span class="token string">"COMPRESS=DEFLATE,PREDICTOR=3,TILED=YES"</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+    <span class="token punctuation">]</span><span class="token punctuation">}</span>
+    spec <span class="token operator">=</span> Path<span class="token punctuation">(</span>out_tif<span class="token punctuation">)</span><span class="token punctuation">.</span>with_suffix<span class="token punctuation">(</span><span class="token string">".json"</span><span class="token punctuation">)</span>
+    spec<span class="token punctuation">.</span>write_text<span class="token punctuation">(</span>json<span class="token punctuation">.</span>dumps<span class="token punctuation">(</span>pipeline<span class="token punctuation">,</span> indent<span class="token operator">=</span><span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    subprocess<span class="token punctuation">.</span>run<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token string">"pdal"</span><span class="token punctuation">,</span> <span class="token string">"pipeline"</span><span class="token punctuation">,</span> <span class="token builtin">str</span><span class="token punctuation">(</span>spec<span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">,</span> check<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> capture_output<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+    <span class="token keyword">with</span> rasterio<span class="token punctuation">.</span><span class="token builtin">open</span><span class="token punctuation">(</span>out_tif<span class="token punctuation">)</span> <span class="token keyword">as</span> ds<span class="token punctuation">:</span>
+        <span class="token keyword">return</span> ds<span class="token punctuation">.</span>read<span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">,</span> masked<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span><span class="token punctuation">.</span>astype<span class="token punctuation">(</span><span class="token string">"float64"</span><span class="token punctuation">)</span><span class="token punctuation">,</span> ds<span class="token punctuation">.</span>transform<span class="token punctuation">,</span> ds<span class="token punctuation">.</span>crs<span class="token punctuation">,</span> ds<span class="token punctuation">.</span>res<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span>
+
+<span class="token keyword">def</span> <span class="token function">toe_from_slope</span><span class="token punctuation">(</span>z<span class="token punctuation">,</span> cell_m<span class="token punctuation">,</span> slope_threshold_deg<span class="token operator">=</span><span class="token number">12.0</span><span class="token punctuation">,</span> min_area_m2<span class="token operator">=</span><span class="token number">25.0</span><span class="token punctuation">,</span>
+                   close_iterations<span class="token operator">=</span><span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""The toe is where the pile's slope drops to the surrounding ground's."""</span>
+    filled <span class="token operator">=</span> np<span class="token punctuation">.</span>where<span class="token punctuation">(</span>np<span class="token punctuation">.</span>isfinite<span class="token punctuation">(</span>z<span class="token punctuation">)</span> <span class="token operator">&amp;</span> <span class="token operator">~</span><span class="token builtin">getattr</span><span class="token punctuation">(</span>z<span class="token punctuation">,</span> <span class="token string">"mask"</span><span class="token punctuation">,</span> <span class="token boolean">False</span><span class="token punctuation">)</span><span class="token punctuation">,</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>z<span class="token punctuation">)</span><span class="token punctuation">,</span> np<span class="token punctuation">.</span>nan<span class="token punctuation">)</span>
+    gy<span class="token punctuation">,</span> gx <span class="token operator">=</span> np<span class="token punctuation">.</span>gradient<span class="token punctuation">(</span>np<span class="token punctuation">.</span>nan_to_num<span class="token punctuation">(</span>filled<span class="token punctuation">,</span> nan<span class="token operator">=</span>np<span class="token punctuation">.</span>nanmedian<span class="token punctuation">(</span>filled<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> cell_m<span class="token punctuation">)</span>
+    slope <span class="token operator">=</span> np<span class="token punctuation">.</span>degrees<span class="token punctuation">(</span>np<span class="token punctuation">.</span>arctan<span class="token punctuation">(</span>np<span class="token punctuation">.</span>hypot<span class="token punctuation">(</span>gx<span class="token punctuation">,</span> gy<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    steep <span class="token operator">=</span> np<span class="token punctuation">.</span>nan_to_num<span class="token punctuation">(</span>slope<span class="token punctuation">,</span> nan<span class="token operator">=</span><span class="token number">0.0</span><span class="token punctuation">)</span> <span class="token operator">>=</span> slope_threshold_deg
+
+    closed <span class="token operator">=</span> ndimage<span class="token punctuation">.</span>binary_closing<span class="token punctuation">(</span>steep<span class="token punctuation">,</span> iterations<span class="token operator">=</span>close_iterations<span class="token punctuation">)</span>
+    filled_holes <span class="token operator">=</span> ndimage<span class="token punctuation">.</span>binary_fill_holes<span class="token punctuation">(</span>closed<span class="token punctuation">)</span>
+    labels<span class="token punctuation">,</span> n <span class="token operator">=</span> ndimage<span class="token punctuation">.</span>label<span class="token punctuation">(</span>filled_holes<span class="token punctuation">)</span>
+    <span class="token keyword">if</span> n <span class="token operator">==</span> <span class="token number">0</span><span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token boolean">None</span><span class="token punctuation">,</span> <span class="token punctuation">{</span><span class="token string">"found"</span><span class="token punctuation">:</span> <span class="token boolean">False</span><span class="token punctuation">,</span> <span class="token string">"reason"</span><span class="token punctuation">:</span> <span class="token string">"no region above the slope threshold"</span><span class="token punctuation">}</span>
+    sizes <span class="token operator">=</span> ndimage<span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>ones_like<span class="token punctuation">(</span>labels<span class="token punctuation">)</span><span class="token punctuation">,</span> labels<span class="token punctuation">,</span> index<span class="token operator">=</span>np<span class="token punctuation">.</span>arange<span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">,</span> n <span class="token operator">+</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    min_cells <span class="token operator">=</span> min_area_m2 <span class="token operator">/</span> <span class="token punctuation">(</span>cell_m <span class="token operator">**</span> <span class="token number">2</span><span class="token punctuation">)</span>
+    candidates <span class="token operator">=</span> np<span class="token punctuation">.</span>flatnonzero<span class="token punctuation">(</span>sizes <span class="token operator">>=</span> min_cells<span class="token punctuation">)</span> <span class="token operator">+</span> <span class="token number">1</span>
+    <span class="token keyword">if</span> candidates<span class="token punctuation">.</span>size <span class="token operator">==</span> <span class="token number">0</span><span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token boolean">None</span><span class="token punctuation">,</span> <span class="token punctuation">{</span><span class="token string">"found"</span><span class="token punctuation">:</span> <span class="token boolean">False</span><span class="token punctuation">,</span> <span class="token string">"reason"</span><span class="token punctuation">:</span> <span class="token string">"all candidate regions below min area"</span><span class="token punctuation">}</span>
+    biggest <span class="token operator">=</span> candidates<span class="token punctuation">[</span>np<span class="token punctuation">.</span>argmax<span class="token punctuation">(</span>sizes<span class="token punctuation">[</span>candidates <span class="token operator">-</span> <span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">]</span>
+    mask <span class="token operator">=</span> labels <span class="token operator">==</span> biggest
+    <span class="token keyword">return</span> mask<span class="token punctuation">,</span> <span class="token punctuation">{</span>
+        <span class="token string">"found"</span><span class="token punctuation">:</span> <span class="token boolean">True</span><span class="token punctuation">,</span>
+        <span class="token string">"regions_considered"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span>n<span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"candidates_over_min_area"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span>candidates<span class="token punctuation">.</span>size<span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"footprint_m2"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>mask<span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">*</span> cell_m <span class="token operator">**</span> <span class="token number">2</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"slope_threshold_deg"</span><span class="token punctuation">:</span> slope_threshold_deg<span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+</code></pre></div>
+<p>The toe is the largest single judgement in a stockpile measurement and it is worth making explicit rather than drawing by hand. A slope threshold is defensible and repeatable: the material’s angle of repose is 30–40°, the surrounding hardstanding is near 0°, so anything above 12° is on the pile.</p>
+<p>Filling holes matters because the pile’s own crest can be flat — a pile that has been driven over has a plateau on top, which the slope test excludes and <code>binary_fill_holes</code> restores.</p>
+<p>The threshold is also the toe’s uncertainty. Moving it from 12° to 15° shrinks the footprint, and the resulting volume difference is a real number that belongs in the error budget; step 5 computes it rather than arguing about it.</p>
+<figure class="diagram">
+<svg viewBox="46 33 650 227" role="img" aria-labelledby="pile-toe-t pile-toe-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="pile-toe-t">Toe delineation and its effect on volume</title>
+  <desc id="pile-toe-d">A cross-section of a stockpile on hardstanding. The pile rises at about 34 degrees from a toe at each side. A slope threshold of 12 degrees places the toe close to the true break in slope. A threshold of 20 degrees moves the toe up the flank, cutting 84 cubic metres from the volume. A threshold of 6 degrees extends the toe onto the surrounding apron, adding 61 cubic metres of hardstanding to the pile.</desc>
+  <rect class="svg-bg" x="46" y="33" width="650" height="227" fill="#ffffff"/>
+  <path d="M40 186 H700" stroke="#5b6471" stroke-width="1.6" fill="none"/>
+  <path d="M130 186 L300 72 L430 72 L590 186" stroke="#1f6b8a" stroke-width="2.6" fill="none"/>
+  <g stroke-width="2" stroke-dasharray="6 4" fill="none">
+    <path d="M130 186 V206" stroke="#4f7a4d"/>
+    <path d="M590 186 V206" stroke="#4f7a4d"/>
+    <path d="M182 152 V206" stroke="#b0413e"/>
+    <path d="M538 152 V206" stroke="#b0413e"/>
+    <path d="M92 186 V206" stroke="#c46a3d"/>
+    <path d="M628 186 V206" stroke="#c46a3d"/>
+  </g>
+  <g fill="#1f2937" font-size="12">
+    <text x="360" y="60" text-anchor="middle">plateau — slope test excludes it, fill_holes restores it</text>
+    <text x="242" y="132" text-anchor="middle">flank ≈ 34°</text>
+  </g>
+  <g font-size="12">
+    <text x="360" y="224" fill="#4f7a4d" text-anchor="middle">12° threshold — toe at the break in slope</text>
+    <text x="360" y="242" fill="#b0413e" text-anchor="middle">20° threshold: −84 m³ · 6° threshold: +61 m³ (apron included)</text>
+  </g>
+  <text x="60" y="180" fill="#5b6471" font-size="12">hardstanding</text>
+  <text x="648" y="180" fill="#5b6471" font-size="12">apron</text>
+</svg>
+<figcaption>A ±8° swing in the slope threshold is worth ±2% of the volume, which is why the threshold belongs in the error budget rather than in a judgement call.</figcaption>
+</figure>
+<h3 id="2-choose-the-base-surface-and-say-which-you-chose" tabindex="-1"><a class="heading-link" href="#2-choose-the-base-surface-and-say-which-you-chose"><span>2. Choose the base surface, and say which you chose</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python">BASE_METHODS <span class="token operator">=</span> <span class="token punctuation">{</span>
+    <span class="token string">"prior_survey"</span><span class="token punctuation">:</span> <span class="token string">"a survey of the same ground before the pile existed — best"</span><span class="token punctuation">,</span>
+    <span class="token string">"surveyed_spots"</span><span class="token punctuation">:</span> <span class="token string">"levelled spot heights around and under the toe — good"</span><span class="token punctuation">,</span>
+    <span class="token string">"toe_triangulation"</span><span class="token punctuation">:</span> <span class="token string">"a TIN through the delineated toe ring — usual fallback"</span><span class="token punctuation">,</span>
+    <span class="token string">"best_fit_plane"</span><span class="token punctuation">:</span> <span class="token string">"a plane fitted to the toe ring — for flat hardstanding"</span><span class="token punctuation">,</span>
+    <span class="token string">"constant_level"</span><span class="token punctuation">:</span> <span class="token string">"a single level — only for a known flat slab"</span><span class="token punctuation">,</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">def</span> <span class="token function">base_from_toe_triangulation</span><span class="token punctuation">(</span>z<span class="token punctuation">,</span> toe_mask<span class="token punctuation">,</span> cell_m<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""A surface interpolated across the footprint from the toe ring's heights."""</span>
+    ring <span class="token operator">=</span> toe_mask <span class="token operator">&amp;</span> <span class="token operator">~</span>ndimage<span class="token punctuation">.</span>binary_erosion<span class="token punctuation">(</span>toe_mask<span class="token punctuation">,</span> iterations<span class="token operator">=</span><span class="token number">2</span><span class="token punctuation">)</span>
+    ys<span class="token punctuation">,</span> xs <span class="token operator">=</span> np<span class="token punctuation">.</span>nonzero<span class="token punctuation">(</span>ring<span class="token punctuation">)</span>
+    heights <span class="token operator">=</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>z<span class="token punctuation">)</span><span class="token punctuation">[</span>ring<span class="token punctuation">]</span>
+    keep <span class="token operator">=</span> np<span class="token punctuation">.</span>isfinite<span class="token punctuation">(</span>heights<span class="token punctuation">)</span>
+    <span class="token keyword">if</span> keep<span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">&lt;</span> <span class="token number">20</span><span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token boolean">None</span><span class="token punctuation">,</span> <span class="token punctuation">{</span><span class="token string">"ok"</span><span class="token punctuation">:</span> <span class="token boolean">False</span><span class="token punctuation">,</span> <span class="token string">"reason"</span><span class="token punctuation">:</span> <span class="token string-interpolation"><span class="token string">f"only </span><span class="token interpolation"><span class="token punctuation">{</span><span class="token builtin">int</span><span class="token punctuation">(</span>keep<span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">}</span></span><span class="token string"> toe samples"</span></span><span class="token punctuation">}</span>
+    <span class="token keyword">from</span> scipy<span class="token punctuation">.</span>interpolate <span class="token keyword">import</span> griddata
+    pts <span class="token operator">=</span> np<span class="token punctuation">.</span>column_stack<span class="token punctuation">(</span><span class="token punctuation">[</span>xs<span class="token punctuation">[</span>keep<span class="token punctuation">]</span><span class="token punctuation">,</span> ys<span class="token punctuation">[</span>keep<span class="token punctuation">]</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    grid_y<span class="token punctuation">,</span> grid_x <span class="token operator">=</span> np<span class="token punctuation">.</span>mgrid<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">:</span>z<span class="token punctuation">.</span>shape<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">:</span>z<span class="token punctuation">.</span>shape<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">]</span>
+    base <span class="token operator">=</span> griddata<span class="token punctuation">(</span>pts<span class="token punctuation">,</span> heights<span class="token punctuation">[</span>keep<span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token punctuation">(</span>grid_x<span class="token punctuation">,</span> grid_y<span class="token punctuation">)</span><span class="token punctuation">,</span> method<span class="token operator">=</span><span class="token string">"linear"</span><span class="token punctuation">)</span>
+    nearest <span class="token operator">=</span> griddata<span class="token punctuation">(</span>pts<span class="token punctuation">,</span> heights<span class="token punctuation">[</span>keep<span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token punctuation">(</span>grid_x<span class="token punctuation">,</span> grid_y<span class="token punctuation">)</span><span class="token punctuation">,</span> method<span class="token operator">=</span><span class="token string">"nearest"</span><span class="token punctuation">)</span>
+    base <span class="token operator">=</span> np<span class="token punctuation">.</span>where<span class="token punctuation">(</span>np<span class="token punctuation">.</span>isfinite<span class="token punctuation">(</span>base<span class="token punctuation">)</span><span class="token punctuation">,</span> base<span class="token punctuation">,</span> nearest<span class="token punctuation">)</span>
+    <span class="token keyword">return</span> base<span class="token punctuation">,</span> <span class="token punctuation">{</span><span class="token string">"ok"</span><span class="token punctuation">:</span> <span class="token boolean">True</span><span class="token punctuation">,</span> <span class="token string">"toe_samples"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span>keep<span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                  <span class="token string">"toe_height_range_m"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>ptp<span class="token punctuation">(</span>heights<span class="token punctuation">[</span>keep<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                  <span class="token string">"method"</span><span class="token punctuation">:</span> <span class="token string">"toe_triangulation"</span><span class="token punctuation">}</span>
+
+<span class="token keyword">def</span> <span class="token function">base_from_plane</span><span class="token punctuation">(</span>z<span class="token punctuation">,</span> toe_mask<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    ring <span class="token operator">=</span> toe_mask <span class="token operator">&amp;</span> <span class="token operator">~</span>ndimage<span class="token punctuation">.</span>binary_erosion<span class="token punctuation">(</span>toe_mask<span class="token punctuation">,</span> iterations<span class="token operator">=</span><span class="token number">2</span><span class="token punctuation">)</span>
+    ys<span class="token punctuation">,</span> xs <span class="token operator">=</span> np<span class="token punctuation">.</span>nonzero<span class="token punctuation">(</span>ring<span class="token punctuation">)</span>
+    h <span class="token operator">=</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>z<span class="token punctuation">)</span><span class="token punctuation">[</span>ring<span class="token punctuation">]</span>
+    keep <span class="token operator">=</span> np<span class="token punctuation">.</span>isfinite<span class="token punctuation">(</span>h<span class="token punctuation">)</span>
+    A <span class="token operator">=</span> np<span class="token punctuation">.</span>column_stack<span class="token punctuation">(</span><span class="token punctuation">[</span>xs<span class="token punctuation">[</span>keep<span class="token punctuation">]</span><span class="token punctuation">,</span> ys<span class="token punctuation">[</span>keep<span class="token punctuation">]</span><span class="token punctuation">,</span> np<span class="token punctuation">.</span>ones<span class="token punctuation">(</span>keep<span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    coef<span class="token punctuation">,</span> residuals<span class="token punctuation">,</span> <span class="token operator">*</span>_ <span class="token operator">=</span> np<span class="token punctuation">.</span>linalg<span class="token punctuation">.</span>lstsq<span class="token punctuation">(</span>A<span class="token punctuation">,</span> h<span class="token punctuation">[</span>keep<span class="token punctuation">]</span><span class="token punctuation">,</span> rcond<span class="token operator">=</span><span class="token boolean">None</span><span class="token punctuation">)</span>
+    grid_y<span class="token punctuation">,</span> grid_x <span class="token operator">=</span> np<span class="token punctuation">.</span>mgrid<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">:</span>z<span class="token punctuation">.</span>shape<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">:</span>z<span class="token punctuation">.</span>shape<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">]</span>
+    base <span class="token operator">=</span> coef<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span> <span class="token operator">*</span> grid_x <span class="token operator">+</span> coef<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span> <span class="token operator">*</span> grid_y <span class="token operator">+</span> coef<span class="token punctuation">[</span><span class="token number">2</span><span class="token punctuation">]</span>
+    fit <span class="token operator">=</span> A @ coef
+    rms <span class="token operator">=</span> <span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>sqrt<span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token punctuation">(</span>h<span class="token punctuation">[</span>keep<span class="token punctuation">]</span> <span class="token operator">-</span> fit<span class="token punctuation">)</span> <span class="token operator">**</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">.</span>mean<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> base<span class="token punctuation">,</span> <span class="token punctuation">{</span><span class="token string">"ok"</span><span class="token punctuation">:</span> <span class="token boolean">True</span><span class="token punctuation">,</span> <span class="token string">"method"</span><span class="token punctuation">:</span> <span class="token string">"best_fit_plane"</span><span class="token punctuation">,</span>
+                  <span class="token string">"toe_samples"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span>keep<span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"plane_rms_m"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>rms<span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">}</span>
+
+<span class="token keyword">def</span> <span class="token function">base_from_prior</span><span class="token punctuation">(</span>prior_tif<span class="token punctuation">,</span> z_shape<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">with</span> rasterio<span class="token punctuation">.</span><span class="token builtin">open</span><span class="token punctuation">(</span>prior_tif<span class="token punctuation">)</span> <span class="token keyword">as</span> ds<span class="token punctuation">:</span>
+        base <span class="token operator">=</span> ds<span class="token punctuation">.</span>read<span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">,</span> masked<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span><span class="token punctuation">.</span>astype<span class="token punctuation">(</span><span class="token string">"float64"</span><span class="token punctuation">)</span>
+    <span class="token keyword">if</span> base<span class="token punctuation">.</span>shape <span class="token operator">!=</span> z_shape<span class="token punctuation">:</span>
+        <span class="token keyword">raise</span> ValueError<span class="token punctuation">(</span><span class="token string">"prior survey is not on the same grid"</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>base<span class="token punctuation">.</span>filled<span class="token punctuation">(</span>np<span class="token punctuation">.</span>nan<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token punctuation">{</span><span class="token string">"ok"</span><span class="token punctuation">:</span> <span class="token boolean">True</span><span class="token punctuation">,</span> <span class="token string">"method"</span><span class="token punctuation">:</span> <span class="token string">"prior_survey"</span><span class="token punctuation">}</span>
+</code></pre></div>
+<p>The base surface ranks the methods by how much they assume, and stating which was used is the single most important line in the report. A prior survey of the same ground measures the base; a toe triangulation <em>assumes</em> the ground under the pile follows the toe, which is wrong if the pile sits in a hollow or on a pad built up for it.</p>
+<p>The toe height range is the diagnostic for that assumption. A toe ring spanning 12 cm on flat hardstanding is fine; one spanning 1.4 m means the pile is on a slope, and a linear interpolation across the footprint is then a significant assumption that the error budget has to carry.</p>
+<p><code>plane_rms_m</code> from the plane fit serves the same purpose: a low RMS confirms the hardstanding is flat and the plane is a good base, while a high one says it is not.</p>
+<h3 id="3-integrate-by-prisms" tabindex="-1"><a class="heading-link" href="#3-integrate-by-prisms"><span>3. Integrate by prisms</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">prism_volume</span><span class="token punctuation">(</span>z<span class="token punctuation">,</span> base<span class="token punctuation">,</span> toe_mask<span class="token punctuation">,</span> cell_m<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Each cell is a prism of area cell² and height (surface − base)."""</span>
+    h <span class="token operator">=</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>z<span class="token punctuation">)</span> <span class="token operator">-</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>base<span class="token punctuation">)</span>
+    valid <span class="token operator">=</span> toe_mask <span class="token operator">&amp;</span> np<span class="token punctuation">.</span>isfinite<span class="token punctuation">(</span>h<span class="token punctuation">)</span>
+    <span class="token keyword">if</span> <span class="token builtin">hasattr</span><span class="token punctuation">(</span>z<span class="token punctuation">,</span> <span class="token string">"mask"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        valid <span class="token operator">&amp;</span><span class="token operator">=</span> <span class="token operator">~</span>z<span class="token punctuation">.</span>mask
+    heights <span class="token operator">=</span> np<span class="token punctuation">.</span>where<span class="token punctuation">(</span>valid<span class="token punctuation">,</span> h<span class="token punctuation">,</span> <span class="token number">0.0</span><span class="token punctuation">)</span>
+    cell_area <span class="token operator">=</span> cell_m <span class="token operator">**</span> <span class="token number">2</span>
+
+    positive <span class="token operator">=</span> <span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>clip<span class="token punctuation">(</span>heights<span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token boolean">None</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">*</span> cell_area
+    negative <span class="token operator">=</span> <span class="token builtin">float</span><span class="token punctuation">(</span><span class="token operator">-</span>np<span class="token punctuation">.</span>clip<span class="token punctuation">(</span>heights<span class="token punctuation">,</span> <span class="token boolean">None</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">*</span> cell_area
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token string">"volume_m3"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>positive <span class="token operator">-</span> negative<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"above_base_m3"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>positive<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"below_base_m3"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>negative<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"footprint_m2"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>valid<span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">*</span> cell_area<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"cells"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span>valid<span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"max_height_m"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>nanmax<span class="token punctuation">(</span>np<span class="token punctuation">.</span>where<span class="token punctuation">(</span>valid<span class="token punctuation">,</span> h<span class="token punctuation">,</span> np<span class="token punctuation">.</span>nan<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"mean_height_m"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>nanmean<span class="token punctuation">(</span>np<span class="token punctuation">.</span>where<span class="token punctuation">(</span>valid<span class="token punctuation">,</span> h<span class="token punctuation">,</span> np<span class="token punctuation">.</span>nan<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"nodata_cells_in_footprint"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span><span class="token punctuation">(</span>toe_mask <span class="token operator">&amp;</span> <span class="token operator">~</span>valid<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+</code></pre></div>
+<p>Prism integration over a grid is exact for the grid it is given and is the standard method. A TIN-based integration gives a slightly different answer on the same data — typically within 0.3% — because it interpolates the surface differently, and neither is more correct.</p>
+<p><code>below_base_m3</code> is a useful diagnostic that a single volume number hides. A pile with 40 m³ below its base either has a base that is too high, or sits in a depression that the toe triangulation could not see. Either way it is information.</p>
+<p><code>nodata_cells_in_footprint</code> is the other one to watch: cells inside the toe with no surface data, usually from a reflective or steep face the photogrammetry could not reconstruct. Those cells contribute zero, which understates the volume, and the count says by how much it might.</p>
+<h3 id="4-build-the-error-budget" tabindex="-1"><a class="heading-link" href="#4-build-the-error-budget"><span>4. Build the error budget</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">error_budget</span><span class="token punctuation">(</span>z<span class="token punctuation">,</span> base<span class="token punctuation">,</span> toe_mask<span class="token punctuation">,</span> cell_m<span class="token punctuation">,</span> surface_sigma_m<span class="token punctuation">,</span>
+                 base_sigma_m<span class="token punctuation">,</span> toe_sensitivity_m3<span class="token punctuation">,</span> correlation_length_m<span class="token operator">=</span><span class="token number">2.0</span><span class="token punctuation">,</span>
+                 confidence<span class="token operator">=</span><span class="token number">1.96</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Four independent contributions, combined in quadrature."""</span>
+    cell_area <span class="token operator">=</span> cell_m <span class="token operator">**</span> <span class="token number">2</span>
+    footprint <span class="token operator">=</span> <span class="token builtin">float</span><span class="token punctuation">(</span>toe_mask<span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">*</span> cell_area
+    n_cells <span class="token operator">=</span> <span class="token builtin">int</span><span class="token punctuation">(</span>toe_mask<span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+
+    <span class="token comment"># 1. Surface noise: partly random, correlated over a few metres.</span>
+    corr_cells <span class="token operator">=</span> <span class="token builtin">max</span><span class="token punctuation">(</span><span class="token punctuation">(</span>correlation_length_m <span class="token operator">/</span> cell_m<span class="token punctuation">)</span> <span class="token operator">**</span> <span class="token number">2</span><span class="token punctuation">,</span> <span class="token number">1.0</span><span class="token punctuation">)</span>
+    independent <span class="token operator">=</span> <span class="token builtin">max</span><span class="token punctuation">(</span>n_cells <span class="token operator">/</span> corr_cells<span class="token punctuation">,</span> <span class="token number">1.0</span><span class="token punctuation">)</span>
+    surface_term <span class="token operator">=</span> surface_sigma_m <span class="token operator">*</span> cell_area <span class="token operator">*</span> math<span class="token punctuation">.</span>sqrt<span class="token punctuation">(</span>independent<span class="token punctuation">)</span>
+
+    <span class="token comment"># 2. Base surface: a systematic offset over the whole footprint.</span>
+    base_term <span class="token operator">=</span> base_sigma_m <span class="token operator">*</span> footprint
+
+    <span class="token comment"># 3. Toe position: from re-running the delineation at a different threshold.</span>
+    toe_term <span class="token operator">=</span> toe_sensitivity_m3
+
+    <span class="token comment"># 4. Grid discretisation: half a cell of horizontal ambiguity at the perimeter.</span>
+    perimeter_cells <span class="token operator">=</span> <span class="token builtin">int</span><span class="token punctuation">(</span><span class="token punctuation">(</span>toe_mask <span class="token operator">&amp;</span> <span class="token operator">~</span>ndimage<span class="token punctuation">.</span>binary_erosion<span class="token punctuation">(</span>toe_mask<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    perimeter_m <span class="token operator">=</span> perimeter_cells <span class="token operator">*</span> cell_m
+    mean_edge_height <span class="token operator">=</span> <span class="token number">0.35</span>
+    grid_term <span class="token operator">=</span> perimeter_m <span class="token operator">*</span> <span class="token punctuation">(</span>cell_m <span class="token operator">/</span> <span class="token number">2.0</span><span class="token punctuation">)</span> <span class="token operator">*</span> mean_edge_height
+
+    total <span class="token operator">=</span> math<span class="token punctuation">.</span>sqrt<span class="token punctuation">(</span>surface_term <span class="token operator">**</span> <span class="token number">2</span> <span class="token operator">+</span> base_term <span class="token operator">**</span> <span class="token number">2</span>
+                      <span class="token operator">+</span> toe_term <span class="token operator">**</span> <span class="token number">2</span> <span class="token operator">+</span> grid_term <span class="token operator">**</span> <span class="token number">2</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token string">"footprint_m2"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>footprint<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"terms_m3"</span><span class="token punctuation">:</span> <span class="token punctuation">{</span>
+            <span class="token string">"surface_noise"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>surface_term<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"base_surface"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>base_term<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"toe_position"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>toe_term<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"grid_discretisation"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>grid_term<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token punctuation">}</span><span class="token punctuation">,</span>
+        <span class="token string">"dominant"</span><span class="token punctuation">:</span> <span class="token builtin">max</span><span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"surface_noise"</span><span class="token punctuation">:</span> surface_term<span class="token punctuation">,</span> <span class="token string">"base_surface"</span><span class="token punctuation">:</span> base_term<span class="token punctuation">,</span>
+                         <span class="token string">"toe_position"</span><span class="token punctuation">:</span> toe_term<span class="token punctuation">,</span>
+                         <span class="token string">"grid_discretisation"</span><span class="token punctuation">:</span> grid_term<span class="token punctuation">}</span><span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                        key<span class="token operator">=</span><span class="token keyword">lambda</span> kv<span class="token punctuation">:</span> kv<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+        <span class="token string">"combined_1sigma_m3"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>total<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"expanded_m3"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>total <span class="token operator">*</span> confidence<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"confidence"</span><span class="token punctuation">:</span> <span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span><span class="token builtin">int</span><span class="token punctuation">(</span>confidence <span class="token operator">*</span> <span class="token number">100</span> <span class="token operator">/</span> <span class="token number">1.96</span> <span class="token operator">*</span> <span class="token number">0.95</span><span class="token punctuation">)</span><span class="token punctuation">}</span></span><span class="token string">%"</span></span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+
+<span class="token keyword">def</span> <span class="token function">toe_sensitivity</span><span class="token punctuation">(</span>z<span class="token punctuation">,</span> base_fn<span class="token punctuation">,</span> cell_m<span class="token punctuation">,</span> thresholds<span class="token operator">=</span><span class="token punctuation">(</span><span class="token number">9.0</span><span class="token punctuation">,</span> <span class="token number">12.0</span><span class="token punctuation">,</span> <span class="token number">16.0</span><span class="token punctuation">,</span> <span class="token number">20.0</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Re-run the whole measurement at several toe thresholds; the spread is the term."""</span>
+    results <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    <span class="token keyword">for</span> t <span class="token keyword">in</span> thresholds<span class="token punctuation">:</span>
+        mask<span class="token punctuation">,</span> info <span class="token operator">=</span> toe_from_slope<span class="token punctuation">(</span>z<span class="token punctuation">,</span> cell_m<span class="token punctuation">,</span> slope_threshold_deg<span class="token operator">=</span>t<span class="token punctuation">)</span>
+        <span class="token keyword">if</span> mask <span class="token keyword">is</span> <span class="token boolean">None</span><span class="token punctuation">:</span>
+            <span class="token keyword">continue</span>
+        base<span class="token punctuation">,</span> binfo <span class="token operator">=</span> base_fn<span class="token punctuation">(</span>z<span class="token punctuation">,</span> mask<span class="token punctuation">,</span> cell_m<span class="token punctuation">)</span>
+        <span class="token keyword">if</span> base <span class="token keyword">is</span> <span class="token boolean">None</span><span class="token punctuation">:</span>
+            <span class="token keyword">continue</span>
+        vol <span class="token operator">=</span> prism_volume<span class="token punctuation">(</span>z<span class="token punctuation">,</span> base<span class="token punctuation">,</span> mask<span class="token punctuation">,</span> cell_m<span class="token punctuation">)</span>
+        results<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"threshold_deg"</span><span class="token punctuation">:</span> t<span class="token punctuation">,</span> <span class="token string">"volume_m3"</span><span class="token punctuation">:</span> vol<span class="token punctuation">[</span><span class="token string">"volume_m3"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+                        <span class="token string">"footprint_m2"</span><span class="token punctuation">:</span> vol<span class="token punctuation">[</span><span class="token string">"footprint_m2"</span><span class="token punctuation">]</span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+    <span class="token keyword">if</span> <span class="token builtin">len</span><span class="token punctuation">(</span>results<span class="token punctuation">)</span> <span class="token operator">&lt;</span> <span class="token number">2</span><span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token number">0.0</span><span class="token punctuation">,</span> <span class="token punctuation">{</span><span class="token string">"measurable"</span><span class="token punctuation">:</span> <span class="token boolean">False</span><span class="token punctuation">}</span>
+    vols <span class="token operator">=</span> <span class="token punctuation">[</span>r<span class="token punctuation">[</span><span class="token string">"volume_m3"</span><span class="token punctuation">]</span> <span class="token keyword">for</span> r <span class="token keyword">in</span> results<span class="token punctuation">]</span>
+    spread <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token builtin">max</span><span class="token punctuation">(</span>vols<span class="token punctuation">)</span> <span class="token operator">-</span> <span class="token builtin">min</span><span class="token punctuation">(</span>vols<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token number">2.0</span>
+    <span class="token keyword">return</span> spread<span class="token punctuation">,</span> <span class="token punctuation">{</span><span class="token string">"measurable"</span><span class="token punctuation">:</span> <span class="token boolean">True</span><span class="token punctuation">,</span> <span class="token string">"runs"</span><span class="token punctuation">:</span> results<span class="token punctuation">,</span>
+                    <span class="token string">"half_range_m3"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>spread<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">}</span>
+</code></pre></div>
+<p>Combining in quadrature is right because the four contributions are independent, and the point of writing them out separately is to see which dominates. On almost every real pile it is the base surface, which tells you where to spend effort: another hour surveying spot heights under the toe is worth more than a better camera.</p>
+<p>The toe term measured by re-running the delineation, rather than assumed, is what makes this an error budget rather than a guess. It costs three extra runs of a fast calculation and produces a number nobody can argue with.</p>
+<p>The grid term is usually small and is included because it is the one a reviewer will ask about: a half-cell horizontal ambiguity around a 140 m perimeter at 35 cm mean edge height is about 2.5 m³ at a 10 cm cell, which is negligible, and demonstrating that it is negligible is worth the three lines.</p>
+<h3 id="5-convert-to-tonnes-only-with-a-stated-density" tabindex="-1"><a class="heading-link" href="#5-convert-to-tonnes-only-with-a-stated-density"><span>5. Convert to tonnes only with a stated density</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">to_tonnes</span><span class="token punctuation">(</span>volume_m3<span class="token punctuation">,</span> bulk_density_t_per_m3<span class="token punctuation">,</span> density_sigma<span class="token punctuation">,</span>
+              volume_sigma_m3<span class="token punctuation">,</span> moisture_pct<span class="token operator">=</span><span class="token boolean">None</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    mass <span class="token operator">=</span> volume_m3 <span class="token operator">*</span> bulk_density_t_per_m3
+    rel_v <span class="token operator">=</span> volume_sigma_m3 <span class="token operator">/</span> <span class="token builtin">max</span><span class="token punctuation">(</span>volume_m3<span class="token punctuation">,</span> <span class="token number">1e-9</span><span class="token punctuation">)</span>
+    rel_d <span class="token operator">=</span> density_sigma <span class="token operator">/</span> <span class="token builtin">max</span><span class="token punctuation">(</span>bulk_density_t_per_m3<span class="token punctuation">,</span> <span class="token number">1e-9</span><span class="token punctuation">)</span>
+    rel_total <span class="token operator">=</span> math<span class="token punctuation">.</span>hypot<span class="token punctuation">(</span>rel_v<span class="token punctuation">,</span> rel_d<span class="token punctuation">)</span>
+    out <span class="token operator">=</span> <span class="token punctuation">{</span>
+        <span class="token string">"volume_m3"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>volume_m3<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"bulk_density_t_per_m3"</span><span class="token punctuation">:</span> bulk_density_t_per_m3<span class="token punctuation">,</span>
+        <span class="token string">"mass_t"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>mass<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"mass_uncertainty_t"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>mass <span class="token operator">*</span> rel_total<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"relative_from_volume_pct"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>rel_v <span class="token operator">*</span> <span class="token number">100</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"relative_from_density_pct"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>rel_d <span class="token operator">*</span> <span class="token number">100</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"dominant"</span><span class="token punctuation">:</span> <span class="token string">"density"</span> <span class="token keyword">if</span> rel_d <span class="token operator">></span> rel_v <span class="token keyword">else</span> <span class="token string">"volume"</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+    <span class="token keyword">if</span> moisture_pct <span class="token keyword">is</span> <span class="token keyword">not</span> <span class="token boolean">None</span><span class="token punctuation">:</span>
+        out<span class="token punctuation">[</span><span class="token string">"dry_mass_t"</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token builtin">round</span><span class="token punctuation">(</span>mass <span class="token operator">/</span> <span class="token punctuation">(</span><span class="token number">1</span> <span class="token operator">+</span> moisture_pct <span class="token operator">/</span> <span class="token number">100.0</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span>
+        out<span class="token punctuation">[</span><span class="token string">"moisture_pct"</span><span class="token punctuation">]</span> <span class="token operator">=</span> moisture_pct
+    <span class="token keyword">return</span> out
+
+<span class="token keyword">print</span><span class="token punctuation">(</span>to_tonnes<span class="token punctuation">(</span><span class="token number">4218.4</span><span class="token punctuation">,</span> bulk_density_t_per_m3<span class="token operator">=</span><span class="token number">1.62</span><span class="token punctuation">,</span> density_sigma<span class="token operator">=</span><span class="token number">0.08</span><span class="token punctuation">,</span>
+                volume_sigma_m3<span class="token operator">=</span><span class="token number">48.2</span><span class="token punctuation">,</span> moisture_pct<span class="token operator">=</span><span class="token number">6.5</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Tonnage is what gets invoiced and the density is almost always the larger uncertainty. A bulk density of 1.62 ± 0.08 t/m³ is a 4.9% relative uncertainty against roughly 1.1% from the volume — so a survey accurate to 1% delivers a tonnage accurate to 5%, and reporting the tonnage without the density uncertainty misrepresents the measurement entirely.</p>
+<p>Saying so explicitly is also the professional move: it moves the conversation from “is your survey accurate?” to “where did the density figure come from?”, which is the question that actually matters.</p>
+<figure class="diagram">
+<svg viewBox="4 6 732 278" role="img" aria-labelledby="pile-base-t pile-base-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="pile-base-t">Base surface methods ranked by what they assume</title>
+  <desc id="pile-base-d">A table of five base surface methods ordered by how much each assumes. A prior survey of the same ground measures the base and assumes nothing, giving an uncertainty of one to two centimetres. Levelled spot heights under the toe are nearly as good. A triangulated toe ring assumes the ground under the pile follows its toe. A best-fit plane assumes the hardstanding is flat. A single constant level assumes a known slab.</desc>
+  <rect class="svg-bg" x="4" y="6" width="732" height="278" fill="#ffffff"/>
+  <g stroke-width="1.5">
+    <rect x="18" y="20" width="268" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="286" y="20" width="236" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="522" y="20" width="200" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="18" y="54" width="268" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="286" y="54" width="236" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="522" y="54" width="200" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="18" y="88" width="268" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="286" y="88" width="236" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="522" y="88" width="200" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="18" y="122" width="268" height="34" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="286" y="122" width="236" height="34" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="522" y="122" width="200" height="34" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="18" y="156" width="268" height="34" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="286" y="156" width="236" height="34" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="522" y="156" width="200" height="34" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="18" y="190" width="268" height="34" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="286" y="190" width="236" height="34" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="522" y="190" width="200" height="34" fill="#f7dfdc" stroke="#b0413e"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="152" y="42">method</text><text x="404" y="42">assumes</text><text x="622" y="42">base sigma</text>
+    <text x="152" y="76">prior survey of the ground</text><text x="404" y="76">nothing</text><text x="622" y="76">0.01–0.02 m</text>
+    <text x="152" y="110">levelled spot heights</text><text x="404" y="110">interpolation between them</text><text x="622" y="110">0.02–0.03 m</text>
+    <text x="152" y="144">triangulated toe ring</text><text x="404" y="144">ground follows the toe</text><text x="622" y="144">0.05 m</text>
+    <text x="152" y="178">best-fit plane through the toe</text><text x="404" y="178">the hardstanding is flat</text><text x="622" y="178">0.05–0.08 m</text>
+    <text x="152" y="212">single constant level</text><text x="404" y="212">a known flat slab</text><text x="622" y="212">0.10 m or worse</text>
+  </g>
+  <text x="20" y="244" fill="#1f2937" font-size="12.5">The base is the dominant error term on almost every pile, so this choice decides the uncertainty.</text>
+  <text x="20" y="266" fill="#5b6471" font-size="12">An hour surveying spot heights under the toe is worth more than a better camera.</text>
+</svg>
+<figcaption>The base surface dominates the error budget, so the method chosen decides the reported uncertainty.</figcaption>
+</figure>
+<h3 id="6-produce-the-report" tabindex="-1"><a class="heading-link" href="#6-produce-the-report"><span>6. Produce the report</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">stockpile_report</span><span class="token punctuation">(</span>las_path<span class="token punctuation">,</span> out_dir<span class="token operator">=</span><span class="token string">"build/stockpile"</span><span class="token punctuation">,</span> cell_m<span class="token operator">=</span><span class="token number">0.10</span><span class="token punctuation">,</span>
+                     base_method<span class="token operator">=</span><span class="token string">"toe_triangulation"</span><span class="token punctuation">,</span> prior_tif<span class="token operator">=</span><span class="token boolean">None</span><span class="token punctuation">,</span>
+                     surface_sigma_m<span class="token operator">=</span><span class="token number">0.025</span><span class="token punctuation">,</span> base_sigma_m<span class="token operator">=</span><span class="token number">0.05</span><span class="token punctuation">,</span>
+                     bulk_density<span class="token operator">=</span><span class="token boolean">None</span><span class="token punctuation">,</span> density_sigma<span class="token operator">=</span><span class="token boolean">None</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    Path<span class="token punctuation">(</span>out_dir<span class="token punctuation">)</span><span class="token punctuation">.</span>mkdir<span class="token punctuation">(</span>parents<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> exist_ok<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+    z<span class="token punctuation">,</span> transform<span class="token punctuation">,</span> crs<span class="token punctuation">,</span> res <span class="token operator">=</span> surface_grid<span class="token punctuation">(</span>las_path<span class="token punctuation">,</span> <span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>out_dir<span class="token punctuation">}</span></span><span class="token string">/surface.tif"</span></span><span class="token punctuation">,</span> cell_m<span class="token operator">=</span>cell_m<span class="token punctuation">)</span>
+
+    toe_mask<span class="token punctuation">,</span> toe_info <span class="token operator">=</span> toe_from_slope<span class="token punctuation">(</span>z<span class="token punctuation">,</span> res<span class="token punctuation">)</span>
+    <span class="token keyword">if</span> toe_mask <span class="token keyword">is</span> <span class="token boolean">None</span><span class="token punctuation">:</span>
+        <span class="token keyword">raise</span> RuntimeError<span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"toe delineation failed: </span><span class="token interpolation"><span class="token punctuation">{</span>toe_info<span class="token punctuation">[</span><span class="token string">'reason'</span><span class="token punctuation">]</span><span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+
+    base_fn <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token string">"toe_triangulation"</span><span class="token punctuation">:</span> base_from_toe_triangulation<span class="token punctuation">,</span>
+               <span class="token string">"best_fit_plane"</span><span class="token punctuation">:</span> <span class="token keyword">lambda</span> zz<span class="token punctuation">,</span> mm<span class="token punctuation">,</span> cc<span class="token punctuation">:</span> base_from_plane<span class="token punctuation">(</span>zz<span class="token punctuation">,</span> mm<span class="token punctuation">)</span><span class="token punctuation">}</span><span class="token punctuation">[</span>base_method<span class="token punctuation">]</span>
+    base<span class="token punctuation">,</span> base_info <span class="token operator">=</span> <span class="token punctuation">(</span>base_from_prior<span class="token punctuation">(</span>prior_tif<span class="token punctuation">,</span> z<span class="token punctuation">.</span>shape<span class="token punctuation">)</span> <span class="token keyword">if</span> prior_tif
+                       <span class="token keyword">else</span> base_fn<span class="token punctuation">(</span>z<span class="token punctuation">,</span> toe_mask<span class="token punctuation">,</span> res<span class="token punctuation">)</span><span class="token punctuation">)</span>
+    vol <span class="token operator">=</span> prism_volume<span class="token punctuation">(</span>z<span class="token punctuation">,</span> base<span class="token punctuation">,</span> toe_mask<span class="token punctuation">,</span> res<span class="token punctuation">)</span>
+    toe_term<span class="token punctuation">,</span> toe_detail <span class="token operator">=</span> toe_sensitivity<span class="token punctuation">(</span>z<span class="token punctuation">,</span> base_fn<span class="token punctuation">,</span> res<span class="token punctuation">)</span>
+    budget <span class="token operator">=</span> error_budget<span class="token punctuation">(</span>z<span class="token punctuation">,</span> base<span class="token punctuation">,</span> toe_mask<span class="token punctuation">,</span> res<span class="token punctuation">,</span> surface_sigma_m<span class="token punctuation">,</span> base_sigma_m<span class="token punctuation">,</span> toe_term<span class="token punctuation">)</span>
+
+    report <span class="token operator">=</span> <span class="token punctuation">{</span>
+        <span class="token string">"survey"</span><span class="token punctuation">:</span> <span class="token punctuation">{</span><span class="token string">"source"</span><span class="token punctuation">:</span> Path<span class="token punctuation">(</span>las_path<span class="token punctuation">)</span><span class="token punctuation">.</span>name<span class="token punctuation">,</span> <span class="token string">"cell_m"</span><span class="token punctuation">:</span> res<span class="token punctuation">,</span>
+                   <span class="token string">"crs"</span><span class="token punctuation">:</span> <span class="token builtin">str</span><span class="token punctuation">(</span>crs<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"surface_statistic"</span><span class="token punctuation">:</span> <span class="token string">"max"</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+        <span class="token string">"toe"</span><span class="token punctuation">:</span> toe_info<span class="token punctuation">,</span>
+        <span class="token string">"base"</span><span class="token punctuation">:</span> <span class="token punctuation">{</span><span class="token operator">**</span>base_info<span class="token punctuation">,</span> <span class="token string">"declared_method"</span><span class="token punctuation">:</span> base_info<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"method"</span><span class="token punctuation">,</span> base_method<span class="token punctuation">)</span><span class="token punctuation">,</span>
+                 <span class="token string">"assumed_sigma_m"</span><span class="token punctuation">:</span> base_sigma_m<span class="token punctuation">}</span><span class="token punctuation">,</span>
+        <span class="token string">"volume"</span><span class="token punctuation">:</span> vol<span class="token punctuation">,</span>
+        <span class="token string">"toe_sensitivity"</span><span class="token punctuation">:</span> toe_detail<span class="token punctuation">,</span>
+        <span class="token string">"uncertainty"</span><span class="token punctuation">:</span> budget<span class="token punctuation">,</span>
+        <span class="token string">"headline"</span><span class="token punctuation">:</span> <span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>vol<span class="token punctuation">[</span><span class="token string">'volume_m3'</span><span class="token punctuation">]</span><span class="token punctuation">:</span><span class="token format-spec">.0f</span><span class="token punctuation">}</span></span><span class="token string"> ± </span><span class="token interpolation"><span class="token punctuation">{</span>budget<span class="token punctuation">[</span><span class="token string">'expanded_m3'</span><span class="token punctuation">]</span><span class="token punctuation">:</span><span class="token format-spec">.0f</span><span class="token punctuation">}</span></span><span class="token string"> m³ "</span></span>
+                    <span class="token string-interpolation"><span class="token string">f"(</span><span class="token interpolation"><span class="token punctuation">{</span>budget<span class="token punctuation">[</span><span class="token string">'expanded_m3'</span><span class="token punctuation">]</span> <span class="token operator">/</span> <span class="token builtin">max</span><span class="token punctuation">(</span>vol<span class="token punctuation">[</span><span class="token string">'volume_m3'</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span> <span class="token operator">*</span> <span class="token number">100</span><span class="token punctuation">:</span><span class="token format-spec">.1f</span><span class="token punctuation">}</span></span><span class="token string">%), "</span></span>
+                    <span class="token string-interpolation"><span class="token string">f"base from </span><span class="token interpolation"><span class="token punctuation">{</span>base_info<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">'method'</span><span class="token punctuation">,</span> base_method<span class="token punctuation">)</span><span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+    <span class="token keyword">if</span> bulk_density<span class="token punctuation">:</span>
+        report<span class="token punctuation">[</span><span class="token string">"mass"</span><span class="token punctuation">]</span> <span class="token operator">=</span> to_tonnes<span class="token punctuation">(</span>vol<span class="token punctuation">[</span><span class="token string">"volume_m3"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> bulk_density<span class="token punctuation">,</span> density_sigma <span class="token keyword">or</span> <span class="token number">0.08</span><span class="token punctuation">,</span>
+                                   budget<span class="token punctuation">[</span><span class="token string">"expanded_m3"</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    Path<span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>out_dir<span class="token punctuation">}</span></span><span class="token string">/report.json"</span></span><span class="token punctuation">)</span><span class="token punctuation">.</span>write_text<span class="token punctuation">(</span>json<span class="token punctuation">.</span>dumps<span class="token punctuation">(</span>report<span class="token punctuation">,</span> indent<span class="token operator">=</span><span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> report
+
+<span class="token keyword">print</span><span class="token punctuation">(</span>json<span class="token punctuation">.</span>dumps<span class="token punctuation">(</span>stockpile_report<span class="token punctuation">(</span><span class="token string">"input/pile_a.laz"</span><span class="token punctuation">,</span> bulk_density<span class="token operator">=</span><span class="token number">1.62</span><span class="token punctuation">)</span><span class="token punctuation">,</span> indent<span class="token operator">=</span><span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<figure class="diagram">
+<svg viewBox="26 12 688 230" role="img" aria-labelledby="pile-budget-t pile-budget-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="pile-budget-t">Where the uncertainty comes from</title>
+  <desc id="pile-budget-d">A bar chart of the four error terms for a 4218 cubic metre pile with a 1412 square metre footprint. The base surface contributes 71 cubic metres and dominates. Toe position contributes 42. Surface noise contributes 9. Grid discretisation contributes 2.5. Combined in quadrature the one-sigma uncertainty is 83 cubic metres and the expanded 95 percent figure is 163, about 3.9 percent of the volume.</desc>
+  <rect class="svg-bg" x="26" y="12" width="688" height="230" fill="#ffffff"/>
+  <path d="M40 26 V176 H700" stroke="#5b6471" stroke-width="1.5" fill="none"/>
+  <g stroke-width="1.5">
+    <rect x="40" y="34" width="284" height="28" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="40" y="70" width="168" height="28" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="40" y="106" width="36" height="28" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="40" y="142" width="10" height="28" fill="#eef5e9" stroke="#4f7a4d"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5">
+    <text x="334" y="52">base surface: 71 m³ (5 cm over 1,412 m²)</text>
+    <text x="218" y="88">toe position: 42 m³ (re-run at 9°–20°)</text>
+    <text x="86" y="124">surface noise: 9 m³ (2.5 cm, 141k cells)</text>
+    <text x="60" y="160">grid discretisation: 2.5 m³</text>
+  </g>
+  <text x="40" y="200" fill="#1f2937" font-size="12.5">combined 1σ: 83 m³ · expanded 95%: 163 m³ · headline 4,218 ± 163 m³ (3.9%)</text>
+  <text x="40" y="224" fill="#5b6471" font-size="12">the survey's own point accuracy is the smallest term; the base assumption is 8× larger</text>
+</svg>
+<figcaption>Better survey accuracy would move the smallest bar; surveying the ground under the pile before it was built would remove the largest.</figcaption>
+</figure>
+<h2 id="expected-output-verification" tabindex="-1"><a class="heading-link" href="#expected-output-verification"><span>Expected Output &amp; Verification</span></a></h2>
+<div class="codeblock" data-lang="text"><div class="codeblock__bar"><span class="codeblock__lang">text</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-text" tabindex="0" role="group" aria-label="text code sample"><code class="language-text">{
+  "survey": {"source": "pile_a.laz", "cell_m": 0.1, "crs": "EPSG:25832",
+             "surface_statistic": "max"},
+  "toe": {"found": true, "regions_considered": 14, "candidates_over_min_area": 1,
+          "footprint_m2": 1412.4, "slope_threshold_deg": 12.0},
+  "base": {"ok": true, "toe_samples": 1184, "toe_height_range_m": 0.184,
+           "method": "toe_triangulation", "declared_method": "toe_triangulation",
+           "assumed_sigma_m": 0.05},
+  "volume": {"volume_m3": 4218.4, "above_base_m3": 4226.1, "below_base_m3": 7.7,
+             "footprint_m2": 1412.4, "cells": 141240, "max_height_m": 8.412,
+             "mean_height_m": 2.987, "nodata_cells_in_footprint": 184},
+  "toe_sensitivity": {"measurable": true, "half_range_m3": 42.1, "runs": [
+     {"threshold_deg": 9.0, "volume_m3": 4279.8, "footprint_m2": 1508.2},
+     {"threshold_deg": 12.0, "volume_m3": 4218.4, "footprint_m2": 1412.4},
+     {"threshold_deg": 16.0, "volume_m3": 4212.0, "footprint_m2": 1364.1},
+     {"threshold_deg": 20.0, "volume_m3": 4195.6, "footprint_m2": 1298.4}]},
+  "uncertainty": {"terms_m3": {"surface_noise": 9.2, "base_surface": 70.6,
+                               "toe_position": 42.1, "grid_discretisation": 2.5},
+                  "dominant": "base_surface",
+                  "combined_1sigma_m3": 82.9, "expanded_m3": 162.5},
+  "headline": "4218 ± 163 m³ (3.9%), base from toe_triangulation",
+  "mass": {"volume_m3": 4218.4, "bulk_density_t_per_m3": 1.62, "mass_t": 6833.8,
+           "mass_uncertainty_t": 352.1, "relative_from_volume_pct": 3.85,
+           "relative_from_density_pct": 4.94, "dominant": "density"}
+}
+</code></pre></div>
+<p>The headline is the deliverable: “4,218 ± 163 m³ (3.9%), base from toe triangulation”. The 0.184 m toe height range confirms the hardstanding is flat enough for the triangulated base to be reasonable, and the 184 nodata cells inside the footprint are 1.84 m² — small enough to ignore and worth stating.</p>
+<p>The mass line is where the conversation usually goes, and there the density’s 4.94% dominates the volume’s 3.85%.</p>
+<p>Verify the volume against an independent integration method, since a bug in the masking or the base would not be visible in the number:</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">tin_cross_check</span><span class="token punctuation">(</span>las_path<span class="token punctuation">,</span> toe_mask<span class="token punctuation">,</span> base<span class="token punctuation">,</span> transform<span class="token punctuation">,</span> cell_m<span class="token punctuation">,</span> tolerance_pct<span class="token operator">=</span><span class="token number">1.0</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Integrate the same surface as a TIN and compare with the prism result."""</span>
+    <span class="token keyword">import</span> trimesh
+    <span class="token keyword">from</span> scipy<span class="token punctuation">.</span>spatial <span class="token keyword">import</span> Delaunay
+
+    ys<span class="token punctuation">,</span> xs <span class="token operator">=</span> np<span class="token punctuation">.</span>nonzero<span class="token punctuation">(</span>toe_mask<span class="token punctuation">)</span>
+    z_surf <span class="token operator">=</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>surface_z<span class="token punctuation">)</span><span class="token punctuation">[</span>toe_mask<span class="token punctuation">]</span>
+    z_base <span class="token operator">=</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>base<span class="token punctuation">)</span><span class="token punctuation">[</span>toe_mask<span class="token punctuation">]</span>
+    keep <span class="token operator">=</span> np<span class="token punctuation">.</span>isfinite<span class="token punctuation">(</span>z_surf<span class="token punctuation">)</span> <span class="token operator">&amp;</span> np<span class="token punctuation">.</span>isfinite<span class="token punctuation">(</span>z_base<span class="token punctuation">)</span>
+    east <span class="token operator">=</span> transform<span class="token punctuation">.</span>c <span class="token operator">+</span> <span class="token punctuation">(</span>xs<span class="token punctuation">[</span>keep<span class="token punctuation">]</span> <span class="token operator">+</span> <span class="token number">0.5</span><span class="token punctuation">)</span> <span class="token operator">*</span> cell_m
+    north <span class="token operator">=</span> transform<span class="token punctuation">.</span>f <span class="token operator">-</span> <span class="token punctuation">(</span>ys<span class="token punctuation">[</span>keep<span class="token punctuation">]</span> <span class="token operator">+</span> <span class="token number">0.5</span><span class="token punctuation">)</span> <span class="token operator">*</span> cell_m
+    pts2d <span class="token operator">=</span> np<span class="token punctuation">.</span>column_stack<span class="token punctuation">(</span><span class="token punctuation">[</span>east<span class="token punctuation">,</span> north<span class="token punctuation">]</span><span class="token punctuation">)</span>
+    tri <span class="token operator">=</span> Delaunay<span class="token punctuation">(</span>pts2d<span class="token punctuation">)</span>
+
+    a <span class="token operator">=</span> pts2d<span class="token punctuation">[</span>tri<span class="token punctuation">.</span>simplices<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">]</span>
+    b <span class="token operator">=</span> pts2d<span class="token punctuation">[</span>tri<span class="token punctuation">.</span>simplices<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">]</span>
+    c <span class="token operator">=</span> pts2d<span class="token punctuation">[</span>tri<span class="token punctuation">.</span>simplices<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">]</span><span class="token punctuation">]</span>
+    area <span class="token operator">=</span> <span class="token number">0.5</span> <span class="token operator">*</span> np<span class="token punctuation">.</span><span class="token builtin">abs</span><span class="token punctuation">(</span><span class="token punctuation">(</span>b<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">]</span> <span class="token operator">-</span> a<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token operator">*</span> <span class="token punctuation">(</span>c<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">]</span> <span class="token operator">-</span> a<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+                        <span class="token operator">-</span> <span class="token punctuation">(</span>c<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">]</span> <span class="token operator">-</span> a<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token operator">*</span> <span class="token punctuation">(</span>b<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">]</span> <span class="token operator">-</span> a<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    h <span class="token operator">=</span> <span class="token punctuation">(</span>z_surf<span class="token punctuation">[</span>keep<span class="token punctuation">]</span> <span class="token operator">-</span> z_base<span class="token punctuation">[</span>keep<span class="token punctuation">]</span><span class="token punctuation">)</span>
+    mean_h <span class="token operator">=</span> <span class="token punctuation">(</span>h<span class="token punctuation">[</span>tri<span class="token punctuation">.</span>simplices<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">]</span> <span class="token operator">+</span> h<span class="token punctuation">[</span>tri<span class="token punctuation">.</span>simplices<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">]</span>
+              <span class="token operator">+</span> h<span class="token punctuation">[</span>tri<span class="token punctuation">.</span>simplices<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">]</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token number">3.0</span>
+    tin_volume <span class="token operator">=</span> <span class="token builtin">float</span><span class="token punctuation">(</span><span class="token punctuation">(</span>area <span class="token operator">*</span> mean_h<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+
+    diff_pct <span class="token operator">=</span> <span class="token number">100.0</span> <span class="token operator">*</span> <span class="token punctuation">(</span>tin_volume <span class="token operator">-</span> prism_result<span class="token punctuation">[</span><span class="token string">"volume_m3"</span><span class="token punctuation">]</span><span class="token punctuation">)</span> \
+        <span class="token operator">/</span> <span class="token builtin">max</span><span class="token punctuation">(</span>prism_result<span class="token punctuation">[</span><span class="token string">"volume_m3"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token number">1e-9</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"tin_m3"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>tin_volume<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"prism_m3"</span><span class="token punctuation">:</span> prism_result<span class="token punctuation">[</span><span class="token string">"volume_m3"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+            <span class="token string">"difference_pct"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>diff_pct<span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"agrees"</span><span class="token punctuation">:</span> <span class="token builtin">abs</span><span class="token punctuation">(</span>diff_pct<span class="token punctuation">)</span> <span class="token operator">&lt;=</span> tolerance_pct<span class="token punctuation">,</span>
+            <span class="token string">"note"</span><span class="token punctuation">:</span> <span class="token string">"TIN and prism differ by their surface interpolation; "</span>
+                    <span class="token string">"under 1% is expected"</span><span class="token punctuation">}</span>
+</code></pre></div>
+<p>Prism and TIN integration agreeing within 1% is a genuine check that the footprint, the base and the surface are all being read consistently. A 15% disagreement means one of them is including cells the other is not — usually nodata handling.</p>
+<p>Then verify against the physical geometry, which catches a whole class of unit and datum errors:</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">plausibility_check</span><span class="token punctuation">(</span>report<span class="token punctuation">,</span> angle_of_repose_deg<span class="token operator">=</span><span class="token punctuation">(</span><span class="token number">28.0</span><span class="token punctuation">,</span> <span class="token number">42.0</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""A pile's volume, footprint and height are geometrically related."""</span>
+    v <span class="token operator">=</span> report<span class="token punctuation">[</span><span class="token string">"volume"</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token string">"volume_m3"</span><span class="token punctuation">]</span>
+    a <span class="token operator">=</span> report<span class="token punctuation">[</span><span class="token string">"volume"</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token string">"footprint_m2"</span><span class="token punctuation">]</span>
+    h_max <span class="token operator">=</span> report<span class="token punctuation">[</span><span class="token string">"volume"</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token string">"max_height_m"</span><span class="token punctuation">]</span>
+    h_mean <span class="token operator">=</span> report<span class="token punctuation">[</span><span class="token string">"volume"</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token string">"mean_height_m"</span><span class="token punctuation">]</span>
+
+    <span class="token comment"># A cone of this footprint and height would have volume A·h/3; a flat-topped</span>
+    <span class="token comment"># pile lies between A·h/3 and A·h.</span>
+    cone <span class="token operator">=</span> a <span class="token operator">*</span> h_max <span class="token operator">/</span> <span class="token number">3.0</span>
+    prism <span class="token operator">=</span> a <span class="token operator">*</span> h_max
+    equivalent_radius <span class="token operator">=</span> math<span class="token punctuation">.</span>sqrt<span class="token punctuation">(</span>a <span class="token operator">/</span> math<span class="token punctuation">.</span>pi<span class="token punctuation">)</span>
+    implied_angle <span class="token operator">=</span> math<span class="token punctuation">.</span>degrees<span class="token punctuation">(</span>math<span class="token punctuation">.</span>atan<span class="token punctuation">(</span>h_max <span class="token operator">/</span> <span class="token builtin">max</span><span class="token punctuation">(</span>equivalent_radius<span class="token punctuation">,</span> <span class="token number">1e-6</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token string">"volume_m3"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>v<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"cone_bound_m3"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>cone<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"prism_bound_m3"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>prism<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"within_geometric_bounds"</span><span class="token punctuation">:</span> cone <span class="token operator">*</span> <span class="token number">0.9</span> <span class="token operator">&lt;=</span> v <span class="token operator">&lt;=</span> prism <span class="token operator">*</span> <span class="token number">1.1</span><span class="token punctuation">,</span>
+        <span class="token string">"mean_over_max_height"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>h_mean <span class="token operator">/</span> <span class="token builtin">max</span><span class="token punctuation">(</span>h_max<span class="token punctuation">,</span> <span class="token number">1e-9</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"implied_flank_angle_deg"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>implied_angle<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"angle_plausible"</span><span class="token punctuation">:</span> angle_of_repose_deg<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span> <span class="token operator">&lt;=</span> implied_angle <span class="token operator">&lt;=</span> angle_of_repose_deg<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+        <span class="token string">"verdict"</span><span class="token punctuation">:</span> <span class="token string">"geometry consistent"</span>
+                   <span class="token keyword">if</span> <span class="token punctuation">(</span>cone <span class="token operator">*</span> <span class="token number">0.9</span> <span class="token operator">&lt;=</span> v <span class="token operator">&lt;=</span> prism <span class="token operator">*</span> <span class="token number">1.1</span><span class="token punctuation">)</span>
+                   <span class="token keyword">else</span> <span class="token string">"volume inconsistent with footprint and height — check units"</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+
+<span class="token keyword">print</span><span class="token punctuation">(</span>json<span class="token punctuation">.</span>dumps<span class="token punctuation">(</span>plausibility_check<span class="token punctuation">(</span>report<span class="token punctuation">)</span><span class="token punctuation">,</span> indent<span class="token operator">=</span><span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>A volume outside the cone-to-prism bounds for its own footprint and height cannot be right, and this check catches a metre/foot mix-up, a wrong cell size and a base surface at the wrong datum — all of which produce a volume that looks like a number and fails basic geometry.</p>
+<h2 id="performance-notes" tabindex="-1"><a class="heading-link" href="#performance-notes"><span>Performance Notes</span></a></h2>
+<ul>
+<li><strong>A 10 cm grid over a 1,400 m² pile is 141,000 cells</strong>, so every step after rasterisation is milliseconds.</li>
+<li><strong>Rasterisation at 10 cm from a 40-million-point cloud takes about a minute.</strong> That is the only slow step.</li>
+<li><strong>Use 5–10 cm cells for a stockpile</strong>, not the 25–50 cm used for site-wide differencing: the pile’s perimeter is where the grid term lives, and a finer cell shrinks it.</li>
+<li><strong>The toe sensitivity run costs four full integrations</strong>, which is seconds. Always run it.</li>
+<li><strong><code>griddata</code> with <code>linear</code> over 141,000 cells from 1,184 toe samples is under a second.</strong> For much larger footprints, a coarser base grid interpolated up is faster and no less accurate.</li>
+<li><strong>Store the surface, base and footprint rasters.</strong> A disputed volume is re-examined, not re-surveyed.</li>
+</ul>
+<h2 id="common-errors" tabindex="-1"><a class="heading-link" href="#common-errors"><span>Common Errors</span></a></h2>
+<p><strong>Toe delineation picks up a neighbouring pile.</strong> The largest connected region won. Restrict to a supplied boundary polygon, or raise <code>min_area_m2</code> and select by proximity to a seed point.</p>
+<p><strong>Volume is negative.</strong> The base is above the surface — a prior survey from the wrong epoch, or a datum mismatch.</p>
+<p><strong><code>below_base_m3</code> is large.</strong> The base assumption is wrong, or the pile sits in a hollow. Investigate before reporting.</p>
+<p><strong>Uncertainty is under 1%.</strong> The base sigma was set optimistically. A triangulated base on unknown ground is rarely better than 5 cm.</p>
+<p><strong>Tonnage disputed.</strong> The density, almost always. Ask for the source of the figure and its uncertainty.</p>
+<p><strong>Volume differs from the contractor’s by 8%.</strong> Compare footprints first: toe definition accounts for most inter-surveyor disagreement, and comparing the two toe polygons settles it faster than comparing methods.</p>
+<p><strong>Nodata cells inside the footprint.</strong> Steep or reflective faces the survey missed. Report the area; consider a second flight with more oblique imagery.</p>
+<h2 id="frequently-asked-questions" tabindex="-1"><a class="heading-link" href="#frequently-asked-questions"><span>Frequently Asked Questions</span></a></h2>
+<h3 id="what-uncertainty-should-i-expect" tabindex="-1"><a class="heading-link" href="#what-uncertainty-should-i-expect"><span>What uncertainty should I expect?</span></a></h3>
+<p>For a well-flown drone survey on flat hardstanding with a triangulated base, 2–5% expanded is typical. With a prior survey of the ground, 1–2%. Anyone quoting better than 1% on a triangulated base is not counting the base.</p>
+<h3 id="should-the-report-include-the-raw-volume-without-uncertainty" tabindex="-1"><a class="heading-link" href="#should-the-report-include-the-raw-volume-without-uncertainty"><span>Should the report include the raw volume without uncertainty?</span></a></h3>
+<p>No. A volume without an uncertainty invites false precision, and the uncertainty is the part that lets a surveyor decide whether the number supports a payment.</p>
+<h3 id="how-do-i-handle-a-pile-against-a-wall" tabindex="-1"><a class="heading-link" href="#how-do-i-handle-a-pile-against-a-wall"><span>How do I handle a pile against a wall?</span></a></h3>
+<p>The toe ring is incomplete, so the base cannot be triangulated across the footprint from it alone. Survey spot heights along the wall line, or use the prior survey — and if neither is available, say the base is assumed and raise its sigma accordingly.</p>
+<h2 id="related-guides" tabindex="-1"><a class="heading-link" href="#related-guides"><span>Related Guides</span></a></h2>
+<ul>
+<li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/dsm-differencing-for-volume-change/">DSM Differencing for Volume Change</a> — volume between two epochs rather than against a base</li>
+<li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/excluding-vegetation-from-change-detection/">Excluding Vegetation from Change Detection</a> — the mask a vegetated pile needs</li>
+<li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/delaunay-meshing-of-terrain-with-pdal/">Delaunay Meshing of Terrain with PDAL</a> — the TIN used in the cross-check</li>
+</ul>
+<p>Back to <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/">Change Detection Between Scan Epochs</a>.</p>
+
+
+      
+      
+
+      <div class="related-nav">
+        
+
+        
+          <div>
+            <h3>Related</h3>
+            <div class="related-grid">
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/cloud-to-cloud-distance-with-open3d/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Cloud-to-Cloud Distance with Open3D</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/dsm-differencing-for-volume-change/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">DSM Differencing for Volume Change</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/excluding-vegetation-from-change-detection/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Excluding Vegetation from Change Detection</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/flagging-changed-buildings-for-retiling/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Flagging Changed Buildings for Retiling</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/m3c2-change-detection-with-py4dgeo/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">M3C2 Change Detection with py4dgeo</span>
+                </a>
+              
+            </div>
+          </div>
+        
+      </div>
+    </article>
+
+    
+    <aside class="toc" aria-label="On this page" data-toc hidden>
+      <h4>On this page</h4>
+      <ul></ul>
+    </aside>
+  </div>
+</div>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+  <div class="container site-footer__inner">
+    <div class="site-footer__brand">
+      <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+        <img src="/assets/img/logo-mark.svg" alt="" class="brand__mark" width="36" height="36">
+        <span class="brand__name">
+          3D Geospatial
+          <small>Digital Twin Automation</small>
+        </span>
+      </a>
+      <p>Engineering-grade guides on point cloud processing, mesh pipelines, LOD strategies, and CI/CD automation for digital twin platforms.</p>
+      <a class="footer-social" href="https://github.com/3d-geospatial" aria-label="3D Geospatial on GitHub" rel="noopener" target="_blank">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+          <path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.53-1.34-1.3-1.7-1.3-1.7-1.06-.72.08-.71.08-.71 1.17.08 1.79 1.2 1.79 1.2 1.04 1.79 2.73 1.27 3.4.97.1-.75.4-1.27.73-1.56-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.19-3.08-.12-.3-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.75.11 3.05.74.8 1.19 1.83 1.19 3.08 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.07.78 2.15v3.18c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5Z"/>
+        </svg>
+        <span>GitHub</span>
+      </a>
+    </div>
+
+    <div class="site-footer__col">
+      <h4>Sections</h4>
+      <ul>
+        <li><a href="https://www.3d-geospatial.com/">Home</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management &amp; Optimization</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/">Point Cloud &amp; Mesh Pipelines</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/">Troubleshooting &amp; Reliability</a></li>
+        
+      </ul>
+    </div>
+
+    
+      <div class="site-footer__col">
+        <h4>3D Geospatial Fundamentals</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/">3D Format Standards Comparison</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/">BIM and IFC Georeferencing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/">CityGML and CityJSON Processing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems for 3D Assets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/">Digital Elevation Model Workflows</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/">Spatial Indexing and Tiling Schemes for 3D Data</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>LOD Management &amp; Optimization</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/">Automated Tile Generation for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/">Cesium ion Upload Automation for 3D Tilesets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/">glTF LOD Generation With Draco Compression</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/">Streaming Sync Patterns for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/">Tileset Metadata and 3D Tiles Next</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/">Vector Overlays on 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Point Cloud &amp; Mesh Pipelines</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/">Automated Mesh Decimation for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/">Change Detection Between LiDAR Scan Epochs</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/">CI/CD Automation for Spatial Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">LiDAR Classification and Ground Extraction</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/photogrammetry-processing-pipelines/">Photogrammetry Processing Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/">Point Cloud Filtering Techniques</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/">Surface Reconstruction for Geospatial Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/">Texture Mapping Workflows for Digital Twins</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Troubleshooting &amp; Reliability</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/">Cross-Section Failure Modes in Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/">Data Validation &amp; QA Gates for 3D Tiles</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/">Performance Profiling and Benchmarking</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/">Pipeline Observability and Monitoring</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/">Streaming &amp; Runtime Diagnostics for 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+  </div>
+  <div class="container site-footer__bottom">
+    <span>© 2026 3D Geospatial &amp; Digital Twin Automation</span>
+    <span>Built with Eleventy · PWA-enabled</span>
+  </div>
+</footer>
+
+
+  <script src="/assets/js/site.js?v=b99aa9f971" defer></script>
+  
+</body>
+</html>

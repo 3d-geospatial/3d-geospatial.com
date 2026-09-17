@@ -1,0 +1,1135 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <title>Load Testing Tile Servers with Locust — 3D Geospatial</title>
+  <meta name="description" content="Load-test a tile server with a realistic request pattern: camera-driven tile selection, burst shapes, cache-hit modelling">
+  <meta name="keywords" content="3D geospatial, digital twin, point cloud, mesh pipeline, LOD, 3D Tiles, Cesium, PDAL, Open3D, Python, CI/CD">
+  <meta name="author" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta name="theme-color" content="#1f6b8a" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f171d" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+
+  
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem("theme");
+        var theme = (stored === "dark" || stored === "light") ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    })();
+  </script>
+  <meta name="generator" content="Eleventy">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="googlebot" content="index,follow,max-image-preview:large">
+
+  
+  <link rel="canonical" href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/load-testing-tile-servers-with-locust/">
+  <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">
+
+  
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/icon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+
+  
+  <link rel="apple-touch-icon" href="/assets/img/icon-180.png">
+  <link rel="mask-icon" href="/assets/img/logo.svg" color="#1f6b8a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="3D Geospatial">
+  <meta name="application-name" content="3D Geospatial">
+
+  
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Load Testing Tile Servers with Locust — 3D Geospatial">
+  <meta property="og:description" content="Load-test a tile server with a realistic request pattern: camera-driven tile selection, burst shapes, cache-hit modelling">
+  <meta property="og:url" content="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/load-testing-tile-servers-with-locust/">
+  <meta property="og:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+  <meta property="og:site_name" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta property="og:locale" content="en_US">
+  
+  <meta property="article:published_time" content="2026-09-17T23:36:56.451Z">
+  <meta property="article:modified_time" content="2026-09-17T23:36:56.451Z">
+  <meta property="article:publisher" content="https://www.3d-geospatial.com/">
+  
+
+  
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Load Testing Tile Servers with Locust — 3D Geospatial">
+  <meta name="twitter:description" content="Load-test a tile server with a realistic request pattern: camera-driven tile selection, burst shapes, cache-hit modelling">
+  <meta name="twitter:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta name="twitter:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+
+  
+  <link rel="preload" href="/assets/css/styles.css?v=8c46394d6c" as="style">
+  
+
+  <link rel="stylesheet" href="/assets/css/styles.css?v=8c46394d6c">
+
+  
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.3d-geospatial.com/#organization",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "url": "https://www.3d-geospatial.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/icon-512.png",
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://www.3d-geospatial.com/#website",
+      "url": "https://www.3d-geospatial.com/",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "description": "Build reliable 3D spatial data pipelines for digital twins — point clouds, meshes, LOD strategies, Python processing, and CI/CD automation.",
+      "inLanguage": "en",
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      }
+    },
+    {
+      "@type": "TechArticle",
+      "@id": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/load-testing-tile-servers-with-locust/#article",
+      "isPartOf": {
+        "@id": "https://www.3d-geospatial.com/#website"
+      },
+      "headline": "Load Testing Tile Servers with Locust",
+      "name": "Load Testing Tile Servers with Locust",
+      "description": "Load-test a tile server with a realistic request pattern: camera-driven tile selection, burst shapes, cache-hit modelling",
+      "url": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/load-testing-tile-servers-with-locust/",
+      "mainEntityOfPage": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/load-testing-tile-servers-with-locust/",
+      "inLanguage": "en",
+      "datePublished": "2026-09-17T23:36:56.451Z",
+      "dateModified": "2026-09-17T23:36:56.451Z",
+      "author": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "image": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/og-cover.png",
+        "width": 1200,
+        "height": 630
+      },
+      "breadcrumb": {
+        "@id": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/load-testing-tile-servers-with-locust/#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/load-testing-tile-servers-with-locust/#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://www.3d-geospatial.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Digital Twin Troubleshooting And Reliability",
+          "item": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Performance Profiling And Benchmarking",
+          "item": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "name": "Load Testing Tile Servers With Locust",
+          "item": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/load-testing-tile-servers-with-locust/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  
+<header class="site-header" role="banner">
+  <div class="container site-header__inner">
+    <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+      <img src="/assets/img/logo.svg" alt="" class="brand__mark" width="36" height="36">
+      <span class="brand__name">
+        3D Geospatial
+        <small>Digital Twin Automation</small>
+      </span>
+    </a>
+
+    <button class="theme-toggle" type="button" data-theme-toggle
+            aria-label="Switch to dark theme" title="Switch to dark theme">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4.2"/>
+        <path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/>
+      </svg>
+    </button>
+
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>
+      <span class="nav-toggle__icon" aria-hidden="true"><span></span></span>
+      Menu
+    </button>
+
+    <nav class="primary-nav" id="primary-nav" aria-label="Primary">
+      
+      <a href="https://www.3d-geospatial.com/" >
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/>
+        </svg>
+        Home
+      </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2 3 7l9 5 9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 17l9 5 9-5"/>
+            </svg>
+          
+          3D Geospatial Fundamentals
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+          
+          LOD Management &amp; Optimization
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="6" cy="6" r="1.5"/><circle cx="12" cy="6" r="1.5"/><circle cx="18" cy="6" r="1.5"/>
+              <circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/>
+              <circle cx="6" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="18" cy="18" r="1.5"/>
+            </svg>
+          
+          Point Cloud &amp; Mesh Pipelines
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/" aria-current="page">
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <path d="M12 9v4"/><path d="M12 17h.01"/>
+            </svg>
+          
+          Troubleshooting &amp; Reliability
+        </a>
+      
+    </nav>
+  </div>
+</header>
+
+
+  <main id="main">
+    
+
+
+<div class="container">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    
+      
+        <a href="https://www.3d-geospatial.com/">Home</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/">Digital Twin Troubleshooting And Reliability</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/">Performance Profiling And Benchmarking</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <span class="current">Load Testing Tile Servers With Locust</span>
+      
+    
+  </nav>
+
+  <div class="content-page">
+    <article class="article">
+      <h1 id="load-testing-tile-servers-with-locust" tabindex="-1"><a class="heading-link" href="#load-testing-tile-servers-with-locust"><span>Load Testing Tile Servers with Locust</span></a></h1>
+<p>This page load-tests a 3D Tiles server with Locust using a request pattern that resembles what viewers actually do — bursts of tile requests driven by simulated camera movement, a realistic mix of cache hits and misses, correct HTTP/2 concurrency — and reads the result as a capacity number with a stated confidence rather than a requests-per-second figure nobody can act on.</p>
+<h2 id="why-you-hit-this" tabindex="-1"><a class="heading-link" href="#why-you-hit-this"><span>Why you hit this</span></a></h2>
+<p>A tile server’s load profile is unlike a web application’s. A session opens with a burst of 400 requests in two seconds, goes quiet while the user reads the map, then bursts again when they pan. Average throughput is meaningless; what matters is whether the burst is served inside the user’s patience, and whether the burst from the hundredth concurrent user is served as fast as the first.</p>
+<p>Load testing with a flat request rate measures something the server never experiences. The number it produces — “4,200 requests per second” — cannot answer “how many concurrent users can we support?”, which is the only question anyone is asking.</p>
+<h2 id="prerequisites" tabindex="-1"><a class="heading-link" href="#prerequisites"><span>Prerequisites</span></a></h2>
+<ul>
+<li>Python 3.10+ with <code>locust&gt;=2.29</code>; the tile server reachable from the load generator.</li>
+<li>A tileset’s URL and a way to enumerate real tile paths — the manifest from <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/resuming-failed-tiling-runs-from-checkpoints/">resuming failed tiling runs from checkpoints</a>, or a crawl of the tileset JSON.</li>
+<li>A load generator with more bandwidth than the server’s expected capacity, or the test measures the generator.</li>
+</ul>
+<h2 id="step-by-step" tabindex="-1"><a class="heading-link" href="#step-by-step"><span>Step-by-Step</span></a></h2>
+<h3 id="1-enumerate-real-tile-paths-with-their-sizes" tabindex="-1"><a class="heading-link" href="#1-enumerate-real-tile-paths-with-their-sizes"><span>1. Enumerate real tile paths with their sizes</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token comment"># tilepaths.py</span>
+<span class="token keyword">import</span> json
+<span class="token keyword">import</span> random
+<span class="token keyword">from</span> collections <span class="token keyword">import</span> defaultdict
+<span class="token keyword">from</span> pathlib <span class="token keyword">import</span> Path
+
+<span class="token keyword">import</span> requests
+
+<span class="token keyword">def</span> <span class="token function">crawl_tileset</span><span class="token punctuation">(</span>base_url<span class="token punctuation">,</span> tileset_path<span class="token operator">=</span><span class="token string">"tileset.json"</span><span class="token punctuation">,</span> max_tiles<span class="token operator">=</span><span class="token number">20_000</span><span class="token punctuation">,</span>
+                  session<span class="token operator">=</span><span class="token boolean">None</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Walk the tileset tree and collect content URIs with their depth."""</span>
+    session <span class="token operator">=</span> session <span class="token keyword">or</span> requests<span class="token punctuation">.</span>Session<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    root <span class="token operator">=</span> session<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>base_url<span class="token punctuation">}</span></span><span class="token string">/</span><span class="token interpolation"><span class="token punctuation">{</span>tileset_path<span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">,</span> timeout<span class="token operator">=</span><span class="token number">30</span><span class="token punctuation">)</span>
+    root<span class="token punctuation">.</span>raise_for_status<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    doc <span class="token operator">=</span> root<span class="token punctuation">.</span>json<span class="token punctuation">(</span><span class="token punctuation">)</span>
+
+    tiles<span class="token punctuation">,</span> external <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+
+    <span class="token keyword">def</span> <span class="token function">recurse</span><span class="token punctuation">(</span>tile<span class="token punctuation">,</span> depth<span class="token punctuation">,</span> prefix<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        uri <span class="token operator">=</span> <span class="token punctuation">(</span>tile<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"content"</span><span class="token punctuation">)</span> <span class="token keyword">or</span> <span class="token punctuation">{</span><span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"uri"</span><span class="token punctuation">)</span>
+        <span class="token keyword">if</span> uri<span class="token punctuation">:</span>
+            full <span class="token operator">=</span> uri <span class="token keyword">if</span> uri<span class="token punctuation">.</span>startswith<span class="token punctuation">(</span><span class="token string">"http"</span><span class="token punctuation">)</span> <span class="token keyword">else</span> <span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>prefix<span class="token punctuation">}</span></span><span class="token string">/</span><span class="token interpolation"><span class="token punctuation">{</span>uri<span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">.</span>replace<span class="token punctuation">(</span><span class="token string">"//"</span><span class="token punctuation">,</span> <span class="token string">"/"</span><span class="token punctuation">)</span>
+            <span class="token keyword">if</span> uri<span class="token punctuation">.</span>endswith<span class="token punctuation">(</span><span class="token string">".json"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+                external<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">(</span>full<span class="token punctuation">,</span> depth<span class="token punctuation">)</span><span class="token punctuation">)</span>
+            <span class="token keyword">else</span><span class="token punctuation">:</span>
+                tiles<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"path"</span><span class="token punctuation">:</span> full<span class="token punctuation">,</span> <span class="token string">"depth"</span><span class="token punctuation">:</span> depth<span class="token punctuation">,</span>
+                              <span class="token string">"geometric_error"</span><span class="token punctuation">:</span> tile<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"geometricError"</span><span class="token punctuation">)</span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+        <span class="token keyword">for</span> child <span class="token keyword">in</span> tile<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"children"</span><span class="token punctuation">)</span> <span class="token keyword">or</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">:</span>
+            recurse<span class="token punctuation">(</span>child<span class="token punctuation">,</span> depth <span class="token operator">+</span> <span class="token number">1</span><span class="token punctuation">,</span> prefix<span class="token punctuation">)</span>
+
+    recurse<span class="token punctuation">(</span>doc<span class="token punctuation">[</span><span class="token string">"root"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> base_url<span class="token punctuation">.</span>rstrip<span class="token punctuation">(</span><span class="token string">"/"</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token keyword">for</span> url<span class="token punctuation">,</span> depth <span class="token keyword">in</span> external<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token number">200</span><span class="token punctuation">]</span><span class="token punctuation">:</span>
+        <span class="token keyword">try</span><span class="token punctuation">:</span>
+            sub <span class="token operator">=</span> session<span class="token punctuation">.</span>get<span class="token punctuation">(</span>url<span class="token punctuation">,</span> timeout<span class="token operator">=</span><span class="token number">30</span><span class="token punctuation">)</span>
+            sub<span class="token punctuation">.</span>raise_for_status<span class="token punctuation">(</span><span class="token punctuation">)</span>
+            recurse<span class="token punctuation">(</span>sub<span class="token punctuation">.</span>json<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token string">"root"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> depth<span class="token punctuation">,</span> url<span class="token punctuation">.</span>rsplit<span class="token punctuation">(</span><span class="token string">"/"</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+        <span class="token keyword">except</span> Exception<span class="token punctuation">:</span>
+            <span class="token keyword">continue</span>
+        <span class="token keyword">if</span> <span class="token builtin">len</span><span class="token punctuation">(</span>tiles<span class="token punctuation">)</span> <span class="token operator">>=</span> max_tiles<span class="token punctuation">:</span>
+            <span class="token keyword">break</span>
+
+    by_depth <span class="token operator">=</span> defaultdict<span class="token punctuation">(</span><span class="token builtin">list</span><span class="token punctuation">)</span>
+    <span class="token keyword">for</span> t <span class="token keyword">in</span> tiles<span class="token punctuation">[</span><span class="token punctuation">:</span>max_tiles<span class="token punctuation">]</span><span class="token punctuation">:</span>
+        by_depth<span class="token punctuation">[</span>t<span class="token punctuation">[</span><span class="token string">"depth"</span><span class="token punctuation">]</span><span class="token punctuation">]</span><span class="token punctuation">.</span>append<span class="token punctuation">(</span>t<span class="token punctuation">[</span><span class="token string">"path"</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"tiles"</span><span class="token punctuation">:</span> tiles<span class="token punctuation">[</span><span class="token punctuation">:</span>max_tiles<span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token string">"by_depth"</span><span class="token punctuation">:</span> <span class="token builtin">dict</span><span class="token punctuation">(</span>by_depth<span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"depths"</span><span class="token punctuation">:</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span>by_depth<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"count"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>tiles<span class="token punctuation">[</span><span class="token punctuation">:</span>max_tiles<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">}</span>
+
+<span class="token keyword">def</span> <span class="token function">measure_sizes</span><span class="token punctuation">(</span>paths<span class="token punctuation">,</span> session<span class="token operator">=</span><span class="token boolean">None</span><span class="token punctuation">,</span> sample<span class="token operator">=</span><span class="token number">200</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    session <span class="token operator">=</span> session <span class="token keyword">or</span> requests<span class="token punctuation">.</span>Session<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    sizes <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    <span class="token keyword">for</span> path <span class="token keyword">in</span> random<span class="token punctuation">.</span>sample<span class="token punctuation">(</span>paths<span class="token punctuation">,</span> <span class="token builtin">min</span><span class="token punctuation">(</span>sample<span class="token punctuation">,</span> <span class="token builtin">len</span><span class="token punctuation">(</span>paths<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">try</span><span class="token punctuation">:</span>
+            head <span class="token operator">=</span> session<span class="token punctuation">.</span>head<span class="token punctuation">(</span>path<span class="token punctuation">,</span> timeout<span class="token operator">=</span><span class="token number">20</span><span class="token punctuation">)</span>
+            length <span class="token operator">=</span> <span class="token builtin">int</span><span class="token punctuation">(</span>head<span class="token punctuation">.</span>headers<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"Content-Length"</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+            <span class="token keyword">if</span> length<span class="token punctuation">:</span>
+                sizes<span class="token punctuation">.</span>append<span class="token punctuation">(</span>length<span class="token punctuation">)</span>
+        <span class="token keyword">except</span> Exception<span class="token punctuation">:</span>
+            <span class="token keyword">continue</span>
+    <span class="token keyword">if</span> <span class="token keyword">not</span> sizes<span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"measured"</span><span class="token punctuation">:</span> <span class="token number">0</span><span class="token punctuation">}</span>
+    <span class="token keyword">import</span> statistics
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"measured"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>sizes<span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"median_kb"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>statistics<span class="token punctuation">.</span>median<span class="token punctuation">(</span>sizes<span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token number">1024</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"p95_kb"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">sorted</span><span class="token punctuation">(</span>sizes<span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token builtin">int</span><span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>sizes<span class="token punctuation">)</span> <span class="token operator">*</span> <span class="token number">0.95</span><span class="token punctuation">)</span><span class="token punctuation">]</span> <span class="token operator">/</span> <span class="token number">1024</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"total_mb"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">sum</span><span class="token punctuation">(</span>sizes<span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token number">1e6</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">}</span>
+</code></pre></div>
+<p>Testing against <strong>real</strong> tile paths rather than a synthetic URL pattern is what makes the numbers transferable. A synthetic path hits the same file repeatedly, so the server’s OS page cache serves everything from memory and the test measures the network stack; real paths spread across thousands of files exercise the storage layer the way a session does.</p>
+<p>Grouping by depth matters for step 2, because a session does not request tiles uniformly: it requests a few coarse tiles and many fine ones, and the fine ones are the small numerous files that stress a server’s request handling rather than its bandwidth.</p>
+<p>Measuring the size distribution up front gives the bandwidth figure the results need to be interpreted against — a server saturating a 1 Gbps link at 200 requests per second with 600 KB tiles is bandwidth-bound, not compute-bound, and no amount of tuning helps.</p>
+<h3 id="2-model-the-session-not-the-request" tabindex="-1"><a class="heading-link" href="#2-model-the-session-not-the-request"><span>2. Model the session, not the request</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token comment"># locustfile.py</span>
+<span class="token keyword">import</span> json
+<span class="token keyword">import</span> random
+<span class="token keyword">import</span> time
+<span class="token keyword">from</span> pathlib <span class="token keyword">import</span> Path
+
+<span class="token keyword">from</span> locust <span class="token keyword">import</span> FastHttpUser<span class="token punctuation">,</span> LoadTestShape<span class="token punctuation">,</span> between<span class="token punctuation">,</span> events<span class="token punctuation">,</span> task
+
+TILES <span class="token operator">=</span> json<span class="token punctuation">.</span>loads<span class="token punctuation">(</span>Path<span class="token punctuation">(</span><span class="token string">"tiles.json"</span><span class="token punctuation">)</span><span class="token punctuation">.</span>read_text<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+BY_DEPTH <span class="token operator">=</span> TILES<span class="token punctuation">[</span><span class="token string">"by_depth"</span><span class="token punctuation">]</span>
+DEPTHS <span class="token operator">=</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span><span class="token builtin">int</span><span class="token punctuation">(</span>d<span class="token punctuation">)</span> <span class="token keyword">for</span> d <span class="token keyword">in</span> BY_DEPTH<span class="token punctuation">)</span>
+
+SESSION_PROFILE <span class="token operator">=</span> <span class="token punctuation">{</span>
+    <span class="token string">"initial_burst_tiles"</span><span class="token punctuation">:</span> <span class="token number">380</span><span class="token punctuation">,</span>
+    <span class="token string">"pan_burst_tiles"</span><span class="token punctuation">:</span> <span class="token number">120</span><span class="token punctuation">,</span>
+    <span class="token string">"pans_per_session"</span><span class="token punctuation">:</span> <span class="token number">6</span><span class="token punctuation">,</span>
+    <span class="token string">"read_seconds"</span><span class="token punctuation">:</span> <span class="token punctuation">(</span><span class="token number">4.0</span><span class="token punctuation">,</span> <span class="token number">14.0</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token string">"coarse_share"</span><span class="token punctuation">:</span> <span class="token number">0.08</span><span class="token punctuation">,</span>        <span class="token comment"># fraction of requests at the shallowest levels</span>
+    <span class="token string">"revisit_share"</span><span class="token punctuation">:</span> <span class="token number">0.35</span><span class="token punctuation">,</span>       <span class="token comment"># fraction of a pan burst already seen this session</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">def</span> <span class="token function">pick_tiles</span><span class="token punctuation">(</span>n<span class="token punctuation">,</span> seen<span class="token punctuation">,</span> profile<span class="token operator">=</span>SESSION_PROFILE<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""A burst: mostly deep tiles, a few coarse ones, some already-seen ones."""</span>
+    out <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    coarse_n <span class="token operator">=</span> <span class="token builtin">int</span><span class="token punctuation">(</span>n <span class="token operator">*</span> profile<span class="token punctuation">[</span><span class="token string">"coarse_share"</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    shallow <span class="token operator">=</span> <span class="token punctuation">[</span>d <span class="token keyword">for</span> d <span class="token keyword">in</span> DEPTHS <span class="token keyword">if</span> d <span class="token operator">&lt;=</span> DEPTHS<span class="token punctuation">[</span><span class="token builtin">len</span><span class="token punctuation">(</span>DEPTHS<span class="token punctuation">)</span> <span class="token operator">//</span> <span class="token number">3</span><span class="token punctuation">]</span><span class="token punctuation">]</span>
+    deep <span class="token operator">=</span> <span class="token punctuation">[</span>d <span class="token keyword">for</span> d <span class="token keyword">in</span> DEPTHS <span class="token keyword">if</span> d <span class="token operator">></span> DEPTHS<span class="token punctuation">[</span><span class="token builtin">len</span><span class="token punctuation">(</span>DEPTHS<span class="token punctuation">)</span> <span class="token operator">//</span> <span class="token number">3</span><span class="token punctuation">]</span><span class="token punctuation">]</span>
+
+    <span class="token keyword">for</span> _ <span class="token keyword">in</span> <span class="token builtin">range</span><span class="token punctuation">(</span>coarse_n<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        d <span class="token operator">=</span> random<span class="token punctuation">.</span>choice<span class="token punctuation">(</span>shallow<span class="token punctuation">)</span>
+        out<span class="token punctuation">.</span>append<span class="token punctuation">(</span>random<span class="token punctuation">.</span>choice<span class="token punctuation">(</span>BY_DEPTH<span class="token punctuation">[</span><span class="token builtin">str</span><span class="token punctuation">(</span>d<span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    revisit_n <span class="token operator">=</span> <span class="token builtin">int</span><span class="token punctuation">(</span><span class="token punctuation">(</span>n <span class="token operator">-</span> coarse_n<span class="token punctuation">)</span> <span class="token operator">*</span> profile<span class="token punctuation">[</span><span class="token string">"revisit_share"</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    <span class="token keyword">if</span> seen <span class="token keyword">and</span> revisit_n<span class="token punctuation">:</span>
+        out<span class="token punctuation">.</span>extend<span class="token punctuation">(</span>random<span class="token punctuation">.</span>sample<span class="token punctuation">(</span><span class="token builtin">list</span><span class="token punctuation">(</span>seen<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token builtin">min</span><span class="token punctuation">(</span>revisit_n<span class="token punctuation">,</span> <span class="token builtin">len</span><span class="token punctuation">(</span>seen<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token keyword">while</span> <span class="token builtin">len</span><span class="token punctuation">(</span>out<span class="token punctuation">)</span> <span class="token operator">&lt;</span> n<span class="token punctuation">:</span>
+        d <span class="token operator">=</span> random<span class="token punctuation">.</span>choice<span class="token punctuation">(</span>deep<span class="token punctuation">)</span>
+        out<span class="token punctuation">.</span>append<span class="token punctuation">(</span>random<span class="token punctuation">.</span>choice<span class="token punctuation">(</span>BY_DEPTH<span class="token punctuation">[</span><span class="token builtin">str</span><span class="token punctuation">(</span>d<span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    random<span class="token punctuation">.</span>shuffle<span class="token punctuation">(</span>out<span class="token punctuation">)</span>
+    <span class="token keyword">return</span> out
+
+<span class="token keyword">class</span> <span class="token class-name">ViewerUser</span><span class="token punctuation">(</span>FastHttpUser<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""One user = one browser session looking at the tileset."""</span>
+    wait_time <span class="token operator">=</span> between<span class="token punctuation">(</span><span class="token operator">*</span>SESSION_PROFILE<span class="token punctuation">[</span><span class="token string">"read_seconds"</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    concurrency <span class="token operator">=</span> <span class="token number">18</span>                 <span class="token comment"># matches a browser's HTTP/2 scheduling</span>
+    network_timeout <span class="token operator">=</span> <span class="token number">30.0</span>
+    connection_timeout <span class="token operator">=</span> <span class="token number">10.0</span>
+
+    <span class="token keyword">def</span> <span class="token function">on_start</span><span class="token punctuation">(</span>self<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        self<span class="token punctuation">.</span>seen <span class="token operator">=</span> <span class="token builtin">set</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+        self<span class="token punctuation">.</span>client<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"/tileset.json"</span><span class="token punctuation">,</span> name<span class="token operator">=</span><span class="token string">"tileset.json"</span><span class="token punctuation">)</span>
+        self<span class="token punctuation">.</span>_burst<span class="token punctuation">(</span>SESSION_PROFILE<span class="token punctuation">[</span><span class="token string">"initial_burst_tiles"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> name<span class="token operator">=</span><span class="token string">"initial burst"</span><span class="token punctuation">)</span>
+
+    <span class="token decorator annotation punctuation">@task</span><span class="token punctuation">(</span>SESSION_PROFILE<span class="token punctuation">[</span><span class="token string">"pans_per_session"</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    <span class="token keyword">def</span> <span class="token function">pan</span><span class="token punctuation">(</span>self<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        self<span class="token punctuation">.</span>_burst<span class="token punctuation">(</span>SESSION_PROFILE<span class="token punctuation">[</span><span class="token string">"pan_burst_tiles"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> name<span class="token operator">=</span><span class="token string">"pan burst"</span><span class="token punctuation">)</span>
+
+    <span class="token decorator annotation punctuation">@task</span><span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">)</span>
+    <span class="token keyword">def</span> <span class="token function">idle</span><span class="token punctuation">(</span>self<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        time<span class="token punctuation">.</span>sleep<span class="token punctuation">(</span>random<span class="token punctuation">.</span>uniform<span class="token punctuation">(</span><span class="token operator">*</span>SESSION_PROFILE<span class="token punctuation">[</span><span class="token string">"read_seconds"</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+
+    <span class="token keyword">def</span> <span class="token function">_burst</span><span class="token punctuation">(</span>self<span class="token punctuation">,</span> count<span class="token punctuation">,</span> name<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        paths <span class="token operator">=</span> pick_tiles<span class="token punctuation">(</span>count<span class="token punctuation">,</span> self<span class="token punctuation">.</span>seen<span class="token punctuation">)</span>
+        started <span class="token operator">=</span> time<span class="token punctuation">.</span>time<span class="token punctuation">(</span><span class="token punctuation">)</span>
+        <span class="token keyword">for</span> path <span class="token keyword">in</span> paths<span class="token punctuation">:</span>
+            headers <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token punctuation">}</span>
+            <span class="token keyword">if</span> path <span class="token keyword">in</span> self<span class="token punctuation">.</span>seen<span class="token punctuation">:</span>
+                <span class="token comment"># A revisit: the browser would send a conditional request or hit</span>
+                <span class="token comment"># its own cache. Immutable URLs mean no request at all.</span>
+                <span class="token keyword">continue</span>
+            <span class="token keyword">with</span> self<span class="token punctuation">.</span>client<span class="token punctuation">.</span>get<span class="token punctuation">(</span>path<span class="token punctuation">,</span> name<span class="token operator">=</span><span class="token string-interpolation"><span class="token string">f"tile </span><span class="token interpolation"><span class="token punctuation">{</span>name<span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">,</span> headers<span class="token operator">=</span>headers<span class="token punctuation">,</span>
+                                 catch_response<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span> <span class="token keyword">as</span> response<span class="token punctuation">:</span>
+                <span class="token keyword">if</span> response<span class="token punctuation">.</span>status_code <span class="token operator">==</span> <span class="token number">200</span><span class="token punctuation">:</span>
+                    response<span class="token punctuation">.</span>success<span class="token punctuation">(</span><span class="token punctuation">)</span>
+                    self<span class="token punctuation">.</span>seen<span class="token punctuation">.</span>add<span class="token punctuation">(</span>path<span class="token punctuation">)</span>
+                <span class="token keyword">elif</span> response<span class="token punctuation">.</span>status_code <span class="token operator">==</span> <span class="token number">404</span><span class="token punctuation">:</span>
+                    response<span class="token punctuation">.</span>failure<span class="token punctuation">(</span><span class="token string">"404 — tile path does not exist"</span><span class="token punctuation">)</span>
+                <span class="token keyword">else</span><span class="token punctuation">:</span>
+                    response<span class="token punctuation">.</span>failure<span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"status </span><span class="token interpolation"><span class="token punctuation">{</span>response<span class="token punctuation">.</span>status_code<span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+        events<span class="token punctuation">.</span>request<span class="token punctuation">.</span>fire<span class="token punctuation">(</span>
+            request_type<span class="token operator">=</span><span class="token string">"BURST"</span><span class="token punctuation">,</span> name<span class="token operator">=</span>name<span class="token punctuation">,</span>
+            response_time<span class="token operator">=</span><span class="token punctuation">(</span>time<span class="token punctuation">.</span>time<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">-</span> started<span class="token punctuation">)</span> <span class="token operator">*</span> <span class="token number">1000.0</span><span class="token punctuation">,</span>
+            response_length<span class="token operator">=</span><span class="token number">0</span><span class="token punctuation">,</span> exception<span class="token operator">=</span><span class="token boolean">None</span><span class="token punctuation">,</span> context<span class="token operator">=</span><span class="token punctuation">{</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+        <span class="token punctuation">)</span>
+</code></pre></div>
+<p><code>FastHttpUser</code> rather than <code>HttpUser</code> is not optional at this scale. The default requests-based user costs about 1.5 ms of Python per request, so a single worker saturates at roughly 600 requests per second and the test measures Locust; <code>FastHttpUser</code> uses geventhttpclient and reaches several thousand.</p>
+<p>Skipping the request entirely on a revisit is the modelling decision that most affects the result. With the immutable URLs from <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/versioning-tilesets-with-immutable-prefixes/">versioning tilesets with immutable prefixes</a>, a browser that has seen a tile does not ask again — not even conditionally — so a load test that re-requests revisited tiles overstates the server’s load by the revisit share, which is 35% here.</p>
+<p>Firing a custom <code>BURST</code> event with the whole burst’s wall-clock duration is what turns per-request latency into the metric users feel. A burst of 380 tiles where every request takes 40 ms is fine if they are concurrent and catastrophic if they are serialised, and only the burst duration distinguishes those.</p>
+<figure class="diagram">
+<svg viewBox="26 2 688 252" role="img" aria-labelledby="locust-shape-t locust-shape-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="locust-shape-t">A flat request rate against a realistic session shape</title>
+  <desc id="locust-shape-d">Two request-rate timelines over 60 seconds for the same total number of requests. The flat profile issues a steady 40 requests per second, which the server handles with a 24 millisecond median and no queueing. The session profile issues a 380-request burst in the first two seconds, then quiet periods with 120-request bursts every 10 seconds. The peak instantaneous rate is 190 per second, queueing appears during each burst, and the 95th percentile latency is 310 milliseconds.</desc>
+  <rect class="svg-bg" x="26" y="2" width="688" height="252" fill="#ffffff"/>
+  <path d="M40 112 H700" stroke="#5b6471" stroke-width="1.4" fill="none"/>
+  <path d="M40 210 H700" stroke="#5b6471" stroke-width="1.4" fill="none"/>
+  <rect x="40" y="88" width="660" height="24" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="1.4"/>
+  <g fill="#eef5e9" stroke="#4f7a4d" stroke-width="1.4">
+    <rect x="40" y="130" width="34" height="80"/>
+    <rect x="148" y="176" width="26" height="34"/>
+    <rect x="256" y="176" width="26" height="34"/>
+    <rect x="364" y="176" width="26" height="34"/>
+    <rect x="472" y="176" width="26" height="34"/>
+    <rect x="580" y="176" width="26" height="34"/>
+  </g>
+  <g fill="#1f2937" font-size="12">
+    <text x="48" y="80">flat: 40 req/s steady</text>
+    <text x="48" y="124">session: 380-tile burst, then 120 every 10 s</text>
+  </g>
+  <g fill="#1f2937" font-size="12" text-anchor="end">
+    <text x="698" y="80">p95 latency 31 ms — "the server is fine"</text>
+    <text x="698" y="236">p95 latency 310 ms — what users get</text>
+  </g>
+  <text x="57" y="226" fill="#1f2937" font-size="11.5" text-anchor="middle">190/s</text>
+  <text x="370" y="30" fill="#1f2937" font-size="13" text-anchor="middle">same total requests over 60 seconds, two profiles</text>
+  <text x="370" y="50" fill="#5b6471" font-size="12" text-anchor="middle">the flat profile never produces the queueing the burst does, so it cannot find the limit</text>
+</svg>
+<figcaption>Identical total throughput; only the burst profile reproduces the queueing that decides whether a session feels fast.</figcaption>
+</figure>
+<h3 id="3-shape-the-load-to-find-the-capacity-not-a-number" tabindex="-1"><a class="heading-link" href="#3-shape-the-load-to-find-the-capacity-not-a-number"><span>3. Shape the load to find the capacity, not a number</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">class</span> <span class="token class-name">StepToFailure</span><span class="token punctuation">(</span>LoadTestShape<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Ramp concurrent sessions in steps and hold each long enough to measure."""</span>
+    steps <span class="token operator">=</span> <span class="token punctuation">[</span>
+        <span class="token punctuation">{</span><span class="token string">"users"</span><span class="token punctuation">:</span> <span class="token number">10</span><span class="token punctuation">,</span> <span class="token string">"hold"</span><span class="token punctuation">:</span> <span class="token number">90</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+        <span class="token punctuation">{</span><span class="token string">"users"</span><span class="token punctuation">:</span> <span class="token number">25</span><span class="token punctuation">,</span> <span class="token string">"hold"</span><span class="token punctuation">:</span> <span class="token number">90</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+        <span class="token punctuation">{</span><span class="token string">"users"</span><span class="token punctuation">:</span> <span class="token number">50</span><span class="token punctuation">,</span> <span class="token string">"hold"</span><span class="token punctuation">:</span> <span class="token number">120</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+        <span class="token punctuation">{</span><span class="token string">"users"</span><span class="token punctuation">:</span> <span class="token number">100</span><span class="token punctuation">,</span> <span class="token string">"hold"</span><span class="token punctuation">:</span> <span class="token number">120</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+        <span class="token punctuation">{</span><span class="token string">"users"</span><span class="token punctuation">:</span> <span class="token number">200</span><span class="token punctuation">,</span> <span class="token string">"hold"</span><span class="token punctuation">:</span> <span class="token number">120</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+        <span class="token punctuation">{</span><span class="token string">"users"</span><span class="token punctuation">:</span> <span class="token number">400</span><span class="token punctuation">,</span> <span class="token string">"hold"</span><span class="token punctuation">:</span> <span class="token number">120</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+        <span class="token punctuation">{</span><span class="token string">"users"</span><span class="token punctuation">:</span> <span class="token number">800</span><span class="token punctuation">,</span> <span class="token string">"hold"</span><span class="token punctuation">:</span> <span class="token number">120</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+    <span class="token punctuation">]</span>
+
+    <span class="token keyword">def</span> <span class="token function">__init__</span><span class="token punctuation">(</span>self<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token builtin">super</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span>__init__<span class="token punctuation">(</span><span class="token punctuation">)</span>
+        self<span class="token punctuation">.</span>_plan <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+        t <span class="token operator">=</span> <span class="token number">0</span>
+        <span class="token keyword">for</span> step <span class="token keyword">in</span> self<span class="token punctuation">.</span>steps<span class="token punctuation">:</span>
+            t <span class="token operator">+=</span> step<span class="token punctuation">[</span><span class="token string">"hold"</span><span class="token punctuation">]</span>
+            self<span class="token punctuation">.</span>_plan<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">(</span>t<span class="token punctuation">,</span> step<span class="token punctuation">[</span><span class="token string">"users"</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+
+    <span class="token keyword">def</span> <span class="token function">tick</span><span class="token punctuation">(</span>self<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        run_time <span class="token operator">=</span> self<span class="token punctuation">.</span>get_run_time<span class="token punctuation">(</span><span class="token punctuation">)</span>
+        <span class="token keyword">for</span> until<span class="token punctuation">,</span> users <span class="token keyword">in</span> self<span class="token punctuation">.</span>_plan<span class="token punctuation">:</span>
+            <span class="token keyword">if</span> run_time <span class="token operator">&lt;</span> until<span class="token punctuation">:</span>
+                spawn <span class="token operator">=</span> <span class="token builtin">max</span><span class="token punctuation">(</span>users <span class="token operator">//</span> <span class="token number">10</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span>
+                <span class="token keyword">return</span> users<span class="token punctuation">,</span> spawn
+        <span class="token keyword">return</span> <span class="token boolean">None</span>
+
+SLO <span class="token operator">=</span> <span class="token punctuation">{</span>
+    <span class="token string">"burst_p95_seconds"</span><span class="token punctuation">:</span> <span class="token number">3.0</span><span class="token punctuation">,</span>        <span class="token comment"># a 380-tile burst inside 3 s</span>
+    <span class="token string">"tile_p95_ms"</span><span class="token punctuation">:</span> <span class="token number">250</span><span class="token punctuation">,</span>
+    <span class="token string">"error_rate"</span><span class="token punctuation">:</span> <span class="token number">0.005</span><span class="token punctuation">,</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">def</span> <span class="token function">capacity_from_history</span><span class="token punctuation">(</span>history<span class="token punctuation">,</span> slo<span class="token operator">=</span>SLO<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""history: [{users, burst_p95_s, tile_p95_ms, error_rate, rps}]"""</span>
+    passing <span class="token operator">=</span> <span class="token punctuation">[</span>h <span class="token keyword">for</span> h <span class="token keyword">in</span> history
+               <span class="token keyword">if</span> h<span class="token punctuation">[</span><span class="token string">"burst_p95_s"</span><span class="token punctuation">]</span> <span class="token operator">&lt;=</span> slo<span class="token punctuation">[</span><span class="token string">"burst_p95_seconds"</span><span class="token punctuation">]</span>
+               <span class="token keyword">and</span> h<span class="token punctuation">[</span><span class="token string">"tile_p95_ms"</span><span class="token punctuation">]</span> <span class="token operator">&lt;=</span> slo<span class="token punctuation">[</span><span class="token string">"tile_p95_ms"</span><span class="token punctuation">]</span>
+               <span class="token keyword">and</span> h<span class="token punctuation">[</span><span class="token string">"error_rate"</span><span class="token punctuation">]</span> <span class="token operator">&lt;=</span> slo<span class="token punctuation">[</span><span class="token string">"error_rate"</span><span class="token punctuation">]</span><span class="token punctuation">]</span>
+    failing <span class="token operator">=</span> <span class="token punctuation">[</span>h <span class="token keyword">for</span> h <span class="token keyword">in</span> history <span class="token keyword">if</span> h <span class="token keyword">not</span> <span class="token keyword">in</span> passing<span class="token punctuation">]</span>
+    best <span class="token operator">=</span> <span class="token builtin">max</span><span class="token punctuation">(</span>passing<span class="token punctuation">,</span> key<span class="token operator">=</span><span class="token keyword">lambda</span> h<span class="token punctuation">:</span> h<span class="token punctuation">[</span><span class="token string">"users"</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token keyword">if</span> passing <span class="token keyword">else</span> <span class="token boolean">None</span>
+    first_fail <span class="token operator">=</span> <span class="token builtin">min</span><span class="token punctuation">(</span>failing<span class="token punctuation">,</span> key<span class="token operator">=</span><span class="token keyword">lambda</span> h<span class="token punctuation">:</span> h<span class="token punctuation">[</span><span class="token string">"users"</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token keyword">if</span> failing <span class="token keyword">else</span> <span class="token boolean">None</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token string">"slo"</span><span class="token punctuation">:</span> slo<span class="token punctuation">,</span>
+        <span class="token string">"max_passing_users"</span><span class="token punctuation">:</span> best<span class="token punctuation">[</span><span class="token string">"users"</span><span class="token punctuation">]</span> <span class="token keyword">if</span> best <span class="token keyword">else</span> <span class="token number">0</span><span class="token punctuation">,</span>
+        <span class="token string">"throughput_at_capacity_rps"</span><span class="token punctuation">:</span> best<span class="token punctuation">[</span><span class="token string">"rps"</span><span class="token punctuation">]</span> <span class="token keyword">if</span> best <span class="token keyword">else</span> <span class="token number">0</span><span class="token punctuation">,</span>
+        <span class="token string">"first_failing_users"</span><span class="token punctuation">:</span> first_fail<span class="token punctuation">[</span><span class="token string">"users"</span><span class="token punctuation">]</span> <span class="token keyword">if</span> first_fail <span class="token keyword">else</span> <span class="token boolean">None</span><span class="token punctuation">,</span>
+        <span class="token string">"first_failure_reason"</span><span class="token punctuation">:</span> <span class="token punctuation">(</span>
+            <span class="token string">"burst latency"</span> <span class="token keyword">if</span> first_fail <span class="token keyword">and</span> first_fail<span class="token punctuation">[</span><span class="token string">"burst_p95_s"</span><span class="token punctuation">]</span> <span class="token operator">></span> slo<span class="token punctuation">[</span><span class="token string">"burst_p95_seconds"</span><span class="token punctuation">]</span>
+            <span class="token keyword">else</span> <span class="token string">"tile latency"</span> <span class="token keyword">if</span> first_fail <span class="token keyword">and</span> first_fail<span class="token punctuation">[</span><span class="token string">"tile_p95_ms"</span><span class="token punctuation">]</span> <span class="token operator">></span> slo<span class="token punctuation">[</span><span class="token string">"tile_p95_ms"</span><span class="token punctuation">]</span>
+            <span class="token keyword">else</span> <span class="token string">"errors"</span> <span class="token keyword">if</span> first_fail <span class="token keyword">else</span> <span class="token boolean">None</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"headroom_note"</span><span class="token punctuation">:</span> <span class="token string">"quote the passing figure, not the failing one"</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+</code></pre></div>
+<p>Stepping and holding, rather than ramping continuously, is what makes each measurement attributable. A continuous ramp gives one blurred curve; steps give a table where each row is a steady state with its own percentiles, and the capacity is the last row that met the objective.</p>
+<p>Defining the objective in terms of the <strong>burst</strong> rather than the request is what makes the answer meaningful. “250 ms at the 95th percentile per tile” is a server metric; “a 380-tile opening burst completes within 3 seconds” is what a user experiences, and the two diverge exactly when the server starts queueing.</p>
+<p>Reporting the first failing step and <em>why</em> it failed is the other half. A capacity that ends in errors is a different problem from one that ends in latency: errors mean a connection or worker limit, latency means saturation.</p>
+<h3 id="4-model-the-cdn-or-state-that-you-did-not" tabindex="-1"><a class="heading-link" href="#4-model-the-cdn-or-state-that-you-did-not"><span>4. Model the CDN, or state that you did not</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python">CACHE_PROFILE <span class="token operator">=</span> <span class="token punctuation">{</span>
+    <span class="token string">"edge_hit_rate"</span><span class="token punctuation">:</span> <span class="token number">0.92</span><span class="token punctuation">,</span>       <span class="token comment"># measured from CDN logs, not guessed</span>
+    <span class="token string">"origin_share"</span><span class="token punctuation">:</span> <span class="token number">0.08</span><span class="token punctuation">,</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">class</span> <span class="token class-name">OriginUser</span><span class="token punctuation">(</span>ViewerUser<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Only the requests a CDN would forward — this is what the origin must survive."""</span>
+    <span class="token keyword">def</span> <span class="token function">_burst</span><span class="token punctuation">(</span>self<span class="token punctuation">,</span> count<span class="token punctuation">,</span> name<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        paths <span class="token operator">=</span> pick_tiles<span class="token punctuation">(</span>count<span class="token punctuation">,</span> self<span class="token punctuation">.</span>seen<span class="token punctuation">)</span>
+        misses <span class="token operator">=</span> <span class="token punctuation">[</span>p <span class="token keyword">for</span> p <span class="token keyword">in</span> paths
+                  <span class="token keyword">if</span> p <span class="token keyword">not</span> <span class="token keyword">in</span> self<span class="token punctuation">.</span>seen
+                  <span class="token keyword">and</span> random<span class="token punctuation">.</span>random<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">></span> CACHE_PROFILE<span class="token punctuation">[</span><span class="token string">"edge_hit_rate"</span><span class="token punctuation">]</span><span class="token punctuation">]</span>
+        started <span class="token operator">=</span> time<span class="token punctuation">.</span>time<span class="token punctuation">(</span><span class="token punctuation">)</span>
+        <span class="token keyword">for</span> path <span class="token keyword">in</span> misses<span class="token punctuation">:</span>
+            <span class="token keyword">with</span> self<span class="token punctuation">.</span>client<span class="token punctuation">.</span>get<span class="token punctuation">(</span>path<span class="token punctuation">,</span> name<span class="token operator">=</span><span class="token string-interpolation"><span class="token string">f"origin </span><span class="token interpolation"><span class="token punctuation">{</span>name<span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">,</span>
+                                 catch_response<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span> <span class="token keyword">as</span> response<span class="token punctuation">:</span>
+                <span class="token keyword">if</span> response<span class="token punctuation">.</span>status_code <span class="token operator">==</span> <span class="token number">200</span><span class="token punctuation">:</span>
+                    response<span class="token punctuation">.</span>success<span class="token punctuation">(</span><span class="token punctuation">)</span>
+                    self<span class="token punctuation">.</span>seen<span class="token punctuation">.</span>add<span class="token punctuation">(</span>path<span class="token punctuation">)</span>
+                <span class="token keyword">else</span><span class="token punctuation">:</span>
+                    response<span class="token punctuation">.</span>failure<span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"status </span><span class="token interpolation"><span class="token punctuation">{</span>response<span class="token punctuation">.</span>status_code<span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+        events<span class="token punctuation">.</span>request<span class="token punctuation">.</span>fire<span class="token punctuation">(</span>request_type<span class="token operator">=</span><span class="token string">"BURST"</span><span class="token punctuation">,</span> name<span class="token operator">=</span><span class="token string-interpolation"><span class="token string">f"origin </span><span class="token interpolation"><span class="token punctuation">{</span>name<span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">,</span>
+                            response_time<span class="token operator">=</span><span class="token punctuation">(</span>time<span class="token punctuation">.</span>time<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">-</span> started<span class="token punctuation">)</span> <span class="token operator">*</span> <span class="token number">1000.0</span><span class="token punctuation">,</span>
+                            response_length<span class="token operator">=</span><span class="token number">0</span><span class="token punctuation">,</span> exception<span class="token operator">=</span><span class="token boolean">None</span><span class="token punctuation">,</span> context<span class="token operator">=</span><span class="token punctuation">{</span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+
+<span class="token keyword">def</span> <span class="token function">interpret_with_cdn</span><span class="token punctuation">(</span>origin_capacity_users<span class="token punctuation">,</span> cache_profile<span class="token operator">=</span>CACHE_PROFILE<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    amplification <span class="token operator">=</span> <span class="token number">1.0</span> <span class="token operator">/</span> <span class="token builtin">max</span><span class="token punctuation">(</span>cache_profile<span class="token punctuation">[</span><span class="token string">"origin_share"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token number">1e-9</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token string">"origin_capacity_sessions"</span><span class="token punctuation">:</span> origin_capacity_users<span class="token punctuation">,</span>
+        <span class="token string">"assumed_edge_hit_rate"</span><span class="token punctuation">:</span> cache_profile<span class="token punctuation">[</span><span class="token string">"edge_hit_rate"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+        <span class="token string">"implied_total_sessions"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span>origin_capacity_users <span class="token operator">*</span> amplification<span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"caveat"</span><span class="token punctuation">:</span> <span class="token string">"this multiplication is only valid if the hit rate holds at scale; "</span>
+                  <span class="token string">"a cold edge after a deploy sees a 0% hit rate"</span><span class="token punctuation">,</span>
+        <span class="token string">"cold_edge_capacity_sessions"</span><span class="token punctuation">:</span> origin_capacity_users<span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+</code></pre></div>
+<p>Load-testing the origin behind a CDN with a full session profile measures a situation that never happens, because the edge absorbs 90%+ of the requests. Testing only the miss stream gives the origin’s real requirement, and multiplying by the amplification gives the total session capacity.</p>
+<p>The caveat in that function is the important part and is routinely forgotten: immediately after a deploy the edge is cold, so the origin briefly sees every request. A system sized on a 92% hit rate will fall over in the first minute after a release unless the deploy warms the cache or the origin has the headroom — which is a strong argument for the immutable-prefix scheme, where old tiles stay cached and only changed tiles are cold.</p>
+<p>Measuring the hit rate from the CDN’s own logs rather than assuming it is the difference between a capacity figure and a guess.</p>
+<figure class="diagram">
+<svg viewBox="4 20 697 220" role="img" aria-labelledby="locust-cdn-t locust-cdn-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="locust-cdn-t">Testing the origin behind a CDN</title>
+  <desc id="locust-cdn-d">A session issues 380 tile requests. The CDN edge serves 92 percent of them from cache and forwards 30 to the origin. Testing the origin with the full session profile measures a load it never sees. Testing it with the miss stream only gives the origin's real requirement, and multiplying by the amplification factor of 12.5 gives the total session capacity. Immediately after a deploy the edge is cold, so the origin briefly sees all 380.</desc>
+  <rect class="svg-bg" x="4" y="20" width="697" height="220" fill="#ffffff"/>
+  <defs>
+    <marker id="locust-cdn-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
+    </marker>
+  </defs>
+  <rect x="18" y="72" width="134" height="56" rx="7" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="232" y="72" width="134" height="56" rx="7" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <rect x="446" y="34" width="150" height="52" rx="7" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <rect x="446" y="118" width="150" height="52" rx="7" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <g stroke="#5b6471" stroke-width="2" fill="none" marker-end="url(#locust-cdn-arrow)">
+    <path d="M152 100 H230"/>
+    <path d="M366 92 L444 64"/>
+    <path d="M366 110 L444 138"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="85" y="94">one session:</text><text x="85" y="112">380 requests</text>
+    <text x="299" y="86">CDN edge</text><text x="299" y="104">92% hit rate</text>
+    <text x="299" y="122">(measured)</text>
+    <text x="521" y="56">warm edge: 30</text><text x="521" y="74">reach the origin</text>
+    <text x="521" y="140">cold edge after a</text><text x="521" y="158">deploy: all 380</text>
+  </g>
+  <text x="628" y="56" fill="#1f2937" font-size="12">×12.5</text>
+  <text x="628" y="74" fill="#1f2937" font-size="12">sessions</text>
+  <text x="628" y="146" fill="#b0413e" font-size="12">no</text>
+  <text x="628" y="164" fill="#b0413e" font-size="12">headroom</text>
+  <text x="370" y="200" fill="#1f2937" font-size="12.5" text-anchor="middle">size the origin for the miss stream, then check it survives a cold edge</text>
+  <text x="370" y="222" fill="#5b6471" font-size="12" text-anchor="middle">immutable prefixes keep unchanged tiles cached, so only changed tiles are cold</text>
+</svg>
+<figcaption>The amplification factor is only valid while the edge is warm; the minute after a deploy is when the origin meets the unmultiplied load.</figcaption>
+</figure>
+<h3 id="5-run-it-and-collect-the-right-metrics" tabindex="-1"><a class="heading-link" href="#5-run-it-and-collect-the-right-metrics"><span>5. Run it and collect the right metrics</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token comment"># runner.py</span>
+<span class="token keyword">import</span> json
+<span class="token keyword">import</span> subprocess
+<span class="token keyword">from</span> pathlib <span class="token keyword">import</span> Path
+
+<span class="token keyword">def</span> <span class="token function">run_locust</span><span class="token punctuation">(</span>host<span class="token punctuation">,</span> users<span class="token punctuation">,</span> spawn_rate<span class="token punctuation">,</span> run_time<span class="token punctuation">,</span> out_prefix<span class="token punctuation">,</span>
+               locustfile<span class="token operator">=</span><span class="token string">"locustfile.py"</span><span class="token punctuation">,</span> workers<span class="token operator">=</span><span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    args <span class="token operator">=</span> <span class="token punctuation">[</span>
+        <span class="token string">"locust"</span><span class="token punctuation">,</span> <span class="token string">"-f"</span><span class="token punctuation">,</span> locustfile<span class="token punctuation">,</span> <span class="token string">"--headless"</span><span class="token punctuation">,</span>
+        <span class="token string">"--host"</span><span class="token punctuation">,</span> host<span class="token punctuation">,</span>
+        <span class="token string">"--users"</span><span class="token punctuation">,</span> <span class="token builtin">str</span><span class="token punctuation">(</span>users<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"--spawn-rate"</span><span class="token punctuation">,</span> <span class="token builtin">str</span><span class="token punctuation">(</span>spawn_rate<span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"--run-time"</span><span class="token punctuation">,</span> run_time<span class="token punctuation">,</span>
+        <span class="token string">"--csv"</span><span class="token punctuation">,</span> out_prefix<span class="token punctuation">,</span> <span class="token string">"--csv-full-history"</span><span class="token punctuation">,</span>
+        <span class="token string">"--html"</span><span class="token punctuation">,</span> <span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>out_prefix<span class="token punctuation">}</span></span><span class="token string">.html"</span></span><span class="token punctuation">,</span>
+        <span class="token string">"--only-summary"</span><span class="token punctuation">,</span>
+    <span class="token punctuation">]</span>
+    <span class="token keyword">if</span> workers <span class="token operator">></span> <span class="token number">1</span><span class="token punctuation">:</span>
+        args<span class="token punctuation">.</span>extend<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token string">"--processes"</span><span class="token punctuation">,</span> <span class="token builtin">str</span><span class="token punctuation">(</span>workers<span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    proc <span class="token operator">=</span> subprocess<span class="token punctuation">.</span>run<span class="token punctuation">(</span>args<span class="token punctuation">,</span> capture_output<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> text<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"returncode"</span><span class="token punctuation">:</span> proc<span class="token punctuation">.</span>returncode<span class="token punctuation">,</span>
+            <span class="token string">"stderr_tail"</span><span class="token punctuation">:</span> proc<span class="token punctuation">.</span>stderr<span class="token punctuation">.</span>strip<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span>splitlines<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token operator">-</span><span class="token number">6</span><span class="token punctuation">:</span><span class="token punctuation">]</span><span class="token punctuation">}</span>
+
+<span class="token keyword">def</span> <span class="token function">read_results</span><span class="token punctuation">(</span>out_prefix<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">import</span> csv
+    rows <span class="token operator">=</span> <span class="token builtin">list</span><span class="token punctuation">(</span>csv<span class="token punctuation">.</span>DictReader<span class="token punctuation">(</span>Path<span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>out_prefix<span class="token punctuation">}</span></span><span class="token string">_stats.csv"</span></span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">open</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    by_name <span class="token operator">=</span> <span class="token punctuation">{</span>r<span class="token punctuation">[</span><span class="token string">"Name"</span><span class="token punctuation">]</span><span class="token punctuation">:</span> r <span class="token keyword">for</span> r <span class="token keyword">in</span> rows<span class="token punctuation">}</span>
+    total <span class="token operator">=</span> by_name<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"Aggregated"</span><span class="token punctuation">)</span> <span class="token keyword">or</span> rows<span class="token punctuation">[</span><span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">]</span>
+
+    <span class="token keyword">def</span> <span class="token function">num</span><span class="token punctuation">(</span>row<span class="token punctuation">,</span> key<span class="token punctuation">,</span> default<span class="token operator">=</span><span class="token number">0.0</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">try</span><span class="token punctuation">:</span>
+            <span class="token keyword">return</span> <span class="token builtin">float</span><span class="token punctuation">(</span>row<span class="token punctuation">.</span>get<span class="token punctuation">(</span>key<span class="token punctuation">,</span> default<span class="token punctuation">)</span> <span class="token keyword">or</span> default<span class="token punctuation">)</span>
+        <span class="token keyword">except</span> ValueError<span class="token punctuation">:</span>
+            <span class="token keyword">return</span> default
+
+    tiles <span class="token operator">=</span> <span class="token punctuation">[</span>r <span class="token keyword">for</span> r <span class="token keyword">in</span> rows <span class="token keyword">if</span> r<span class="token punctuation">[</span><span class="token string">"Name"</span><span class="token punctuation">]</span><span class="token punctuation">.</span>startswith<span class="token punctuation">(</span><span class="token string">"tile "</span><span class="token punctuation">)</span><span class="token punctuation">]</span>
+    bursts <span class="token operator">=</span> <span class="token punctuation">[</span>r <span class="token keyword">for</span> r <span class="token keyword">in</span> rows <span class="token keyword">if</span> r<span class="token punctuation">[</span><span class="token string">"Name"</span><span class="token punctuation">]</span><span class="token punctuation">.</span>endswith<span class="token punctuation">(</span><span class="token string">"burst"</span><span class="token punctuation">)</span>
+              <span class="token keyword">and</span> r<span class="token punctuation">[</span><span class="token string">"Type"</span><span class="token punctuation">]</span> <span class="token operator">==</span> <span class="token string">"BURST"</span><span class="token punctuation">]</span>
+    requests_total <span class="token operator">=</span> <span class="token builtin">sum</span><span class="token punctuation">(</span>num<span class="token punctuation">(</span>r<span class="token punctuation">,</span> <span class="token string">"Request Count"</span><span class="token punctuation">)</span> <span class="token keyword">for</span> r <span class="token keyword">in</span> tiles<span class="token punctuation">)</span>
+    failures <span class="token operator">=</span> <span class="token builtin">sum</span><span class="token punctuation">(</span>num<span class="token punctuation">(</span>r<span class="token punctuation">,</span> <span class="token string">"Failure Count"</span><span class="token punctuation">)</span> <span class="token keyword">for</span> r <span class="token keyword">in</span> tiles<span class="token punctuation">)</span>
+
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token string">"requests"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span>requests_total<span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"failures"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span>failures<span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"error_rate"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>failures <span class="token operator">/</span> <span class="token builtin">max</span><span class="token punctuation">(</span>requests_total<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">5</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"rps"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>num<span class="token punctuation">(</span>total<span class="token punctuation">,</span> <span class="token string">"Requests/s"</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"tile_p50_ms"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">max</span><span class="token punctuation">(</span><span class="token punctuation">(</span>num<span class="token punctuation">(</span>r<span class="token punctuation">,</span> <span class="token string">"50%"</span><span class="token punctuation">)</span> <span class="token keyword">for</span> r <span class="token keyword">in</span> tiles<span class="token punctuation">)</span><span class="token punctuation">,</span> default<span class="token operator">=</span><span class="token number">0.0</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"tile_p95_ms"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">max</span><span class="token punctuation">(</span><span class="token punctuation">(</span>num<span class="token punctuation">(</span>r<span class="token punctuation">,</span> <span class="token string">"95%"</span><span class="token punctuation">)</span> <span class="token keyword">for</span> r <span class="token keyword">in</span> tiles<span class="token punctuation">)</span><span class="token punctuation">,</span> default<span class="token operator">=</span><span class="token number">0.0</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"tile_p99_ms"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">max</span><span class="token punctuation">(</span><span class="token punctuation">(</span>num<span class="token punctuation">(</span>r<span class="token punctuation">,</span> <span class="token string">"99%"</span><span class="token punctuation">)</span> <span class="token keyword">for</span> r <span class="token keyword">in</span> tiles<span class="token punctuation">)</span><span class="token punctuation">,</span> default<span class="token operator">=</span><span class="token number">0.0</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"burst_p50_s"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">max</span><span class="token punctuation">(</span><span class="token punctuation">(</span>num<span class="token punctuation">(</span>r<span class="token punctuation">,</span> <span class="token string">"50%"</span><span class="token punctuation">)</span> <span class="token keyword">for</span> r <span class="token keyword">in</span> bursts<span class="token punctuation">)</span><span class="token punctuation">,</span> default<span class="token operator">=</span><span class="token number">0.0</span><span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token number">1000</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"burst_p95_s"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">max</span><span class="token punctuation">(</span><span class="token punctuation">(</span>num<span class="token punctuation">(</span>r<span class="token punctuation">,</span> <span class="token string">"95%"</span><span class="token punctuation">)</span> <span class="token keyword">for</span> r <span class="token keyword">in</span> bursts<span class="token punctuation">)</span><span class="token punctuation">,</span> default<span class="token operator">=</span><span class="token number">0.0</span><span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token number">1000</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"bytes_total_mb"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>num<span class="token punctuation">(</span>total<span class="token punctuation">,</span> <span class="token string">"Total Response Length"</span><span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token number">1e6</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+
+<span class="token keyword">def</span> <span class="token function">step_campaign</span><span class="token punctuation">(</span>host<span class="token punctuation">,</span> steps<span class="token punctuation">,</span> run_time_per_step<span class="token operator">=</span><span class="token string">"2m"</span><span class="token punctuation">,</span> out_dir<span class="token operator">=</span><span class="token string">"build/loadtest"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    Path<span class="token punctuation">(</span>out_dir<span class="token punctuation">)</span><span class="token punctuation">.</span>mkdir<span class="token punctuation">(</span>parents<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> exist_ok<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+    history <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    <span class="token keyword">for</span> users <span class="token keyword">in</span> steps<span class="token punctuation">:</span>
+        prefix <span class="token operator">=</span> <span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>out_dir<span class="token punctuation">}</span></span><span class="token string">/step_</span><span class="token interpolation"><span class="token punctuation">{</span>users<span class="token punctuation">}</span></span><span class="token string">"</span></span>
+        run_locust<span class="token punctuation">(</span>host<span class="token punctuation">,</span> users<span class="token operator">=</span>users<span class="token punctuation">,</span> spawn_rate<span class="token operator">=</span><span class="token builtin">max</span><span class="token punctuation">(</span>users <span class="token operator">//</span> <span class="token number">10</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                   run_time<span class="token operator">=</span>run_time_per_step<span class="token punctuation">,</span> out_prefix<span class="token operator">=</span>prefix<span class="token punctuation">)</span>
+        result <span class="token operator">=</span> read_results<span class="token punctuation">(</span>prefix<span class="token punctuation">)</span>
+        history<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"users"</span><span class="token punctuation">:</span> users<span class="token punctuation">,</span> <span class="token operator">**</span>result<span class="token punctuation">}</span><span class="token punctuation">)</span>
+        <span class="token keyword">if</span> result<span class="token punctuation">[</span><span class="token string">"error_rate"</span><span class="token punctuation">]</span> <span class="token operator">></span> <span class="token number">0.05</span><span class="token punctuation">:</span>
+            <span class="token keyword">break</span>                          <span class="token comment"># no point continuing past collapse</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"history"</span><span class="token punctuation">:</span> history<span class="token punctuation">,</span> <span class="token string">"capacity"</span><span class="token punctuation">:</span> capacity_from_history<span class="token punctuation">(</span>history<span class="token punctuation">)</span><span class="token punctuation">}</span>
+</code></pre></div>
+<p>Reading the <strong>percentiles</strong> from Locust’s CSV rather than the average response time is what makes the result honest. The average hides the tail, and the tail is the experience: a server with a 40 ms average and a 2.4 s p99 delivers a visibly broken map to one session in a hundred.</p>
+<p>Stopping the campaign once the error rate passes 5% avoids spending twenty minutes measuring a collapsed server, which produces no information beyond “it collapsed”.</p>
+<p><code>--processes</code> is what lets one machine drive a meaningful load: Locust is single-threaded per process, so a four-core generator needs four worker processes to use the hardware.</p>
+<h3 id="6-check-that-the-generator-is-not-the-bottleneck" tabindex="-1"><a class="heading-link" href="#6-check-that-the-generator-is-not-the-bottleneck"><span>6. Check that the generator is not the bottleneck</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">generator_sanity_check</span><span class="token punctuation">(</span>host<span class="token punctuation">,</span> tile_paths<span class="token punctuation">,</span> sample<span class="token operator">=</span><span class="token number">200</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Measure single-request latency and generator CPU before trusting any result."""</span>
+    <span class="token keyword">import</span> os
+    <span class="token keyword">import</span> statistics
+    <span class="token keyword">import</span> time
+
+    <span class="token keyword">import</span> requests
+
+    session <span class="token operator">=</span> requests<span class="token punctuation">.</span>Session<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    latencies <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    <span class="token keyword">for</span> path <span class="token keyword">in</span> tile_paths<span class="token punctuation">[</span><span class="token punctuation">:</span>sample<span class="token punctuation">]</span><span class="token punctuation">:</span>
+        t0 <span class="token operator">=</span> time<span class="token punctuation">.</span>perf_counter<span class="token punctuation">(</span><span class="token punctuation">)</span>
+        <span class="token keyword">try</span><span class="token punctuation">:</span>
+            r <span class="token operator">=</span> session<span class="token punctuation">.</span>get<span class="token punctuation">(</span>path<span class="token punctuation">,</span> timeout<span class="token operator">=</span><span class="token number">20</span><span class="token punctuation">)</span>
+            <span class="token keyword">if</span> r<span class="token punctuation">.</span>status_code <span class="token operator">==</span> <span class="token number">200</span><span class="token punctuation">:</span>
+                latencies<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">(</span>time<span class="token punctuation">.</span>perf_counter<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">-</span> t0<span class="token punctuation">)</span> <span class="token operator">*</span> <span class="token number">1000</span><span class="token punctuation">)</span>
+        <span class="token keyword">except</span> Exception<span class="token punctuation">:</span>
+            <span class="token keyword">continue</span>
+    load1<span class="token punctuation">,</span> load5<span class="token punctuation">,</span> load15 <span class="token operator">=</span> os<span class="token punctuation">.</span>getloadavg<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    cores <span class="token operator">=</span> os<span class="token punctuation">.</span>cpu_count<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">or</span> <span class="token number">1</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token string">"unloaded_p50_ms"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>statistics<span class="token punctuation">.</span>median<span class="token punctuation">(</span>latencies<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span> <span class="token keyword">if</span> latencies <span class="token keyword">else</span> <span class="token boolean">None</span><span class="token punctuation">,</span>
+        <span class="token string">"unloaded_p95_ms"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">sorted</span><span class="token punctuation">(</span>latencies<span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token builtin">int</span><span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>latencies<span class="token punctuation">)</span> <span class="token operator">*</span> <span class="token number">0.95</span><span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span>
+        <span class="token keyword">if</span> latencies <span class="token keyword">else</span> <span class="token boolean">None</span><span class="token punctuation">,</span>
+        <span class="token string">"generator_cores"</span><span class="token punctuation">:</span> cores<span class="token punctuation">,</span>
+        <span class="token string">"load_average_1m"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>load1<span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"generator_saturated"</span><span class="token punctuation">:</span> load1 <span class="token operator">></span> cores <span class="token operator">*</span> <span class="token number">0.8</span><span class="token punctuation">,</span>
+        <span class="token string">"advice"</span><span class="token punctuation">:</span> <span class="token string">"add load-generator machines or raise --processes"</span>
+                  <span class="token keyword">if</span> load1 <span class="token operator">></span> cores <span class="token operator">*</span> <span class="token number">0.8</span>
+                  <span class="token keyword">else</span> <span class="token string">"generator has headroom"</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+
+<span class="token keyword">def</span> <span class="token function">bandwidth_check</span><span class="token punctuation">(</span>results<span class="token punctuation">,</span> link_gbps<span class="token operator">=</span><span class="token number">1.0</span><span class="token punctuation">,</span> duration_s<span class="token operator">=</span><span class="token number">120</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    served_gbit <span class="token operator">=</span> results<span class="token punctuation">[</span><span class="token string">"bytes_total_mb"</span><span class="token punctuation">]</span> <span class="token operator">*</span> <span class="token number">8</span> <span class="token operator">/</span> <span class="token number">1000.0</span>
+    used_gbps <span class="token operator">=</span> served_gbit <span class="token operator">/</span> <span class="token builtin">max</span><span class="token punctuation">(</span>duration_s<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token string">"served_mb"</span><span class="token punctuation">:</span> results<span class="token punctuation">[</span><span class="token string">"bytes_total_mb"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+        <span class="token string">"average_gbps"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>used_gbps<span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"link_gbps"</span><span class="token punctuation">:</span> link_gbps<span class="token punctuation">,</span>
+        <span class="token string">"link_utilisation"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>used_gbps <span class="token operator">/</span> <span class="token builtin">max</span><span class="token punctuation">(</span>link_gbps<span class="token punctuation">,</span> <span class="token number">1e-9</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"bandwidth_bound"</span><span class="token punctuation">:</span> used_gbps <span class="token operator">></span> link_gbps <span class="token operator">*</span> <span class="token number">0.7</span><span class="token punctuation">,</span>
+        <span class="token string">"note"</span><span class="token punctuation">:</span> <span class="token string">"above 70% of the link, the test measures the network rather than "</span>
+                <span class="token string">"the server"</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+</code></pre></div>
+<p>Checking the generator’s load average during the run is the step that prevents the most common wrong conclusion. A Locust run that reports a 3 s p95 on a generator at 100% CPU is measuring Locust, and the server may be entirely idle.</p>
+<p>The bandwidth check is the same guard from the other direction. Tiles are large, so a test that serves 40 GB in two minutes is using 2.7 Gbps — and on a 1 Gbps link the latency is the queueing in the network, not the server.</p>
+<p>Recording the <strong>unloaded</strong> latency before the campaign gives the baseline every later percentile is compared against. A p50 that starts at 180 ms unloaded means the server is far away or slow at rest, and the load test will only ever add to that.</p>
+<figure class="diagram">
+<svg viewBox="4 6 732 244" role="img" aria-labelledby="locust-steps-t locust-steps-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="locust-steps-t">Step campaign result and where capacity lies</title>
+  <desc id="locust-steps-d">A table of six load steps. At 10 concurrent sessions the burst 95th percentile is 1.1 seconds and tile latency 38 milliseconds, passing. At 50 sessions it is 1.4 seconds and 52 milliseconds, passing. At 100 sessions it is 2.2 seconds and 118 milliseconds, passing. At 200 sessions it is 4.8 seconds and 384 milliseconds, failing on burst latency. At 400 sessions errors reach 3.1 percent. Capacity is therefore 100 sessions, not the 2100 requests per second the 400-session step achieved.</desc>
+  <rect class="svg-bg" x="4" y="6" width="732" height="244" fill="#ffffff"/>
+  <g stroke-width="1.5">
+    <rect x="18" y="20" width="110" height="32" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="128" y="20" width="120" height="32" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="248" y="20" width="130" height="32" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="378" y="20" width="120" height="32" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="498" y="20" width="110" height="32" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="608" y="20" width="114" height="32" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="18" y="52" width="110" height="30" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="128" y="52" width="120" height="30" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="248" y="52" width="130" height="30" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="378" y="52" width="120" height="30" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="498" y="52" width="110" height="30" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="608" y="52" width="114" height="30" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="18" y="82" width="110" height="30" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="128" y="82" width="120" height="30" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="248" y="82" width="130" height="30" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="378" y="82" width="120" height="30" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="498" y="82" width="110" height="30" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="608" y="82" width="114" height="30" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="18" y="112" width="110" height="34" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2.4"/>
+    <rect x="128" y="112" width="120" height="34" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2.4"/>
+    <rect x="248" y="112" width="130" height="34" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2.4"/>
+    <rect x="378" y="112" width="120" height="34" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2.4"/>
+    <rect x="498" y="112" width="110" height="34" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2.4"/>
+    <rect x="608" y="112" width="114" height="34" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2.4"/>
+    <rect x="18" y="146" width="110" height="30" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="128" y="146" width="120" height="30" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="248" y="146" width="130" height="30" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="378" y="146" width="120" height="30" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="498" y="146" width="110" height="30" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="608" y="146" width="114" height="30" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="18" y="176" width="110" height="30" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="128" y="176" width="120" height="30" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="248" y="176" width="130" height="30" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="378" y="176" width="120" height="30" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="498" y="176" width="110" height="30" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="608" y="176" width="114" height="30" fill="#f7dfdc" stroke="#b0413e"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="73" y="41">sessions</text><text x="188" y="41">burst p95</text>
+    <text x="313" y="41">tile p95</text><text x="438" y="41">errors</text>
+    <text x="553" y="41">req/s</text><text x="665" y="41">verdict</text>
+    <text x="73" y="72">10</text><text x="188" y="72">1.1 s</text>
+    <text x="313" y="72">38 ms</text><text x="438" y="72">0.0%</text>
+    <text x="553" y="72">210</text><text x="665" y="72">pass</text>
+    <text x="73" y="102">50</text><text x="188" y="102">1.4 s</text>
+    <text x="313" y="102">52 ms</text><text x="438" y="102">0.0%</text>
+    <text x="553" y="102">880</text><text x="665" y="102">pass</text>
+    <text x="73" y="134">100</text><text x="188" y="134">2.2 s</text>
+    <text x="313" y="134">118 ms</text><text x="438" y="134">0.1%</text>
+    <text x="553" y="134">1,540</text><text x="665" y="134">capacity</text>
+    <text x="73" y="166">200</text><text x="188" y="166">4.8 s</text>
+    <text x="313" y="166">384 ms</text><text x="438" y="166">0.4%</text>
+    <text x="553" y="166">1,980</text><text x="665" y="166">fail: burst</text>
+    <text x="73" y="196">400</text><text x="188" y="196">11.2 s</text>
+    <text x="313" y="196">1,840 ms</text><text x="438" y="196">3.1%</text>
+    <text x="553" y="196">2,100</text><text x="665" y="196">fail: errors</text>
+  </g>
+  <text x="370" y="232" fill="#1f2937" font-size="12.5" text-anchor="middle">capacity is 100 concurrent sessions — the 2,100 req/s at 400 sessions is a broken server working hard</text>
+</svg>
+<figcaption>Throughput keeps rising past the capacity limit, which is why a requests-per-second figure alone always overstates what a server can serve.</figcaption>
+</figure>
+<h2 id="expected-output-verification" tabindex="-1"><a class="heading-link" href="#expected-output-verification"><span>Expected Output &amp; Verification</span></a></h2>
+<div class="codeblock" data-lang="text"><div class="codeblock__bar"><span class="codeblock__lang">text</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-text" tabindex="0" role="group" aria-label="text code sample"><code class="language-text">{'tiles': 18412, 'depths': [0, 1, 2, 3, 4, 5], 'count': 18412}
+{'measured': 200, 'median_kb': 412.4, 'p95_kb': 1180.2, 'total_mb': 98.4}
+{'unloaded_p50_ms': 22.4, 'unloaded_p95_ms': 41.8, 'generator_cores': 8,
+ 'load_average_1m': 0.42, 'generator_saturated': False,
+ 'advice': 'generator has headroom'}
+{
+  "history": [
+    {"users": 10, "rps": 210.4, "tile_p95_ms": 38.0, "burst_p95_s": 1.1,
+     "error_rate": 0.0, "bytes_total_mb": 10412.8},
+    {"users": 50, "rps": 880.2, "tile_p95_ms": 52.0, "burst_p95_s": 1.4,
+     "error_rate": 0.0, "bytes_total_mb": 42184.1},
+    {"users": 100, "rps": 1540.8, "tile_p95_ms": 118.0, "burst_p95_s": 2.2,
+     "error_rate": 0.001, "bytes_total_mb": 74188.4},
+    {"users": 200, "rps": 1980.1, "tile_p95_ms": 384.0, "burst_p95_s": 4.8,
+     "error_rate": 0.004, "bytes_total_mb": 92104.8},
+    {"users": 400, "rps": 2100.4, "tile_p95_ms": 1840.0, "burst_p95_s": 11.2,
+     "error_rate": 0.031, "bytes_total_mb": 96412.2}
+  ],
+  "capacity": {
+    "max_passing_users": 100,
+    "throughput_at_capacity_rps": 1540.8,
+    "first_failing_users": 200,
+    "first_failure_reason": "burst latency",
+    "headroom_note": "quote the passing figure, not the failing one"
+  }
+}
+{'served_mb': 74188.4, 'average_gbps': 4.946, 'link_gbps': 10.0,
+ 'link_utilisation': 0.495, 'bandwidth_bound': False}
+</code></pre></div>
+<p>The capacity is 100 concurrent sessions, and the throughput at that point is 1,541 requests per second. The 400-session step achieved a <em>higher</em> throughput of 2,100 requests per second while delivering an 11-second opening burst and 3% errors — which is why quoting the peak throughput as capacity is misleading.</p>
+<p>The failure mode is burst latency rather than errors, which points at saturation rather than a connection limit: the server is keeping up with the request count and taking too long per request.</p>
+<p>At 49% link utilisation the test is not bandwidth-bound, so the finding is about the server. Had that figure been 85%, the whole campaign would have been measuring the network.</p>
+<p>Verify the load profile resembles production, using the server’s own logs:</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">compare_with_production_logs</span><span class="token punctuation">(</span>log_path<span class="token punctuation">,</span> generated_history<span class="token punctuation">,</span>
+                                 window_seconds<span class="token operator">=</span><span class="token number">60</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Do the generated bursts look like real sessions?"""</span>
+    <span class="token keyword">import</span> re
+    <span class="token keyword">from</span> collections <span class="token keyword">import</span> Counter
+
+    pattern <span class="token operator">=</span> re<span class="token punctuation">.</span><span class="token builtin">compile</span><span class="token punctuation">(</span><span class="token string">r'"GET (?P&lt;path>\S+)".*?(?P&lt;status>\d{3})'</span><span class="token punctuation">)</span>
+    per_second <span class="token operator">=</span> Counter<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    paths <span class="token operator">=</span> Counter<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    <span class="token keyword">with</span> <span class="token builtin">open</span><span class="token punctuation">(</span>log_path<span class="token punctuation">,</span> <span class="token string">"r"</span><span class="token punctuation">,</span> encoding<span class="token operator">=</span><span class="token string">"utf-8"</span><span class="token punctuation">,</span> errors<span class="token operator">=</span><span class="token string">"replace"</span><span class="token punctuation">)</span> <span class="token keyword">as</span> f<span class="token punctuation">:</span>
+        <span class="token keyword">for</span> i<span class="token punctuation">,</span> line <span class="token keyword">in</span> <span class="token builtin">enumerate</span><span class="token punctuation">(</span>f<span class="token punctuation">)</span><span class="token punctuation">:</span>
+            m <span class="token operator">=</span> pattern<span class="token punctuation">.</span>search<span class="token punctuation">(</span>line<span class="token punctuation">)</span>
+            <span class="token keyword">if</span> <span class="token keyword">not</span> m<span class="token punctuation">:</span>
+                <span class="token keyword">continue</span>
+            paths<span class="token punctuation">[</span>m<span class="token punctuation">.</span>group<span class="token punctuation">(</span><span class="token string">"path"</span><span class="token punctuation">)</span><span class="token punctuation">]</span> <span class="token operator">+=</span> <span class="token number">1</span>
+            per_second<span class="token punctuation">[</span>i <span class="token operator">//</span> <span class="token number">1000</span><span class="token punctuation">]</span> <span class="token operator">+=</span> <span class="token number">1</span>
+
+    rates <span class="token operator">=</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span>per_second<span class="token punctuation">.</span>values<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token keyword">if</span> <span class="token keyword">not</span> rates<span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"comparable"</span><span class="token punctuation">:</span> <span class="token boolean">False</span><span class="token punctuation">,</span> <span class="token string">"reason"</span><span class="token punctuation">:</span> <span class="token string">"no requests parsed from the log"</span><span class="token punctuation">}</span>
+    peak <span class="token operator">=</span> rates<span class="token punctuation">[</span><span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">]</span>
+    median <span class="token operator">=</span> rates<span class="token punctuation">[</span><span class="token builtin">len</span><span class="token punctuation">(</span>rates<span class="token punctuation">)</span> <span class="token operator">//</span> <span class="token number">2</span><span class="token punctuation">]</span>
+    burstiness <span class="token operator">=</span> peak <span class="token operator">/</span> <span class="token builtin">max</span><span class="token punctuation">(</span>median<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span>
+
+    generated_peak <span class="token operator">=</span> <span class="token builtin">max</span><span class="token punctuation">(</span>h<span class="token punctuation">[</span><span class="token string">"rps"</span><span class="token punctuation">]</span> <span class="token keyword">for</span> h <span class="token keyword">in</span> generated_history<span class="token punctuation">)</span>
+    generated_median <span class="token operator">=</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span>h<span class="token punctuation">[</span><span class="token string">"rps"</span><span class="token punctuation">]</span> <span class="token keyword">for</span> h <span class="token keyword">in</span> generated_history<span class="token punctuation">)</span><span class="token punctuation">[</span>
+        <span class="token builtin">len</span><span class="token punctuation">(</span>generated_history<span class="token punctuation">)</span> <span class="token operator">//</span> <span class="token number">2</span><span class="token punctuation">]</span>
+
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token string">"production_burstiness"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>burstiness<span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"generated_burstiness"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>generated_peak <span class="token operator">/</span> <span class="token builtin">max</span><span class="token punctuation">(</span>generated_median<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"distinct_paths_in_log"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>paths<span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"top_path_share"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>paths<span class="token punctuation">.</span>most_common<span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span> <span class="token operator">/</span> <span class="token builtin">sum</span><span class="token punctuation">(</span>paths<span class="token punctuation">.</span>values<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"profile_matches"</span><span class="token punctuation">:</span> <span class="token builtin">abs</span><span class="token punctuation">(</span>burstiness <span class="token operator">-</span> generated_peak
+                               <span class="token operator">/</span> <span class="token builtin">max</span><span class="token punctuation">(</span>generated_median<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">&lt;</span> burstiness <span class="token operator">*</span> <span class="token number">0.5</span><span class="token punctuation">,</span>
+        <span class="token string">"note"</span><span class="token punctuation">:</span> <span class="token string">"a top-path share above 0.05 means production re-requests tiles the "</span>
+                <span class="token string">"test assumes are cached — check the Cache-Control headers"</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+</code></pre></div>
+<p>The <code>top_path_share</code> figure is the check that validates the revisit model. If one path is 12% of production requests, browsers are re-requesting it rather than caching it, and the test’s assumption that revisits cost nothing is wrong — which usually means the <code>Cache-Control</code> headers are not what the versioning scheme intended.</p>
+<p>Then verify the server’s behaviour at capacity is graceful rather than a cliff:</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">degradation_shape</span><span class="token punctuation">(</span>history<span class="token punctuation">,</span> slo<span class="token operator">=</span>SLO<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""A gentle degradation is manageable; a cliff needs a queue or a limiter."""</span>
+    rows <span class="token operator">=</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span>history<span class="token punctuation">,</span> key<span class="token operator">=</span><span class="token keyword">lambda</span> h<span class="token punctuation">:</span> h<span class="token punctuation">[</span><span class="token string">"users"</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    deltas <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    <span class="token keyword">for</span> a<span class="token punctuation">,</span> b <span class="token keyword">in</span> <span class="token builtin">zip</span><span class="token punctuation">(</span>rows<span class="token punctuation">,</span> rows<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">:</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        user_ratio <span class="token operator">=</span> b<span class="token punctuation">[</span><span class="token string">"users"</span><span class="token punctuation">]</span> <span class="token operator">/</span> <span class="token builtin">max</span><span class="token punctuation">(</span>a<span class="token punctuation">[</span><span class="token string">"users"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span>
+        latency_ratio <span class="token operator">=</span> b<span class="token punctuation">[</span><span class="token string">"tile_p95_ms"</span><span class="token punctuation">]</span> <span class="token operator">/</span> <span class="token builtin">max</span><span class="token punctuation">(</span>a<span class="token punctuation">[</span><span class="token string">"tile_p95_ms"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token number">1e-9</span><span class="token punctuation">)</span>
+        deltas<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span>
+            <span class="token string">"from_users"</span><span class="token punctuation">:</span> a<span class="token punctuation">[</span><span class="token string">"users"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token string">"to_users"</span><span class="token punctuation">:</span> b<span class="token punctuation">[</span><span class="token string">"users"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+            <span class="token string">"user_ratio"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>user_ratio<span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"latency_ratio"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>latency_ratio<span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"elasticity"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>latency_ratio <span class="token operator">/</span> <span class="token builtin">max</span><span class="token punctuation">(</span>user_ratio<span class="token punctuation">,</span> <span class="token number">1e-9</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token punctuation">}</span><span class="token punctuation">)</span>
+    worst <span class="token operator">=</span> <span class="token builtin">max</span><span class="token punctuation">(</span>deltas<span class="token punctuation">,</span> key<span class="token operator">=</span><span class="token keyword">lambda</span> d<span class="token punctuation">:</span> d<span class="token punctuation">[</span><span class="token string">"elasticity"</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token keyword">if</span> deltas <span class="token keyword">else</span> <span class="token boolean">None</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token string">"steps"</span><span class="token punctuation">:</span> deltas<span class="token punctuation">,</span>
+        <span class="token string">"worst_step"</span><span class="token punctuation">:</span> worst<span class="token punctuation">,</span>
+        <span class="token string">"cliff"</span><span class="token punctuation">:</span> <span class="token builtin">bool</span><span class="token punctuation">(</span>worst <span class="token keyword">and</span> worst<span class="token punctuation">[</span><span class="token string">"elasticity"</span><span class="token punctuation">]</span> <span class="token operator">></span> <span class="token number">2.5</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"advice"</span><span class="token punctuation">:</span> <span class="token string">"add a concurrency limiter so excess sessions queue rather than "</span>
+                  <span class="token string">"degrading everyone"</span> <span class="token keyword">if</span> worst <span class="token keyword">and</span> worst<span class="token punctuation">[</span><span class="token string">"elasticity"</span><span class="token punctuation">]</span> <span class="token operator">></span> <span class="token number">2.5</span>
+                  <span class="token keyword">else</span> <span class="token string">"degradation is proportional; scaling horizontally will work"</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+</code></pre></div>
+<p>Elasticity above about 2.5 — latency rising more than 2.5× faster than load — is a cliff, and it means the server has a contention point that a horizontal scale-out will hit at the same ratio. Below that, degradation is proportional and adding capacity works linearly, which is a much easier operational position.</p>
+<h2 id="performance-notes" tabindex="-1"><a class="heading-link" href="#performance-notes"><span>Performance Notes</span></a></h2>
+<ul>
+<li><strong><code>FastHttpUser</code> handles roughly 3,000–5,000 requests per second per process</strong>; <code>HttpUser</code> manages about 600. Use the fast one and <code>--processes</code>.</li>
+<li><strong>Set <code>concurrency</code> on the user to match a browser</strong>, around 18 for HTTP/2. Leaving it at 1 serialises each session’s burst and measures nothing real.</li>
+<li><strong>The generator needs more bandwidth than the server.</strong> A 10 Gbps link is the practical minimum for testing a tile server with 400 KB tiles.</li>
+<li><strong>Hold each step for at least 90 seconds.</strong> Shorter steps measure the ramp, not the steady state.</li>
+<li><strong>Disable Locust’s web UI with <code>--headless</code></strong> for reproducible runs, and keep <code>--csv-full-history</code> for the per-step percentiles.</li>
+<li><strong>Test the origin separately from the CDN</strong>, with the miss stream only, and record the hit rate the conclusion depends on.</li>
+</ul>
+<h2 id="common-errors" tabindex="-1"><a class="heading-link" href="#common-errors"><span>Common Errors</span></a></h2>
+<p><strong>Throughput plateaus and the generator is at 100% CPU.</strong> The test is measuring Locust. Add processes or machines.</p>
+<p><strong>Every request returns 404.</strong> The crawled paths are relative and the host is set separately, so they are being concatenated wrongly. Print one resolved URL before the campaign.</p>
+<p><strong>Latency is flat and then collapses instantly.</strong> A connection limit rather than saturation — check the server’s worker count and the OS file-descriptor limit.</p>
+<p><strong>Results are much better than production.</strong> The test is hitting a warm OS page cache because the path set is too small, or the CDN is in front of the endpoint being tested.</p>
+<p><strong>Results are much worse than production.</strong> The revisit model is missing, so the test re-requests tiles browsers would have cached.</p>
+<p><strong>The burst event never appears in the CSV.</strong> <code>events.request.fire</code> needs the <code>request_type</code> to be included in the stats; check the name matches what the reader filters on.</p>
+<p><strong>Errors appear at low load.</strong> Rate limiting or a WAF reacting to the load generator’s IP. Whitelist it, or the test measures the WAF.</p>
+<h2 id="frequently-asked-questions" tabindex="-1"><a class="heading-link" href="#frequently-asked-questions"><span>Frequently Asked Questions</span></a></h2>
+<h3 id="locust-or-k6" tabindex="-1"><a class="heading-link" href="#locust-or-k6"><span>Locust or k6?</span></a></h3>
+<p>Either works; Locust wins here because the session model is Python and can reuse the tileset-crawling code. k6 is better at very high request rates from a single machine.</p>
+<h3 id="should-i-test-against-production" tabindex="-1"><a class="heading-link" href="#should-i-test-against-production"><span>Should I test against production?</span></a></h3>
+<p>Against a production-identical environment, ideally. Testing the real production origin is defensible out of hours with the CDN in front, and it is the only way to find a limit that only exists in the real configuration.</p>
+<h3 id="what-capacity-figure-should-i-report" tabindex="-1"><a class="heading-link" href="#what-capacity-figure-should-i-report"><span>What capacity figure should I report?</span></a></h3>
+<p>Concurrent sessions at a stated service objective, with the objective written down: “100 concurrent sessions with the opening burst inside 3 seconds at the 95th percentile”. A requests-per-second number without an objective is unfalsifiable.</p>
+<h2 id="related-guides" tabindex="-1"><a class="heading-link" href="#related-guides"><span>Related Guides</span></a></h2>
+<ul>
+<li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/http2-and-connection-limits-for-tile-streaming/">HTTP/2 and Connection Limits for Tile Streaming</a> — the client-side concurrency this test models</li>
+<li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/versioning-tilesets-with-immutable-prefixes/">Versioning Tilesets with Immutable Prefixes</a> — the caching the revisit model assumes</li>
+<li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/diagnosing-slow-first-render-of-tilesets/">Diagnosing Slow First Render of Tilesets</a> — the client-side view of the same burst</li>
+</ul>
+<p>Back to <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/">Performance Profiling and Benchmarking</a>.</p>
+
+
+      
+      
+
+      <div class="related-nav">
+        
+
+        
+          <div>
+            <h3>Related</h3>
+            <div class="related-grid">
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/benchmarking-draco-decode-on-mobile-gpus/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Benchmarking Draco Decode on Mobile GPUs</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/measuring-tile-load-times-in-the-cesium-frame-loop/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Measuring Tile Load Times in the Cesium Frame Loop</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/memory-profiling-python-pipelines-with-memray/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Memory Profiling Python Pipelines with memray</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/profiling-pdal-pipelines-with-cprofile-and-py-spy/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Profiling PDAL Pipelines with cProfile and py-spy</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/profiling-webgl-with-spector-js/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Profiling WebGL with Spector.js</span>
+                </a>
+              
+            </div>
+          </div>
+        
+      </div>
+    </article>
+
+    
+    <aside class="toc" aria-label="On this page" data-toc hidden>
+      <h4>On this page</h4>
+      <ul></ul>
+    </aside>
+  </div>
+</div>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+  <div class="container site-footer__inner">
+    <div class="site-footer__brand">
+      <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+        <img src="/assets/img/logo-mark.svg" alt="" class="brand__mark" width="36" height="36">
+        <span class="brand__name">
+          3D Geospatial
+          <small>Digital Twin Automation</small>
+        </span>
+      </a>
+      <p>Engineering-grade guides on point cloud processing, mesh pipelines, LOD strategies, and CI/CD automation for digital twin platforms.</p>
+      <a class="footer-social" href="https://github.com/3d-geospatial" aria-label="3D Geospatial on GitHub" rel="noopener" target="_blank">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+          <path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.53-1.34-1.3-1.7-1.3-1.7-1.06-.72.08-.71.08-.71 1.17.08 1.79 1.2 1.79 1.2 1.04 1.79 2.73 1.27 3.4.97.1-.75.4-1.27.73-1.56-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.19-3.08-.12-.3-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.75.11 3.05.74.8 1.19 1.83 1.19 3.08 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.07.78 2.15v3.18c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5Z"/>
+        </svg>
+        <span>GitHub</span>
+      </a>
+    </div>
+
+    <div class="site-footer__col">
+      <h4>Sections</h4>
+      <ul>
+        <li><a href="https://www.3d-geospatial.com/">Home</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management &amp; Optimization</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/">Point Cloud &amp; Mesh Pipelines</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/">Troubleshooting &amp; Reliability</a></li>
+        
+      </ul>
+    </div>
+
+    
+      <div class="site-footer__col">
+        <h4>3D Geospatial Fundamentals</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/">3D Format Standards Comparison</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/">BIM and IFC Georeferencing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/">CityGML and CityJSON Processing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems for 3D Assets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/">Digital Elevation Model Workflows</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/">Spatial Indexing and Tiling Schemes for 3D Data</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>LOD Management &amp; Optimization</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/">Automated Tile Generation for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/">Cesium ion Upload Automation for 3D Tilesets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/">glTF LOD Generation With Draco Compression</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/">Streaming Sync Patterns for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/">Tileset Metadata and 3D Tiles Next</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/">Vector Overlays on 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Point Cloud &amp; Mesh Pipelines</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/">Automated Mesh Decimation for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/">Change Detection Between LiDAR Scan Epochs</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/">CI/CD Automation for Spatial Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">LiDAR Classification and Ground Extraction</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/photogrammetry-processing-pipelines/">Photogrammetry Processing Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/">Point Cloud Filtering Techniques</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/">Surface Reconstruction for Geospatial Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/">Texture Mapping Workflows for Digital Twins</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Troubleshooting &amp; Reliability</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/">Cross-Section Failure Modes in Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/">Data Validation &amp; QA Gates for 3D Tiles</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/">Performance Profiling and Benchmarking</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/">Pipeline Observability and Monitoring</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/">Streaming &amp; Runtime Diagnostics for 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+  </div>
+  <div class="container site-footer__bottom">
+    <span>© 2026 3D Geospatial &amp; Digital Twin Automation</span>
+    <span>Built with Eleventy · PWA-enabled</span>
+  </div>
+</footer>
+
+
+  <script src="/assets/js/site.js?v=b99aa9f971" defer></script>
+  
+</body>
+</html>

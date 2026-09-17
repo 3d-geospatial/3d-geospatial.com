@@ -1,0 +1,967 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <title>Inspecting glTF with gltf-transform — 3D Geospatial</title>
+  <meta name="description" content="Read what is actually inside a GLB with gltf-transform: accessor types, texture sizes, draw calls">
+  <meta name="keywords" content="3D geospatial, digital twin, point cloud, mesh pipeline, LOD, 3D Tiles, Cesium, PDAL, Open3D, Python, CI/CD">
+  <meta name="author" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta name="theme-color" content="#1f6b8a" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f171d" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+
+  
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem("theme");
+        var theme = (stored === "dark" || stored === "light") ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    })();
+  </script>
+  <meta name="generator" content="Eleventy">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="googlebot" content="index,follow,max-image-preview:large">
+
+  
+  <link rel="canonical" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/inspecting-gltf-with-gltf-transform/">
+  <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">
+
+  
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/icon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+
+  
+  <link rel="apple-touch-icon" href="/assets/img/icon-180.png">
+  <link rel="mask-icon" href="/assets/img/logo.svg" color="#1f6b8a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="3D Geospatial">
+  <meta name="application-name" content="3D Geospatial">
+
+  
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Inspecting glTF with gltf-transform — 3D Geospatial">
+  <meta property="og:description" content="Read what is actually inside a GLB with gltf-transform: accessor types, texture sizes, draw calls">
+  <meta property="og:url" content="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/inspecting-gltf-with-gltf-transform/">
+  <meta property="og:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+  <meta property="og:site_name" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta property="og:locale" content="en_US">
+  
+  <meta property="article:published_time" content="2026-09-17T23:36:56.454Z">
+  <meta property="article:modified_time" content="2026-09-17T23:36:56.454Z">
+  <meta property="article:publisher" content="https://www.3d-geospatial.com/">
+  
+
+  
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Inspecting glTF with gltf-transform — 3D Geospatial">
+  <meta name="twitter:description" content="Read what is actually inside a GLB with gltf-transform: accessor types, texture sizes, draw calls">
+  <meta name="twitter:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta name="twitter:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+
+  
+  <link rel="preload" href="/assets/css/styles.css?v=8c46394d6c" as="style">
+  
+
+  <link rel="stylesheet" href="/assets/css/styles.css?v=8c46394d6c">
+
+  
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.3d-geospatial.com/#organization",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "url": "https://www.3d-geospatial.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/icon-512.png",
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://www.3d-geospatial.com/#website",
+      "url": "https://www.3d-geospatial.com/",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "description": "Build reliable 3D spatial data pipelines for digital twins — point clouds, meshes, LOD strategies, Python processing, and CI/CD automation.",
+      "inLanguage": "en",
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      }
+    },
+    {
+      "@type": "TechArticle",
+      "@id": "https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/inspecting-gltf-with-gltf-transform/#article",
+      "isPartOf": {
+        "@id": "https://www.3d-geospatial.com/#website"
+      },
+      "headline": "Inspecting glTF with gltf-transform",
+      "name": "Inspecting glTF with gltf-transform",
+      "description": "Read what is actually inside a GLB with gltf-transform: accessor types, texture sizes, draw calls",
+      "url": "https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/inspecting-gltf-with-gltf-transform/",
+      "mainEntityOfPage": "https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/inspecting-gltf-with-gltf-transform/",
+      "inLanguage": "en",
+      "datePublished": "2026-09-17T23:36:56.454Z",
+      "dateModified": "2026-09-17T23:36:56.454Z",
+      "author": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "image": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/og-cover.png",
+        "width": 1200,
+        "height": 630
+      },
+      "breadcrumb": {
+        "@id": "https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/inspecting-gltf-with-gltf-transform/#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/inspecting-gltf-with-gltf-transform/#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://www.3d-geospatial.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "LOD Management Optimization Strategies",
+          "item": "https://www.3d-geospatial.com/lod-management-optimization-strategies/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "GLTF LOD Generation With Draco Compression",
+          "item": "https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "name": "Inspecting GLTF With GLTF Transform",
+          "item": "https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/inspecting-gltf-with-gltf-transform/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  
+<header class="site-header" role="banner">
+  <div class="container site-header__inner">
+    <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+      <img src="/assets/img/logo.svg" alt="" class="brand__mark" width="36" height="36">
+      <span class="brand__name">
+        3D Geospatial
+        <small>Digital Twin Automation</small>
+      </span>
+    </a>
+
+    <button class="theme-toggle" type="button" data-theme-toggle
+            aria-label="Switch to dark theme" title="Switch to dark theme">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4.2"/>
+        <path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/>
+      </svg>
+    </button>
+
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>
+      <span class="nav-toggle__icon" aria-hidden="true"><span></span></span>
+      Menu
+    </button>
+
+    <nav class="primary-nav" id="primary-nav" aria-label="Primary">
+      
+      <a href="https://www.3d-geospatial.com/" >
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/>
+        </svg>
+        Home
+      </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2 3 7l9 5 9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 17l9 5 9-5"/>
+            </svg>
+          
+          3D Geospatial Fundamentals
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/" aria-current="page">
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+          
+          LOD Management &amp; Optimization
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="6" cy="6" r="1.5"/><circle cx="12" cy="6" r="1.5"/><circle cx="18" cy="6" r="1.5"/>
+              <circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/>
+              <circle cx="6" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="18" cy="18" r="1.5"/>
+            </svg>
+          
+          Point Cloud &amp; Mesh Pipelines
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <path d="M12 9v4"/><path d="M12 17h.01"/>
+            </svg>
+          
+          Troubleshooting &amp; Reliability
+        </a>
+      
+    </nav>
+  </div>
+</header>
+
+
+  <main id="main">
+    
+
+
+<div class="container">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    
+      
+        <a href="https://www.3d-geospatial.com/">Home</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management Optimization Strategies</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/">GLTF LOD Generation With Draco Compression</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <span class="current">Inspecting GLTF With GLTF Transform</span>
+      
+    
+  </nav>
+
+  <div class="content-page">
+    <article class="article">
+      <h1 id="inspecting-gltf-with-gltf-transform" tabindex="-1"><a class="heading-link" href="#inspecting-gltf-with-gltf-transform"><span>Inspecting glTF with gltf-transform</span></a></h1>
+<p>This page reads what is actually inside a GLB — meshes, primitives, accessors, materials, texture dimensions, extensions and unused data — using the <code>gltf-transform</code> CLI and its Node API, and turns that reading into a scriptable audit that fails a tiling build when a tile regresses.</p>
+<h2 id="why-you-hit-this" tabindex="-1"><a class="heading-link" href="#why-you-hit-this"><span>Why you hit this</span></a></h2>
+<p>Tile content is the part of a 3D Tiles pipeline that nobody looks at. The tileset JSON is readable, the viewer either works or does not, and the GLB in between is a binary blob that gets passed from a mesh exporter to a compressor to a CDN without anyone checking what it contains. That is where the surprises live: a 4096×4096 normal map on a building with no visible detail, 40 primitives where 2 would do, a <code>KHR_materials_pbrSpecularGlossiness</code> extension no current viewer reads, 30% of the buffer occupied by accessors nothing references.</p>
+<p>Every one of those is a bandwidth or frame-rate problem, and all of them are visible in one command.</p>
+<h2 id="prerequisites" tabindex="-1"><a class="heading-link" href="#prerequisites"><span>Prerequisites</span></a></h2>
+<ul>
+<li>Node.js 18+ and the CLI: <code>npm install -g @gltf-transform/cli</code>.</li>
+<li>For the scripted audit, <code>npm install @gltf-transform/core @gltf-transform/extensions</code>.</li>
+<li>A GLB or glTF file — tile content from <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/converting-glb-to-3d-tiles-with-3d-tiles-tools/">converting GLB to 3D Tiles with 3d-tiles-tools</a>, or any exporter output.</li>
+</ul>
+<h2 id="step-by-step" tabindex="-1"><a class="heading-link" href="#step-by-step"><span>Step-by-Step</span></a></h2>
+<h3 id="1-start-with-inspect" tabindex="-1"><a class="heading-link" href="#1-start-with-inspect"><span>1. Start with <code>inspect</code></span></a></h3>
+<div class="codeblock" data-lang="bash"><div class="codeblock__bar"><span class="codeblock__lang">bash</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-bash" tabindex="0" role="group" aria-label="bash code sample"><code class="language-bash">npx gltf-transform inspect output/content/12021000.glb
+</code></pre></div>
+<div class="codeblock" data-lang="text"><div class="codeblock__bar"><span class="codeblock__lang">text</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-text" tabindex="0" role="group" aria-label="text code sample"><code class="language-text"> SCENES ─────────────────────────────────────
+  name        rootName   bboxMin              bboxMax
+  Scene       Root       -118.4,-3.2,-96.7    121.9,74.1,102.4
+
+ MESHES ─────────────────────────────────────
+  name          primitives   mode        vertices   glPrimitives   indices      attributes
+  building_1    1            TRIANGLES   4,182      2,788          uint16       POSITION, NORMAL, TEXCOORD_0
+  ...
+
+ TEXTURES ───────────────────────────────────
+  name        uri   slots                  instances   mimeType     resolution   size
+  atlas_0     —     baseColorTexture       412         image/jpeg   4096x4096    9.42 MB
+  atlas_0_n   —     normalTexture          412         image/png    4096x4096   31.80 MB
+</code></pre></div>
+<p>The <code>inspect</code> output is the whole first pass. Three numbers in it are usually wrong on a first look at a tile: the texture size, the primitive count and whether indices are <code>uint16</code> or <code>uint32</code>.</p>
+<p>A 31.8 MB PNG normal map is the single most common finding, and it is almost always a mistake — PNG is lossless and normal maps do not need it at tile scale, so converting to WebP typically takes that to under 2 MB. The <code>slots</code> and <code>instances</code> columns tell you whether a texture is worth optimising at all: a texture used by 412 primitives matters, one used by 1 does not.</p>
+<figure class="diagram">
+<svg viewBox="4 6 732 248" role="img" aria-labelledby="gti-anatomy-t gti-anatomy-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="gti-anatomy-t">What inspect reports, and what each number costs</title>
+  <desc id="gti-anatomy-d">A table of inspect sections and the cost each one drives. Meshes and primitives drive draw calls. Vertices and accessors drive buffer size and parse time. Texture resolution and MIME type drive download size and GPU memory. Materials drive shader variants. Extensions drive client compatibility. Unused accessors and textures cost bytes for nothing.</desc>
+  <rect class="svg-bg" x="4" y="6" width="732" height="248" fill="#ffffff"/>
+  <g stroke-width="1.5">
+    <rect x="18" y="20" width="196" height="32" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="214" y="20" width="230" height="32" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="444" y="20" width="278" height="32" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="18" y="52" width="196" height="32" fill="#ffffff" stroke="#5b6471"/>
+    <rect x="214" y="52" width="230" height="32" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="444" y="52" width="278" height="32" fill="#ffffff" stroke="#5b6471"/>
+    <rect x="18" y="84" width="196" height="32" fill="#ffffff" stroke="#5b6471"/>
+    <rect x="214" y="84" width="230" height="32" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="444" y="84" width="278" height="32" fill="#ffffff" stroke="#5b6471"/>
+    <rect x="18" y="116" width="196" height="32" fill="#ffffff" stroke="#5b6471"/>
+    <rect x="214" y="116" width="230" height="32" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="444" y="116" width="278" height="32" fill="#ffffff" stroke="#5b6471"/>
+    <rect x="18" y="148" width="196" height="32" fill="#ffffff" stroke="#5b6471"/>
+    <rect x="214" y="148" width="230" height="32" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="444" y="148" width="278" height="32" fill="#ffffff" stroke="#5b6471"/>
+    <rect x="18" y="180" width="196" height="32" fill="#ffffff" stroke="#5b6471"/>
+    <rect x="214" y="180" width="230" height="32" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="444" y="180" width="278" height="32" fill="#ffffff" stroke="#5b6471"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="116" y="41">inspect section</text><text x="329" y="41">drives</text><text x="583" y="41">what to look for</text>
+    <text x="116" y="73">meshes, primitives</text><text x="329" y="73">draw calls</text><text x="583" y="73">more than ~8 primitives per tile</text>
+    <text x="116" y="105">vertices, accessors</text><text x="329" y="105">buffer size, parse time</text><text x="583" y="105">uint32 indices under 65k vertices</text>
+    <text x="116" y="137">textures</text><text x="329" y="137">download, GPU memory</text><text x="583" y="137">PNG, or 4096² where 1024² serves</text>
+    <text x="116" y="169">materials</text><text x="329" y="169">shader variants</text><text x="583" y="169">near-duplicate materials</text>
+    <text x="116" y="201">extensions</text><text x="329" y="201">client compatibility</text><text x="583" y="201">anything deprecated or required</text>
+  </g>
+  <text x="370" y="236" fill="#5b6471" font-size="12" text-anchor="middle">one command produces every row; the rightmost column is the reason to read it</text>
+</svg>
+<figcaption>Each section of the report maps to a specific cost, which is what makes the output actionable rather than informational.</figcaption>
+</figure>
+<h3 id="2-find-what-nothing-references" tabindex="-1"><a class="heading-link" href="#2-find-what-nothing-references"><span>2. Find what nothing references</span></a></h3>
+<div class="codeblock" data-lang="bash"><div class="codeblock__bar"><span class="codeblock__lang">bash</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-bash" tabindex="0" role="group" aria-label="bash code sample"><code class="language-bash">npx gltf-transform copy input.glb /tmp/pruned.glb --no-prune <span class="token operator"><span class="token file-descriptor important">2</span>></span>/dev/null <span class="token operator">||</span> <span class="token boolean">true</span>
+
+npx gltf-transform prune input.glb output/pruned.glb <span class="token punctuation">\</span>
+  --keep-attributes <span class="token boolean">false</span> --keep-indices <span class="token boolean">false</span> --keep-solid-textures <span class="token boolean">false</span>
+</code></pre></div>
+<div class="codeblock" data-lang="javascript"><div class="codeblock__bar"><span class="codeblock__lang">javascript</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-javascript" tabindex="0" role="group" aria-label="javascript code sample"><code class="language-javascript"><span class="token comment">// audit/unused.mjs</span>
+<span class="token keyword">import</span> <span class="token punctuation">{</span> NodeIO <span class="token punctuation">}</span> <span class="token keyword">from</span> <span class="token string">'@gltf-transform/core'</span><span class="token punctuation">;</span>
+<span class="token keyword">import</span> <span class="token punctuation">{</span> <span class="token constant">ALL_EXTENSIONS</span> <span class="token punctuation">}</span> <span class="token keyword">from</span> <span class="token string">'@gltf-transform/extensions'</span><span class="token punctuation">;</span>
+
+<span class="token keyword">const</span> io <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">NodeIO</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">registerExtensions</span><span class="token punctuation">(</span><span class="token constant">ALL_EXTENSIONS</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token keyword">export</span> <span class="token keyword">async</span> <span class="token keyword">function</span> <span class="token function">unusedReport</span><span class="token punctuation">(</span><span class="token parameter">path</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+  <span class="token keyword">const</span> doc <span class="token operator">=</span> <span class="token keyword">await</span> io<span class="token punctuation">.</span><span class="token function">read</span><span class="token punctuation">(</span>path<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">const</span> root <span class="token operator">=</span> doc<span class="token punctuation">.</span><span class="token function">getRoot</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+  <span class="token keyword">const</span> referencedAccessors <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Set</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">const</span> mesh <span class="token keyword">of</span> root<span class="token punctuation">.</span><span class="token function">listMeshes</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">const</span> prim <span class="token keyword">of</span> mesh<span class="token punctuation">.</span><span class="token function">listPrimitives</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">const</span> name <span class="token keyword">of</span> prim<span class="token punctuation">.</span><span class="token function">listSemantics</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> referencedAccessors<span class="token punctuation">.</span><span class="token function">add</span><span class="token punctuation">(</span>prim<span class="token punctuation">.</span><span class="token function">getAttribute</span><span class="token punctuation">(</span>name<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token keyword">if</span> <span class="token punctuation">(</span>prim<span class="token punctuation">.</span><span class="token function">getIndices</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> referencedAccessors<span class="token punctuation">.</span><span class="token function">add</span><span class="token punctuation">(</span>prim<span class="token punctuation">.</span><span class="token function">getIndices</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">const</span> target <span class="token keyword">of</span> prim<span class="token punctuation">.</span><span class="token function">listTargets</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">const</span> name <span class="token keyword">of</span> target<span class="token punctuation">.</span><span class="token function">listSemantics</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> referencedAccessors<span class="token punctuation">.</span><span class="token function">add</span><span class="token punctuation">(</span>target<span class="token punctuation">.</span><span class="token function">getAttribute</span><span class="token punctuation">(</span>name<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+  <span class="token punctuation">}</span>
+
+  <span class="token keyword">const</span> allAccessors <span class="token operator">=</span> root<span class="token punctuation">.</span><span class="token function">listAccessors</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">const</span> orphanAccessors <span class="token operator">=</span> allAccessors<span class="token punctuation">.</span><span class="token function">filter</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">a</span><span class="token punctuation">)</span> <span class="token operator">=></span> <span class="token operator">!</span>referencedAccessors<span class="token punctuation">.</span><span class="token function">has</span><span class="token punctuation">(</span>a<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">const</span> orphanBytes <span class="token operator">=</span> orphanAccessors<span class="token punctuation">.</span><span class="token function">reduce</span><span class="token punctuation">(</span>
+    <span class="token punctuation">(</span><span class="token parameter">sum<span class="token punctuation">,</span> a</span><span class="token punctuation">)</span> <span class="token operator">=></span> sum <span class="token operator">+</span> a<span class="token punctuation">.</span><span class="token function">getCount</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">*</span> a<span class="token punctuation">.</span><span class="token function">getElementSize</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">*</span> a<span class="token punctuation">.</span><span class="token function">getComponentSize</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+  <span class="token keyword">const</span> usedTextures <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Set</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">const</span> mat <span class="token keyword">of</span> root<span class="token punctuation">.</span><span class="token function">listMaterials</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">const</span> slot <span class="token keyword">of</span> <span class="token punctuation">[</span><span class="token string">'BaseColor'</span><span class="token punctuation">,</span> <span class="token string">'Normal'</span><span class="token punctuation">,</span> <span class="token string">'Emissive'</span><span class="token punctuation">,</span> <span class="token string">'Occlusion'</span><span class="token punctuation">,</span> <span class="token string">'MetallicRoughness'</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      <span class="token keyword">const</span> tex <span class="token operator">=</span> mat<span class="token punctuation">[</span><span class="token template-string"><span class="token template-punctuation string">`</span><span class="token string">get</span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>slot<span class="token interpolation-punctuation punctuation">}</span></span><span class="token string">Texture</span><span class="token template-punctuation string">`</span></span><span class="token punctuation">]</span><span class="token operator">?.</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token keyword">if</span> <span class="token punctuation">(</span>tex<span class="token punctuation">)</span> usedTextures<span class="token punctuation">.</span><span class="token function">add</span><span class="token punctuation">(</span>tex<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+  <span class="token punctuation">}</span>
+  <span class="token keyword">const</span> orphanTextures <span class="token operator">=</span> root<span class="token punctuation">.</span><span class="token function">listTextures</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">filter</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">t</span><span class="token punctuation">)</span> <span class="token operator">=></span> <span class="token operator">!</span>usedTextures<span class="token punctuation">.</span><span class="token function">has</span><span class="token punctuation">(</span>t<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+  <span class="token keyword">const</span> usedMaterials <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Set</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">const</span> mesh <span class="token keyword">of</span> root<span class="token punctuation">.</span><span class="token function">listMeshes</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">const</span> prim <span class="token keyword">of</span> mesh<span class="token punctuation">.</span><span class="token function">listPrimitives</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      <span class="token keyword">if</span> <span class="token punctuation">(</span>prim<span class="token punctuation">.</span><span class="token function">getMaterial</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> usedMaterials<span class="token punctuation">.</span><span class="token function">add</span><span class="token punctuation">(</span>prim<span class="token punctuation">.</span><span class="token function">getMaterial</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+  <span class="token punctuation">}</span>
+
+  <span class="token keyword">return</span> <span class="token punctuation">{</span>
+    <span class="token literal-property property">accessors</span><span class="token operator">:</span> <span class="token punctuation">{</span> <span class="token literal-property property">total</span><span class="token operator">:</span> allAccessors<span class="token punctuation">.</span>length<span class="token punctuation">,</span> <span class="token literal-property property">orphan</span><span class="token operator">:</span> orphanAccessors<span class="token punctuation">.</span>length<span class="token punctuation">,</span>
+                 <span class="token literal-property property">orphanKB</span><span class="token operator">:</span> Math<span class="token punctuation">.</span><span class="token function">round</span><span class="token punctuation">(</span>orphanBytes <span class="token operator">/</span> <span class="token number">1024</span><span class="token punctuation">)</span> <span class="token punctuation">}</span><span class="token punctuation">,</span>
+    <span class="token literal-property property">textures</span><span class="token operator">:</span> <span class="token punctuation">{</span> <span class="token literal-property property">total</span><span class="token operator">:</span> root<span class="token punctuation">.</span><span class="token function">listTextures</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span>length<span class="token punctuation">,</span> <span class="token literal-property property">orphan</span><span class="token operator">:</span> orphanTextures<span class="token punctuation">.</span>length<span class="token punctuation">,</span>
+                <span class="token literal-property property">orphanKB</span><span class="token operator">:</span> Math<span class="token punctuation">.</span><span class="token function">round</span><span class="token punctuation">(</span>orphanTextures<span class="token punctuation">.</span><span class="token function">reduce</span><span class="token punctuation">(</span>
+                  <span class="token punctuation">(</span><span class="token parameter">s<span class="token punctuation">,</span> t</span><span class="token punctuation">)</span> <span class="token operator">=></span> s <span class="token operator">+</span> <span class="token punctuation">(</span>t<span class="token punctuation">.</span><span class="token function">getImage</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">?.</span>byteLength <span class="token operator">??</span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token number">1024</span><span class="token punctuation">)</span> <span class="token punctuation">}</span><span class="token punctuation">,</span>
+    <span class="token literal-property property">materials</span><span class="token operator">:</span> <span class="token punctuation">{</span> <span class="token literal-property property">total</span><span class="token operator">:</span> root<span class="token punctuation">.</span><span class="token function">listMaterials</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span>length<span class="token punctuation">,</span>
+                 <span class="token literal-property property">orphan</span><span class="token operator">:</span> root<span class="token punctuation">.</span><span class="token function">listMaterials</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span>length <span class="token operator">-</span> usedMaterials<span class="token punctuation">.</span>size <span class="token punctuation">}</span><span class="token punctuation">,</span>
+    <span class="token literal-property property">meshes</span><span class="token operator">:</span> <span class="token punctuation">{</span> <span class="token literal-property property">total</span><span class="token operator">:</span> root<span class="token punctuation">.</span><span class="token function">listMeshes</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span>length<span class="token punctuation">,</span>
+              <span class="token literal-property property">orphan</span><span class="token operator">:</span> root<span class="token punctuation">.</span><span class="token function">listMeshes</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">filter</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">m</span><span class="token punctuation">)</span> <span class="token operator">=></span> m<span class="token punctuation">.</span><span class="token function">listParents</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+                <span class="token punctuation">.</span><span class="token function">filter</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">p</span><span class="token punctuation">)</span> <span class="token operator">=></span> p<span class="token punctuation">.</span>propertyType <span class="token operator">===</span> <span class="token string">'Node'</span><span class="token punctuation">)</span><span class="token punctuation">.</span>length <span class="token operator">===</span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">.</span>length <span class="token punctuation">}</span><span class="token punctuation">,</span>
+  <span class="token punctuation">}</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+</code></pre></div>
+<p>Orphaned data is the easiest win in a tile pipeline and the most common. Exporters leave behind morph-target accessors nothing uses, tangent attributes for materials with no normal map, and a second UV set from a baking step that was removed. Between 5% and 30% of a tile’s buffer is typical, and <code>prune</code> removes it in one pass with no visual change.</p>
+<p>Walking the document graph rather than trusting a tool’s report matters when the pipeline has several stages: a <code>prune</code> that ran before a later step added data will report clean while the file is not.</p>
+<h3 id="3-count-what-the-gpu-will-actually-do" tabindex="-1"><a class="heading-link" href="#3-count-what-the-gpu-will-actually-do"><span>3. Count what the GPU will actually do</span></a></h3>
+<div class="codeblock" data-lang="javascript"><div class="codeblock__bar"><span class="codeblock__lang">javascript</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-javascript" tabindex="0" role="group" aria-label="javascript code sample"><code class="language-javascript"><span class="token comment">// audit/cost.mjs</span>
+<span class="token keyword">import</span> <span class="token punctuation">{</span> NodeIO <span class="token punctuation">}</span> <span class="token keyword">from</span> <span class="token string">'@gltf-transform/core'</span><span class="token punctuation">;</span>
+<span class="token keyword">import</span> <span class="token punctuation">{</span> <span class="token constant">ALL_EXTENSIONS</span> <span class="token punctuation">}</span> <span class="token keyword">from</span> <span class="token string">'@gltf-transform/extensions'</span><span class="token punctuation">;</span>
+
+<span class="token keyword">const</span> io <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">NodeIO</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">registerExtensions</span><span class="token punctuation">(</span><span class="token constant">ALL_EXTENSIONS</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token keyword">export</span> <span class="token keyword">async</span> <span class="token keyword">function</span> <span class="token function">costReport</span><span class="token punctuation">(</span><span class="token parameter">path</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+  <span class="token keyword">const</span> doc <span class="token operator">=</span> <span class="token keyword">await</span> io<span class="token punctuation">.</span><span class="token function">read</span><span class="token punctuation">(</span>path<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">const</span> root <span class="token operator">=</span> doc<span class="token punctuation">.</span><span class="token function">getRoot</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+  <span class="token keyword">let</span> drawCalls <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+  <span class="token keyword">let</span> triangles <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+  <span class="token keyword">let</span> vertices <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+  <span class="token keyword">let</span> instancedDrawCalls <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+  <span class="token keyword">const</span> materialsPerPrim <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Set</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+  <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">const</span> node <span class="token keyword">of</span> root<span class="token punctuation">.</span><span class="token function">listNodes</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> mesh <span class="token operator">=</span> node<span class="token punctuation">.</span><span class="token function">getMesh</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>mesh<span class="token punctuation">)</span> <span class="token keyword">continue</span><span class="token punctuation">;</span>
+    <span class="token keyword">const</span> instancing <span class="token operator">=</span> node<span class="token punctuation">.</span><span class="token function">getExtension</span><span class="token punctuation">(</span><span class="token string">'EXT_mesh_gpu_instancing'</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">const</span> instanceCount <span class="token operator">=</span> instancing
+      <span class="token operator">?</span> instancing<span class="token punctuation">.</span><span class="token function">getAttribute</span><span class="token punctuation">(</span><span class="token string">'TRANSLATION'</span><span class="token punctuation">)</span><span class="token operator">?.</span><span class="token function">getCount</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">??</span> <span class="token number">1</span>
+      <span class="token operator">:</span> <span class="token number">1</span><span class="token punctuation">;</span>
+    <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">const</span> prim <span class="token keyword">of</span> mesh<span class="token punctuation">.</span><span class="token function">listPrimitives</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      <span class="token keyword">const</span> idx <span class="token operator">=</span> prim<span class="token punctuation">.</span><span class="token function">getIndices</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token keyword">const</span> count <span class="token operator">=</span> idx <span class="token operator">?</span> idx<span class="token punctuation">.</span><span class="token function">getCount</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">:</span> prim<span class="token punctuation">.</span><span class="token function">getAttribute</span><span class="token punctuation">(</span><span class="token string">'POSITION'</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">getCount</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      triangles <span class="token operator">+=</span> Math<span class="token punctuation">.</span><span class="token function">floor</span><span class="token punctuation">(</span>count <span class="token operator">/</span> <span class="token number">3</span><span class="token punctuation">)</span> <span class="token operator">*</span> <span class="token punctuation">(</span>instancing <span class="token operator">?</span> instanceCount <span class="token operator">:</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      vertices <span class="token operator">+=</span> prim<span class="token punctuation">.</span><span class="token function">getAttribute</span><span class="token punctuation">(</span><span class="token string">'POSITION'</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">getCount</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token keyword">if</span> <span class="token punctuation">(</span>instancing<span class="token punctuation">)</span> instancedDrawCalls <span class="token operator">+=</span> <span class="token number">1</span><span class="token punctuation">;</span> <span class="token keyword">else</span> drawCalls <span class="token operator">+=</span> <span class="token number">1</span><span class="token punctuation">;</span>
+      <span class="token keyword">if</span> <span class="token punctuation">(</span>prim<span class="token punctuation">.</span><span class="token function">getMaterial</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> materialsPerPrim<span class="token punctuation">.</span><span class="token function">add</span><span class="token punctuation">(</span>prim<span class="token punctuation">.</span><span class="token function">getMaterial</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+  <span class="token punctuation">}</span>
+
+  <span class="token keyword">const</span> textureBytes <span class="token operator">=</span> root<span class="token punctuation">.</span><span class="token function">listTextures</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+    <span class="token punctuation">.</span><span class="token function">reduce</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">s<span class="token punctuation">,</span> t</span><span class="token punctuation">)</span> <span class="token operator">=></span> s <span class="token operator">+</span> <span class="token punctuation">(</span>t<span class="token punctuation">.</span><span class="token function">getImage</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">?.</span>byteLength <span class="token operator">??</span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">const</span> gpuTextureBytes <span class="token operator">=</span> root<span class="token punctuation">.</span><span class="token function">listTextures</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">reduce</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">s<span class="token punctuation">,</span> t</span><span class="token punctuation">)</span> <span class="token operator">=></span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> size <span class="token operator">=</span> t<span class="token punctuation">.</span><span class="token function">getSize</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">return</span> s <span class="token operator">+</span> <span class="token punctuation">(</span>size <span class="token operator">?</span> size<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span> <span class="token operator">*</span> size<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span> <span class="token operator">*</span> <span class="token number">4</span> <span class="token operator">*</span> <span class="token number">1.33</span> <span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">;</span>   <span class="token comment">// RGBA + mipmaps</span>
+  <span class="token punctuation">}</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+  <span class="token keyword">return</span> <span class="token punctuation">{</span>
+    drawCalls<span class="token punctuation">,</span> instancedDrawCalls<span class="token punctuation">,</span> triangles<span class="token punctuation">,</span> vertices<span class="token punctuation">,</span>
+    <span class="token literal-property property">materials</span><span class="token operator">:</span> materialsPerPrim<span class="token punctuation">.</span>size<span class="token punctuation">,</span>
+    <span class="token literal-property property">indexWidth</span><span class="token operator">:</span> <span class="token function">indexWidths</span><span class="token punctuation">(</span>root<span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token literal-property property">textureBytesOnWire</span><span class="token operator">:</span> Math<span class="token punctuation">.</span><span class="token function">round</span><span class="token punctuation">(</span>textureBytes <span class="token operator">/</span> <span class="token number">1024</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token literal-property property">textureBytesOnGpu</span><span class="token operator">:</span> Math<span class="token punctuation">.</span><span class="token function">round</span><span class="token punctuation">(</span>gpuTextureBytes <span class="token operator">/</span> <span class="token number">1024</span> <span class="token operator">/</span> <span class="token number">1024</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token literal-property property">extensionsRequired</span><span class="token operator">:</span> root<span class="token punctuation">.</span><span class="token function">listExtensionsRequired</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">map</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">e</span><span class="token punctuation">)</span> <span class="token operator">=></span> e<span class="token punctuation">.</span>extensionName<span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token literal-property property">extensionsUsed</span><span class="token operator">:</span> root<span class="token punctuation">.</span><span class="token function">listExtensionsUsed</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">map</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">e</span><span class="token punctuation">)</span> <span class="token operator">=></span> e<span class="token punctuation">.</span>extensionName<span class="token punctuation">)</span><span class="token punctuation">,</span>
+  <span class="token punctuation">}</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">function</span> <span class="token function">indexWidths</span><span class="token punctuation">(</span><span class="token parameter">root</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+  <span class="token keyword">const</span> widths <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token punctuation">}</span><span class="token punctuation">;</span>
+  <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">const</span> mesh <span class="token keyword">of</span> root<span class="token punctuation">.</span><span class="token function">listMeshes</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">const</span> prim <span class="token keyword">of</span> mesh<span class="token punctuation">.</span><span class="token function">listPrimitives</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      <span class="token keyword">const</span> idx <span class="token operator">=</span> prim<span class="token punctuation">.</span><span class="token function">getIndices</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>idx<span class="token punctuation">)</span> <span class="token punctuation">{</span> widths<span class="token punctuation">.</span>none <span class="token operator">=</span> <span class="token punctuation">(</span>widths<span class="token punctuation">.</span>none <span class="token operator">??</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token operator">+</span> <span class="token number">1</span><span class="token punctuation">;</span> <span class="token keyword">continue</span><span class="token punctuation">;</span> <span class="token punctuation">}</span>
+      <span class="token keyword">const</span> bits <span class="token operator">=</span> idx<span class="token punctuation">.</span><span class="token function">getComponentSize</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">*</span> <span class="token number">8</span><span class="token punctuation">;</span>
+      <span class="token keyword">const</span> maxVertex <span class="token operator">=</span> prim<span class="token punctuation">.</span><span class="token function">getAttribute</span><span class="token punctuation">(</span><span class="token string">'POSITION'</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">getCount</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token keyword">const</span> key <span class="token operator">=</span> maxVertex <span class="token operator">&lt;</span> <span class="token number">65536</span> <span class="token operator">&amp;&amp;</span> bits <span class="token operator">===</span> <span class="token number">32</span> <span class="token operator">?</span> <span class="token string">'uint32_wasteful'</span> <span class="token operator">:</span> <span class="token template-string"><span class="token template-punctuation string">`</span><span class="token string">uint</span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>bits<span class="token interpolation-punctuation punctuation">}</span></span><span class="token template-punctuation string">`</span></span><span class="token punctuation">;</span>
+      widths<span class="token punctuation">[</span>key<span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token punctuation">(</span>widths<span class="token punctuation">[</span>key<span class="token punctuation">]</span> <span class="token operator">??</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token operator">+</span> <span class="token number">1</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+  <span class="token punctuation">}</span>
+  <span class="token keyword">return</span> widths<span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+</code></pre></div>
+<p><code>textureBytesOnGpu</code> is the number that explains a viewer running out of memory while the network panel looks fine. A 4096×4096 texture compresses to 2 MB on the wire and occupies about 87 MB on the GPU once decoded to RGBA with mipmaps — so a scene holding 40 such tiles has a memory problem that no amount of compression addresses. Only a smaller texture, or a GPU-compressed format like KTX2/Basis, changes it.</p>
+<p><code>uint32_wasteful</code> catches a real and invisible cost: indices stored as 32-bit for a primitive with fewer than 65,536 vertices, doubling the index buffer for nothing. Exporters do this routinely.</p>
+<h3 id="4-check-the-extensions-against-what-your-client-supports" tabindex="-1"><a class="heading-link" href="#4-check-the-extensions-against-what-your-client-supports"><span>4. Check the extensions against what your client supports</span></a></h3>
+<div class="codeblock" data-lang="javascript"><div class="codeblock__bar"><span class="codeblock__lang">javascript</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-javascript" tabindex="0" role="group" aria-label="javascript code sample"><code class="language-javascript"><span class="token comment">// audit/extensions.mjs</span>
+<span class="token keyword">const</span> <span class="token constant">SUPPORTED</span> <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Set</span><span class="token punctuation">(</span><span class="token punctuation">[</span>
+  <span class="token string">'KHR_draco_mesh_compression'</span><span class="token punctuation">,</span>
+  <span class="token string">'KHR_mesh_quantization'</span><span class="token punctuation">,</span>
+  <span class="token string">'KHR_texture_basisu'</span><span class="token punctuation">,</span>
+  <span class="token string">'KHR_materials_unlit'</span><span class="token punctuation">,</span>
+  <span class="token string">'KHR_texture_transform'</span><span class="token punctuation">,</span>
+  <span class="token string">'EXT_mesh_gpu_instancing'</span><span class="token punctuation">,</span>
+  <span class="token string">'EXT_meshopt_compression'</span><span class="token punctuation">,</span>
+  <span class="token string">'EXT_structural_metadata'</span><span class="token punctuation">,</span>
+  <span class="token string">'EXT_mesh_features'</span><span class="token punctuation">,</span>
+<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token keyword">const</span> <span class="token constant">DEPRECATED</span> <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Set</span><span class="token punctuation">(</span><span class="token punctuation">[</span>
+  <span class="token string">'KHR_materials_pbrSpecularGlossiness'</span><span class="token punctuation">,</span>
+  <span class="token string">'KHR_technique_webgl'</span><span class="token punctuation">,</span>
+  <span class="token string">'CESIUM_RTC'</span><span class="token punctuation">,</span>
+<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token keyword">export</span> <span class="token keyword">function</span> <span class="token function">extensionVerdict</span><span class="token punctuation">(</span><span class="token parameter">report</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+  <span class="token keyword">const</span> required <span class="token operator">=</span> report<span class="token punctuation">.</span>extensionsRequired <span class="token operator">??</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+  <span class="token keyword">const</span> used <span class="token operator">=</span> report<span class="token punctuation">.</span>extensionsUsed <span class="token operator">??</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+  <span class="token keyword">const</span> blocking <span class="token operator">=</span> required<span class="token punctuation">.</span><span class="token function">filter</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">e</span><span class="token punctuation">)</span> <span class="token operator">=></span> <span class="token operator">!</span><span class="token constant">SUPPORTED</span><span class="token punctuation">.</span><span class="token function">has</span><span class="token punctuation">(</span>e<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">const</span> deprecated <span class="token operator">=</span> used<span class="token punctuation">.</span><span class="token function">filter</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">e</span><span class="token punctuation">)</span> <span class="token operator">=></span> <span class="token constant">DEPRECATED</span><span class="token punctuation">.</span><span class="token function">has</span><span class="token punctuation">(</span>e<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">const</span> unknown <span class="token operator">=</span> used<span class="token punctuation">.</span><span class="token function">filter</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">e</span><span class="token punctuation">)</span> <span class="token operator">=></span> <span class="token operator">!</span><span class="token constant">SUPPORTED</span><span class="token punctuation">.</span><span class="token function">has</span><span class="token punctuation">(</span>e<span class="token punctuation">)</span> <span class="token operator">&amp;&amp;</span> <span class="token operator">!</span><span class="token constant">DEPRECATED</span><span class="token punctuation">.</span><span class="token function">has</span><span class="token punctuation">(</span>e<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">return</span> <span class="token punctuation">{</span>
+    blocking<span class="token punctuation">,</span> deprecated<span class="token punctuation">,</span> unknown<span class="token punctuation">,</span>
+    <span class="token literal-property property">ok</span><span class="token operator">:</span> blocking<span class="token punctuation">.</span>length <span class="token operator">===</span> <span class="token number">0</span> <span class="token operator">&amp;&amp;</span> deprecated<span class="token punctuation">.</span>length <span class="token operator">===</span> <span class="token number">0</span><span class="token punctuation">,</span>
+  <span class="token punctuation">}</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+</code></pre></div>
+<p>The distinction between <code>extensionsUsed</code> and <code>extensionsRequired</code> decides how a client fails. An extension in <code>used</code> but not <code>required</code> is optional — the client can ignore it and render something reasonable. One in <code>required</code> that the client does not support means the whole file is refused, which is the correct behaviour and looks like a broken tile.</p>
+<p><code>KHR_materials_pbrSpecularGlossiness</code> is worth calling out because it is the one exporters still emit and current viewers no longer read; <code>gltf-transform metal-rough</code> converts it.</p>
+<h3 id="5-wire-it-into-a-build-gate" tabindex="-1"><a class="heading-link" href="#5-wire-it-into-a-build-gate"><span>5. Wire it into a build gate</span></a></h3>
+<div class="codeblock" data-lang="javascript"><div class="codeblock__bar"><span class="codeblock__lang">javascript</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-javascript" tabindex="0" role="group" aria-label="javascript code sample"><code class="language-javascript"><span class="token comment">// audit/gate.mjs</span>
+<span class="token keyword">import</span> <span class="token punctuation">{</span> readdir <span class="token punctuation">}</span> <span class="token keyword">from</span> <span class="token string">'node:fs/promises'</span><span class="token punctuation">;</span>
+<span class="token keyword">import</span> <span class="token punctuation">{</span> join <span class="token punctuation">}</span> <span class="token keyword">from</span> <span class="token string">'node:path'</span><span class="token punctuation">;</span>
+<span class="token keyword">import</span> <span class="token punctuation">{</span> costReport <span class="token punctuation">}</span> <span class="token keyword">from</span> <span class="token string">'./cost.mjs'</span><span class="token punctuation">;</span>
+<span class="token keyword">import</span> <span class="token punctuation">{</span> unusedReport <span class="token punctuation">}</span> <span class="token keyword">from</span> <span class="token string">'./unused.mjs'</span><span class="token punctuation">;</span>
+<span class="token keyword">import</span> <span class="token punctuation">{</span> extensionVerdict <span class="token punctuation">}</span> <span class="token keyword">from</span> <span class="token string">'./extensions.mjs'</span><span class="token punctuation">;</span>
+
+<span class="token keyword">const</span> <span class="token constant">BUDGET</span> <span class="token operator">=</span> <span class="token punctuation">{</span>
+  <span class="token literal-property property">maxDrawCallsPerTile</span><span class="token operator">:</span> <span class="token number">8</span><span class="token punctuation">,</span>
+  <span class="token literal-property property">maxTrianglesPerTile</span><span class="token operator">:</span> <span class="token number">600_000</span><span class="token punctuation">,</span>
+  <span class="token literal-property property">maxTextureBytesOnWireKB</span><span class="token operator">:</span> <span class="token number">3_072</span><span class="token punctuation">,</span>
+  <span class="token literal-property property">maxTextureBytesOnGpuMB</span><span class="token operator">:</span> <span class="token number">96</span><span class="token punctuation">,</span>
+  <span class="token literal-property property">maxOrphanKB</span><span class="token operator">:</span> <span class="token number">64</span><span class="token punctuation">,</span>
+  <span class="token literal-property property">maxTextureDimension</span><span class="token operator">:</span> <span class="token number">2048</span><span class="token punctuation">,</span>
+<span class="token punctuation">}</span><span class="token punctuation">;</span>
+
+<span class="token keyword">export</span> <span class="token keyword">async</span> <span class="token keyword">function</span> <span class="token function">gate</span><span class="token punctuation">(</span><span class="token parameter">contentDir</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+  <span class="token keyword">const</span> files <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token keyword">await</span> <span class="token function">readdir</span><span class="token punctuation">(</span>contentDir<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">filter</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">f</span><span class="token punctuation">)</span> <span class="token operator">=></span> f<span class="token punctuation">.</span><span class="token function">endsWith</span><span class="token punctuation">(</span><span class="token string">'.glb'</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">const</span> findings <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+  <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">const</span> file <span class="token keyword">of</span> files<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> path <span class="token operator">=</span> <span class="token function">join</span><span class="token punctuation">(</span>contentDir<span class="token punctuation">,</span> file<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">const</span> cost <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token function">costReport</span><span class="token punctuation">(</span>path<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">const</span> unused <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token function">unusedReport</span><span class="token punctuation">(</span>path<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">const</span> ext <span class="token operator">=</span> <span class="token function">extensionVerdict</span><span class="token punctuation">(</span>cost<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>cost<span class="token punctuation">.</span>drawCalls <span class="token operator">></span> <span class="token constant">BUDGET</span><span class="token punctuation">.</span>maxDrawCallsPerTile<span class="token punctuation">)</span>
+      findings<span class="token punctuation">.</span><span class="token function">push</span><span class="token punctuation">(</span><span class="token punctuation">{</span> file<span class="token punctuation">,</span> <span class="token literal-property property">issue</span><span class="token operator">:</span> <span class="token template-string"><span class="token template-punctuation string">`</span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>cost<span class="token punctuation">.</span>drawCalls<span class="token interpolation-punctuation punctuation">}</span></span><span class="token string"> draw calls</span><span class="token template-punctuation string">`</span></span><span class="token punctuation">,</span> <span class="token literal-property property">severity</span><span class="token operator">:</span> <span class="token string">'warn'</span> <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>cost<span class="token punctuation">.</span>triangles <span class="token operator">></span> <span class="token constant">BUDGET</span><span class="token punctuation">.</span>maxTrianglesPerTile<span class="token punctuation">)</span>
+      findings<span class="token punctuation">.</span><span class="token function">push</span><span class="token punctuation">(</span><span class="token punctuation">{</span> file<span class="token punctuation">,</span> <span class="token literal-property property">issue</span><span class="token operator">:</span> <span class="token template-string"><span class="token template-punctuation string">`</span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>cost<span class="token punctuation">.</span>triangles<span class="token interpolation-punctuation punctuation">}</span></span><span class="token string"> triangles</span><span class="token template-punctuation string">`</span></span><span class="token punctuation">,</span> <span class="token literal-property property">severity</span><span class="token operator">:</span> <span class="token string">'warn'</span> <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>cost<span class="token punctuation">.</span>textureBytesOnWire <span class="token operator">></span> <span class="token constant">BUDGET</span><span class="token punctuation">.</span>maxTextureBytesOnWireKB<span class="token punctuation">)</span>
+      findings<span class="token punctuation">.</span><span class="token function">push</span><span class="token punctuation">(</span><span class="token punctuation">{</span> file<span class="token punctuation">,</span> <span class="token literal-property property">issue</span><span class="token operator">:</span> <span class="token template-string"><span class="token template-punctuation string">`</span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>cost<span class="token punctuation">.</span>textureBytesOnWire<span class="token interpolation-punctuation punctuation">}</span></span><span class="token string"> KB textures on wire</span><span class="token template-punctuation string">`</span></span><span class="token punctuation">,</span>
+                      <span class="token literal-property property">severity</span><span class="token operator">:</span> <span class="token string">'error'</span> <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>cost<span class="token punctuation">.</span>textureBytesOnGpu <span class="token operator">></span> <span class="token constant">BUDGET</span><span class="token punctuation">.</span>maxTextureBytesOnGpuMB<span class="token punctuation">)</span>
+      findings<span class="token punctuation">.</span><span class="token function">push</span><span class="token punctuation">(</span><span class="token punctuation">{</span> file<span class="token punctuation">,</span> <span class="token literal-property property">issue</span><span class="token operator">:</span> <span class="token template-string"><span class="token template-punctuation string">`</span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>cost<span class="token punctuation">.</span>textureBytesOnGpu<span class="token interpolation-punctuation punctuation">}</span></span><span class="token string"> MB textures on GPU</span><span class="token template-punctuation string">`</span></span><span class="token punctuation">,</span>
+                      <span class="token literal-property property">severity</span><span class="token operator">:</span> <span class="token string">'error'</span> <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>unused<span class="token punctuation">.</span>accessors<span class="token punctuation">.</span>orphanKB <span class="token operator">></span> <span class="token constant">BUDGET</span><span class="token punctuation">.</span>maxOrphanKB<span class="token punctuation">)</span>
+      findings<span class="token punctuation">.</span><span class="token function">push</span><span class="token punctuation">(</span><span class="token punctuation">{</span> file<span class="token punctuation">,</span> <span class="token literal-property property">issue</span><span class="token operator">:</span> <span class="token template-string"><span class="token template-punctuation string">`</span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>unused<span class="token punctuation">.</span>accessors<span class="token punctuation">.</span>orphanKB<span class="token interpolation-punctuation punctuation">}</span></span><span class="token string"> KB orphaned accessors</span><span class="token template-punctuation string">`</span></span><span class="token punctuation">,</span>
+                      <span class="token literal-property property">severity</span><span class="token operator">:</span> <span class="token string">'warn'</span> <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>cost<span class="token punctuation">.</span>indexWidth<span class="token punctuation">.</span>uint32_wasteful<span class="token punctuation">)</span>
+      findings<span class="token punctuation">.</span><span class="token function">push</span><span class="token punctuation">(</span><span class="token punctuation">{</span> file<span class="token punctuation">,</span> <span class="token literal-property property">issue</span><span class="token operator">:</span> <span class="token template-string"><span class="token template-punctuation string">`</span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>cost<span class="token punctuation">.</span>indexWidth<span class="token punctuation">.</span>uint32_wasteful<span class="token interpolation-punctuation punctuation">}</span></span><span class="token string"> primitive(s) with </span><span class="token template-punctuation string">`</span></span>
+                     <span class="token operator">+</span> <span class="token template-string"><span class="token template-punctuation string">`</span><span class="token string">needless uint32 indices</span><span class="token template-punctuation string">`</span></span><span class="token punctuation">,</span> <span class="token literal-property property">severity</span><span class="token operator">:</span> <span class="token string">'warn'</span> <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">const</span> e <span class="token keyword">of</span> ext<span class="token punctuation">.</span>blocking<span class="token punctuation">)</span>
+      findings<span class="token punctuation">.</span><span class="token function">push</span><span class="token punctuation">(</span><span class="token punctuation">{</span> file<span class="token punctuation">,</span> <span class="token literal-property property">issue</span><span class="token operator">:</span> <span class="token template-string"><span class="token template-punctuation string">`</span><span class="token string">required extension not supported: </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>e<span class="token interpolation-punctuation punctuation">}</span></span><span class="token template-punctuation string">`</span></span><span class="token punctuation">,</span>
+                      <span class="token literal-property property">severity</span><span class="token operator">:</span> <span class="token string">'error'</span> <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">const</span> e <span class="token keyword">of</span> ext<span class="token punctuation">.</span>deprecated<span class="token punctuation">)</span>
+      findings<span class="token punctuation">.</span><span class="token function">push</span><span class="token punctuation">(</span><span class="token punctuation">{</span> file<span class="token punctuation">,</span> <span class="token literal-property property">issue</span><span class="token operator">:</span> <span class="token template-string"><span class="token template-punctuation string">`</span><span class="token string">deprecated extension: </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>e<span class="token interpolation-punctuation punctuation">}</span></span><span class="token template-punctuation string">`</span></span><span class="token punctuation">,</span> <span class="token literal-property property">severity</span><span class="token operator">:</span> <span class="token string">'error'</span> <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  <span class="token keyword">const</span> errors <span class="token operator">=</span> findings<span class="token punctuation">.</span><span class="token function">filter</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">f</span><span class="token punctuation">)</span> <span class="token operator">=></span> f<span class="token punctuation">.</span>severity <span class="token operator">===</span> <span class="token string">'error'</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">return</span> <span class="token punctuation">{</span> <span class="token literal-property property">files</span><span class="token operator">:</span> files<span class="token punctuation">.</span>length<span class="token punctuation">,</span> findings<span class="token punctuation">,</span> <span class="token literal-property property">errors</span><span class="token operator">:</span> errors<span class="token punctuation">.</span>length<span class="token punctuation">,</span>
+           <span class="token literal-property property">pass</span><span class="token operator">:</span> errors<span class="token punctuation">.</span>length <span class="token operator">===</span> <span class="token number">0</span> <span class="token punctuation">}</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">const</span> result <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token function">gate</span><span class="token punctuation">(</span>process<span class="token punctuation">.</span>argv<span class="token punctuation">[</span><span class="token number">2</span><span class="token punctuation">]</span> <span class="token operator">??</span> <span class="token string">'output/content'</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+console<span class="token punctuation">.</span><span class="token function">log</span><span class="token punctuation">(</span><span class="token constant">JSON</span><span class="token punctuation">.</span><span class="token function">stringify</span><span class="token punctuation">(</span><span class="token punctuation">{</span> <span class="token literal-property property">files</span><span class="token operator">:</span> result<span class="token punctuation">.</span>files<span class="token punctuation">,</span> <span class="token literal-property property">errors</span><span class="token operator">:</span> result<span class="token punctuation">.</span>errors<span class="token punctuation">,</span>
+                             <span class="token literal-property property">sample</span><span class="token operator">:</span> result<span class="token punctuation">.</span>findings<span class="token punctuation">.</span><span class="token function">slice</span><span class="token punctuation">(</span><span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">6</span><span class="token punctuation">)</span> <span class="token punctuation">}</span><span class="token punctuation">,</span> <span class="token keyword">null</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>result<span class="token punctuation">.</span>pass<span class="token punctuation">)</span> process<span class="token punctuation">.</span><span class="token function">exit</span><span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+</code></pre></div>
+<p>Distinguishing <code>warn</code> from <code>error</code> is what makes a gate survive contact with a real pipeline. Draw calls and orphaned bytes are worth reporting and not worth blocking a release over; a required extension nobody supports and a texture that will exhaust GPU memory are.</p>
+<p>Running this over the whole content directory takes about 15 ms per file, so a 6,000-tile city is under two minutes — cheap enough for every build.</p>
+<figure class="diagram">
+<svg viewBox="4 6 732 312" role="img" aria-labelledby="gti-budget-t gti-budget-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="gti-budget-t">A per-tile budget worth gating on</title>
+  <desc id="gti-budget-d">A table of six budget limits for tile content with the reason for each. Draw calls at eight per tile keeps state changes affordable. Triangles at 600 thousand keeps parse time bounded. Textures on the wire at 3 megabytes keeps the download reasonable. Textures on the GPU at 96 megabytes is the figure that actually exhausts memory. Orphaned accessors at 64 kilobytes catches exporter leftovers. Texture dimension at 2048 keeps the GPU figure achievable.</desc>
+  <rect class="svg-bg" x="4" y="6" width="732" height="312" fill="#ffffff"/>
+  <g stroke-width="1.5">
+    <rect x="18" y="20" width="252" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="270" y="20" width="110" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="380" y="20" width="342" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="18" y="54" width="252" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="270" y="54" width="110" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="380" y="54" width="342" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="18" y="88" width="252" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="270" y="88" width="110" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="380" y="88" width="342" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="18" y="122" width="252" height="34" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="270" y="122" width="110" height="34" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="380" y="122" width="342" height="34" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="18" y="156" width="252" height="34" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="270" y="156" width="110" height="34" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="380" y="156" width="342" height="34" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="18" y="190" width="252" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="270" y="190" width="110" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="380" y="190" width="342" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="18" y="224" width="252" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="270" y="224" width="110" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="380" y="224" width="342" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="144" y="42">metric</text><text x="325" y="42">limit</text><text x="551" y="42">why this number</text>
+    <text x="144" y="76">draw calls per tile</text><text x="325" y="76">8</text><text x="551" y="76">state changes dominate above this</text>
+    <text x="144" y="110">triangles per tile</text><text x="325" y="110">600 k</text><text x="551" y="110">parse time becomes visible</text>
+    <text x="144" y="144">texture bytes on the wire</text><text x="325" y="144">3 MB</text><text x="551" y="144">download on the critical path</text>
+    <text x="144" y="178">texture bytes on the GPU</text><text x="325" y="178">96 MB</text><text x="551" y="178">this is what exhausts memory</text>
+    <text x="144" y="212">orphaned accessors</text><text x="325" y="212">64 KB</text><text x="551" y="212">exporter leftovers, free to remove</text>
+    <text x="144" y="246">max texture dimension</text><text x="325" y="246">2048</text><text x="551" y="246">keeps the GPU figure achievable</text>
+  </g>
+  <text x="20" y="278" fill="#1f2937" font-size="12.5">The GPU figure is width times height times four times 1.33, independent of the compressed size.</text>
+  <text x="20" y="300" fill="#5b6471" font-size="12">Gate on the two texture rows as errors; the rest are worth reporting and not blocking.</text>
+</svg>
+<figcaption>Six numbers, and the GPU texture figure is the one that has no relation to what the network panel shows.</figcaption>
+</figure>
+<h3 id="6-fix-what-the-audit-found" tabindex="-1"><a class="heading-link" href="#6-fix-what-the-audit-found"><span>6. Fix what the audit found</span></a></h3>
+<div class="codeblock" data-lang="bash"><div class="codeblock__bar"><span class="codeblock__lang">bash</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-bash" tabindex="0" role="group" aria-label="bash code sample"><code class="language-bash">npx gltf-transform optimize input.glb output.glb <span class="token punctuation">\</span>
+  --texture-compress webp --texture-size <span class="token number">2048</span> <span class="token punctuation">\</span>
+  <span class="token parameter variable">--compress</span> meshopt <span class="token parameter variable">--simplify</span> <span class="token boolean">false</span>
+
+npx gltf-transform prune input.glb step1.glb
+npx gltf-transform dedup step1.glb step2.glb
+npx gltf-transform <span class="token function">join</span> step2.glb step3.glb <span class="token parameter variable">--keepMeshes</span> <span class="token boolean">false</span> <span class="token parameter variable">--keepNamed</span> <span class="token boolean">false</span>
+npx gltf-transform metal-rough step3.glb step4.glb
+npx gltf-transform resize step4.glb step5.glb <span class="token parameter variable">--width</span> <span class="token number">2048</span> <span class="token parameter variable">--height</span> <span class="token number">2048</span>
+npx gltf-transform webp step5.glb output.glb <span class="token parameter variable">--slots</span> <span class="token string">"{baseColor,normal,emissive}"</span>
+</code></pre></div>
+<p><code>optimize</code> runs a reasonable default chain and is the right first move; the explicit sequence is what you reach for when a specific finding needs addressing without changing anything else. <code>--simplify false</code> matters whenever the geometry’s level of detail was already decided upstream, as it is in a tiling pipeline — letting <code>optimize</code> simplify again undoes deliberate decisions and, on tiled meshes, opens seams.</p>
+<p><code>join</code> is the fix for a high draw-call count: it merges primitives that share a material into one. <code>dedup</code> removes duplicate accessors, textures and materials, which is where most of the savings on an exporter’s output come from.</p>
+<figure class="diagram">
+<svg viewBox="6 10 728 226" role="img" aria-labelledby="gti-fix-t gti-fix-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="gti-fix-t">Findings and the command that fixes each</title>
+  <desc id="gti-fix-d">A mapping from audit finding to remedy. Orphaned accessors are removed by prune. Duplicate materials and textures by dedup. Too many draw calls by join. A deprecated specular-glossiness extension by metal-rough. Oversized textures by resize. PNG textures by webp or ktx2. Needless 32-bit indices by the reorder or optimize command.</desc>
+  <rect class="svg-bg" x="6" y="10" width="728" height="226" fill="#ffffff"/>
+  <defs>
+    <marker id="gti-fix-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
+    </marker>
+  </defs>
+  <g stroke-width="1.5">
+    <rect x="20" y="24" width="300" height="28" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="20" y="58" width="300" height="28" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="20" y="92" width="300" height="28" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="20" y="126" width="300" height="28" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="20" y="160" width="300" height="28" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="20" y="194" width="300" height="28" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="440" y="24" width="280" height="28" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="440" y="58" width="280" height="28" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="440" y="92" width="280" height="28" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="440" y="126" width="280" height="28" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="440" y="160" width="280" height="28" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="440" y="194" width="280" height="28" fill="#eef5e9" stroke="#4f7a4d"/>
+  </g>
+  <g stroke="#5b6471" stroke-width="1.6" fill="none" marker-end="url(#gti-fix-arrow)">
+    <path d="M320 38 H438"/><path d="M320 72 H438"/><path d="M320 106 H438"/>
+    <path d="M320 140 H438"/><path d="M320 174 H438"/><path d="M320 208 H438"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="170" y="43">orphaned accessors, 240 KB</text><text x="580" y="43">gltf-transform prune</text>
+    <text x="170" y="77">duplicate materials ×6</text><text x="580" y="77">gltf-transform dedup</text>
+    <text x="170" y="111">41 draw calls in one tile</text><text x="580" y="111">gltf-transform join</text>
+    <text x="170" y="145">pbrSpecularGlossiness</text><text x="580" y="145">gltf-transform metal-rough</text>
+    <text x="170" y="179">4096² PNG normal map</text><text x="580" y="179">resize + webp (or ktx2)</text>
+    <text x="170" y="213">uint32 indices, 4k vertices</text><text x="580" y="213">gltf-transform optimize</text>
+  </g>
+</svg>
+<figcaption>Every finding the audit produces has one command that fixes it; none of them requires re-exporting the mesh.</figcaption>
+</figure>
+<h2 id="expected-output-verification" tabindex="-1"><a class="heading-link" href="#expected-output-verification"><span>Expected Output &amp; Verification</span></a></h2>
+<div class="codeblock" data-lang="text"><div class="codeblock__bar"><span class="codeblock__lang">text</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-text" tabindex="0" role="group" aria-label="text code sample"><code class="language-text">{
+  "files": 412,
+  "errors": 9,
+  "sample": [
+    {"file": "12021000.glb", "issue": "31840 KB textures on wire", "severity": "error"},
+    {"file": "12021000.glb", "issue": "174 MB textures on GPU", "severity": "error"},
+    {"file": "12021000.glb", "issue": "41 draw calls", "severity": "warn"},
+    {"file": "12021001.glb", "issue": "248 KB orphaned accessors", "severity": "warn"},
+    {"file": "12021004.glb", "issue": "deprecated extension: KHR_materials_pbrSpecularGlossiness", "severity": "error"},
+    {"file": "12021009.glb", "issue": "6 primitive(s) with needless uint32 indices", "severity": "warn"}
+  ]
+}
+</code></pre></div>
+<p>Nine errors across 412 tiles, concentrated in a handful of files — which is the usual shape, because the cause is one exporter setting applied to a subset of the input. The two errors on <code>12021000.glb</code> are the same root cause seen twice: an oversized PNG normal map, expensive on the wire and far more expensive on the GPU.</p>
+<p>Verify that fixing the findings did not change the geometry, which is the risk with any optimisation chain:</p>
+<div class="codeblock" data-lang="javascript"><div class="codeblock__bar"><span class="codeblock__lang">javascript</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-javascript" tabindex="0" role="group" aria-label="javascript code sample"><code class="language-javascript"><span class="token comment">// audit/equivalence.mjs</span>
+<span class="token keyword">import</span> <span class="token punctuation">{</span> NodeIO <span class="token punctuation">}</span> <span class="token keyword">from</span> <span class="token string">'@gltf-transform/core'</span><span class="token punctuation">;</span>
+<span class="token keyword">import</span> <span class="token punctuation">{</span> <span class="token constant">ALL_EXTENSIONS</span> <span class="token punctuation">}</span> <span class="token keyword">from</span> <span class="token string">'@gltf-transform/extensions'</span><span class="token punctuation">;</span>
+
+<span class="token keyword">const</span> io <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">NodeIO</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">registerExtensions</span><span class="token punctuation">(</span><span class="token constant">ALL_EXTENSIONS</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token keyword">export</span> <span class="token keyword">async</span> <span class="token keyword">function</span> <span class="token function">geometryEquivalence</span><span class="token punctuation">(</span><span class="token parameter">before<span class="token punctuation">,</span> after<span class="token punctuation">,</span> tolM <span class="token operator">=</span> <span class="token number">0.001</span></span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+  <span class="token keyword">const</span> <span class="token punctuation">[</span>a<span class="token punctuation">,</span> b<span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token keyword">await</span> Promise<span class="token punctuation">.</span><span class="token function">all</span><span class="token punctuation">(</span><span class="token punctuation">[</span>io<span class="token punctuation">.</span><span class="token function">read</span><span class="token punctuation">(</span>before<span class="token punctuation">)</span><span class="token punctuation">,</span> io<span class="token punctuation">.</span><span class="token function">read</span><span class="token punctuation">(</span>after<span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">const</span> <span class="token function-variable function">bounds</span> <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token parameter">doc</span><span class="token punctuation">)</span> <span class="token operator">=></span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> lo <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token number">Infinity</span><span class="token punctuation">,</span> <span class="token number">Infinity</span><span class="token punctuation">,</span> <span class="token number">Infinity</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+    <span class="token keyword">const</span> hi <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token operator">-</span><span class="token number">Infinity</span><span class="token punctuation">,</span> <span class="token operator">-</span><span class="token number">Infinity</span><span class="token punctuation">,</span> <span class="token operator">-</span><span class="token number">Infinity</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+    <span class="token keyword">let</span> tris <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+    <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">const</span> mesh <span class="token keyword">of</span> doc<span class="token punctuation">.</span><span class="token function">getRoot</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">listMeshes</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">const</span> prim <span class="token keyword">of</span> mesh<span class="token punctuation">.</span><span class="token function">listPrimitives</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token keyword">const</span> pos <span class="token operator">=</span> prim<span class="token punctuation">.</span><span class="token function">getAttribute</span><span class="token punctuation">(</span><span class="token string">'POSITION'</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">const</span> min <span class="token operator">=</span> pos<span class="token punctuation">.</span><span class="token function">getMinNormalized</span><span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">const</span> max <span class="token operator">=</span> pos<span class="token punctuation">.</span><span class="token function">getMaxNormalized</span><span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">let</span> i <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span> i <span class="token operator">&lt;</span> <span class="token number">3</span><span class="token punctuation">;</span> i<span class="token operator">++</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+          lo<span class="token punctuation">[</span>i<span class="token punctuation">]</span> <span class="token operator">=</span> Math<span class="token punctuation">.</span><span class="token function">min</span><span class="token punctuation">(</span>lo<span class="token punctuation">[</span>i<span class="token punctuation">]</span><span class="token punctuation">,</span> min<span class="token punctuation">[</span>i<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+          hi<span class="token punctuation">[</span>i<span class="token punctuation">]</span> <span class="token operator">=</span> Math<span class="token punctuation">.</span><span class="token function">max</span><span class="token punctuation">(</span>hi<span class="token punctuation">[</span>i<span class="token punctuation">]</span><span class="token punctuation">,</span> max<span class="token punctuation">[</span>i<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">}</span>
+        <span class="token keyword">const</span> idx <span class="token operator">=</span> prim<span class="token punctuation">.</span><span class="token function">getIndices</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        tris <span class="token operator">+=</span> Math<span class="token punctuation">.</span><span class="token function">floor</span><span class="token punctuation">(</span><span class="token punctuation">(</span>idx <span class="token operator">?</span> idx<span class="token punctuation">.</span><span class="token function">getCount</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">:</span> pos<span class="token punctuation">.</span><span class="token function">getCount</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+      <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span> lo<span class="token punctuation">,</span> hi<span class="token punctuation">,</span> tris <span class="token punctuation">}</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span><span class="token punctuation">;</span>
+  <span class="token keyword">const</span> ba <span class="token operator">=</span> <span class="token function">bounds</span><span class="token punctuation">(</span>a<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">const</span> bb <span class="token operator">=</span> <span class="token function">bounds</span><span class="token punctuation">(</span>b<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">const</span> deltas <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token operator">...</span>ba<span class="token punctuation">.</span>lo<span class="token punctuation">.</span><span class="token function">map</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">v<span class="token punctuation">,</span> i</span><span class="token punctuation">)</span> <span class="token operator">=></span> Math<span class="token punctuation">.</span><span class="token function">abs</span><span class="token punctuation">(</span>v <span class="token operator">-</span> bb<span class="token punctuation">.</span>lo<span class="token punctuation">[</span>i<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                  <span class="token operator">...</span>ba<span class="token punctuation">.</span>hi<span class="token punctuation">.</span><span class="token function">map</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">v<span class="token punctuation">,</span> i</span><span class="token punctuation">)</span> <span class="token operator">=></span> Math<span class="token punctuation">.</span><span class="token function">abs</span><span class="token punctuation">(</span>v <span class="token operator">-</span> bb<span class="token punctuation">.</span>hi<span class="token punctuation">[</span>i<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+  <span class="token keyword">return</span> <span class="token punctuation">{</span>
+    <span class="token literal-property property">trianglesBefore</span><span class="token operator">:</span> ba<span class="token punctuation">.</span>tris<span class="token punctuation">,</span> <span class="token literal-property property">trianglesAfter</span><span class="token operator">:</span> bb<span class="token punctuation">.</span>tris<span class="token punctuation">,</span>
+    <span class="token literal-property property">trianglesEqual</span><span class="token operator">:</span> ba<span class="token punctuation">.</span>tris <span class="token operator">===</span> bb<span class="token punctuation">.</span>tris<span class="token punctuation">,</span>
+    <span class="token literal-property property">maxBoundsDeltaM</span><span class="token operator">:</span> Math<span class="token punctuation">.</span><span class="token function">max</span><span class="token punctuation">(</span><span class="token operator">...</span>deltas<span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token literal-property property">boundsEqual</span><span class="token operator">:</span> Math<span class="token punctuation">.</span><span class="token function">max</span><span class="token punctuation">(</span><span class="token operator">...</span>deltas<span class="token punctuation">)</span> <span class="token operator">&lt;=</span> tolM<span class="token punctuation">,</span>
+  <span class="token punctuation">}</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+</code></pre></div>
+<p>Triangle count and bounding box are a weak check that catches strong failures: a <code>simplify</code> that ran by accident changes the triangle count, and a quantisation with the wrong range moves the bounds. Both are easy to do accidentally with <code>optimize</code> and both are invisible in a viewer at normal zoom.</p>
+<p>Then verify the file still validates and loads:</p>
+<div class="codeblock" data-lang="bash"><div class="codeblock__bar"><span class="codeblock__lang">bash</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-bash" tabindex="0" role="group" aria-label="bash code sample"><code class="language-bash">npx gltf-validator output/content/12021000.glb <span class="token operator"><span class="token file-descriptor important">2</span>></span><span class="token file-descriptor important">&amp;1</span> <span class="token operator">|</span> <span class="token function">head</span> <span class="token parameter variable">-20</span>
+
+npx gltf-transform inspect output/content/12021000.glb <span class="token operator">|</span> <span class="token function">grep</span> <span class="token parameter variable">-A4</span> <span class="token string">"TEXTURES"</span>
+</code></pre></div>
+<p>A validator run after the optimisation chain is worth the seconds. <code>join</code> and <code>dedup</code> rewrite accessor indices, and a bug in a plugin or an unusual input occasionally produces a file that is structurally invalid while still opening in a tolerant viewer.</p>
+<h2 id="performance-notes" tabindex="-1"><a class="heading-link" href="#performance-notes"><span>Performance Notes</span></a></h2>
+<ul>
+<li><strong>Reading a 4 MB GLB with the Node API is about 15 ms</strong>, so auditing thousands of tiles is minutes, not hours. Reuse one <code>NodeIO</code> instance.</li>
+<li><strong><code>inspect</code> on the CLI spawns a process per file.</strong> For bulk work use the API; for one file the CLI is fine.</li>
+<li><strong>GPU texture cost is width × height × 4 × 1.33</strong>, independent of the compressed size on the wire. This is the number to budget against, not the download.</li>
+<li><strong>KTX2/Basis keeps textures compressed on the GPU</strong>, cutting that figure by 4–6×. It is the real fix for a texture memory problem.</li>
+<li><strong><code>join</code> reduces draw calls and increases the smallest unit that can be culled.</strong> For tile content that is the right trade; for a scene with distinct moving parts it is not.</li>
+<li><strong>Run the gate on changed tiles only</strong> in an incremental build, using the manifest from <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/resuming-failed-tiling-runs-from-checkpoints/">resuming failed tiling runs from checkpoints</a>.</li>
+</ul>
+<h2 id="common-errors" tabindex="-1"><a class="heading-link" href="#common-errors"><span>Common Errors</span></a></h2>
+<p><strong><code>Error: Missing extension: KHR_draco_mesh_compression</code>.</strong> The extensions were not registered on the <code>NodeIO</code>. <code>registerExtensions(ALL_EXTENSIONS)</code> is required to read compressed files.</p>
+<p><strong><code>inspect</code> reports 0 textures on a file that clearly has them.</strong> The glTF references external image files that are not next to it. GLB is self-contained; <code>.gltf</code> is not.</p>
+<p><strong>Triangle count changes after <code>optimize</code>.</strong> <code>simplify</code> ran. Pass <code>--simplify false</code> in a tiling pipeline.</p>
+<p><strong><code>join</code> produced one enormous primitive and the frame rate got worse.</strong> Culling granularity collapsed. Join within a material and within a spatial group, not across the whole tile.</p>
+<p><strong>The optimised file is larger.</strong> WebP on a texture that was already a well-compressed JPEG, or meshopt on top of Draco. Compress once, and compare.</p>
+<p><strong>Validator errors about accessor bounds after quantisation.</strong> <code>KHR_mesh_quantization</code> requires <code>min</code>/<code>max</code> on quantised accessors to be in the quantised space. Let <code>gltf-transform</code> do the quantisation rather than writing it by hand.</p>
+<h2 id="frequently-asked-questions" tabindex="-1"><a class="heading-link" href="#frequently-asked-questions"><span>Frequently Asked Questions</span></a></h2>
+<h3 id="draco-or-meshopt" tabindex="-1"><a class="heading-link" href="#draco-or-meshopt"><span>Draco or meshopt?</span></a></h3>
+<p>Meshopt decodes faster and compresses slightly less; Draco compresses more and decodes slower. For tile content where the client is loading dozens of tiles per second, meshopt’s decode speed usually wins. Measure on your own content — the ratio depends heavily on mesh regularity.</p>
+<h3 id="should-tile-content-use-ktx2-textures" tabindex="-1"><a class="heading-link" href="#should-tile-content-use-ktx2-textures"><span>Should tile content use KTX2 textures?</span></a></h3>
+<p>Yes where GPU memory is the constraint, which it is for any textured city. The cost is a longer encode step in the pipeline and a client that must support <code>KHR_texture_basisu</code>.</p>
+<h3 id="can-this-audit-replace-the-3d-tiles-validator" tabindex="-1"><a class="heading-link" href="#can-this-audit-replace-the-3d-tiles-validator"><span>Can this audit replace the 3D Tiles validator?</span></a></h3>
+<p>No — they check different things. The validator checks the tileset structure and the glTF’s conformance; this audit checks the cost and the content decisions. Run both.</p>
+<h2 id="related-guides" tabindex="-1"><a class="heading-link" href="#related-guides"><span>Related Guides</span></a></h2>
+<ul>
+<li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/merging-meshes-to-cut-draw-calls/">Merging Meshes to Cut Draw Calls</a> — the fix for the draw-call finding</li>
+<li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/gltfpack-settings-for-3d-tiles-content/">gltfpack Settings for 3D Tiles Content</a> — the other compression path</li>
+<li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/converting-glb-to-3d-tiles-with-3d-tiles-tools/">Converting GLB to 3D Tiles with 3d-tiles-tools</a> — where this content comes from</li>
+</ul>
+<p>Back to <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/">glTF LOD Generation with Draco Compression</a>.</p>
+
+
+      
+      
+
+      <div class="related-nav">
+        
+
+        
+          <div>
+            <h3>Related</h3>
+            <div class="related-grid">
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/draco-vs-meshopt-compression-for-gltf-tiles/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Draco vs Meshopt Compression for glTF Tiles</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/generating-lod-chains-with-meshoptimizer/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Generating LOD Chains with meshoptimizer</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/gltfpack-settings-for-3d-tiles-content/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">gltfpack Settings for 3D Tiles Content</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/merging-meshes-to-cut-draw-calls/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Merging Meshes to Cut Draw Calls</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/tuning-draco-quantization-for-building-meshes/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Tuning Draco Quantization for Building Meshes</span>
+                </a>
+              
+            </div>
+          </div>
+        
+      </div>
+    </article>
+
+    
+    <aside class="toc" aria-label="On this page" data-toc hidden>
+      <h4>On this page</h4>
+      <ul></ul>
+    </aside>
+  </div>
+</div>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+  <div class="container site-footer__inner">
+    <div class="site-footer__brand">
+      <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+        <img src="/assets/img/logo-mark.svg" alt="" class="brand__mark" width="36" height="36">
+        <span class="brand__name">
+          3D Geospatial
+          <small>Digital Twin Automation</small>
+        </span>
+      </a>
+      <p>Engineering-grade guides on point cloud processing, mesh pipelines, LOD strategies, and CI/CD automation for digital twin platforms.</p>
+      <a class="footer-social" href="https://github.com/3d-geospatial" aria-label="3D Geospatial on GitHub" rel="noopener" target="_blank">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+          <path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.53-1.34-1.3-1.7-1.3-1.7-1.06-.72.08-.71.08-.71 1.17.08 1.79 1.2 1.79 1.2 1.04 1.79 2.73 1.27 3.4.97.1-.75.4-1.27.73-1.56-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.19-3.08-.12-.3-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.75.11 3.05.74.8 1.19 1.83 1.19 3.08 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.07.78 2.15v3.18c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5Z"/>
+        </svg>
+        <span>GitHub</span>
+      </a>
+    </div>
+
+    <div class="site-footer__col">
+      <h4>Sections</h4>
+      <ul>
+        <li><a href="https://www.3d-geospatial.com/">Home</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management &amp; Optimization</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/">Point Cloud &amp; Mesh Pipelines</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/">Troubleshooting &amp; Reliability</a></li>
+        
+      </ul>
+    </div>
+
+    
+      <div class="site-footer__col">
+        <h4>3D Geospatial Fundamentals</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/">3D Format Standards Comparison</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/">BIM and IFC Georeferencing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/">CityGML and CityJSON Processing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems for 3D Assets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/">Digital Elevation Model Workflows</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/">Spatial Indexing and Tiling Schemes for 3D Data</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>LOD Management &amp; Optimization</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/">Automated Tile Generation for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/">Cesium ion Upload Automation for 3D Tilesets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/">glTF LOD Generation With Draco Compression</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/">Streaming Sync Patterns for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/">Tileset Metadata and 3D Tiles Next</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/">Vector Overlays on 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Point Cloud &amp; Mesh Pipelines</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/">Automated Mesh Decimation for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/">Change Detection Between LiDAR Scan Epochs</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/">CI/CD Automation for Spatial Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">LiDAR Classification and Ground Extraction</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/photogrammetry-processing-pipelines/">Photogrammetry Processing Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/">Point Cloud Filtering Techniques</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/">Surface Reconstruction for Geospatial Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/">Texture Mapping Workflows for Digital Twins</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Troubleshooting &amp; Reliability</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/">Cross-Section Failure Modes in Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/">Data Validation &amp; QA Gates for 3D Tiles</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/">Performance Profiling and Benchmarking</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/">Pipeline Observability and Monitoring</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/">Streaming &amp; Runtime Diagnostics for 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+  </div>
+  <div class="container site-footer__bottom">
+    <span>© 2026 3D Geospatial &amp; Digital Twin Automation</span>
+    <span>Built with Eleventy · PWA-enabled</span>
+  </div>
+</footer>
+
+
+  <script src="/assets/js/site.js?v=b99aa9f971" defer></script>
+  
+</body>
+</html>

@@ -374,5 +374,8 @@ Instrument these five measurements once and leave them in. They cost a few micro
 - [Data Validation & QA Gates](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/) — proving the geometry is sound before blaming the client
 - [Streaming Sync Patterns for 3D Geospatial](https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/) — the SSE queue, prefetch, and eviction model these diagnostics probe
 - [Automated Tile Generation for 3D Geospatial](https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/) — where a correct, measured geometricError is produced
+- [Debugging with the Cesium 3D Tiles Inspector](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/debugging-with-the-cesium-3d-tiles-inspector/) — read every Cesium3DTilesInspector field and act on it
+- [Detecting Stale Tiles After Deploy](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/detecting-stale-tiles-after-deploy/) — catch a half-updated tileset in production
+- [Diagnosing Slow First Render of Tilesets](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/diagnosing-slow-first-render-of-tilesets/) — break the first paint into its stages
 
 Back to [Digital Twin Troubleshooting & Reliability](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/).

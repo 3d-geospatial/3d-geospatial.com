@@ -1,0 +1,899 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <title>HTTP/2 and Connection Limits for Tile Streaming — 3D Geospatial</title>
+  <meta name="description" content="Why a tileset stalls at six parallel requests on HTTP/1.1, what HTTP/2 and HTTP/3 change, how to measure concurrency in the browser and how to tune request">
+  <meta name="keywords" content="3D geospatial, digital twin, point cloud, mesh pipeline, LOD, 3D Tiles, Cesium, PDAL, Open3D, Python, CI/CD">
+  <meta name="author" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta name="theme-color" content="#1f6b8a" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f171d" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+
+  
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem("theme");
+        var theme = (stored === "dark" || stored === "light") ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    })();
+  </script>
+  <meta name="generator" content="Eleventy">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="googlebot" content="index,follow,max-image-preview:large">
+
+  
+  <link rel="canonical" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/http2-and-connection-limits-for-tile-streaming/">
+  <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">
+
+  
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/icon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+
+  
+  <link rel="apple-touch-icon" href="/assets/img/icon-180.png">
+  <link rel="mask-icon" href="/assets/img/logo.svg" color="#1f6b8a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="3D Geospatial">
+  <meta name="application-name" content="3D Geospatial">
+
+  
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="HTTP/2 and Connection Limits for Tile Streaming — 3D Geospatial">
+  <meta property="og:description" content="Why a tileset stalls at six parallel requests on HTTP/1.1, what HTTP/2 and HTTP/3 change, how to measure concurrency in the browser and how to tune request">
+  <meta property="og:url" content="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/http2-and-connection-limits-for-tile-streaming/">
+  <meta property="og:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+  <meta property="og:site_name" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta property="og:locale" content="en_US">
+  
+  <meta property="article:published_time" content="2026-09-17T23:36:56.454Z">
+  <meta property="article:modified_time" content="2026-09-17T23:36:56.454Z">
+  <meta property="article:publisher" content="https://www.3d-geospatial.com/">
+  
+
+  
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="HTTP/2 and Connection Limits for Tile Streaming — 3D Geospatial">
+  <meta name="twitter:description" content="Why a tileset stalls at six parallel requests on HTTP/1.1, what HTTP/2 and HTTP/3 change, how to measure concurrency in the browser and how to tune request">
+  <meta name="twitter:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta name="twitter:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+
+  
+  <link rel="preload" href="/assets/css/styles.css?v=8c46394d6c" as="style">
+  
+
+  <link rel="stylesheet" href="/assets/css/styles.css?v=8c46394d6c">
+
+  
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.3d-geospatial.com/#organization",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "url": "https://www.3d-geospatial.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/icon-512.png",
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://www.3d-geospatial.com/#website",
+      "url": "https://www.3d-geospatial.com/",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "description": "Build reliable 3D spatial data pipelines for digital twins — point clouds, meshes, LOD strategies, Python processing, and CI/CD automation.",
+      "inLanguage": "en",
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      }
+    },
+    {
+      "@type": "TechArticle",
+      "@id": "https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/http2-and-connection-limits-for-tile-streaming/#article",
+      "isPartOf": {
+        "@id": "https://www.3d-geospatial.com/#website"
+      },
+      "headline": "HTTP/2 and Connection Limits for Tile Streaming",
+      "name": "HTTP/2 and Connection Limits for Tile Streaming",
+      "description": "Why a tileset stalls at six parallel requests on HTTP/1.1, what HTTP/2 and HTTP/3 change, how to measure concurrency in the browser and how to tune request",
+      "url": "https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/http2-and-connection-limits-for-tile-streaming/",
+      "mainEntityOfPage": "https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/http2-and-connection-limits-for-tile-streaming/",
+      "inLanguage": "en",
+      "datePublished": "2026-09-17T23:36:56.454Z",
+      "dateModified": "2026-09-17T23:36:56.454Z",
+      "author": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "image": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/og-cover.png",
+        "width": 1200,
+        "height": 630
+      },
+      "breadcrumb": {
+        "@id": "https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/http2-and-connection-limits-for-tile-streaming/#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/http2-and-connection-limits-for-tile-streaming/#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://www.3d-geospatial.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "LOD Management Optimization Strategies",
+          "item": "https://www.3d-geospatial.com/lod-management-optimization-strategies/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Streaming Sync Patterns",
+          "item": "https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "name": "Http2 And Connection Limits For Tile Streaming",
+          "item": "https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/http2-and-connection-limits-for-tile-streaming/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  
+<header class="site-header" role="banner">
+  <div class="container site-header__inner">
+    <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+      <img src="/assets/img/logo.svg" alt="" class="brand__mark" width="36" height="36">
+      <span class="brand__name">
+        3D Geospatial
+        <small>Digital Twin Automation</small>
+      </span>
+    </a>
+
+    <button class="theme-toggle" type="button" data-theme-toggle
+            aria-label="Switch to dark theme" title="Switch to dark theme">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4.2"/>
+        <path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/>
+      </svg>
+    </button>
+
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>
+      <span class="nav-toggle__icon" aria-hidden="true"><span></span></span>
+      Menu
+    </button>
+
+    <nav class="primary-nav" id="primary-nav" aria-label="Primary">
+      
+      <a href="https://www.3d-geospatial.com/" >
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/>
+        </svg>
+        Home
+      </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2 3 7l9 5 9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 17l9 5 9-5"/>
+            </svg>
+          
+          3D Geospatial Fundamentals
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/" aria-current="page">
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+          
+          LOD Management &amp; Optimization
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="6" cy="6" r="1.5"/><circle cx="12" cy="6" r="1.5"/><circle cx="18" cy="6" r="1.5"/>
+              <circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/>
+              <circle cx="6" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="18" cy="18" r="1.5"/>
+            </svg>
+          
+          Point Cloud &amp; Mesh Pipelines
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <path d="M12 9v4"/><path d="M12 17h.01"/>
+            </svg>
+          
+          Troubleshooting &amp; Reliability
+        </a>
+      
+    </nav>
+  </div>
+</header>
+
+
+  <main id="main">
+    
+
+
+<div class="container">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    
+      
+        <a href="https://www.3d-geospatial.com/">Home</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management Optimization Strategies</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/">Streaming Sync Patterns</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <span class="current">Http2 And Connection Limits For Tile Streaming</span>
+      
+    
+  </nav>
+
+  <div class="content-page">
+    <article class="article">
+      <h1 id="http2-and-connection-limits-for-tile-streaming" tabindex="-1"><a class="heading-link" href="#http2-and-connection-limits-for-tile-streaming"><span>HTTP/2 and Connection Limits for Tile Streaming</span></a></h1>
+<p>This page explains why a tileset loads at six requests at a time on one protocol and sixty on another, measures what is actually happening in the browser, and tunes the client’s request scheduling, the server’s stream limits and the tile sizing to match — for a session that fetches 900 tiles in the first eight seconds.</p>
+<h2 id="why-you-hit-this" tabindex="-1"><a class="heading-link" href="#why-you-hit-this"><span>Why you hit this</span></a></h2>
+<p>Tile streaming is an unusual HTTP workload: hundreds of small-to-medium GETs, issued in bursts as the camera moves, to the same origin. Almost every other web workload is a handful of requests followed by a long idle period, so the defaults in browsers, proxies and servers are tuned for that instead.</p>
+<p>The result is a specific, common symptom: the viewer takes eight seconds to fill in when the network is plainly capable of doing it in two, and the network panel shows a neat staircase of six concurrent requests with everything else queued. Nothing is slow; everything is waiting.</p>
+<h2 id="prerequisites" tabindex="-1"><a class="heading-link" href="#prerequisites"><span>Prerequisites</span></a></h2>
+<ul>
+<li>A tileset served over HTTPS from a CDN or a server you control.</li>
+<li>Chrome or Firefox developer tools, plus <code>curl</code> with HTTP/2 support and optionally <code>h2load</code> or <code>nghttp</code>.</li>
+<li>The client from <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/prefetching-tiles-along-a-camera-path/">prefetching tiles along a camera path</a>, or any CesiumJS viewer.</li>
+</ul>
+<h2 id="step-by-step" tabindex="-1"><a class="heading-link" href="#step-by-step"><span>Step-by-Step</span></a></h2>
+<h3 id="1-find-out-which-protocol-is-actually-in-use" tabindex="-1"><a class="heading-link" href="#1-find-out-which-protocol-is-actually-in-use"><span>1. Find out which protocol is actually in use</span></a></h3>
+<div class="codeblock" data-lang="bash"><div class="codeblock__bar"><span class="codeblock__lang">bash</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-bash" tabindex="0" role="group" aria-label="bash code sample"><code class="language-bash"><span class="token function">curl</span> <span class="token parameter variable">-sI</span> <span class="token parameter variable">--http2</span> https://tiles.example.com/city/b-7f3a9c21/tileset.json <span class="token operator">|</span> <span class="token function">head</span> <span class="token parameter variable">-1</span>
+<span class="token comment"># HTTP/2 200</span>
+
+<span class="token function">curl</span> <span class="token parameter variable">-s</span> <span class="token parameter variable">-o</span> /dev/null <span class="token parameter variable">-w</span> <span class="token string">'%{http_version} %{time_connect} %{time_starttransfer} %{size_download}\n'</span> <span class="token punctuation">\</span>
+  https://tiles.example.com/city/b-7f3a9c21/content/0/0/0.glb
+
+nghttp <span class="token parameter variable">-nv</span> https://tiles.example.com/city/b-7f3a9c21/tileset.json <span class="token operator"><span class="token file-descriptor important">2</span>></span><span class="token file-descriptor important">&amp;1</span> <span class="token punctuation">\</span>
+  <span class="token operator">|</span> <span class="token function">grep</span> <span class="token parameter variable">-E</span> <span class="token string">"SETTINGS|MAX_CONCURRENT"</span>
+</code></pre></div>
+<div class="codeblock" data-lang="javascript"><div class="codeblock__bar"><span class="codeblock__lang">javascript</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-javascript" tabindex="0" role="group" aria-label="javascript code sample"><code class="language-javascript"><span class="token comment">// In the browser console, on the page that loads the tileset:</span>
+performance<span class="token punctuation">.</span><span class="token function">getEntriesByType</span><span class="token punctuation">(</span><span class="token string">'resource'</span><span class="token punctuation">)</span>
+  <span class="token punctuation">.</span><span class="token function">filter</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">e</span><span class="token punctuation">)</span> <span class="token operator">=></span> e<span class="token punctuation">.</span>name<span class="token punctuation">.</span><span class="token function">includes</span><span class="token punctuation">(</span><span class="token string">'/content/'</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+  <span class="token punctuation">.</span><span class="token function">slice</span><span class="token punctuation">(</span><span class="token operator">-</span><span class="token number">10</span><span class="token punctuation">)</span>
+  <span class="token punctuation">.</span><span class="token function">map</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">e</span><span class="token punctuation">)</span> <span class="token operator">=></span> <span class="token punctuation">(</span><span class="token punctuation">{</span>
+    <span class="token literal-property property">name</span><span class="token operator">:</span> e<span class="token punctuation">.</span>name<span class="token punctuation">.</span><span class="token function">split</span><span class="token punctuation">(</span><span class="token string">'/'</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">slice</span><span class="token punctuation">(</span><span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+    <span class="token literal-property property">protocol</span><span class="token operator">:</span> e<span class="token punctuation">.</span>nextHopProtocol<span class="token punctuation">,</span>      <span class="token comment">// 'h2', 'h3', 'http/1.1'</span>
+    <span class="token literal-property property">queuedMs</span><span class="token operator">:</span> Math<span class="token punctuation">.</span><span class="token function">round</span><span class="token punctuation">(</span>e<span class="token punctuation">.</span>requestStart <span class="token operator">-</span> e<span class="token punctuation">.</span>startTime<span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token literal-property property">ttfbMs</span><span class="token operator">:</span> Math<span class="token punctuation">.</span><span class="token function">round</span><span class="token punctuation">(</span>e<span class="token punctuation">.</span>responseStart <span class="token operator">-</span> e<span class="token punctuation">.</span>requestStart<span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token literal-property property">downloadMs</span><span class="token operator">:</span> Math<span class="token punctuation">.</span><span class="token function">round</span><span class="token punctuation">(</span>e<span class="token punctuation">.</span>responseEnd <span class="token operator">-</span> e<span class="token punctuation">.</span>responseStart<span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token literal-property property">bytes</span><span class="token operator">:</span> e<span class="token punctuation">.</span>encodedBodySize<span class="token punctuation">,</span>
+  <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+</code></pre></div>
+<p><code>nextHopProtocol</code> is the authoritative answer and it is per resource, which matters: a page can serve its own assets over HTTP/2 while the tile host negotiates HTTP/1.1 because of an older load balancer or a TLS configuration without ALPN.</p>
+<p><code>queuedMs</code> is the number that diagnoses the problem. A tile that spent 4,200 ms between <code>startTime</code> and <code>requestStart</code> was not slow to download — it was waiting for a connection slot, and no amount of bandwidth fixes it.</p>
+<figure class="diagram">
+<svg viewBox="4 6 732 256" role="img" aria-labelledby="h2-limits-t h2-limits-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="h2-limits-t">Concurrency limits by protocol</title>
+  <desc id="h2-limits-d">A comparison of three protocols for a burst of 900 tile requests. HTTP/1.1 allows six connections per origin, so requests queue and the burst takes eight seconds. HTTP/2 multiplexes over one connection with a typical limit of 100 concurrent streams, finishing in 2.1 seconds but subject to head-of-line blocking if a packet is lost. HTTP/3 over QUIC also multiplexes but loses no streams to a dropped packet, finishing in 1.8 seconds on a lossy link.</desc>
+  <rect class="svg-bg" x="4" y="6" width="732" height="256" fill="#ffffff"/>
+  <g stroke-width="1.5">
+    <rect x="18" y="20" width="150" height="32" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="168" y="20" width="164" height="32" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="332" y="20" width="174" height="32" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="506" y="20" width="216" height="32" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="18" y="52" width="150" height="56" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="168" y="52" width="164" height="56" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="332" y="52" width="174" height="56" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="506" y="52" width="216" height="56" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="18" y="108" width="150" height="56" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="168" y="108" width="164" height="56" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="332" y="108" width="174" height="56" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="506" y="108" width="216" height="56" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="18" y="164" width="150" height="56" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="168" y="164" width="164" height="56" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="332" y="164" width="174" height="56" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="506" y="164" width="216" height="56" fill="#eef5e9" stroke="#4f7a4d"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="93" y="41">protocol</text><text x="250" y="41">concurrency</text>
+    <text x="419" y="41">900 tiles take</text><text x="614" y="41">the catch</text>
+    <text x="93" y="74">HTTP/1.1</text><text x="93" y="94">(no ALPN, old LB)</text>
+    <text x="250" y="74">6 connections</text><text x="250" y="94">per origin</text>
+    <text x="419" y="74">8.0 s</text><text x="419" y="94">mostly queueing</text>
+    <text x="614" y="74">one slow tile blocks</text><text x="614" y="94">its whole connection</text>
+    <text x="93" y="130">HTTP/2</text><text x="93" y="150">(h2)</text>
+    <text x="250" y="130">~100 streams</text><text x="250" y="150">on 1 connection</text>
+    <text x="419" y="130">2.1 s</text><text x="419" y="150">bandwidth-bound</text>
+    <text x="614" y="130">TCP head-of-line: one</text><text x="614" y="150">lost packet stalls all</text>
+    <text x="93" y="186">HTTP/3</text><text x="93" y="206">(h3, QUIC)</text>
+    <text x="250" y="186">~100 streams</text><text x="250" y="206">independent</text>
+    <text x="419" y="186">1.8 s on 1% loss</text><text x="419" y="206">2.0 s clean</text>
+    <text x="614" y="186">UDP blocked on some</text><text x="614" y="206">corporate networks</text>
+  </g>
+  <text x="370" y="244" fill="#5b6471" font-size="12" text-anchor="middle">same tiles, same bandwidth — the protocol decides whether they queue</text>
+</svg>
+<figcaption>The 900 tiles and the bandwidth are identical in all three rows; only the concurrency limit changes.</figcaption>
+</figure>
+<h3 id="2-measure-the-concurrency-you-are-actually-getting" tabindex="-1"><a class="heading-link" href="#2-measure-the-concurrency-you-are-actually-getting"><span>2. Measure the concurrency you are actually getting</span></a></h3>
+<div class="codeblock" data-lang="javascript"><div class="codeblock__bar"><span class="codeblock__lang">javascript</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-javascript" tabindex="0" role="group" aria-label="javascript code sample"><code class="language-javascript"><span class="token keyword">export</span> <span class="token keyword">function</span> <span class="token function">concurrencyProfile</span><span class="token punctuation">(</span>urlFilter <span class="token operator">=</span> <span class="token string">'/content/'</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+  <span class="token keyword">const</span> entries <span class="token operator">=</span> performance<span class="token punctuation">.</span><span class="token function">getEntriesByType</span><span class="token punctuation">(</span><span class="token string">'resource'</span><span class="token punctuation">)</span>
+    <span class="token punctuation">.</span><span class="token function">filter</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">e</span><span class="token punctuation">)</span> <span class="token operator">=></span> e<span class="token punctuation">.</span>name<span class="token punctuation">.</span><span class="token function">includes</span><span class="token punctuation">(</span>urlFilter<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">if</span> <span class="token punctuation">(</span><span class="token operator">!</span>entries<span class="token punctuation">.</span>length<span class="token punctuation">)</span> <span class="token keyword">return</span> <span class="token punctuation">{</span> <span class="token literal-property property">samples</span><span class="token operator">:</span> <span class="token number">0</span> <span class="token punctuation">}</span><span class="token punctuation">;</span>
+
+  <span class="token comment">// Sweep a timeline of starts and ends to find the peak overlap.</span>
+  <span class="token keyword">const</span> events <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+  <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">const</span> e <span class="token keyword">of</span> entries<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    events<span class="token punctuation">.</span><span class="token function">push</span><span class="token punctuation">(</span><span class="token punctuation">{</span> <span class="token literal-property property">t</span><span class="token operator">:</span> e<span class="token punctuation">.</span>startTime<span class="token punctuation">,</span> <span class="token literal-property property">d</span><span class="token operator">:</span> <span class="token operator">+</span><span class="token number">1</span> <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    events<span class="token punctuation">.</span><span class="token function">push</span><span class="token punctuation">(</span><span class="token punctuation">{</span> <span class="token literal-property property">t</span><span class="token operator">:</span> e<span class="token punctuation">.</span>responseEnd<span class="token punctuation">,</span> <span class="token literal-property property">d</span><span class="token operator">:</span> <span class="token operator">-</span><span class="token number">1</span> <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  events<span class="token punctuation">.</span><span class="token function">sort</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">a<span class="token punctuation">,</span> b</span><span class="token punctuation">)</span> <span class="token operator">=></span> a<span class="token punctuation">.</span>t <span class="token operator">-</span> b<span class="token punctuation">.</span>t <span class="token operator">||</span> a<span class="token punctuation">.</span>d <span class="token operator">-</span> b<span class="token punctuation">.</span>d<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">let</span> inflight <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">,</span> peak <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+  <span class="token keyword">const</span> samples <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+  <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">const</span> ev <span class="token keyword">of</span> events<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    inflight <span class="token operator">+=</span> ev<span class="token punctuation">.</span>d<span class="token punctuation">;</span>
+    peak <span class="token operator">=</span> Math<span class="token punctuation">.</span><span class="token function">max</span><span class="token punctuation">(</span>peak<span class="token punctuation">,</span> inflight<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    samples<span class="token punctuation">.</span><span class="token function">push</span><span class="token punctuation">(</span><span class="token punctuation">{</span> <span class="token literal-property property">t</span><span class="token operator">:</span> ev<span class="token punctuation">.</span>t<span class="token punctuation">,</span> inflight <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+
+  <span class="token keyword">const</span> queued <span class="token operator">=</span> entries<span class="token punctuation">.</span><span class="token function">map</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">e</span><span class="token punctuation">)</span> <span class="token operator">=></span> e<span class="token punctuation">.</span>requestStart <span class="token operator">-</span> e<span class="token punctuation">.</span>startTime<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">const</span> <span class="token function-variable function">q</span> <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token parameter">arr<span class="token punctuation">,</span> f</span><span class="token punctuation">)</span> <span class="token operator">=></span> arr<span class="token punctuation">.</span><span class="token function">slice</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">sort</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">a<span class="token punctuation">,</span> b</span><span class="token punctuation">)</span> <span class="token operator">=></span> a <span class="token operator">-</span> b<span class="token punctuation">)</span><span class="token punctuation">[</span>Math<span class="token punctuation">.</span><span class="token function">floor</span><span class="token punctuation">(</span>f <span class="token operator">*</span> arr<span class="token punctuation">.</span>length<span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+  <span class="token keyword">const</span> span <span class="token operator">=</span> Math<span class="token punctuation">.</span><span class="token function">max</span><span class="token punctuation">(</span><span class="token operator">...</span>entries<span class="token punctuation">.</span><span class="token function">map</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">e</span><span class="token punctuation">)</span> <span class="token operator">=></span> e<span class="token punctuation">.</span>responseEnd<span class="token punctuation">)</span><span class="token punctuation">)</span>
+             <span class="token operator">-</span> Math<span class="token punctuation">.</span><span class="token function">min</span><span class="token punctuation">(</span><span class="token operator">...</span>entries<span class="token punctuation">.</span><span class="token function">map</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">e</span><span class="token punctuation">)</span> <span class="token operator">=></span> e<span class="token punctuation">.</span>startTime<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">const</span> bytes <span class="token operator">=</span> entries<span class="token punctuation">.</span><span class="token function">reduce</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">s<span class="token punctuation">,</span> e</span><span class="token punctuation">)</span> <span class="token operator">=></span> s <span class="token operator">+</span> <span class="token punctuation">(</span>e<span class="token punctuation">.</span>encodedBodySize <span class="token operator">||</span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+  <span class="token keyword">return</span> <span class="token punctuation">{</span>
+    <span class="token literal-property property">samples</span><span class="token operator">:</span> entries<span class="token punctuation">.</span>length<span class="token punctuation">,</span>
+    <span class="token literal-property property">protocol</span><span class="token operator">:</span> entries<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">.</span>nextHopProtocol<span class="token punctuation">,</span>
+    <span class="token literal-property property">peakConcurrency</span><span class="token operator">:</span> peak<span class="token punctuation">,</span>
+    <span class="token literal-property property">medianQueuedMs</span><span class="token operator">:</span> Math<span class="token punctuation">.</span><span class="token function">round</span><span class="token punctuation">(</span><span class="token function">q</span><span class="token punctuation">(</span>queued<span class="token punctuation">,</span> <span class="token number">0.5</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token literal-property property">p95QueuedMs</span><span class="token operator">:</span> Math<span class="token punctuation">.</span><span class="token function">round</span><span class="token punctuation">(</span><span class="token function">q</span><span class="token punctuation">(</span>queued<span class="token punctuation">,</span> <span class="token number">0.95</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token literal-property property">spanSeconds</span><span class="token operator">:</span> <span class="token function">Number</span><span class="token punctuation">(</span><span class="token punctuation">(</span>span <span class="token operator">/</span> <span class="token number">1000</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">toFixed</span><span class="token punctuation">(</span><span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token literal-property property">effectiveMbps</span><span class="token operator">:</span> <span class="token function">Number</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token punctuation">(</span>bytes <span class="token operator">*</span> <span class="token number">8</span><span class="token punctuation">)</span> <span class="token operator">/</span> span <span class="token operator">/</span> <span class="token number">1000</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">toFixed</span><span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token literal-property property">verdict</span><span class="token operator">:</span> peak <span class="token operator">&lt;=</span> <span class="token number">6</span> <span class="token operator">?</span> <span class="token string">'HTTP/1.1 connection limit — fix the transport first'</span>
+           <span class="token operator">:</span> <span class="token function">q</span><span class="token punctuation">(</span>queued<span class="token punctuation">,</span> <span class="token number">0.95</span><span class="token punctuation">)</span> <span class="token operator">></span> <span class="token number">500</span> <span class="token operator">?</span> <span class="token string">'client-side scheduling is the bottleneck'</span>
+           <span class="token operator">:</span> <span class="token string">'bandwidth- or server-bound'</span><span class="token punctuation">,</span>
+  <span class="token punctuation">}</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+
+console<span class="token punctuation">.</span><span class="token function">table</span><span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token function">concurrencyProfile</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+</code></pre></div>
+<p>A peak concurrency of exactly 6 is the signature of HTTP/1.1, and it is conclusive — browsers have allowed six connections per origin for well over a decade and the number has not moved. Seeing 6 means the transport is the problem and nothing else is worth tuning until it is fixed.</p>
+<p>A peak well below the protocol’s limit with low queue times means the client is not asking for enough at once, which is step 4. A peak at the limit with high queue times means the requests are there and the pipe is full, which is a tile-size problem rather than a concurrency one.</p>
+<h3 id="3-fix-the-transport" tabindex="-1"><a class="heading-link" href="#3-fix-the-transport"><span>3. Fix the transport</span></a></h3>
+<div class="codeblock" data-lang="nginx"><div class="codeblock__bar"><span class="codeblock__lang">nginx</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-nginx" tabindex="0" role="group" aria-label="nginx code sample"><code class="language-nginx"><span class="token comment"># nginx: HTTP/2 and HTTP/3, with stream limits raised for tile bursts</span>
+<span class="token directive"><span class="token keyword">server</span></span> <span class="token punctuation">{</span>
+    <span class="token directive"><span class="token keyword">listen</span> <span class="token number">443</span> ssl</span><span class="token punctuation">;</span>
+    <span class="token directive"><span class="token keyword">listen</span> <span class="token number">443</span> quic reuseport</span><span class="token punctuation">;</span>
+    <span class="token directive"><span class="token keyword">http2</span> <span class="token boolean">on</span></span><span class="token punctuation">;</span>
+
+    <span class="token directive"><span class="token keyword">ssl_protocols</span> TLSv1.2 TLSv1.3</span><span class="token punctuation">;</span>
+
+    <span class="token comment"># Default is 128; tile bursts benefit from more, at some memory cost.</span>
+    <span class="token directive"><span class="token keyword">http2_max_concurrent_streams</span> <span class="token number">256</span></span><span class="token punctuation">;</span>
+
+    <span class="token comment"># Advertise HTTP/3 so clients can upgrade.</span>
+    <span class="token directive"><span class="token keyword">add_header</span> Alt-Svc <span class="token string">'h3=":443"; ma=86400'</span> always</span><span class="token punctuation">;</span>
+
+    <span class="token directive"><span class="token keyword">location</span> /city/</span> <span class="token punctuation">{</span>
+        <span class="token directive"><span class="token keyword">root</span> /srv/tiles</span><span class="token punctuation">;</span>
+        <span class="token directive"><span class="token keyword">add_header</span> Cache-Control <span class="token string">"public, max-age=31536000, immutable"</span></span><span class="token punctuation">;</span>
+        <span class="token directive"><span class="token keyword">gzip</span> <span class="token boolean">on</span></span><span class="token punctuation">;</span>
+        <span class="token directive"><span class="token keyword">gzip_types</span> application/json</span><span class="token punctuation">;</span>
+        <span class="token directive"><span class="token keyword">gzip_min_length</span> <span class="token number">512</span></span><span class="token punctuation">;</span>
+
+        <span class="token comment"># Tiles are already compressed; do not re-compress binaries.</span>
+        <span class="token directive"><span class="token keyword">location</span> ~* \.(glb|b3dm|ktx2|webp|subtree)$</span> <span class="token punctuation">{</span>
+            <span class="token directive"><span class="token keyword">gzip</span> <span class="token boolean">off</span></span><span class="token punctuation">;</span>
+            <span class="token directive"><span class="token keyword">add_header</span> Cache-Control <span class="token string">"public, max-age=31536000, immutable"</span></span><span class="token punctuation">;</span>
+        <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span>
+</code></pre></div>
+<div class="codeblock" data-lang="bash"><div class="codeblock__bar"><span class="codeblock__lang">bash</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-bash" tabindex="0" role="group" aria-label="bash code sample"><code class="language-bash"><span class="token comment"># Prove the upgrade works, and measure it</span>
+h2load <span class="token parameter variable">-n</span> <span class="token number">900</span> <span class="token parameter variable">-c</span> <span class="token number">1</span> <span class="token parameter variable">-m</span> <span class="token number">100</span> https://tiles.example.com/city/b-7f3a9c21/content/0/0/0.glb
+h2load <span class="token parameter variable">-n</span> <span class="token number">900</span> <span class="token parameter variable">-c</span> <span class="token number">6</span> <span class="token parameter variable">-m</span> <span class="token number">1</span>   https://tiles.example.com/city/b-7f3a9c21/content/0/0/0.glb
+</code></pre></div>
+<p>The two <code>h2load</code> invocations are the experiment worth running: one connection with 100 multiplexed streams against six connections with one stream each. The first is what HTTP/2 gives you and the second approximates HTTP/1.1, on identical hardware and network, so the difference is attributable.</p>
+<p><code>http2_max_concurrent_streams</code> at 256 rather than the default 128 helps a burst and costs memory per connection. Raising it far higher is counterproductive: beyond the bandwidth-delay product the streams simply share the same pipe, and the server pays for the bookkeeping.</p>
+<p>Compression deserves attention because the default is wrong in both directions. Tileset JSON compresses 8–12× and must be gzipped; <code>.glb</code> files containing Draco or meshopt data and KTX2 textures are already compressed, and gzipping them burns CPU to make them very slightly larger.</p>
+<h3 id="4-tune-the-clients-request-scheduling" tabindex="-1"><a class="heading-link" href="#4-tune-the-clients-request-scheduling"><span>4. Tune the client’s request scheduling</span></a></h3>
+<div class="codeblock" data-lang="javascript"><div class="codeblock__bar"><span class="codeblock__lang">javascript</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-javascript" tabindex="0" role="group" aria-label="javascript code sample"><code class="language-javascript"><span class="token keyword">export</span> <span class="token keyword">function</span> <span class="token function">tuneRequestScheduler</span><span class="token punctuation">(</span><span class="token parameter">protocol</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+  <span class="token comment">// CesiumJS: RequestScheduler governs how many requests are outstanding.</span>
+  <span class="token keyword">const</span> perServer <span class="token operator">=</span> protocol <span class="token operator">===</span> <span class="token string">'http/1.1'</span> <span class="token operator">?</span> <span class="token number">6</span>
+                  <span class="token operator">:</span> protocol <span class="token operator">===</span> <span class="token string">'h3'</span> <span class="token operator">?</span> <span class="token number">24</span>
+                  <span class="token operator">:</span> <span class="token number">18</span><span class="token punctuation">;</span>                              <span class="token comment">// h2</span>
+  Cesium<span class="token punctuation">.</span>RequestScheduler<span class="token punctuation">.</span>maximumRequestsPerServer <span class="token operator">=</span> perServer<span class="token punctuation">;</span>
+  Cesium<span class="token punctuation">.</span>RequestScheduler<span class="token punctuation">.</span>maximumRequests <span class="token operator">=</span> Math<span class="token punctuation">.</span><span class="token function">max</span><span class="token punctuation">(</span>perServer <span class="token operator">*</span> <span class="token number">2</span><span class="token punctuation">,</span> <span class="token number">50</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  Cesium<span class="token punctuation">.</span>RequestScheduler<span class="token punctuation">.</span>throttleRequests <span class="token operator">=</span> <span class="token boolean">true</span><span class="token punctuation">;</span>
+  <span class="token keyword">return</span> <span class="token punctuation">{</span>
+    protocol<span class="token punctuation">,</span>
+    <span class="token literal-property property">maximumRequestsPerServer</span><span class="token operator">:</span> Cesium<span class="token punctuation">.</span>RequestScheduler<span class="token punctuation">.</span>maximumRequestsPerServer<span class="token punctuation">,</span>
+    <span class="token literal-property property">maximumRequests</span><span class="token operator">:</span> Cesium<span class="token punctuation">.</span>RequestScheduler<span class="token punctuation">.</span>maximumRequests<span class="token punctuation">,</span>
+  <span class="token punctuation">}</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">export</span> <span class="token keyword">async</span> <span class="token keyword">function</span> <span class="token function">configureFromMeasurement</span><span class="token punctuation">(</span><span class="token parameter">probeUrl</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+  <span class="token keyword">const</span> before <span class="token operator">=</span> performance<span class="token punctuation">.</span><span class="token function">now</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">await</span> <span class="token function">fetch</span><span class="token punctuation">(</span>probeUrl<span class="token punctuation">,</span> <span class="token punctuation">{</span> <span class="token literal-property property">cache</span><span class="token operator">:</span> <span class="token string">'reload'</span> <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">const</span> entry <span class="token operator">=</span> performance<span class="token punctuation">.</span><span class="token function">getEntriesByType</span><span class="token punctuation">(</span><span class="token string">'resource'</span><span class="token punctuation">)</span>
+    <span class="token punctuation">.</span><span class="token function">filter</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">e</span><span class="token punctuation">)</span> <span class="token operator">=></span> e<span class="token punctuation">.</span>name <span class="token operator">===</span> probeUrl<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">slice</span><span class="token punctuation">(</span><span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+  <span class="token keyword">const</span> protocol <span class="token operator">=</span> entry<span class="token operator">?.</span>nextHopProtocol <span class="token operator">??</span> <span class="token string">'h2'</span><span class="token punctuation">;</span>
+  <span class="token keyword">const</span> rttMs <span class="token operator">=</span> entry <span class="token operator">?</span> entry<span class="token punctuation">.</span>responseStart <span class="token operator">-</span> entry<span class="token punctuation">.</span>requestStart <span class="token operator">:</span> <span class="token number">60</span><span class="token punctuation">;</span>
+  <span class="token keyword">const</span> cfg <span class="token operator">=</span> <span class="token function">tuneRequestScheduler</span><span class="token punctuation">(</span>protocol<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">return</span> <span class="token punctuation">{</span> <span class="token operator">...</span>cfg<span class="token punctuation">,</span> <span class="token literal-property property">rttMs</span><span class="token operator">:</span> Math<span class="token punctuation">.</span><span class="token function">round</span><span class="token punctuation">(</span>rttMs<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token literal-property property">probeMs</span><span class="token operator">:</span> Math<span class="token punctuation">.</span><span class="token function">round</span><span class="token punctuation">(</span>performance<span class="token punctuation">.</span><span class="token function">now</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">-</span> before<span class="token punctuation">)</span> <span class="token punctuation">}</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+</code></pre></div>
+<p>More outstanding requests is not monotonically better, which is the counter-intuitive part. Beyond about 20 concurrent tile requests the additional streams share the same bandwidth, so each one completes more slowly, and the tiles the camera needs <em>now</em> finish later than they would have with fewer in flight. The client’s priority ordering also stops mattering once everything is in flight at once.</p>
+<p>Eighteen is a reasonable HTTP/2 default for a tileset: enough to saturate a typical connection, few enough that re-prioritising as the camera moves still has an effect. On HTTP/3 a higher number is safe because a stalled stream does not hold up the others.</p>
+<p>Raising it on HTTP/1.1 does nothing at all — the browser enforces six regardless — and setting it high there just means the scheduler queues internally instead of letting the browser queue.</p>
+<h3 id="5-size-tiles-for-the-protocol" tabindex="-1"><a class="heading-link" href="#5-size-tiles-for-the-protocol"><span>5. Size tiles for the protocol</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">tile_size_budget</span><span class="token punctuation">(</span>rtt_ms<span class="token punctuation">,</span> bandwidth_mbps<span class="token punctuation">,</span> concurrency<span class="token punctuation">,</span> target_fill_s<span class="token operator">=</span><span class="token number">2.0</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""How big tiles should be so a burst is bandwidth-bound, not latency-bound."""</span>
+    bytes_per_s <span class="token operator">=</span> bandwidth_mbps <span class="token operator">*</span> <span class="token number">1e6</span> <span class="token operator">/</span> <span class="token number">8</span>
+    total_bytes <span class="token operator">=</span> bytes_per_s <span class="token operator">*</span> target_fill_s
+    <span class="token comment"># Each request costs at least one RTT of latency, amortised across concurrency.</span>
+    latency_budget_s <span class="token operator">=</span> target_fill_s <span class="token operator">*</span> <span class="token number">0.25</span>
+    max_sequential_requests <span class="token operator">=</span> latency_budget_s <span class="token operator">/</span> <span class="token punctuation">(</span>rtt_ms <span class="token operator">/</span> <span class="token number">1000</span><span class="token punctuation">)</span> <span class="token operator">*</span> concurrency
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token string">"rtt_ms"</span><span class="token punctuation">:</span> rtt_ms<span class="token punctuation">,</span>
+        <span class="token string">"bandwidth_mbps"</span><span class="token punctuation">:</span> bandwidth_mbps<span class="token punctuation">,</span>
+        <span class="token string">"concurrency"</span><span class="token punctuation">:</span> concurrency<span class="token punctuation">,</span>
+        <span class="token string">"total_kb_in_window"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>total_bytes <span class="token operator">/</span> <span class="token number">1024</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"max_requests_in_window"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span>max_sequential_requests<span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"ideal_tile_kb"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>total_bytes <span class="token operator">/</span> <span class="token builtin">max</span><span class="token punctuation">(</span>max_sequential_requests<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token number">1024</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+
+<span class="token keyword">for</span> rtt<span class="token punctuation">,</span> bw<span class="token punctuation">,</span> conc <span class="token keyword">in</span> <span class="token punctuation">[</span><span class="token punctuation">(</span><span class="token number">20</span><span class="token punctuation">,</span> <span class="token number">100</span><span class="token punctuation">,</span> <span class="token number">18</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token punctuation">(</span><span class="token number">80</span><span class="token punctuation">,</span> <span class="token number">25</span><span class="token punctuation">,</span> <span class="token number">18</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token punctuation">(</span><span class="token number">80</span><span class="token punctuation">,</span> <span class="token number">25</span><span class="token punctuation">,</span> <span class="token number">6</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token punctuation">(</span><span class="token number">160</span><span class="token punctuation">,</span> <span class="token number">8</span><span class="token punctuation">,</span> <span class="token number">18</span><span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">:</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span>tile_size_budget<span class="token punctuation">(</span>rtt<span class="token punctuation">,</span> bw<span class="token punctuation">,</span> conc<span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Tile size and concurrency trade against each other, and the ratio that matters is how much of the fill window goes to latency rather than to transfer. On a 20 ms link with 18 streams, a tile can be small — 40 KB is fine, and 900 of them fit in the window. On a 160 ms satellite link with the same concurrency, small tiles spend the whole window in round trips and the ideal tile is several hundred kilobytes.</p>
+<p>This is the calculation that justifies the tile-size decisions in <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/choosing-shard-sizes-for-city-scale-tiling/">choosing shard sizes for city-scale tiling</a>, from the network side rather than the pipeline side. It also explains why a tileset tuned on an office LAN performs badly on mobile: the tiles are too small for the latency.</p>
+<figure class="diagram">
+<svg viewBox="4 6 732 278" role="img" aria-labelledby="h2-headers-t h2-headers-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="h2-headers-t">Compression and connection settings per file type</title>
+  <desc id="h2-headers-d">A table of five tile-server settings. Tileset JSON should be gzipped for an eight to twelve times saving. GLB, KTX2 and subtree files must not be gzipped because they are already compressed. Stream concurrency should be raised above the default. Alt-Svc should advertise HTTP/3 as an upgrade path. Domain sharding should be removed because it splits one warm connection into several cold ones.</desc>
+  <rect class="svg-bg" x="4" y="6" width="732" height="278" fill="#ffffff"/>
+  <g stroke-width="1.5">
+    <rect x="18" y="20" width="268" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="286" y="20" width="116" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="402" y="20" width="320" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="18" y="54" width="268" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="286" y="54" width="116" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="402" y="54" width="320" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="18" y="88" width="268" height="34" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="286" y="88" width="116" height="34" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="402" y="88" width="320" height="34" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="18" y="122" width="268" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="286" y="122" width="116" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="402" y="122" width="320" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="18" y="156" width="268" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="286" y="156" width="116" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="402" y="156" width="320" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="18" y="190" width="268" height="34" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="286" y="190" width="116" height="34" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="402" y="190" width="320" height="34" fill="#f7dfdc" stroke="#b0413e"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="152" y="42">setting</text><text x="344" y="42">value</text><text x="562" y="42">effect</text>
+    <text x="152" y="76">gzip application/json</text><text x="344" y="76">on</text><text x="562" y="76">8–12× on the file that gates every session</text>
+    <text x="152" y="110">gzip .glb .ktx2 .subtree</text><text x="344" y="110">off</text><text x="562" y="110">already compressed — CPU for nothing</text>
+    <text x="152" y="144">http2_max_concurrent_streams</text><text x="344" y="144">256</text><text x="562" y="144">room for an opening burst</text>
+    <text x="152" y="178">Alt-Svc h3</text><text x="344" y="178">advertise</text><text x="562" y="178">returning visitors upgrade</text>
+    <text x="152" y="212">domain sharding</text><text x="344" y="212">remove</text><text x="562" y="212">splits one warm connection into four cold</text>
+  </g>
+  <text x="20" y="244" fill="#1f2937" font-size="12.5">The first two rows are the same directive applied in opposite directions, and both matter.</text>
+  <text x="20" y="266" fill="#5b6471" font-size="12">Sharding was correct for HTTP/1.1 and is actively harmful now.</text>
+</svg>
+<figcaption>Two of these are server one-liners worth more than any client tuning, and one is an optimisation to unlearn.</figcaption>
+</figure>
+<h3 id="6-avoid-the-traps-that-undo-the-gains" tabindex="-1"><a class="heading-link" href="#6-avoid-the-traps-that-undo-the-gains"><span>6. Avoid the traps that undo the gains</span></a></h3>
+<div class="codeblock" data-lang="javascript"><div class="codeblock__bar"><span class="codeblock__lang">javascript</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-javascript" tabindex="0" role="group" aria-label="javascript code sample"><code class="language-javascript"><span class="token keyword">export</span> <span class="token keyword">function</span> <span class="token function">transportPitfallCheck</span><span class="token punctuation">(</span><span class="token parameter">entries</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+  <span class="token keyword">const</span> byOrigin <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">Map</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">const</span> e <span class="token keyword">of</span> entries<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> origin <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">URL</span><span class="token punctuation">(</span>e<span class="token punctuation">.</span>name<span class="token punctuation">)</span><span class="token punctuation">.</span>origin<span class="token punctuation">;</span>
+    <span class="token keyword">const</span> bucket <span class="token operator">=</span> byOrigin<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span>origin<span class="token punctuation">)</span> <span class="token operator">??</span> <span class="token punctuation">{</span> <span class="token literal-property property">count</span><span class="token operator">:</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token literal-property property">protocols</span><span class="token operator">:</span> <span class="token keyword">new</span> <span class="token class-name">Set</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">}</span><span class="token punctuation">;</span>
+    bucket<span class="token punctuation">.</span>count <span class="token operator">+=</span> <span class="token number">1</span><span class="token punctuation">;</span>
+    bucket<span class="token punctuation">.</span>protocols<span class="token punctuation">.</span><span class="token function">add</span><span class="token punctuation">(</span>e<span class="token punctuation">.</span>nextHopProtocol<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    byOrigin<span class="token punctuation">.</span><span class="token function">set</span><span class="token punctuation">(</span>origin<span class="token punctuation">,</span> bucket<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  <span class="token keyword">const</span> findings <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+  <span class="token keyword">if</span> <span class="token punctuation">(</span>byOrigin<span class="token punctuation">.</span>size <span class="token operator">></span> <span class="token number">1</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    findings<span class="token punctuation">.</span><span class="token function">push</span><span class="token punctuation">(</span><span class="token punctuation">{</span>
+      <span class="token literal-property property">issue</span><span class="token operator">:</span> <span class="token template-string"><span class="token template-punctuation string">`</span><span class="token string">tiles served from </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>byOrigin<span class="token punctuation">.</span>size<span class="token interpolation-punctuation punctuation">}</span></span><span class="token string"> origins</span><span class="token template-punctuation string">`</span></span><span class="token punctuation">,</span>
+      <span class="token literal-property property">why</span><span class="token operator">:</span> <span class="token string">'HTTP/2 multiplexes per connection; sharding across origins '</span>
+         <span class="token operator">+</span> <span class="token string">'forces separate connections and separate congestion windows'</span><span class="token punctuation">,</span>
+      <span class="token literal-property property">severity</span><span class="token operator">:</span> <span class="token string">'high'</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">const</span> <span class="token punctuation">[</span>origin<span class="token punctuation">,</span> b<span class="token punctuation">]</span> <span class="token keyword">of</span> byOrigin<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>b<span class="token punctuation">.</span>protocols<span class="token punctuation">.</span><span class="token function">has</span><span class="token punctuation">(</span><span class="token string">'http/1.1'</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      findings<span class="token punctuation">.</span><span class="token function">push</span><span class="token punctuation">(</span><span class="token punctuation">{</span> <span class="token literal-property property">issue</span><span class="token operator">:</span> <span class="token template-string"><span class="token template-punctuation string">`</span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>origin<span class="token interpolation-punctuation punctuation">}</span></span><span class="token string"> negotiated HTTP/1.1</span><span class="token template-punctuation string">`</span></span><span class="token punctuation">,</span> <span class="token literal-property property">severity</span><span class="token operator">:</span> <span class="token string">'high'</span><span class="token punctuation">,</span>
+                      <span class="token literal-property property">why</span><span class="token operator">:</span> <span class="token string">'six-connection limit applies'</span> <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+    <span class="token keyword">if</span> <span class="token punctuation">(</span>b<span class="token punctuation">.</span>protocols<span class="token punctuation">.</span>size <span class="token operator">></span> <span class="token number">1</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+      findings<span class="token punctuation">.</span><span class="token function">push</span><span class="token punctuation">(</span><span class="token punctuation">{</span> <span class="token literal-property property">issue</span><span class="token operator">:</span> <span class="token template-string"><span class="token template-punctuation string">`</span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>origin<span class="token interpolation-punctuation punctuation">}</span></span><span class="token string"> mixes </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span><span class="token punctuation">[</span><span class="token operator">...</span>b<span class="token punctuation">.</span>protocols<span class="token punctuation">]</span><span class="token punctuation">.</span><span class="token function">join</span><span class="token punctuation">(</span><span class="token string">', '</span><span class="token punctuation">)</span><span class="token interpolation-punctuation punctuation">}</span></span><span class="token template-punctuation string">`</span></span><span class="token punctuation">,</span>
+                      <span class="token literal-property property">severity</span><span class="token operator">:</span> <span class="token string">'medium'</span><span class="token punctuation">,</span>
+                      <span class="token literal-property property">why</span><span class="token operator">:</span> <span class="token string">'inconsistent limits make concurrency unpredictable'</span> <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+  <span class="token punctuation">}</span>
+  <span class="token keyword">const</span> redirects <span class="token operator">=</span> entries<span class="token punctuation">.</span><span class="token function">filter</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">e</span><span class="token punctuation">)</span> <span class="token operator">=></span> e<span class="token punctuation">.</span>redirectEnd <span class="token operator">></span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">if</span> <span class="token punctuation">(</span>redirects<span class="token punctuation">.</span>length<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    findings<span class="token punctuation">.</span><span class="token function">push</span><span class="token punctuation">(</span><span class="token punctuation">{</span> <span class="token literal-property property">issue</span><span class="token operator">:</span> <span class="token template-string"><span class="token template-punctuation string">`</span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>redirects<span class="token punctuation">.</span>length<span class="token interpolation-punctuation punctuation">}</span></span><span class="token string"> tile request(s) redirected</span><span class="token template-punctuation string">`</span></span><span class="token punctuation">,</span>
+                    <span class="token literal-property property">severity</span><span class="token operator">:</span> <span class="token string">'high'</span><span class="token punctuation">,</span>
+                    <span class="token literal-property property">why</span><span class="token operator">:</span> <span class="token string">'each redirect is an extra round trip per tile'</span> <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  <span class="token keyword">const</span> noCache <span class="token operator">=</span> entries<span class="token punctuation">.</span><span class="token function">filter</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">e</span><span class="token punctuation">)</span> <span class="token operator">=></span> e<span class="token punctuation">.</span>transferSize <span class="token operator">></span> <span class="token number">0</span> <span class="token operator">&amp;&amp;</span> e<span class="token punctuation">.</span>decodedBodySize <span class="token operator">></span> <span class="token number">0</span>
+                                     <span class="token operator">&amp;&amp;</span> e<span class="token punctuation">.</span>transferSize <span class="token operator">>=</span> e<span class="token punctuation">.</span>decodedBodySize<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">return</span> <span class="token punctuation">{</span> <span class="token literal-property property">origins</span><span class="token operator">:</span> byOrigin<span class="token punctuation">.</span>size<span class="token punctuation">,</span> findings<span class="token punctuation">,</span>
+           <span class="token literal-property property">uncachedFraction</span><span class="token operator">:</span> <span class="token function">Number</span><span class="token punctuation">(</span><span class="token punctuation">(</span>noCache<span class="token punctuation">.</span>length <span class="token operator">/</span> Math<span class="token punctuation">.</span><span class="token function">max</span><span class="token punctuation">(</span>entries<span class="token punctuation">.</span>length<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+                                    <span class="token punctuation">.</span><span class="token function">toFixed</span><span class="token punctuation">(</span><span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">}</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+</code></pre></div>
+<p>Domain sharding is the practice to unlearn. It was correct for HTTP/1.1 — six connections per origin times four origins is 24 — and is actively harmful on HTTP/2, where it splits one multiplexed connection with a warm congestion window into four cold ones with separate TLS handshakes.</p>
+<p>Redirects are the other quiet cost. A tile host that redirects <code>http</code> to <code>https</code>, or a bucket that redirects a path without a trailing slash, adds a full round trip to every tile — which on 900 tiles at 80 ms is 72 seconds of latency spread across the session.</p>
+<figure class="diagram">
+<svg viewBox="17 -4 697 244" role="img" aria-labelledby="h2-tune-t h2-tune-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="h2-tune-t">Fill time against outstanding requests</title>
+  <desc id="h2-tune-d">A chart of time to fill the view against the number of outstanding tile requests on an HTTP/2 connection at 25 megabits per second and 80 milliseconds round trip. At 6 outstanding requests it takes 5.4 seconds. At 12 it takes 3.1 seconds. At 18 it takes 2.6 seconds, the best result. At 32 it takes 2.7 seconds and at 64 it takes 3.2 seconds, because the streams share the same bandwidth and priority ordering stops having any effect.</desc>
+  <rect class="svg-bg" x="17" y="-4" width="697" height="244" fill="#ffffff"/>
+  <path d="M84 24 V184 H700" stroke="#5b6471" stroke-width="1.5" fill="none"/>
+  <g stroke-width="1.5">
+    <rect x="116" y="30" width="78" height="154" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="234" y="96" width="78" height="88" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="352" y="110" width="78" height="74" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="470" y="107" width="78" height="77" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="588" y="93" width="78" height="91" fill="#fdf3e0" stroke="#c46a3d"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="155" y="24">5.4 s</text><text x="273" y="90">3.1 s</text>
+    <text x="391" y="104">2.6 s</text><text x="509" y="101">2.7 s</text><text x="627" y="87">3.2 s</text>
+    <text x="155" y="202">6</text><text x="273" y="202">12</text><text x="391" y="202">18</text>
+    <text x="509" y="202">32</text><text x="627" y="202">64</text>
+  </g>
+  <text x="400" y="222" fill="#5b6471" font-size="12" text-anchor="middle">maximumRequestsPerServer — HTTP/2, 25 Mbps, 80 ms RTT, 900 tiles</text>
+  <text x="44" y="96" fill="#5b6471" font-size="12" text-anchor="middle">fill</text>
+  <text x="44" y="112" fill="#5b6471" font-size="12" text-anchor="middle">time</text>
+  <text x="391" y="150" fill="#1f2937" font-size="12" text-anchor="middle">best</text>
+</svg>
+<figcaption>The curve has a floor around 18 and rises again past 32 — more streams share the same bandwidth and defeat prioritisation.</figcaption>
+</figure>
+<h2 id="expected-output-verification" tabindex="-1"><a class="heading-link" href="#expected-output-verification"><span>Expected Output &amp; Verification</span></a></h2>
+<div class="codeblock" data-lang="text"><div class="codeblock__bar"><span class="codeblock__lang">text</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-text" tabindex="0" role="group" aria-label="text code sample"><code class="language-text">HTTP/2 200
+2 0.041 0.068 148204
+{'rtt_ms': 20, 'bandwidth_mbps': 100, 'concurrency': 18, 'total_kb_in_window': 24414,
+ 'max_requests_in_window': 450, 'ideal_tile_kb': 54.3}
+{'rtt_ms': 80, 'bandwidth_mbps': 25, 'concurrency': 18, 'total_kb_in_window': 6104,
+ 'max_requests_in_window': 112, 'ideal_tile_kb': 54.5}
+{'rtt_ms': 80, 'bandwidth_mbps': 25, 'concurrency': 6, 'total_kb_in_window': 6104,
+ 'max_requests_in_window': 37, 'ideal_tile_kb': 164.9}
+┌─────────┬─────────┬──────────┬──────────────────┬─────────────────┬──────────────┬───────────────┬───────────────┐
+│ samples │protocol │peakConcur│ medianQueuedMs   │ p95QueuedMs     │ spanSeconds  │ effectiveMbps │ verdict       │
+│ 912     │ h2      │ 18       │ 4                │ 61              │ 2.58         │ 23.4          │ bandwidth-... │
+└─────────┴─────────┴──────────┴──────────────────┴─────────────────┴──────────────┴───────────────┴───────────────┘
+</code></pre></div>
+<p>A median queue time of 4 ms and an effective throughput within 10% of the link’s capacity is the target state: requests are not waiting, and the constraint is bandwidth, which is the only honest constraint. The <code>ideal_tile_kb</code> figures converging on about 54 KB for two very different links is a coincidence of those numbers and not a general rule — the six-concurrency row shows how much it moves.</p>
+<p>Verify the improvement rather than assuming it, by running the same session before and after:</p>
+<div class="codeblock" data-lang="javascript"><div class="codeblock__bar"><span class="codeblock__lang">javascript</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-javascript" tabindex="0" role="group" aria-label="javascript code sample"><code class="language-javascript"><span class="token keyword">export</span> <span class="token keyword">async</span> <span class="token keyword">function</span> <span class="token function">abComparison</span><span class="token punctuation">(</span><span class="token parameter">loadSession<span class="token punctuation">,</span> configs</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+  <span class="token keyword">const</span> results <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+  <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">const</span> cfg <span class="token keyword">of</span> configs<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+    performance<span class="token punctuation">.</span><span class="token function">clearResourceTimings</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token function">tuneRequestScheduler</span><span class="token punctuation">(</span>cfg<span class="token punctuation">.</span>protocol<span class="token punctuation">)</span><span class="token punctuation">;</span>
+    Cesium<span class="token punctuation">.</span>RequestScheduler<span class="token punctuation">.</span>maximumRequestsPerServer <span class="token operator">=</span> cfg<span class="token punctuation">.</span>perServer<span class="token punctuation">;</span>
+    <span class="token keyword">const</span> t0 <span class="token operator">=</span> performance<span class="token punctuation">.</span><span class="token function">now</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">await</span> <span class="token function">loadSession</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>                       <span class="token comment">// fly to a fixed view, await tiles settled</span>
+    <span class="token keyword">const</span> profile <span class="token operator">=</span> <span class="token function">concurrencyProfile</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    results<span class="token punctuation">.</span><span class="token function">push</span><span class="token punctuation">(</span><span class="token punctuation">{</span>
+      <span class="token literal-property property">label</span><span class="token operator">:</span> cfg<span class="token punctuation">.</span>label<span class="token punctuation">,</span>
+      <span class="token literal-property property">perServer</span><span class="token operator">:</span> cfg<span class="token punctuation">.</span>perServer<span class="token punctuation">,</span>
+      <span class="token literal-property property">wallSeconds</span><span class="token operator">:</span> <span class="token function">Number</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token punctuation">(</span>performance<span class="token punctuation">.</span><span class="token function">now</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">-</span> t0<span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token number">1000</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">toFixed</span><span class="token punctuation">(</span><span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+      <span class="token literal-property property">peakConcurrency</span><span class="token operator">:</span> profile<span class="token punctuation">.</span>peakConcurrency<span class="token punctuation">,</span>
+      <span class="token literal-property property">p95QueuedMs</span><span class="token operator">:</span> profile<span class="token punctuation">.</span>p95QueuedMs<span class="token punctuation">,</span>
+      <span class="token literal-property property">effectiveMbps</span><span class="token operator">:</span> profile<span class="token punctuation">.</span>effectiveMbps<span class="token punctuation">,</span>
+      <span class="token literal-property property">tiles</span><span class="token operator">:</span> profile<span class="token punctuation">.</span>samples<span class="token punctuation">,</span>
+    <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token punctuation">}</span>
+  <span class="token keyword">const</span> best <span class="token operator">=</span> results<span class="token punctuation">.</span><span class="token function">slice</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">sort</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">a<span class="token punctuation">,</span> b</span><span class="token punctuation">)</span> <span class="token operator">=></span> a<span class="token punctuation">.</span>wallSeconds <span class="token operator">-</span> b<span class="token punctuation">.</span>wallSeconds<span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+  <span class="token keyword">return</span> <span class="token punctuation">{</span> results<span class="token punctuation">,</span> <span class="token literal-property property">best</span><span class="token operator">:</span> best<span class="token punctuation">.</span>label<span class="token punctuation">,</span>
+           <span class="token literal-property property">spread</span><span class="token operator">:</span> <span class="token function">Number</span><span class="token punctuation">(</span><span class="token punctuation">(</span>Math<span class="token punctuation">.</span><span class="token function">max</span><span class="token punctuation">(</span><span class="token operator">...</span>results<span class="token punctuation">.</span><span class="token function">map</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">r</span><span class="token punctuation">)</span> <span class="token operator">=></span> r<span class="token punctuation">.</span>wallSeconds<span class="token punctuation">)</span><span class="token punctuation">)</span>
+                         <span class="token operator">-</span> Math<span class="token punctuation">.</span><span class="token function">min</span><span class="token punctuation">(</span><span class="token operator">...</span>results<span class="token punctuation">.</span><span class="token function">map</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">r</span><span class="token punctuation">)</span> <span class="token operator">=></span> r<span class="token punctuation">.</span>wallSeconds<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">toFixed</span><span class="token punctuation">(</span><span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">}</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+</code></pre></div>
+<p>Fixing the camera path and the tile set is what makes the comparison meaningful; a moving camera changes which tiles are requested and makes two runs incomparable. Clearing the resource timings between runs matters too, or the second run’s profile includes the first run’s entries.</p>
+<p>Then verify the server side under the burst, independently of any browser:</p>
+<div class="codeblock" data-lang="bash"><div class="codeblock__bar"><span class="codeblock__lang">bash</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-bash" tabindex="0" role="group" aria-label="bash code sample"><code class="language-bash">h2load <span class="token parameter variable">-n</span> <span class="token number">900</span> <span class="token parameter variable">-c</span> <span class="token number">1</span> <span class="token parameter variable">-m</span> <span class="token number">100</span> <span class="token parameter variable">--h1</span> https://tiles.example.com/city/b-7f3a9c21/content/0/0/0.glb <span class="token punctuation">\</span>
+  <span class="token operator"><span class="token file-descriptor important">2</span>></span><span class="token file-descriptor important">&amp;1</span> <span class="token operator">|</span> <span class="token function">grep</span> <span class="token parameter variable">-E</span> <span class="token string">"finished in|req/s|time for request"</span>
+
+h2load <span class="token parameter variable">-n</span> <span class="token number">900</span> <span class="token parameter variable">-c</span> <span class="token number">1</span> <span class="token parameter variable">-m</span> <span class="token number">100</span> https://tiles.example.com/city/b-7f3a9c21/content/0/0/0.glb <span class="token punctuation">\</span>
+  <span class="token operator"><span class="token file-descriptor important">2</span>></span><span class="token file-descriptor important">&amp;1</span> <span class="token operator">|</span> <span class="token function">grep</span> <span class="token parameter variable">-E</span> <span class="token string">"finished in|req/s|time for request"</span>
+</code></pre></div>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">server_burst_check</span><span class="token punctuation">(</span>h1_reqs_per_s<span class="token punctuation">,</span> h2_reqs_per_s<span class="token punctuation">,</span> min_speedup<span class="token operator">=</span><span class="token number">2.5</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    ratio <span class="token operator">=</span> h2_reqs_per_s <span class="token operator">/</span> <span class="token builtin">max</span><span class="token punctuation">(</span>h1_reqs_per_s<span class="token punctuation">,</span> <span class="token number">1e-9</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"h1_rps"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>h1_reqs_per_s<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"h2_rps"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>h2_reqs_per_s<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"speedup"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>ratio<span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"verdict"</span><span class="token punctuation">:</span> <span class="token string">"multiplexing working"</span> <span class="token keyword">if</span> ratio <span class="token operator">>=</span> min_speedup
+                       <span class="token keyword">else</span> <span class="token string">"h2 negotiated but not helping — check proxy or stream limit"</span><span class="token punctuation">}</span>
+
+<span class="token keyword">print</span><span class="token punctuation">(</span>server_burst_check<span class="token punctuation">(</span><span class="token number">148.2</span><span class="token punctuation">,</span> <span class="token number">612.9</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>An HTTP/2 run that is barely faster than HTTP/1.1 usually means something in the path is terminating HTTP/2 and re-issuing HTTP/1.1 upstream — a common load-balancer configuration — so the client sees <code>h2</code> while the origin connection is still six-at-a-time.</p>
+<h2 id="performance-notes" tabindex="-1"><a class="heading-link" href="#performance-notes"><span>Performance Notes</span></a></h2>
+<ul>
+<li><strong>One warm HTTP/2 connection beats four cold ones.</strong> Serve every tile from one origin, and serve the page’s own assets from it too if possible, so the connection is already established.</li>
+<li><strong><code>Alt-Svc</code> upgrades to HTTP/3 on the second visit</strong>, not the first. The first load stays on HTTP/2, so HTTP/3’s benefit appears in returning sessions.</li>
+<li><strong>HTTP/3 helps most on lossy links</strong> — mobile, congested wifi — where TCP head-of-line blocking stalls every stream on one lost packet.</li>
+<li><strong>Do not gzip <code>.glb</code>, <code>.ktx2</code> or <code>.subtree</code>.</strong> They are compressed already; gzip costs CPU and adds bytes.</li>
+<li><strong>Do gzip <code>tileset.json</code> and <code>.subtree</code> JSON.</strong> 8–12× on the file that gates every session.</li>
+<li><strong>Preconnect to the tile origin</strong> in the page head: <code>&lt;link rel=&quot;preconnect&quot; href=&quot;https://tiles.example.com&quot; crossorigin&gt;</code> removes the TLS handshake from the critical path.</li>
+<li><strong>Immutable URLs make repeat visits nearly free</strong>, which is the other half of this story — see <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/versioning-tilesets-with-immutable-prefixes/">versioning tilesets with immutable prefixes</a>.</li>
+</ul>
+<h2 id="common-errors" tabindex="-1"><a class="heading-link" href="#common-errors"><span>Common Errors</span></a></h2>
+<p><strong>Peak concurrency is exactly 6 despite <code>h2</code> in the network panel.</strong> A proxy is terminating HTTP/2 and using HTTP/1.1 upstream, or the panel is showing a cached entry. Check with <code>nghttp</code> against the origin.</p>
+<p><strong>Raising <code>maximumRequestsPerServer</code> made it slower.</strong> Past the bandwidth-delay product, extra streams only divide the pipe. The curve has a floor; find it by measurement.</p>
+<p><strong>Tiles are sharded across <code>tiles1</code>…<code>tiles4</code> subdomains.</strong> An HTTP/1.1-era optimisation that now costs four handshakes and four congestion windows. Consolidate.</p>
+<p><strong>Every tile shows a redirect.</strong> A trailing-slash or protocol redirect. Fix the base URL so tiles are fetched at their final location.</p>
+<p><strong>HTTP/3 never activates.</strong> UDP 443 blocked, or <code>Alt-Svc</code> not advertised. Both are common on corporate networks; HTTP/2 must remain a working fallback.</p>
+<p><strong>Throughput collapses when the camera moves fast.</strong> The scheduler is cancelling and re-issuing requests. Lower the concurrency so prioritisation has an effect, and check the prefetch logic.</p>
+<p><strong><code>gzip</code> on <code>.glb</code> makes files larger.</strong> Expected — they are already compressed. Turn it off per extension.</p>
+<h2 id="frequently-asked-questions" tabindex="-1"><a class="heading-link" href="#frequently-asked-questions"><span>Frequently Asked Questions</span></a></h2>
+<h3 id="is-http3-worth-enabling" tabindex="-1"><a class="heading-link" href="#is-http3-worth-enabling"><span>Is HTTP/3 worth enabling?</span></a></h3>
+<p>Yes, as an upgrade path rather than a replacement: advertise it, keep HTTP/2 working, and returning visitors on lossy links get the benefit. It is not worth restructuring anything for.</p>
+<h3 id="does-http2-server-push-help-tile-streaming" tabindex="-1"><a class="heading-link" href="#does-http2-server-push-help-tile-streaming"><span>Does HTTP/2 Server Push help tile streaming?</span></a></h3>
+<p>No. Push is deprecated and removed from most browsers, and it was never a good fit — the server cannot know which tiles the camera will need. Client-side prefetch is the right mechanism.</p>
+<h3 id="should-tiles-be-bundled-to-reduce-request-count" tabindex="-1"><a class="heading-link" href="#should-tiles-be-bundled-to-reduce-request-count"><span>Should tiles be bundled to reduce request count?</span></a></h3>
+<p>Implicit tiling’s subtree files already bundle availability data, and 3D Tiles has no content bundling. Where request count genuinely dominates, larger tiles are the available lever, and the sizing calculation above says how much larger.</p>
+<h2 id="related-guides" tabindex="-1"><a class="heading-link" href="#related-guides"><span>Related Guides</span></a></h2>
+<ul>
+<li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/prefetching-tiles-along-a-camera-path/">Prefetching Tiles Along a Camera Path</a> — deciding what to request, once the transport allows it</li>
+<li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/versioning-tilesets-with-immutable-prefixes/">Versioning Tilesets with Immutable Prefixes</a> — cache headers that make repeat visits free</li>
+<li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/load-testing-tile-servers-with-locust/">Load Testing Tile Servers with Locust</a> — measuring the server under a realistic burst</li>
+</ul>
+<p>Back to <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/">Streaming Sync Patterns</a>.</p>
+
+
+      
+      
+
+      <div class="related-nav">
+        
+
+        
+          <div>
+            <h3>Related</h3>
+            <div class="related-grid">
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/cache-invalidation-for-versioned-tilesets/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Cache Invalidation for Versioned Tilesets</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/prefetching-tiles-along-a-camera-path/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Prefetching Tiles Along a Camera Path</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/streaming-live-sensor-updates-onto-tilesets/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Streaming Live Sensor Updates onto Tilesets</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/tuning-tileset-cache-bytes-for-memory-constrained-clients/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Tuning Tileset Cache Bytes for Memory-Constrained Clients</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/versioning-tilesets-with-immutable-prefixes/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Versioning Tilesets with Immutable Prefixes</span>
+                </a>
+              
+            </div>
+          </div>
+        
+      </div>
+    </article>
+
+    
+    <aside class="toc" aria-label="On this page" data-toc hidden>
+      <h4>On this page</h4>
+      <ul></ul>
+    </aside>
+  </div>
+</div>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+  <div class="container site-footer__inner">
+    <div class="site-footer__brand">
+      <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+        <img src="/assets/img/logo-mark.svg" alt="" class="brand__mark" width="36" height="36">
+        <span class="brand__name">
+          3D Geospatial
+          <small>Digital Twin Automation</small>
+        </span>
+      </a>
+      <p>Engineering-grade guides on point cloud processing, mesh pipelines, LOD strategies, and CI/CD automation for digital twin platforms.</p>
+      <a class="footer-social" href="https://github.com/3d-geospatial" aria-label="3D Geospatial on GitHub" rel="noopener" target="_blank">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+          <path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.53-1.34-1.3-1.7-1.3-1.7-1.06-.72.08-.71.08-.71 1.17.08 1.79 1.2 1.79 1.2 1.04 1.79 2.73 1.27 3.4.97.1-.75.4-1.27.73-1.56-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.19-3.08-.12-.3-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.75.11 3.05.74.8 1.19 1.83 1.19 3.08 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.07.78 2.15v3.18c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5Z"/>
+        </svg>
+        <span>GitHub</span>
+      </a>
+    </div>
+
+    <div class="site-footer__col">
+      <h4>Sections</h4>
+      <ul>
+        <li><a href="https://www.3d-geospatial.com/">Home</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management &amp; Optimization</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/">Point Cloud &amp; Mesh Pipelines</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/">Troubleshooting &amp; Reliability</a></li>
+        
+      </ul>
+    </div>
+
+    
+      <div class="site-footer__col">
+        <h4>3D Geospatial Fundamentals</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/">3D Format Standards Comparison</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/">BIM and IFC Georeferencing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/">CityGML and CityJSON Processing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems for 3D Assets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/">Digital Elevation Model Workflows</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/">Spatial Indexing and Tiling Schemes for 3D Data</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>LOD Management &amp; Optimization</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/">Automated Tile Generation for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/">Cesium ion Upload Automation for 3D Tilesets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/">glTF LOD Generation With Draco Compression</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/">Streaming Sync Patterns for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/">Tileset Metadata and 3D Tiles Next</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/">Vector Overlays on 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Point Cloud &amp; Mesh Pipelines</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/">Automated Mesh Decimation for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/">Change Detection Between LiDAR Scan Epochs</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/">CI/CD Automation for Spatial Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">LiDAR Classification and Ground Extraction</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/photogrammetry-processing-pipelines/">Photogrammetry Processing Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/">Point Cloud Filtering Techniques</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/">Surface Reconstruction for Geospatial Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/">Texture Mapping Workflows for Digital Twins</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Troubleshooting &amp; Reliability</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/">Cross-Section Failure Modes in Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/">Data Validation &amp; QA Gates for 3D Tiles</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/">Performance Profiling and Benchmarking</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/">Pipeline Observability and Monitoring</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/">Streaming &amp; Runtime Diagnostics for 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+  </div>
+  <div class="container site-footer__bottom">
+    <span>© 2026 3D Geospatial &amp; Digital Twin Automation</span>
+    <span>Built with Eleventy · PWA-enabled</span>
+  </div>
+</footer>
+
+
+  <script src="/assets/js/site.js?v=b99aa9f971" defer></script>
+  
+</body>
+</html>

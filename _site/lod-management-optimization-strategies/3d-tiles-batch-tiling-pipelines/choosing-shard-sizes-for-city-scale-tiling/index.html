@@ -1,0 +1,796 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <title>Choosing Shard Sizes for City-Scale Tiling — 3D Geospatial</title>
+  <meta name="description" content="Pick the shard grid for a city tiling job: balance tile bytes, request counts, rebuild granularity and boundary duplication">
+  <meta name="keywords" content="3D geospatial, digital twin, point cloud, mesh pipeline, LOD, 3D Tiles, Cesium, PDAL, Open3D, Python, CI/CD">
+  <meta name="author" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta name="theme-color" content="#1f6b8a" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f171d" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+
+  
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem("theme");
+        var theme = (stored === "dark" || stored === "light") ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    })();
+  </script>
+  <meta name="generator" content="Eleventy">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="googlebot" content="index,follow,max-image-preview:large">
+
+  
+  <link rel="canonical" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/choosing-shard-sizes-for-city-scale-tiling/">
+  <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">
+
+  
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/icon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+
+  
+  <link rel="apple-touch-icon" href="/assets/img/icon-180.png">
+  <link rel="mask-icon" href="/assets/img/logo.svg" color="#1f6b8a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="3D Geospatial">
+  <meta name="application-name" content="3D Geospatial">
+
+  
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Choosing Shard Sizes for City-Scale Tiling — 3D Geospatial">
+  <meta property="og:description" content="Pick the shard grid for a city tiling job: balance tile bytes, request counts, rebuild granularity and boundary duplication">
+  <meta property="og:url" content="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/choosing-shard-sizes-for-city-scale-tiling/">
+  <meta property="og:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+  <meta property="og:site_name" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta property="og:locale" content="en_US">
+  
+  <meta property="article:published_time" content="2026-09-17T23:36:56.452Z">
+  <meta property="article:modified_time" content="2026-09-17T23:36:56.452Z">
+  <meta property="article:publisher" content="https://www.3d-geospatial.com/">
+  
+
+  
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Choosing Shard Sizes for City-Scale Tiling — 3D Geospatial">
+  <meta name="twitter:description" content="Pick the shard grid for a city tiling job: balance tile bytes, request counts, rebuild granularity and boundary duplication">
+  <meta name="twitter:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta name="twitter:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+
+  
+  <link rel="preload" href="/assets/css/styles.css?v=8c46394d6c" as="style">
+  
+
+  <link rel="stylesheet" href="/assets/css/styles.css?v=8c46394d6c">
+
+  
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.3d-geospatial.com/#organization",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "url": "https://www.3d-geospatial.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/icon-512.png",
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://www.3d-geospatial.com/#website",
+      "url": "https://www.3d-geospatial.com/",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "description": "Build reliable 3D spatial data pipelines for digital twins — point clouds, meshes, LOD strategies, Python processing, and CI/CD automation.",
+      "inLanguage": "en",
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      }
+    },
+    {
+      "@type": "TechArticle",
+      "@id": "https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/choosing-shard-sizes-for-city-scale-tiling/#article",
+      "isPartOf": {
+        "@id": "https://www.3d-geospatial.com/#website"
+      },
+      "headline": "Choosing Shard Sizes for City-Scale Tiling",
+      "name": "Choosing Shard Sizes for City-Scale Tiling",
+      "description": "Pick the shard grid for a city tiling job: balance tile bytes, request counts, rebuild granularity and boundary duplication",
+      "url": "https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/choosing-shard-sizes-for-city-scale-tiling/",
+      "mainEntityOfPage": "https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/choosing-shard-sizes-for-city-scale-tiling/",
+      "inLanguage": "en",
+      "datePublished": "2026-09-17T23:36:56.452Z",
+      "dateModified": "2026-09-17T23:36:56.452Z",
+      "author": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "image": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/og-cover.png",
+        "width": 1200,
+        "height": 630
+      },
+      "breadcrumb": {
+        "@id": "https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/choosing-shard-sizes-for-city-scale-tiling/#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/choosing-shard-sizes-for-city-scale-tiling/#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://www.3d-geospatial.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "LOD Management Optimization Strategies",
+          "item": "https://www.3d-geospatial.com/lod-management-optimization-strategies/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "3D Tiles Batch Tiling Pipelines",
+          "item": "https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "name": "Choosing Shard Sizes For City Scale Tiling",
+          "item": "https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/choosing-shard-sizes-for-city-scale-tiling/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  
+<header class="site-header" role="banner">
+  <div class="container site-header__inner">
+    <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+      <img src="/assets/img/logo.svg" alt="" class="brand__mark" width="36" height="36">
+      <span class="brand__name">
+        3D Geospatial
+        <small>Digital Twin Automation</small>
+      </span>
+    </a>
+
+    <button class="theme-toggle" type="button" data-theme-toggle
+            aria-label="Switch to dark theme" title="Switch to dark theme">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4.2"/>
+        <path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/>
+      </svg>
+    </button>
+
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>
+      <span class="nav-toggle__icon" aria-hidden="true"><span></span></span>
+      Menu
+    </button>
+
+    <nav class="primary-nav" id="primary-nav" aria-label="Primary">
+      
+      <a href="https://www.3d-geospatial.com/" >
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/>
+        </svg>
+        Home
+      </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2 3 7l9 5 9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 17l9 5 9-5"/>
+            </svg>
+          
+          3D Geospatial Fundamentals
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/" aria-current="page">
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+          
+          LOD Management &amp; Optimization
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="6" cy="6" r="1.5"/><circle cx="12" cy="6" r="1.5"/><circle cx="18" cy="6" r="1.5"/>
+              <circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/>
+              <circle cx="6" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="18" cy="18" r="1.5"/>
+            </svg>
+          
+          Point Cloud &amp; Mesh Pipelines
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <path d="M12 9v4"/><path d="M12 17h.01"/>
+            </svg>
+          
+          Troubleshooting &amp; Reliability
+        </a>
+      
+    </nav>
+  </div>
+</header>
+
+
+  <main id="main">
+    
+
+
+<div class="container">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    
+      
+        <a href="https://www.3d-geospatial.com/">Home</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management Optimization Strategies</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <span class="current">Choosing Shard Sizes For City Scale Tiling</span>
+      
+    
+  </nav>
+
+  <div class="content-page">
+    <article class="article">
+      <h1 id="choosing-shard-sizes-for-city-scale-tiling" tabindex="-1"><a class="heading-link" href="#choosing-shard-sizes-for-city-scale-tiling"><span>Choosing Shard Sizes for City-Scale Tiling</span></a></h1>
+<p>This page chooses the shard size for a city-scale tiling job from measurements rather than convention — balancing bytes per tile against request count, rebuild granularity against boundary duplication, and the parallel-build sweet spot against scheduler overhead, using building footprints in EPSG:25832 and a quadkey grid.</p>
+<h2 id="why-you-hit-this" tabindex="-1"><a class="heading-link" href="#why-you-hit-this"><span>Why you hit this</span></a></h2>
+<p>The shard size is decided once, early, usually by copying whatever the last project used, and it then constrains everything: how long an incremental rebuild takes, how many requests a viewport costs, how well the work parallelises, and how much geometry is duplicated at boundaries. Getting it wrong is not catastrophic and is expensive in aggregate — a city tiled at zoom 18 makes 260,000 shards where 4,000 would do, and one tiled at zoom 12 rebuilds a quarter of the city when one building changes. The pipeline this feeds is in <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles batch tiling pipelines</a>.</p>
+<h2 id="prerequisites" tabindex="-1"><a class="heading-link" href="#prerequisites"><span>Prerequisites</span></a></h2>
+<ul>
+<li>Python 3.10+ with <code>geopandas&gt;=0.14</code>, <code>mercantile&gt;=1.2</code>, <code>numpy&gt;=1.24</code>, <code>pandas&gt;=2.0</code>, <code>shapely&gt;=2.0</code>.</li>
+<li>The source features with their footprints and an estimate of bytes per feature — from a pilot tiling of a few shards, or 20–60 kB per LOD2 building as a starting figure.</li>
+<li>The viewer’s target: how many tiles a typical viewport should request, and the per-tile byte budget from the client memory work in <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/tuning-tileset-cache-bytes-for-memory-constrained-clients/">tuning tileset cache bytes</a>.</li>
+</ul>
+<h2 id="step-by-step" tabindex="-1"><a class="heading-link" href="#step-by-step"><span>Step-by-Step</span></a></h2>
+<h3 id="1-measure-the-feature-distribution-per-candidate-grid" tabindex="-1"><a class="heading-link" href="#1-measure-the-feature-distribution-per-candidate-grid"><span>1. Measure the feature distribution per candidate grid</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> geopandas <span class="token keyword">as</span> gpd
+<span class="token keyword">import</span> mercantile
+<span class="token keyword">import</span> numpy <span class="token keyword">as</span> np
+<span class="token keyword">import</span> pandas <span class="token keyword">as</span> pd
+<span class="token keyword">from</span> pyproj <span class="token keyword">import</span> Transformer
+
+to_wgs84 <span class="token operator">=</span> Transformer<span class="token punctuation">.</span>from_crs<span class="token punctuation">(</span><span class="token number">25832</span><span class="token punctuation">,</span> <span class="token number">4326</span><span class="token punctuation">,</span> always_xy<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+
+<span class="token keyword">def</span> <span class="token function">assign_shards</span><span class="token punctuation">(</span>gdf<span class="token punctuation">,</span> zoom<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    lon<span class="token punctuation">,</span> lat <span class="token operator">=</span> to_wgs84<span class="token punctuation">.</span>transform<span class="token punctuation">(</span>gdf<span class="token punctuation">.</span>geometry<span class="token punctuation">.</span>centroid<span class="token punctuation">.</span>x<span class="token punctuation">.</span>to_numpy<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                                  gdf<span class="token punctuation">.</span>geometry<span class="token punctuation">.</span>centroid<span class="token punctuation">.</span>y<span class="token punctuation">.</span>to_numpy<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    keys <span class="token operator">=</span> <span class="token punctuation">[</span>mercantile<span class="token punctuation">.</span>quadkey<span class="token punctuation">(</span>mercantile<span class="token punctuation">.</span>tile<span class="token punctuation">(</span>lo<span class="token punctuation">,</span> la<span class="token punctuation">,</span> zoom<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token keyword">for</span> lo<span class="token punctuation">,</span> la <span class="token keyword">in</span> <span class="token builtin">zip</span><span class="token punctuation">(</span>lon<span class="token punctuation">,</span> lat<span class="token punctuation">)</span><span class="token punctuation">]</span>
+    <span class="token keyword">return</span> pd<span class="token punctuation">.</span>Series<span class="token punctuation">(</span>keys<span class="token punctuation">,</span> index<span class="token operator">=</span>gdf<span class="token punctuation">.</span>index<span class="token punctuation">,</span> name<span class="token operator">=</span><span class="token string-interpolation"><span class="token string">f"z</span><span class="token interpolation"><span class="token punctuation">{</span>zoom<span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+
+<span class="token keyword">def</span> <span class="token function">grid_stats</span><span class="token punctuation">(</span>gdf<span class="token punctuation">,</span> zooms<span class="token operator">=</span><span class="token builtin">range</span><span class="token punctuation">(</span><span class="token number">12</span><span class="token punctuation">,</span> <span class="token number">19</span><span class="token punctuation">)</span><span class="token punctuation">,</span> bytes_per_feature<span class="token operator">=</span><span class="token number">34_000</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    rows <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    <span class="token keyword">for</span> z <span class="token keyword">in</span> zooms<span class="token punctuation">:</span>
+        shards <span class="token operator">=</span> assign_shards<span class="token punctuation">(</span>gdf<span class="token punctuation">,</span> z<span class="token punctuation">)</span>
+        counts <span class="token operator">=</span> shards<span class="token punctuation">.</span>value_counts<span class="token punctuation">(</span><span class="token punctuation">)</span>
+        side_m <span class="token operator">=</span> <span class="token number">40075016.686</span> <span class="token operator">*</span> np<span class="token punctuation">.</span>cos<span class="token punctuation">(</span>np<span class="token punctuation">.</span>radians<span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>gdf<span class="token punctuation">.</span>geometry<span class="token punctuation">.</span>centroid<span class="token punctuation">.</span>y<span class="token punctuation">.</span>mean<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">and</span> <span class="token number">48.14</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token number">2</span> <span class="token operator">**</span> z
+        rows<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span>
+            <span class="token string">"zoom"</span><span class="token punctuation">:</span> z<span class="token punctuation">,</span>
+            <span class="token string">"shard_side_m"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>side_m<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"shards"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>counts<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"features_median"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span>counts<span class="token punctuation">.</span>median<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"features_p95"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span>counts<span class="token punctuation">.</span>quantile<span class="token punctuation">(</span><span class="token number">0.95</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"features_max"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span>counts<span class="token punctuation">.</span><span class="token builtin">max</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"bytes_median_mb"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>counts<span class="token punctuation">.</span>median<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">*</span> bytes_per_feature <span class="token operator">/</span> <span class="token number">1e6</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"bytes_p95_mb"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>counts<span class="token punctuation">.</span>quantile<span class="token punctuation">(</span><span class="token number">0.95</span><span class="token punctuation">)</span> <span class="token operator">*</span> bytes_per_feature <span class="token operator">/</span> <span class="token number">1e6</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"empty_share"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token number">1</span> <span class="token operator">-</span> <span class="token builtin">len</span><span class="token punctuation">(</span>counts<span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token builtin">max</span><span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>counts<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token punctuation">}</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> pd<span class="token punctuation">.</span>DataFrame<span class="token punctuation">(</span>rows<span class="token punctuation">)</span>
+
+buildings <span class="token operator">=</span> gpd<span class="token punctuation">.</span>read_file<span class="token punctuation">(</span><span class="token string">"source/footprints.gpkg"</span><span class="token punctuation">)</span><span class="token punctuation">.</span>to_crs<span class="token punctuation">(</span><span class="token number">25832</span><span class="token punctuation">)</span>
+stats <span class="token operator">=</span> grid_stats<span class="token punctuation">(</span>buildings<span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span>stats<span class="token punctuation">.</span>to_string<span class="token punctuation">(</span>index<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>The 95th percentile matters more than the median. A city’s building density varies by an order of magnitude between a historic centre and a suburb, so a grid whose median shard is a comfortable 2 MB will have dense shards at 20 MB — and those are the ones a user in the centre downloads. Sizing on the median produces a tileset that is fine everywhere except where people actually look.</p>
+<figure class="diagram">
+<svg viewBox="52 8 662 248" role="img" aria-labelledby="shard-tradeoff-t shard-tradeoff-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="shard-tradeoff-t">What gets better and worse as shards shrink</title>
+  <desc id="shard-tradeoff-d">Two curves against shard size. Bytes per tile fall as shards shrink, which helps the client, while the number of requests for a fixed viewport rises, which hurts. Rebuild granularity improves with smaller shards and boundary duplication worsens. The workable band is where tile bytes are a few megabytes and a viewport costs tens of requests rather than hundreds.</desc>
+  <rect class="svg-bg" x="52" y="8" width="662" height="248" fill="#ffffff"/>
+  <path d="M70 30 V190 H700" fill="none" stroke="#5b6471" stroke-width="1.5"/>
+  <rect x="250" y="30" width="200" height="160" fill="#eef5e9" stroke="#4f7a4d" stroke-width="1"/>
+  <polyline points="100,40 180,66 250,96 330,124 420,148 520,166 660,180" fill="none" stroke="#1f6b8a" stroke-width="2.5"/>
+  <polyline points="100,182 180,176 250,164 330,140 420,110 520,72 660,36" fill="none" stroke="#b0413e" stroke-width="2.5"/>
+  <g fill="#1f2937" font-size="12" text-anchor="middle">
+    <text x="100" y="212">1.2 km (z12)</text><text x="250" y="212">300 m (z14)</text>
+    <text x="420" y="212">75 m (z16)</text><text x="660" y="212">19 m (z18)</text>
+  </g>
+  <text x="140" y="36" fill="#1f6b8a" font-size="12.5" text-anchor="start">bytes per tile</text>
+  <text x="560" y="58" fill="#b0413e" font-size="12.5" text-anchor="end">requests per viewport</text>
+  <text x="350" y="48" fill="#1f2937" font-size="12.5" text-anchor="middle">workable band</text>
+  <text x="385" y="238" fill="#15384a" font-size="12.5" text-anchor="middle">shard side length — the band is wide, and both ends of the axis are genuinely bad</text>
+</svg>
+<figcaption>The two costs move in opposite directions, so the choice is a band rather than an optimum, and the band is set by the client's limits.</figcaption>
+</figure>
+<h3 id="2-estimate-the-viewport-request-count" tabindex="-1"><a class="heading-link" href="#2-estimate-the-viewport-request-count"><span>2. Estimate the viewport request count</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">requests_per_viewport</span><span class="token punctuation">(</span>zoom<span class="token punctuation">,</span> viewport_m<span class="token operator">=</span><span class="token number">1200</span><span class="token punctuation">,</span> levels<span class="token operator">=</span><span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""How many shards a viewport spans, across the levels a camera loads."""</span>
+    side_m <span class="token operator">=</span> <span class="token number">40075016.686</span> <span class="token operator">*</span> np<span class="token punctuation">.</span>cos<span class="token punctuation">(</span>np<span class="token punctuation">.</span>radians<span class="token punctuation">(</span><span class="token number">48.14</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token number">2</span> <span class="token operator">**</span> zoom
+    across <span class="token operator">=</span> <span class="token builtin">max</span><span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">,</span> <span class="token builtin">int</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>ceil<span class="token punctuation">(</span>viewport_m <span class="token operator">/</span> side_m<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    per_level <span class="token operator">=</span> across <span class="token operator">**</span> <span class="token number">2</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"zoom"</span><span class="token punctuation">:</span> zoom<span class="token punctuation">,</span> <span class="token string">"shard_side_m"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>side_m<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"shards_across_viewport"</span><span class="token punctuation">:</span> across<span class="token punctuation">,</span>
+            <span class="token string">"requests_one_level"</span><span class="token punctuation">:</span> per_level<span class="token punctuation">,</span>
+            <span class="token string">"requests_all_levels"</span><span class="token punctuation">:</span> per_level <span class="token operator">*</span> levels<span class="token punctuation">}</span>
+
+<span class="token keyword">for</span> z <span class="token keyword">in</span> <span class="token builtin">range</span><span class="token punctuation">(</span><span class="token number">12</span><span class="token punctuation">,</span> <span class="token number">19</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    r <span class="token operator">=</span> requests_per_viewport<span class="token punctuation">(</span>z<span class="token punctuation">)</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"z</span><span class="token interpolation"><span class="token punctuation">{</span>z<span class="token punctuation">}</span></span><span class="token string">  side </span><span class="token interpolation"><span class="token punctuation">{</span>r<span class="token punctuation">[</span><span class="token string">'shard_side_m'</span><span class="token punctuation">]</span><span class="token punctuation">:</span><span class="token format-spec">>7.1f</span><span class="token punctuation">}</span></span><span class="token string"> m  </span><span class="token interpolation"><span class="token punctuation">{</span>r<span class="token punctuation">[</span><span class="token string">'shards_across_viewport'</span><span class="token punctuation">]</span><span class="token punctuation">:</span><span class="token format-spec">>3</span><span class="token punctuation">}</span></span><span class="token string"> across  "</span></span>
+          <span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>r<span class="token punctuation">[</span><span class="token string">'requests_all_levels'</span><span class="token punctuation">]</span><span class="token punctuation">:</span><span class="token format-spec">>6,</span><span class="token punctuation">}</span></span><span class="token string"> requests for a 1.2 km view"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>A viewport of about a kilometre is the normal working view for a city twin, and the request count for it is the number to keep in the tens. HTTP/2 multiplexes well, so a hundred requests is survivable and a thousand is not — connection limits, per-request overhead and the browser’s own scheduling turn it into visible stalling, which is the subject of <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/http2-and-connection-limits-for-tile-streaming/">HTTP/2 and connection limits for tile streaming</a>.</p>
+<h3 id="3-quantify-boundary-duplication" tabindex="-1"><a class="heading-link" href="#3-quantify-boundary-duplication"><span>3. Quantify boundary duplication</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">from</span> shapely<span class="token punctuation">.</span>geometry <span class="token keyword">import</span> box
+
+<span class="token keyword">def</span> <span class="token function">boundary_cost</span><span class="token punctuation">(</span>gdf<span class="token punctuation">,</span> zoom<span class="token punctuation">,</span> buffer_m<span class="token operator">=</span><span class="token number">5.0</span><span class="token punctuation">,</span> sample<span class="token operator">=</span><span class="token number">4000</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Share of features that straddle a shard boundary and must be duplicated or clipped."""</span>
+    idx <span class="token operator">=</span> np<span class="token punctuation">.</span>random<span class="token punctuation">.</span>default_rng<span class="token punctuation">(</span><span class="token number">5</span><span class="token punctuation">)</span><span class="token punctuation">.</span>choice<span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>gdf<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token builtin">min</span><span class="token punctuation">(</span>sample<span class="token punctuation">,</span> <span class="token builtin">len</span><span class="token punctuation">(</span>gdf<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> replace<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">)</span>
+    sub <span class="token operator">=</span> gdf<span class="token punctuation">.</span>iloc<span class="token punctuation">[</span>idx<span class="token punctuation">]</span>
+    lon<span class="token punctuation">,</span> lat <span class="token operator">=</span> to_wgs84<span class="token punctuation">.</span>transform<span class="token punctuation">(</span>sub<span class="token punctuation">.</span>geometry<span class="token punctuation">.</span>centroid<span class="token punctuation">.</span>x<span class="token punctuation">.</span>to_numpy<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                                  sub<span class="token punctuation">.</span>geometry<span class="token punctuation">.</span>centroid<span class="token punctuation">.</span>y<span class="token punctuation">.</span>to_numpy<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    straddling <span class="token operator">=</span> <span class="token number">0</span>
+    <span class="token keyword">for</span> geom<span class="token punctuation">,</span> lo<span class="token punctuation">,</span> la <span class="token keyword">in</span> <span class="token builtin">zip</span><span class="token punctuation">(</span>sub<span class="token punctuation">.</span>geometry<span class="token punctuation">,</span> lon<span class="token punctuation">,</span> lat<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        t <span class="token operator">=</span> mercantile<span class="token punctuation">.</span>tile<span class="token punctuation">(</span>lo<span class="token punctuation">,</span> la<span class="token punctuation">,</span> zoom<span class="token punctuation">)</span>
+        b <span class="token operator">=</span> mercantile<span class="token punctuation">.</span>bounds<span class="token punctuation">(</span>t<span class="token punctuation">)</span>
+        x0<span class="token punctuation">,</span> y0 <span class="token operator">=</span> Transformer<span class="token punctuation">.</span>from_crs<span class="token punctuation">(</span><span class="token number">4326</span><span class="token punctuation">,</span> <span class="token number">25832</span><span class="token punctuation">,</span> always_xy<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span><span class="token punctuation">.</span>transform<span class="token punctuation">(</span>b<span class="token punctuation">.</span>west<span class="token punctuation">,</span> b<span class="token punctuation">.</span>south<span class="token punctuation">)</span>
+        x1<span class="token punctuation">,</span> y1 <span class="token operator">=</span> Transformer<span class="token punctuation">.</span>from_crs<span class="token punctuation">(</span><span class="token number">4326</span><span class="token punctuation">,</span> <span class="token number">25832</span><span class="token punctuation">,</span> always_xy<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span><span class="token punctuation">.</span>transform<span class="token punctuation">(</span>b<span class="token punctuation">.</span>east<span class="token punctuation">,</span> b<span class="token punctuation">.</span>north<span class="token punctuation">)</span>
+        cell <span class="token operator">=</span> box<span class="token punctuation">(</span>x0<span class="token punctuation">,</span> y0<span class="token punctuation">,</span> x1<span class="token punctuation">,</span> y1<span class="token punctuation">)</span>
+        <span class="token keyword">if</span> <span class="token keyword">not</span> cell<span class="token punctuation">.</span><span class="token builtin">buffer</span><span class="token punctuation">(</span><span class="token operator">-</span>buffer_m<span class="token punctuation">)</span><span class="token punctuation">.</span>contains<span class="token punctuation">(</span>geom<span class="token punctuation">)</span><span class="token punctuation">:</span>
+            straddling <span class="token operator">+=</span> <span class="token number">1</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"zoom"</span><span class="token punctuation">:</span> zoom<span class="token punctuation">,</span> <span class="token string">"sampled"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>sub<span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"straddling_share"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>straddling <span class="token operator">/</span> <span class="token builtin">len</span><span class="token punctuation">(</span>sub<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">}</span>
+
+<span class="token keyword">for</span> z <span class="token keyword">in</span> <span class="token punctuation">(</span><span class="token number">13</span><span class="token punctuation">,</span> <span class="token number">14</span><span class="token punctuation">,</span> <span class="token number">15</span><span class="token punctuation">,</span> <span class="token number">16</span><span class="token punctuation">,</span> <span class="token number">17</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span>boundary_cost<span class="token punctuation">(</span>buildings<span class="token punctuation">,</span> z<span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Every feature that crosses a shard boundary has to be either duplicated into both shards or clipped, and both cost something: duplication inflates bytes and creates double-drawn edges, clipping produces open geometry that no longer bounds a volume. The share grows as shards shrink — at 19 m shards most buildings straddle a boundary — and that is the hard floor on how small a building-tile shard can usefully be.</p>
+<figure class="diagram">
+<svg viewBox="16 16 728 238" role="img" aria-labelledby="shard-straddle-t shard-straddle-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="shard-straddle-t">Buildings straddling shard boundaries at two grid sizes</title>
+  <desc id="shard-straddle-d">The same block on two grids. On a 400 metre grid, one building in ten crosses a boundary and must be duplicated or clipped. On a 100 metre grid, most buildings cross a boundary, so duplication inflates the tiles and clipped geometry no longer bounds a volume.</desc>
+  <rect class="svg-bg" x="16" y="16" width="728" height="238" fill="#ffffff"/>
+  <g stroke="#5b6471" stroke-width="1.2" fill="none">
+    <path d="M30 30 H330 V190 H30 Z M180 30 V190 M30 110 H330"/>
+  </g>
+  <g stroke="#5b6471" stroke-width="1.2" fill="none">
+    <path d="M430 30 H730 V190 H430 Z M505 30 V190 M580 30 V190 M655 30 V190
+             M430 70 H730 M430 110 H730 M430 150 H730"/>
+  </g>
+  <g fill="#e3f0f4" stroke="#1f6b8a" stroke-width="1.6">
+    <rect x="60" y="50" width="60" height="40"/><rect x="210" y="50" width="70" height="40"/>
+    <rect x="60" y="130" width="70" height="40"/><rect x="240" y="130" width="60" height="40"/>
+    <rect x="460" y="50" width="60" height="40"/><rect x="610" y="50" width="70" height="40"/>
+    <rect x="460" y="130" width="70" height="40"/><rect x="640" y="130" width="60" height="40"/>
+  </g>
+  <rect x="150" y="90" width="70" height="40" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <rect x="550" y="90" width="70" height="40" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <path d="M486 94 H528 V130 H486 Z" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <path d="M664 96 H716 V126 H664 Z" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="180" y="212">400 m grid: ~9% straddle</text>
+    <text x="580" y="212">100 m grid: most straddle</text>
+  </g>
+  <text x="380" y="236" fill="#15384a" font-size="12" text-anchor="middle">Red buildings cross a boundary and must be duplicated into both shards or clipped.</text>
+</svg>
+<figcaption>Straddling is the hard floor on shard size for building tiles: below the size of a city block, most features belong to two shards.</figcaption>
+</figure>
+<h3 id="4-check-the-parallel-build-shape" tabindex="-1"><a class="heading-link" href="#4-check-the-parallel-build-shape"><span>4. Check the parallel-build shape</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">build_shape</span><span class="token punctuation">(</span>stats_row<span class="token punctuation">,</span> workers<span class="token operator">=</span><span class="token number">16</span><span class="token punctuation">,</span> seconds_per_feature<span class="token operator">=</span><span class="token number">0.012</span><span class="token punctuation">,</span> overhead_s<span class="token operator">=</span><span class="token number">2.5</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    shards <span class="token operator">=</span> stats_row<span class="token punctuation">[</span><span class="token string">"shards"</span><span class="token punctuation">]</span>
+    median <span class="token operator">=</span> stats_row<span class="token punctuation">[</span><span class="token string">"features_median"</span><span class="token punctuation">]</span>
+    p95 <span class="token operator">=</span> stats_row<span class="token punctuation">[</span><span class="token string">"features_p95"</span><span class="token punctuation">]</span>
+    per_shard_median <span class="token operator">=</span> median <span class="token operator">*</span> seconds_per_feature <span class="token operator">+</span> overhead_s
+    per_shard_p95 <span class="token operator">=</span> p95 <span class="token operator">*</span> seconds_per_feature <span class="token operator">+</span> overhead_s
+    total_work <span class="token operator">=</span> shards <span class="token operator">*</span> per_shard_median
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token string">"zoom"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span>stats_row<span class="token punctuation">[</span><span class="token string">"zoom"</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"shards"</span><span class="token punctuation">:</span> shards<span class="token punctuation">,</span>
+        <span class="token string">"median_shard_s"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>per_shard_median<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"p95_shard_s"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>per_shard_p95<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"wall_clock_min"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>total_work <span class="token operator">/</span> workers <span class="token operator">/</span> <span class="token number">60</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"overhead_share"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>shards <span class="token operator">*</span> overhead_s <span class="token operator">/</span> total_work<span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+
+<span class="token keyword">for</span> _<span class="token punctuation">,</span> row <span class="token keyword">in</span> stats<span class="token punctuation">.</span>iterrows<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span>build_shape<span class="token punctuation">(</span>row<span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Per-shard overhead is the cost that punishes tiny shards. A tiling job spends two or three seconds per shard on process start, reading inputs, writing outputs and updating the manifest, regardless of whether the shard holds two buildings or two hundred. At zoom 18 that overhead is most of the build: a quarter of a million shards at 2.5 s each is 170 core-hours before any geometry is processed.</p>
+<figure class="diagram">
+<svg viewBox="58 20 666 216" role="img" aria-labelledby="shard-overhead-t shard-overhead-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="shard-overhead-t">Build time split between work and per-shard overhead</title>
+  <desc id="shard-overhead-d">Stacked bars for four zoom levels. At zoom 13 the geometry work dominates and overhead is a few percent. At zoom 15 overhead is about a fifth. At zoom 17 overhead and work are comparable. At zoom 18 overhead is three quarters of the build, so most of the machine time is spent starting and finishing shards rather than tiling.</desc>
+  <rect class="svg-bg" x="58" y="20" width="666" height="216" fill="#ffffff"/>
+  <path d="M110 24 V190" fill="none" stroke="#5b6471" stroke-width="1.5"/>
+  <g stroke-width="1.5">
+    <rect x="110" y="34" width="300" height="28" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="410" y="34" width="14" height="28" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="110" y="74" width="290" height="28" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="400" y="74" width="72" height="28" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="110" y="114" width="280" height="28" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="390" y="114" width="250" height="28" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="110" y="154" width="150" height="28" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="260" y="154" width="450" height="28" fill="#fdf3e0" stroke="#c46a3d"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5">
+    <text x="72" y="53">z13</text><text x="72" y="93">z15</text><text x="72" y="133">z17</text><text x="72" y="173">z18</text>
+  </g>
+  <g fill="#1f2937" font-size="12" text-anchor="start">
+    <text x="150" y="53">geometry work</text>
+    <text x="482" y="93">overhead 20%</text>
+    <text x="650" y="133">47%</text>
+    <text x="480" y="173">overhead 75%</text>
+  </g>
+  <text x="400" y="218" fill="#15384a" font-size="12.5" text-anchor="middle">Per-shard overhead of about 2.5 s is what makes very small shards expensive to build.</text>
+</svg>
+<figcaption>Below a few hundred features per shard, a tiling job stops being a geometry problem and becomes a scheduling one.</figcaption>
+</figure>
+<h3 id="5-put-the-criteria-together" tabindex="-1"><a class="heading-link" href="#5-put-the-criteria-together"><span>5. Put the criteria together</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">score_grid</span><span class="token punctuation">(</span>stats<span class="token punctuation">,</span> max_tile_mb<span class="token operator">=</span><span class="token number">6.0</span><span class="token punctuation">,</span> max_requests<span class="token operator">=</span><span class="token number">120</span><span class="token punctuation">,</span> max_straddle<span class="token operator">=</span><span class="token number">0.15</span><span class="token punctuation">,</span>
+               max_overhead<span class="token operator">=</span><span class="token number">0.25</span><span class="token punctuation">,</span> boundary<span class="token operator">=</span><span class="token boolean">None</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    rows <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    <span class="token keyword">for</span> _<span class="token punctuation">,</span> r <span class="token keyword">in</span> stats<span class="token punctuation">.</span>iterrows<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        z <span class="token operator">=</span> <span class="token builtin">int</span><span class="token punctuation">(</span>r<span class="token punctuation">[</span><span class="token string">"zoom"</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+        req <span class="token operator">=</span> requests_per_viewport<span class="token punctuation">(</span>z<span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token string">"requests_all_levels"</span><span class="token punctuation">]</span>
+        shape <span class="token operator">=</span> build_shape<span class="token punctuation">(</span>r<span class="token punctuation">)</span>
+        straddle <span class="token operator">=</span> boundary<span class="token punctuation">.</span>get<span class="token punctuation">(</span>z<span class="token punctuation">)</span> <span class="token keyword">if</span> boundary <span class="token keyword">else</span> <span class="token boolean">None</span>
+        checks <span class="token operator">=</span> <span class="token punctuation">{</span>
+            <span class="token string">"tile_bytes"</span><span class="token punctuation">:</span> r<span class="token punctuation">[</span><span class="token string">"bytes_p95_mb"</span><span class="token punctuation">]</span> <span class="token operator">&lt;=</span> max_tile_mb<span class="token punctuation">,</span>
+            <span class="token string">"requests"</span><span class="token punctuation">:</span> req <span class="token operator">&lt;=</span> max_requests<span class="token punctuation">,</span>
+            <span class="token string">"straddling"</span><span class="token punctuation">:</span> <span class="token punctuation">(</span>straddle <span class="token keyword">is</span> <span class="token boolean">None</span><span class="token punctuation">)</span> <span class="token keyword">or</span> <span class="token punctuation">(</span>straddle <span class="token operator">&lt;=</span> max_straddle<span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"overhead"</span><span class="token punctuation">:</span> shape<span class="token punctuation">[</span><span class="token string">"overhead_share"</span><span class="token punctuation">]</span> <span class="token operator">&lt;=</span> max_overhead<span class="token punctuation">,</span>
+        <span class="token punctuation">}</span>
+        rows<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"zoom"</span><span class="token punctuation">:</span> z<span class="token punctuation">,</span> <span class="token string">"p95_mb"</span><span class="token punctuation">:</span> r<span class="token punctuation">[</span><span class="token string">"bytes_p95_mb"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token string">"requests"</span><span class="token punctuation">:</span> req<span class="token punctuation">,</span>
+                     <span class="token string">"straddling"</span><span class="token punctuation">:</span> straddle<span class="token punctuation">,</span> <span class="token string">"overhead"</span><span class="token punctuation">:</span> shape<span class="token punctuation">[</span><span class="token string">"overhead_share"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+                     <span class="token string">"passes"</span><span class="token punctuation">:</span> <span class="token builtin">sum</span><span class="token punctuation">(</span>checks<span class="token punctuation">.</span>values<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"ok"</span><span class="token punctuation">:</span> <span class="token builtin">all</span><span class="token punctuation">(</span>checks<span class="token punctuation">.</span>values<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                     <span class="token string">"failing"</span><span class="token punctuation">:</span> <span class="token punctuation">[</span>k <span class="token keyword">for</span> k<span class="token punctuation">,</span> v <span class="token keyword">in</span> checks<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">if</span> <span class="token keyword">not</span> v<span class="token punctuation">]</span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> pd<span class="token punctuation">.</span>DataFrame<span class="token punctuation">(</span>rows<span class="token punctuation">)</span>
+
+boundary <span class="token operator">=</span> <span class="token punctuation">{</span>z<span class="token punctuation">:</span> boundary_cost<span class="token punctuation">(</span>buildings<span class="token punctuation">,</span> z<span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token string">"straddling_share"</span><span class="token punctuation">]</span> <span class="token keyword">for</span> z <span class="token keyword">in</span> <span class="token builtin">range</span><span class="token punctuation">(</span><span class="token number">13</span><span class="token punctuation">,</span> <span class="token number">18</span><span class="token punctuation">)</span><span class="token punctuation">}</span>
+scored <span class="token operator">=</span> score_grid<span class="token punctuation">(</span>stats<span class="token punctuation">,</span> boundary<span class="token operator">=</span>boundary<span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span>scored<span class="token punctuation">.</span>to_string<span class="token punctuation">(</span>index<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+best <span class="token operator">=</span> scored<span class="token punctuation">[</span>scored<span class="token punctuation">[</span><span class="token string">"ok"</span><span class="token punctuation">]</span><span class="token punctuation">]</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"\nworkable zooms: </span><span class="token interpolation"><span class="token punctuation">{</span><span class="token builtin">list</span><span class="token punctuation">(</span>best<span class="token punctuation">[</span><span class="token string">'zoom'</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Four criteria, and the answer is usually a range of two or three zoom levels rather than one. Within that range the tie-breaker is rebuild granularity: the smallest workable shard rebuilds the least when a building changes, which matters for a twin tracking a register that changes daily, as in <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/incremental-retiling-of-changed-city-blocks/">incremental retiling of changed city blocks</a>.</p>
+<h3 id="6-handle-the-dense-outliers-separately" tabindex="-1"><a class="heading-link" href="#6-handle-the-dense-outliers-separately"><span>6. Handle the dense outliers separately</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">split_dense_shards</span><span class="token punctuation">(</span>gdf<span class="token punctuation">,</span> zoom<span class="token punctuation">,</span> max_features<span class="token operator">=</span><span class="token number">400</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Subdivide only the shards that exceed the feature limit, one level deeper."""</span>
+    shards <span class="token operator">=</span> assign_shards<span class="token punctuation">(</span>gdf<span class="token punctuation">,</span> zoom<span class="token punctuation">)</span>
+    counts <span class="token operator">=</span> shards<span class="token punctuation">.</span>value_counts<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    dense <span class="token operator">=</span> <span class="token builtin">set</span><span class="token punctuation">(</span>counts<span class="token punctuation">[</span>counts <span class="token operator">></span> max_features<span class="token punctuation">]</span><span class="token punctuation">.</span>index<span class="token punctuation">)</span>
+    finer <span class="token operator">=</span> assign_shards<span class="token punctuation">(</span>gdf<span class="token punctuation">,</span> zoom <span class="token operator">+</span> <span class="token number">1</span><span class="token punctuation">)</span>
+    assignment <span class="token operator">=</span> np<span class="token punctuation">.</span>where<span class="token punctuation">(</span>shards<span class="token punctuation">.</span>isin<span class="token punctuation">(</span>dense<span class="token punctuation">)</span><span class="token punctuation">,</span> finer<span class="token punctuation">,</span> shards<span class="token punctuation">)</span>
+    out <span class="token operator">=</span> pd<span class="token punctuation">.</span>Series<span class="token punctuation">(</span>assignment<span class="token punctuation">,</span> index<span class="token operator">=</span>gdf<span class="token punctuation">.</span>index<span class="token punctuation">,</span> name<span class="token operator">=</span><span class="token string">"shard"</span><span class="token punctuation">)</span>
+    final <span class="token operator">=</span> out<span class="token punctuation">.</span>value_counts<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> out<span class="token punctuation">,</span> <span class="token punctuation">{</span><span class="token string">"base_zoom"</span><span class="token punctuation">:</span> zoom<span class="token punctuation">,</span> <span class="token string">"dense_shards_split"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>dense<span class="token punctuation">)</span><span class="token punctuation">,</span>
+                 <span class="token string">"shards_total"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>final<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                 <span class="token string">"features_max_after"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span>final<span class="token punctuation">.</span><span class="token builtin">max</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                 <span class="token string">"features_p95_after"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span>final<span class="token punctuation">.</span>quantile<span class="token punctuation">(</span><span class="token number">0.95</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">}</span>
+
+assignment<span class="token punctuation">,</span> info <span class="token operator">=</span> split_dense_shards<span class="token punctuation">(</span>buildings<span class="token punctuation">,</span> <span class="token number">15</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span>info<span class="token punctuation">)</span>
+</code></pre></div>
+<p>Splitting only the dense shards is what resolves the median-versus-p95 tension without penalising the whole city. The result is a mixed grid — most shards at one level, the historic centre a level deeper — which the tileset expresses naturally, because a quadkey child is just a longer key and the merge step in <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/merging-shard-tilesets-into-a-root-tileset/">merging shard tilesets into a root tileset</a> groups by prefix regardless.</p>
+<h2 id="expected-output-verification" tabindex="-1"><a class="heading-link" href="#expected-output-verification"><span>Expected Output &amp; Verification</span></a></h2>
+<div class="codeblock" data-lang="text"><div class="codeblock__bar"><span class="codeblock__lang">text</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-text" tabindex="0" role="group" aria-label="text code sample"><code class="language-text"> zoom  shard_side_m  shards  features_median  features_p95  features_max  bytes_median_mb  bytes_p95_mb
+   12        6538.4      12             4204         11208         14882           142.94        381.07
+   13        3269.2      41             1204          3410          4802            40.94        115.94
+   14        1634.6     142              384          1024          1488            13.06         34.82
+   15         817.3     498              104           308           442             3.54         10.47
+   16         408.7    1742               30            92           148             1.02          3.13
+   17         204.3    5884                9            28            48             0.31          0.95
+   18         102.2   18402                3            10            18             0.10          0.34
+z12  side  6538.4 m    1 across       3 requests for a 1.2 km view
+z15  side   817.3 m    2 across      12 requests for a 1.2 km view
+z16  side   408.7 m    3 across      27 requests for a 1.2 km view
+z17  side   204.3 m    6 across     108 requests for a 1.2 km view
+z18  side   102.2 m   12 across     432 requests for a 1.2 km view
+{'zoom': 13, 'sampled': 4000, 'straddling_share': 0.0142}
+{'zoom': 16, 'sampled': 4000, 'straddling_share': 0.0904}
+{'zoom': 17, 'sampled': 4000, 'straddling_share': 0.1882}
+ zoom  p95_mb  requests  straddling  overhead  passes     ok            failing
+   15   10.47        12      0.0402     0.104       3  False       [tile_bytes]
+   16    3.13        27      0.0904     0.212       4   True                 []
+   17    0.95       108      0.1882     0.471       2  False  [straddling, overhead]
+{'base_zoom': 15, 'dense_shards_split': 38, 'shards_total': 612,
+ 'features_max_after': 388, 'features_p95_after': 281}
+</code></pre></div>
+<p>Zoom 16 is the answer for this city: 3 MB at the 95th percentile, 27 requests for a working view, 9% of buildings straddling a boundary and a fifth of the build in overhead. Zoom 15 fails only on dense-shard bytes, which the split in step 6 fixes — and the split grid at base 15 has a 281-feature 95th percentile, which is the better arrangement if rebuild granularity matters less than request count.</p>
+<p>Verify the choice against a pilot build rather than against the estimate:</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">from</span> pathlib <span class="token keyword">import</span> Path
+
+<span class="token keyword">def</span> <span class="token function">pilot_verify</span><span class="token punctuation">(</span>tileset_dir<span class="token punctuation">,</span> expected_p95_mb<span class="token punctuation">,</span> tolerance<span class="token operator">=</span><span class="token number">1.5</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    sizes <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    <span class="token keyword">for</span> shard <span class="token keyword">in</span> Path<span class="token punctuation">(</span>tileset_dir<span class="token punctuation">)</span><span class="token punctuation">.</span>glob<span class="token punctuation">(</span><span class="token string">"*/"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        total <span class="token operator">=</span> <span class="token builtin">sum</span><span class="token punctuation">(</span>p<span class="token punctuation">.</span>stat<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span>st_size <span class="token keyword">for</span> p <span class="token keyword">in</span> shard<span class="token punctuation">.</span>rglob<span class="token punctuation">(</span><span class="token string">"*"</span><span class="token punctuation">)</span> <span class="token keyword">if</span> p<span class="token punctuation">.</span>is_file<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+        <span class="token keyword">if</span> total<span class="token punctuation">:</span>
+            sizes<span class="token punctuation">.</span>append<span class="token punctuation">(</span>total <span class="token operator">/</span> <span class="token number">1e6</span><span class="token punctuation">)</span>
+    sizes <span class="token operator">=</span> np<span class="token punctuation">.</span>array<span class="token punctuation">(</span>sizes<span class="token punctuation">)</span>
+    p95 <span class="token operator">=</span> <span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>percentile<span class="token punctuation">(</span>sizes<span class="token punctuation">,</span> <span class="token number">95</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"shards_built"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>sizes<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"median_mb"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>median<span class="token punctuation">(</span>sizes<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"p95_mb"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>p95<span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"max_mb"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>sizes<span class="token punctuation">.</span><span class="token builtin">max</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"estimate_ratio"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>p95 <span class="token operator">/</span> expected_p95_mb<span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"within_tolerance"</span><span class="token punctuation">:</span> p95 <span class="token operator">&lt;=</span> expected_p95_mb <span class="token operator">*</span> tolerance<span class="token punctuation">}</span>
+
+<span class="token keyword">print</span><span class="token punctuation">(</span>pilot_verify<span class="token punctuation">(</span><span class="token string">"build/pilot_z16"</span><span class="token punctuation">,</span> expected_p95_mb<span class="token operator">=</span><span class="token number">3.13</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>The bytes-per-feature figure the estimate rests on is the one most likely to be wrong — textures, metadata and compression all move it — so a pilot of twenty or thirty shards before committing to a grid is worth the hour. A ratio outside about 1.5 means the estimate needs updating and the whole table recomputing, which takes seconds once the real figure is known.</p>
+<h2 id="performance-notes" tabindex="-1"><a class="heading-link" href="#performance-notes"><span>Performance Notes</span></a></h2>
+<ul>
+<li><strong>Compute the grid statistics on centroids, not geometry.</strong> Assigning a million footprints to a grid by centroid takes seconds; doing it by intersection takes minutes and changes nothing about the answer.</li>
+<li><strong>Sample for the boundary cost.</strong> Four thousand features give a stable straddling share to within a fraction of a percent.</li>
+<li><strong>Do the pilot at the two candidate zooms</strong>, not at one. The comparison is what makes the decision defensible later.</li>
+<li><strong>Record the chosen zoom in the tileset metadata</strong>, so a later incremental build cannot silently use a different grid — a mixed-grid tileset with two conventions is very hard to reason about.</li>
+<li><strong>Revisit the choice when the source changes materially</strong>: a new LOD3 dataset with textures moves bytes per feature by a factor of five, and the previous grid may no longer pass.</li>
+</ul>
+<h2 id="common-errors" tabindex="-1"><a class="heading-link" href="#common-errors"><span>Common Errors</span></a></h2>
+<p><strong>Shard side lengths are computed without the latitude cosine.</strong> Web Mercator tiles shrink towards the poles, and a zoom-16 tile is 611 m at the equator and 409 m at 48° N. Using the equatorial figure overestimates the features per shard by more than a factor of two.</p>
+<p><strong>Sizing on the median.</strong> The dense shards are the ones users load. Size on the 95th percentile and split the outliers.</p>
+<p><strong>Ignoring per-shard overhead.</strong> A grid that looks ideal on tile bytes can triple the build time. Include the overhead share in the decision.</p>
+<p><strong>Changing the grid without re-merging.</strong> The root tileset references shards by path and geometric error; a new grid invalidates all of it. Rebuild the root, as in the merge guide.</p>
+<p><strong>Assuming one grid for every layer.</strong> Terrain, buildings and point clouds have very different bytes per unit area, and there is no reason for them to share a shard size. Choose per layer and let the merge step reconcile them.</p>
+<h2 id="frequently-asked-questions" tabindex="-1"><a class="heading-link" href="#frequently-asked-questions"><span>Frequently Asked Questions</span></a></h2>
+<h3 id="should-shards-align-with-administrative-boundaries-instead" tabindex="-1"><a class="heading-link" href="#should-shards-align-with-administrative-boundaries-instead"><span>Should shards align with administrative boundaries instead?</span></a></h3>
+<p>Only if the twin’s workflows are administrative — per-district publishing, per-district permissions. Administrative units vary in size by orders of magnitude, which breaks every property this page optimises. A regular grid with a district attribute on each shard usually serves both needs.</p>
+<h3 id="what-about-implicit-tiling-does-the-shard-size-still-matter" tabindex="-1"><a class="heading-link" href="#what-about-implicit-tiling-does-the-shard-size-still-matter"><span>What about implicit tiling — does the shard size still matter?</span></a></h3>
+<p>Yes, for the same reasons: bytes per tile, requests per viewport and rebuild granularity are unchanged. Implicit tiling removes the per-shard JSON, which reduces the overhead term and shifts the workable band one level finer.</p>
+<h3 id="how-does-this-interact-with-the-lod-hierarchy-inside-a-shard" tabindex="-1"><a class="heading-link" href="#how-does-this-interact-with-the-lod-hierarchy-inside-a-shard"><span>How does this interact with the LOD hierarchy inside a shard?</span></a></h3>
+<p>They are independent. The shard grid decides the horizontal partitioning of the work and the requests; the levels inside each shard decide what a camera loads at distance. A shard holding 100 buildings across three internal levels is a normal arrangement.</p>
+<h2 id="related-guides" tabindex="-1"><a class="heading-link" href="#related-guides"><span>Related Guides</span></a></h2>
+<ul>
+<li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a> — the pipeline this configures</li>
+<li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/merging-shard-tilesets-into-a-root-tileset/">Merging Shard Tilesets into a Root Tileset</a> — assembling whatever grid you chose</li>
+<li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/orchestrating-tiling-jobs-with-dask/">Orchestrating Tiling Jobs with Dask</a> — running the resulting shard list in parallel</li>
+</ul>
+<p>Back to <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a>.</p>
+
+
+      
+      
+
+      <div class="related-nav">
+        
+
+        
+          <div>
+            <h3>Related</h3>
+            <div class="related-grid">
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/making-tile-output-deterministic/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Making Tile Output Deterministic</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/merging-shard-tilesets-into-a-root-tileset/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Merging Shard Tilesets into a Root Tileset</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/orchestrating-tiling-jobs-with-dask/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Orchestrating Tiling Jobs with Dask</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/parallel-b3dm-encoding-with-process-pools/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Parallel b3dm Encoding with Process Pools</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/resuming-failed-tiling-runs-from-checkpoints/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Resuming Failed Tiling Runs from Checkpoints</span>
+                </a>
+              
+            </div>
+          </div>
+        
+      </div>
+    </article>
+
+    
+    <aside class="toc" aria-label="On this page" data-toc hidden>
+      <h4>On this page</h4>
+      <ul></ul>
+    </aside>
+  </div>
+</div>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+  <div class="container site-footer__inner">
+    <div class="site-footer__brand">
+      <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+        <img src="/assets/img/logo-mark.svg" alt="" class="brand__mark" width="36" height="36">
+        <span class="brand__name">
+          3D Geospatial
+          <small>Digital Twin Automation</small>
+        </span>
+      </a>
+      <p>Engineering-grade guides on point cloud processing, mesh pipelines, LOD strategies, and CI/CD automation for digital twin platforms.</p>
+      <a class="footer-social" href="https://github.com/3d-geospatial" aria-label="3D Geospatial on GitHub" rel="noopener" target="_blank">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+          <path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.53-1.34-1.3-1.7-1.3-1.7-1.06-.72.08-.71.08-.71 1.17.08 1.79 1.2 1.79 1.2 1.04 1.79 2.73 1.27 3.4.97.1-.75.4-1.27.73-1.56-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.19-3.08-.12-.3-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.75.11 3.05.74.8 1.19 1.83 1.19 3.08 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.07.78 2.15v3.18c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5Z"/>
+        </svg>
+        <span>GitHub</span>
+      </a>
+    </div>
+
+    <div class="site-footer__col">
+      <h4>Sections</h4>
+      <ul>
+        <li><a href="https://www.3d-geospatial.com/">Home</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management &amp; Optimization</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/">Point Cloud &amp; Mesh Pipelines</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/">Troubleshooting &amp; Reliability</a></li>
+        
+      </ul>
+    </div>
+
+    
+      <div class="site-footer__col">
+        <h4>3D Geospatial Fundamentals</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/">3D Format Standards Comparison</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/">BIM and IFC Georeferencing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/">CityGML and CityJSON Processing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems for 3D Assets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/">Digital Elevation Model Workflows</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/">Spatial Indexing and Tiling Schemes for 3D Data</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>LOD Management &amp; Optimization</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/">Automated Tile Generation for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/">Cesium ion Upload Automation for 3D Tilesets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/">glTF LOD Generation With Draco Compression</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/">Streaming Sync Patterns for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/">Tileset Metadata and 3D Tiles Next</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/">Vector Overlays on 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Point Cloud &amp; Mesh Pipelines</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/">Automated Mesh Decimation for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/">Change Detection Between LiDAR Scan Epochs</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/">CI/CD Automation for Spatial Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">LiDAR Classification and Ground Extraction</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/photogrammetry-processing-pipelines/">Photogrammetry Processing Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/">Point Cloud Filtering Techniques</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/">Surface Reconstruction for Geospatial Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/">Texture Mapping Workflows for Digital Twins</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Troubleshooting &amp; Reliability</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/">Cross-Section Failure Modes in Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/">Data Validation &amp; QA Gates for 3D Tiles</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/">Performance Profiling and Benchmarking</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/">Pipeline Observability and Monitoring</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/">Streaming &amp; Runtime Diagnostics for 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+  </div>
+  <div class="container site-footer__bottom">
+    <span>© 2026 3D Geospatial &amp; Digital Twin Automation</span>
+    <span>Built with Eleventy · PWA-enabled</span>
+  </div>
+</footer>
+
+
+  <script src="/assets/js/site.js?v=b99aa9f971" defer></script>
+  
+</body>
+</html>

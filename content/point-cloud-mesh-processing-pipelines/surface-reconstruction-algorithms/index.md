@@ -316,5 +316,8 @@ Both algorithms need *oriented* normals — direction and a consistent outward s
 - [Automated Mesh Decimation](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/) — reduce reconstructed triangle counts to a polygon budget
 - [Texture Mapping Workflows](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/) — apply photogrammetry textures to the reconstructed mesh
 - [Mesh Topology Basics](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/) — manifold rules and repair for the validation step
+- [Alpha Shape Reconstruction with Open3D](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/alpha-shape-reconstruction-with-open3d/) — reconstruct shapes with concavities using alpha shapes
+- [Delaunay Meshing of Terrain with PDAL](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/delaunay-meshing-of-terrain-with-pdal/) — build a TIN from ground points with filters.delaunay and filters.poisson
+- [Trimming Poisson Meshes by Density](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/trimming-poisson-meshes-by-density/) — stop Poisson reconstruction inventing surface
 
 Back to [Point Cloud & Mesh Processing Pipelines](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/).

@@ -1,0 +1,996 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <title>Training a Random Forest Point Classifier — 3D Geospatial</title>
+  <meta name="description" content="Train a point-cloud classifier that generalises: multi-scale eigenvalue features, spatially blocked validation, class weighting">
+  <meta name="keywords" content="3D geospatial, digital twin, point cloud, mesh pipeline, LOD, 3D Tiles, Cesium, PDAL, Open3D, Python, CI/CD">
+  <meta name="author" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta name="theme-color" content="#1f6b8a" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f171d" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+
+  
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem("theme");
+        var theme = (stored === "dark" || stored === "light") ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    })();
+  </script>
+  <meta name="generator" content="Eleventy">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="googlebot" content="index,follow,max-image-preview:large">
+
+  
+  <link rel="canonical" href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/training-a-random-forest-point-classifier/">
+  <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">
+
+  
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/icon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+
+  
+  <link rel="apple-touch-icon" href="/assets/img/icon-180.png">
+  <link rel="mask-icon" href="/assets/img/logo.svg" color="#1f6b8a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="3D Geospatial">
+  <meta name="application-name" content="3D Geospatial">
+
+  
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Training a Random Forest Point Classifier — 3D Geospatial">
+  <meta property="og:description" content="Train a point-cloud classifier that generalises: multi-scale eigenvalue features, spatially blocked validation, class weighting">
+  <meta property="og:url" content="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/training-a-random-forest-point-classifier/">
+  <meta property="og:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+  <meta property="og:site_name" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta property="og:locale" content="en_US">
+  
+  <meta property="article:published_time" content="2026-09-17T23:36:56.457Z">
+  <meta property="article:modified_time" content="2026-09-17T23:36:56.457Z">
+  <meta property="article:publisher" content="https://www.3d-geospatial.com/">
+  
+
+  
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Training a Random Forest Point Classifier — 3D Geospatial">
+  <meta name="twitter:description" content="Train a point-cloud classifier that generalises: multi-scale eigenvalue features, spatially blocked validation, class weighting">
+  <meta name="twitter:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta name="twitter:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+
+  
+  <link rel="preload" href="/assets/css/styles.css?v=8c46394d6c" as="style">
+  
+
+  <link rel="stylesheet" href="/assets/css/styles.css?v=8c46394d6c">
+
+  
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.3d-geospatial.com/#organization",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "url": "https://www.3d-geospatial.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/icon-512.png",
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://www.3d-geospatial.com/#website",
+      "url": "https://www.3d-geospatial.com/",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "description": "Build reliable 3D spatial data pipelines for digital twins — point clouds, meshes, LOD strategies, Python processing, and CI/CD automation.",
+      "inLanguage": "en",
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      }
+    },
+    {
+      "@type": "TechArticle",
+      "@id": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/training-a-random-forest-point-classifier/#article",
+      "isPartOf": {
+        "@id": "https://www.3d-geospatial.com/#website"
+      },
+      "headline": "Training a Random Forest Point Classifier",
+      "name": "Training a Random Forest Point Classifier",
+      "description": "Train a point-cloud classifier that generalises: multi-scale eigenvalue features, spatially blocked validation, class weighting",
+      "url": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/training-a-random-forest-point-classifier/",
+      "mainEntityOfPage": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/training-a-random-forest-point-classifier/",
+      "inLanguage": "en",
+      "datePublished": "2026-09-17T23:36:56.457Z",
+      "dateModified": "2026-09-17T23:36:56.457Z",
+      "author": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "image": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/og-cover.png",
+        "width": 1200,
+        "height": 630
+      },
+      "breadcrumb": {
+        "@id": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/training-a-random-forest-point-classifier/#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/training-a-random-forest-point-classifier/#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://www.3d-geospatial.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Point Cloud Mesh Processing Pipelines",
+          "item": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Lidar Classification And Ground Extraction",
+          "item": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "name": "Training A Random Forest Point Classifier",
+          "item": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/training-a-random-forest-point-classifier/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  
+<header class="site-header" role="banner">
+  <div class="container site-header__inner">
+    <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+      <img src="/assets/img/logo.svg" alt="" class="brand__mark" width="36" height="36">
+      <span class="brand__name">
+        3D Geospatial
+        <small>Digital Twin Automation</small>
+      </span>
+    </a>
+
+    <button class="theme-toggle" type="button" data-theme-toggle
+            aria-label="Switch to dark theme" title="Switch to dark theme">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4.2"/>
+        <path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/>
+      </svg>
+    </button>
+
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>
+      <span class="nav-toggle__icon" aria-hidden="true"><span></span></span>
+      Menu
+    </button>
+
+    <nav class="primary-nav" id="primary-nav" aria-label="Primary">
+      
+      <a href="https://www.3d-geospatial.com/" >
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/>
+        </svg>
+        Home
+      </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2 3 7l9 5 9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 17l9 5 9-5"/>
+            </svg>
+          
+          3D Geospatial Fundamentals
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+          
+          LOD Management &amp; Optimization
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/" aria-current="page">
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="6" cy="6" r="1.5"/><circle cx="12" cy="6" r="1.5"/><circle cx="18" cy="6" r="1.5"/>
+              <circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/>
+              <circle cx="6" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="18" cy="18" r="1.5"/>
+            </svg>
+          
+          Point Cloud &amp; Mesh Pipelines
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <path d="M12 9v4"/><path d="M12 17h.01"/>
+            </svg>
+          
+          Troubleshooting &amp; Reliability
+        </a>
+      
+    </nav>
+  </div>
+</header>
+
+
+  <main id="main">
+    
+
+
+<div class="container">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    
+      
+        <a href="https://www.3d-geospatial.com/">Home</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/">Point Cloud Mesh Processing Pipelines</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">Lidar Classification And Ground Extraction</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <span class="current">Training A Random Forest Point Classifier</span>
+      
+    
+  </nav>
+
+  <div class="content-page">
+    <article class="article">
+      <h1 id="training-a-random-forest-point-classifier" tabindex="-1"><a class="heading-link" href="#training-a-random-forest-point-classifier"><span>Training a Random Forest Point Classifier</span></a></h1>
+<p>This page trains a random forest to classify airborne lidar into ground, vegetation, building and other — computing multi-scale geometric features, splitting train and test <strong>spatially</strong> rather than randomly, handling the severe class imbalance, reading the feature importances to drop what does not help, and reporting per-class error rather than a single accuracy figure.</p>
+<h2 id="why-you-hit-this" tabindex="-1"><a class="heading-link" href="#why-you-hit-this"><span>Why you hit this</span></a></h2>
+<p>Rule-based classification works well for the easy classes and poorly for the hard ones. The progressive morphological filter in <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/ground-classification-with-pdal-pmf/">ground classification with PDAL PMF</a> extracts ground reliably; separating low vegetation from a gravel surface, or a flat roof from a car park, needs more than one threshold.</p>
+<p>A random forest on geometric features handles those cases and is the right tool before anything deeper: it trains in minutes on a laptop, needs no GPU, tolerates unscaled features, and its feature importances tell you what the classification is actually using — which is information a neural network does not readily give up.</p>
+<p>The trap is validation. A random train/test split on point-cloud data reports 99% accuracy and produces a classifier that fails on the next tile, because neighbouring points are nearly identical and end up on both sides of the split.</p>
+<h2 id="prerequisites" tabindex="-1"><a class="heading-link" href="#prerequisites"><span>Prerequisites</span></a></h2>
+<ul>
+<li>Python 3.10+ with <code>numpy</code>, <code>scikit-learn&gt;=1.3</code>, <code>laspy</code>, <code>scipy</code>, <code>pdal</code>.</li>
+<li>At least two classified tiles — one to train on, one held back entirely.</li>
+<li>Height above ground computed, as in the power-line guide.</li>
+</ul>
+<h2 id="step-by-step" tabindex="-1"><a class="heading-link" href="#step-by-step"><span>Step-by-Step</span></a></h2>
+<h3 id="1-compute-features-at-several-scales" tabindex="-1"><a class="heading-link" href="#1-compute-features-at-several-scales"><span>1. Compute features at several scales</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> json
+<span class="token keyword">import</span> math
+<span class="token keyword">from</span> collections <span class="token keyword">import</span> Counter
+<span class="token keyword">from</span> pathlib <span class="token keyword">import</span> Path
+
+<span class="token keyword">import</span> laspy
+<span class="token keyword">import</span> numpy <span class="token keyword">as</span> np
+<span class="token keyword">from</span> scipy<span class="token punctuation">.</span>spatial <span class="token keyword">import</span> cKDTree
+
+FEATURE_SCALES <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token number">0.5</span><span class="token punctuation">,</span> <span class="token number">1.5</span><span class="token punctuation">,</span> <span class="token number">4.0</span><span class="token punctuation">)</span>
+
+<span class="token keyword">def</span> <span class="token function">eigen_features</span><span class="token punctuation">(</span>points<span class="token punctuation">,</span> radius<span class="token punctuation">,</span> min_neighbours<span class="token operator">=</span><span class="token number">5</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    tree <span class="token operator">=</span> cKDTree<span class="token punctuation">(</span>points<span class="token punctuation">)</span>
+    neighbour_lists <span class="token operator">=</span> tree<span class="token punctuation">.</span>query_ball_point<span class="token punctuation">(</span>points<span class="token punctuation">,</span> r<span class="token operator">=</span>radius<span class="token punctuation">,</span> workers<span class="token operator">=</span><span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">)</span>
+    n <span class="token operator">=</span> <span class="token builtin">len</span><span class="token punctuation">(</span>points<span class="token punctuation">)</span>
+    out <span class="token operator">=</span> np<span class="token punctuation">.</span>zeros<span class="token punctuation">(</span><span class="token punctuation">(</span>n<span class="token punctuation">,</span> <span class="token number">7</span><span class="token punctuation">)</span><span class="token punctuation">,</span> dtype<span class="token operator">=</span>np<span class="token punctuation">.</span>float32<span class="token punctuation">)</span>
+    <span class="token keyword">for</span> i<span class="token punctuation">,</span> idx <span class="token keyword">in</span> <span class="token builtin">enumerate</span><span class="token punctuation">(</span>neighbour_lists<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        k <span class="token operator">=</span> <span class="token builtin">len</span><span class="token punctuation">(</span>idx<span class="token punctuation">)</span>
+        <span class="token keyword">if</span> k <span class="token operator">&lt;</span> min_neighbours<span class="token punctuation">:</span>
+            out<span class="token punctuation">[</span>i<span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> k<span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">]</span>
+            <span class="token keyword">continue</span>
+        local <span class="token operator">=</span> points<span class="token punctuation">[</span>idx<span class="token punctuation">]</span>
+        centred <span class="token operator">=</span> local <span class="token operator">-</span> local<span class="token punctuation">.</span>mean<span class="token punctuation">(</span>axis<span class="token operator">=</span><span class="token number">0</span><span class="token punctuation">)</span>
+        cov <span class="token operator">=</span> centred<span class="token punctuation">.</span>T @ centred <span class="token operator">/</span> k
+        w<span class="token punctuation">,</span> v <span class="token operator">=</span> np<span class="token punctuation">.</span>linalg<span class="token punctuation">.</span>eigh<span class="token punctuation">(</span>cov<span class="token punctuation">)</span>
+        w <span class="token operator">=</span> np<span class="token punctuation">.</span>clip<span class="token punctuation">(</span>w<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">:</span><span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token number">1e-12</span><span class="token punctuation">,</span> <span class="token boolean">None</span><span class="token punctuation">)</span>
+        total <span class="token operator">=</span> w<span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+        principal <span class="token operator">=</span> v<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token punctuation">:</span><span class="token punctuation">:</span><span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">]</span>
+        out<span class="token punctuation">[</span>i<span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token punctuation">[</span>
+            <span class="token punctuation">(</span>w<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span> <span class="token operator">-</span> w<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token operator">/</span> w<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">,</span>                      <span class="token comment"># linearity</span>
+            <span class="token punctuation">(</span>w<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span> <span class="token operator">-</span> w<span class="token punctuation">[</span><span class="token number">2</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token operator">/</span> w<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">,</span>                      <span class="token comment"># planarity</span>
+            w<span class="token punctuation">[</span><span class="token number">2</span><span class="token punctuation">]</span> <span class="token operator">/</span> w<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">,</span>                               <span class="token comment"># scattering</span>
+            <span class="token operator">-</span>np<span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">(</span>w <span class="token operator">/</span> total<span class="token punctuation">)</span> <span class="token operator">*</span> np<span class="token punctuation">.</span>log<span class="token punctuation">(</span>w <span class="token operator">/</span> total<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>  <span class="token comment"># eigenentropy</span>
+            <span class="token builtin">abs</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>v<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token punctuation">:</span><span class="token punctuation">:</span><span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token number">2</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>              <span class="token comment"># normal verticality</span>
+            k<span class="token punctuation">,</span>                                         <span class="token comment"># neighbour count = local density</span>
+            <span class="token builtin">float</span><span class="token punctuation">(</span>local<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">]</span><span class="token punctuation">.</span><span class="token builtin">max</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">-</span> local<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">]</span><span class="token punctuation">.</span><span class="token builtin">min</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>  <span class="token comment"># local height range</span>
+        <span class="token punctuation">]</span>
+    <span class="token keyword">return</span> out
+
+FEATURE_NAMES <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token string">"linearity"</span><span class="token punctuation">,</span> <span class="token string">"planarity"</span><span class="token punctuation">,</span> <span class="token string">"scattering"</span><span class="token punctuation">,</span> <span class="token string">"eigenentropy"</span><span class="token punctuation">,</span>
+                 <span class="token string">"normal_verticality"</span><span class="token punctuation">,</span> <span class="token string">"density"</span><span class="token punctuation">,</span> <span class="token string">"height_range"</span><span class="token punctuation">]</span>
+
+<span class="token keyword">def</span> <span class="token function">build_features</span><span class="token punctuation">(</span>las_path<span class="token punctuation">,</span> scales<span class="token operator">=</span>FEATURE_SCALES<span class="token punctuation">,</span> include_intensity<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span>
+                   include_returns<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    las <span class="token operator">=</span> laspy<span class="token punctuation">.</span>read<span class="token punctuation">(</span>las_path<span class="token punctuation">)</span>
+    xyz <span class="token operator">=</span> np<span class="token punctuation">.</span>column_stack<span class="token punctuation">(</span><span class="token punctuation">[</span>np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>las<span class="token punctuation">.</span>x<span class="token punctuation">)</span><span class="token punctuation">,</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>las<span class="token punctuation">.</span>y<span class="token punctuation">)</span><span class="token punctuation">,</span>
+                           np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>las<span class="token punctuation">.</span>z<span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">.</span>astype<span class="token punctuation">(</span>np<span class="token punctuation">.</span>float64<span class="token punctuation">)</span>
+    blocks<span class="token punctuation">,</span> names <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    <span class="token keyword">for</span> r <span class="token keyword">in</span> scales<span class="token punctuation">:</span>
+        blocks<span class="token punctuation">.</span>append<span class="token punctuation">(</span>eigen_features<span class="token punctuation">(</span>xyz<span class="token punctuation">,</span> r<span class="token punctuation">)</span><span class="token punctuation">)</span>
+        names<span class="token punctuation">.</span>extend<span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>n<span class="token punctuation">}</span></span><span class="token string">_r</span><span class="token interpolation"><span class="token punctuation">{</span>r<span class="token punctuation">}</span></span><span class="token string">"</span></span> <span class="token keyword">for</span> n <span class="token keyword">in</span> FEATURE_NAMES<span class="token punctuation">)</span>
+
+    hag <span class="token operator">=</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>las<span class="token punctuation">.</span>HeightAboveGround<span class="token punctuation">,</span> dtype<span class="token operator">=</span>np<span class="token punctuation">.</span>float32<span class="token punctuation">)</span><span class="token punctuation">.</span>reshape<span class="token punctuation">(</span><span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span>
+    blocks<span class="token punctuation">.</span>append<span class="token punctuation">(</span>hag<span class="token punctuation">)</span>
+    names<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token string">"height_above_ground"</span><span class="token punctuation">)</span>
+
+    <span class="token keyword">if</span> include_intensity <span class="token keyword">and</span> <span class="token builtin">hasattr</span><span class="token punctuation">(</span>las<span class="token punctuation">,</span> <span class="token string">"intensity"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        inten <span class="token operator">=</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>las<span class="token punctuation">.</span>intensity<span class="token punctuation">,</span> dtype<span class="token operator">=</span>np<span class="token punctuation">.</span>float32<span class="token punctuation">)</span><span class="token punctuation">.</span>reshape<span class="token punctuation">(</span><span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span>
+        blocks<span class="token punctuation">.</span>append<span class="token punctuation">(</span>inten<span class="token punctuation">)</span>
+        names<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token string">"intensity"</span><span class="token punctuation">)</span>
+    <span class="token keyword">if</span> include_returns <span class="token keyword">and</span> <span class="token builtin">hasattr</span><span class="token punctuation">(</span>las<span class="token punctuation">,</span> <span class="token string">"number_of_returns"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        nret <span class="token operator">=</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>las<span class="token punctuation">.</span>number_of_returns<span class="token punctuation">,</span> dtype<span class="token operator">=</span>np<span class="token punctuation">.</span>float32<span class="token punctuation">)</span><span class="token punctuation">.</span>reshape<span class="token punctuation">(</span><span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span>
+        rnum <span class="token operator">=</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>las<span class="token punctuation">.</span>return_number<span class="token punctuation">,</span> dtype<span class="token operator">=</span>np<span class="token punctuation">.</span>float32<span class="token punctuation">)</span><span class="token punctuation">.</span>reshape<span class="token punctuation">(</span><span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span>
+        blocks<span class="token punctuation">.</span>append<span class="token punctuation">(</span>np<span class="token punctuation">.</span>hstack<span class="token punctuation">(</span><span class="token punctuation">[</span>nret<span class="token punctuation">,</span> rnum<span class="token punctuation">,</span> nret <span class="token operator">-</span> rnum<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+        names<span class="token punctuation">.</span>extend<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token string">"number_of_returns"</span><span class="token punctuation">,</span> <span class="token string">"return_number"</span><span class="token punctuation">,</span> <span class="token string">"returns_after"</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+
+    X <span class="token operator">=</span> np<span class="token punctuation">.</span>hstack<span class="token punctuation">(</span>blocks<span class="token punctuation">)</span><span class="token punctuation">.</span>astype<span class="token punctuation">(</span>np<span class="token punctuation">.</span>float32<span class="token punctuation">)</span>
+    y <span class="token operator">=</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>las<span class="token punctuation">.</span>classification<span class="token punctuation">)</span><span class="token punctuation">.</span>astype<span class="token punctuation">(</span>np<span class="token punctuation">.</span>int16<span class="token punctuation">)</span>
+    <span class="token keyword">return</span> X<span class="token punctuation">,</span> y<span class="token punctuation">,</span> names<span class="token punctuation">,</span> xyz
+</code></pre></div>
+<p>Three scales rather than one is the change that most improves a geometric classifier. At 0.5 m a roof and a car park both look planar; at 4 m the roof is planar and elevated while the car park is planar and at ground level, and the height feature separates them. A single scale forces a compromise that fits neither the fine structure nor the context.</p>
+<p>Eigenentropy is worth including even though it correlates with scattering: it summarises how evenly the variance is distributed and is consistently among the more important features for vegetation.</p>
+<p><code>returns_after</code> — the number of returns following this one from the same pulse — is a strong vegetation cue and is free. A point with three returns after it is under a canopy; a point that is the only return is on a hard surface.</p>
+<figure class="diagram">
+<svg viewBox="4 6 732 246" role="img" aria-labelledby="rf-scale-t rf-scale-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="rf-scale-t">Why one feature scale is not enough</title>
+  <desc id="rf-scale-d">A comparison of four surfaces at two neighbourhood radii. At half a metre, a flat roof and a car park both have planarity 0.88 and are indistinguishable, and low vegetation and a gravel surface both have scattering near 0.2. At four metres, the roof keeps planarity 0.84 while the car park drops to 0.61 because it is bounded by kerbs, and low vegetation rises to scattering 0.31 while gravel stays at 0.09. Combined with height above ground, all four separate.</desc>
+  <rect class="svg-bg" x="4" y="6" width="732" height="246" fill="#ffffff"/>
+  <g stroke-width="1.5">
+    <rect x="18" y="20" width="176" height="32" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="194" y="20" width="176" height="32" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="370" y="20" width="176" height="32" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="546" y="20" width="176" height="32" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="18" y="52" width="176" height="34" fill="#ffffff" stroke="#5b6471"/>
+    <rect x="194" y="52" width="176" height="34" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="370" y="52" width="176" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="546" y="52" width="176" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="18" y="86" width="176" height="34" fill="#ffffff" stroke="#5b6471"/>
+    <rect x="194" y="86" width="176" height="34" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="370" y="86" width="176" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="546" y="86" width="176" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="18" y="120" width="176" height="34" fill="#ffffff" stroke="#5b6471"/>
+    <rect x="194" y="120" width="176" height="34" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="370" y="120" width="176" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="546" y="120" width="176" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="18" y="154" width="176" height="34" fill="#ffffff" stroke="#5b6471"/>
+    <rect x="194" y="154" width="176" height="34" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="370" y="154" width="176" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="546" y="154" width="176" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="106" y="41">surface</text><text x="282" y="41">at r = 0.5 m</text>
+    <text x="458" y="41">at r = 4.0 m</text><text x="634" y="41">height above ground</text>
+    <text x="106" y="74">flat roof</text><text x="282" y="74">planarity 0.88</text>
+    <text x="458" y="74">planarity 0.84</text><text x="634" y="74">8.4 m</text>
+    <text x="106" y="108">car park</text><text x="282" y="108">planarity 0.88</text>
+    <text x="458" y="108">planarity 0.61</text><text x="634" y="108">0.1 m</text>
+    <text x="106" y="142">low vegetation</text><text x="282" y="142">scattering 0.19</text>
+    <text x="458" y="142">scattering 0.31</text><text x="634" y="142">0.6 m</text>
+    <text x="106" y="176">gravel surface</text><text x="282" y="176">scattering 0.21</text>
+    <text x="458" y="176">scattering 0.09</text><text x="634" y="176">0.0 m</text>
+  </g>
+  <text x="370" y="212" fill="#b0413e" font-size="12.5" text-anchor="middle">at one scale the pairs are indistinguishable</text>
+  <text x="370" y="234" fill="#1f2937" font-size="12.5" text-anchor="middle">at two scales plus height, all four separate cleanly</text>
+</svg>
+<figcaption>The confusions a single-scale classifier makes — roof against car park, low vegetation against gravel — resolve at a second scale.</figcaption>
+</figure>
+<h3 id="2-split-spatially-never-randomly" tabindex="-1"><a class="heading-link" href="#2-split-spatially-never-randomly"><span>2. Split spatially, never randomly</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">spatial_blocks</span><span class="token punctuation">(</span>xyz<span class="token punctuation">,</span> block_m<span class="token operator">=</span><span class="token number">50.0</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    i <span class="token operator">=</span> np<span class="token punctuation">.</span>floor<span class="token punctuation">(</span>xyz<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">]</span> <span class="token operator">/</span> block_m<span class="token punctuation">)</span><span class="token punctuation">.</span>astype<span class="token punctuation">(</span>np<span class="token punctuation">.</span>int64<span class="token punctuation">)</span>
+    j <span class="token operator">=</span> np<span class="token punctuation">.</span>floor<span class="token punctuation">(</span>xyz<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">]</span> <span class="token operator">/</span> block_m<span class="token punctuation">)</span><span class="token punctuation">.</span>astype<span class="token punctuation">(</span>np<span class="token punctuation">.</span>int64<span class="token punctuation">)</span>
+    <span class="token keyword">return</span> i <span class="token operator">*</span> <span class="token number">1_000_003</span> <span class="token operator">+</span> j
+
+<span class="token keyword">def</span> <span class="token function">blocked_split</span><span class="token punctuation">(</span>xyz<span class="token punctuation">,</span> y<span class="token punctuation">,</span> test_fraction<span class="token operator">=</span><span class="token number">0.3</span><span class="token punctuation">,</span> block_m<span class="token operator">=</span><span class="token number">50.0</span><span class="token punctuation">,</span> seed<span class="token operator">=</span><span class="token number">7</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Whole blocks go to train or test, so no point's neighbours leak across."""</span>
+    blocks <span class="token operator">=</span> spatial_blocks<span class="token punctuation">(</span>xyz<span class="token punctuation">,</span> block_m<span class="token punctuation">)</span>
+    unique <span class="token operator">=</span> np<span class="token punctuation">.</span>unique<span class="token punctuation">(</span>blocks<span class="token punctuation">)</span>
+    rng <span class="token operator">=</span> np<span class="token punctuation">.</span>random<span class="token punctuation">.</span>default_rng<span class="token punctuation">(</span>seed<span class="token punctuation">)</span>
+    rng<span class="token punctuation">.</span>shuffle<span class="token punctuation">(</span>unique<span class="token punctuation">)</span>
+    n_test <span class="token operator">=</span> <span class="token builtin">max</span><span class="token punctuation">(</span><span class="token builtin">int</span><span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>unique<span class="token punctuation">)</span> <span class="token operator">*</span> test_fraction<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span>
+    test_blocks <span class="token operator">=</span> <span class="token builtin">set</span><span class="token punctuation">(</span>unique<span class="token punctuation">[</span><span class="token punctuation">:</span>n_test<span class="token punctuation">]</span><span class="token punctuation">.</span>tolist<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    is_test <span class="token operator">=</span> np<span class="token punctuation">.</span>isin<span class="token punctuation">(</span>blocks<span class="token punctuation">,</span> <span class="token builtin">list</span><span class="token punctuation">(</span>test_blocks<span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token string">"train"</span><span class="token punctuation">:</span> np<span class="token punctuation">.</span>flatnonzero<span class="token punctuation">(</span><span class="token operator">~</span>is_test<span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"test"</span><span class="token punctuation">:</span> np<span class="token punctuation">.</span>flatnonzero<span class="token punctuation">(</span>is_test<span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"blocks_total"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>unique<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"blocks_test"</span><span class="token punctuation">:</span> n_test<span class="token punctuation">,</span>
+        <span class="token string">"train_points"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token operator">~</span>is_test<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"test_points"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span>is_test<span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"train_class_mix"</span><span class="token punctuation">:</span> <span class="token builtin">dict</span><span class="token punctuation">(</span>Counter<span class="token punctuation">(</span>y<span class="token punctuation">[</span><span class="token operator">~</span>is_test<span class="token punctuation">]</span><span class="token punctuation">.</span>tolist<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"test_class_mix"</span><span class="token punctuation">:</span> <span class="token builtin">dict</span><span class="token punctuation">(</span>Counter<span class="token punctuation">(</span>y<span class="token punctuation">[</span>is_test<span class="token punctuation">]</span><span class="token punctuation">.</span>tolist<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+
+<span class="token keyword">def</span> <span class="token function">random_split_for_comparison</span><span class="token punctuation">(</span>y<span class="token punctuation">,</span> test_fraction<span class="token operator">=</span><span class="token number">0.3</span><span class="token punctuation">,</span> seed<span class="token operator">=</span><span class="token number">7</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Included only to demonstrate the leakage it causes."""</span>
+    rng <span class="token operator">=</span> np<span class="token punctuation">.</span>random<span class="token punctuation">.</span>default_rng<span class="token punctuation">(</span>seed<span class="token punctuation">)</span>
+    idx <span class="token operator">=</span> rng<span class="token punctuation">.</span>permutation<span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>y<span class="token punctuation">)</span><span class="token punctuation">)</span>
+    cut <span class="token operator">=</span> <span class="token builtin">int</span><span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>y<span class="token punctuation">)</span> <span class="token operator">*</span> <span class="token punctuation">(</span><span class="token number">1</span> <span class="token operator">-</span> test_fraction<span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"train"</span><span class="token punctuation">:</span> idx<span class="token punctuation">[</span><span class="token punctuation">:</span>cut<span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token string">"test"</span><span class="token punctuation">:</span> idx<span class="token punctuation">[</span>cut<span class="token punctuation">:</span><span class="token punctuation">]</span><span class="token punctuation">}</span>
+</code></pre></div>
+<p>Blocked splitting is the single most important decision in this page. Points 10 cm apart have nearly identical features and nearly always the same label, so a random split puts a point in training and its neighbour in test — and the model, having memorised the neighbour, scores nearly perfectly on data it has effectively seen.</p>
+<p>The block size has to exceed the largest feature radius by a comfortable margin. With a 4 m maximum radius, 50 m blocks mean only the points within 4 m of a block boundary have any neighbour across it, which is under 1% of the points and a negligible leak.</p>
+<p>A held-out <em>tile</em>, not just held-out blocks, is the final check, because blocks from the same tile still share the flight’s acquisition conditions.</p>
+<h3 id="3-handle-the-class-imbalance" tabindex="-1"><a class="heading-link" href="#3-handle-the-class-imbalance"><span>3. Handle the class imbalance</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">from</span> sklearn<span class="token punctuation">.</span>ensemble <span class="token keyword">import</span> RandomForestClassifier
+
+<span class="token keyword">def</span> <span class="token function">class_weights</span><span class="token punctuation">(</span>y<span class="token punctuation">,</span> strategy<span class="token operator">=</span><span class="token string">"balanced_capped"</span><span class="token punctuation">,</span> cap<span class="token operator">=</span><span class="token number">20.0</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    counts <span class="token operator">=</span> Counter<span class="token punctuation">(</span>y<span class="token punctuation">.</span>tolist<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    total <span class="token operator">=</span> <span class="token builtin">sum</span><span class="token punctuation">(</span>counts<span class="token punctuation">.</span>values<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    n_classes <span class="token operator">=</span> <span class="token builtin">len</span><span class="token punctuation">(</span>counts<span class="token punctuation">)</span>
+    <span class="token keyword">if</span> strategy <span class="token operator">==</span> <span class="token string">"none"</span><span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token boolean">None</span>
+    weights <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token punctuation">}</span>
+    <span class="token keyword">for</span> cls<span class="token punctuation">,</span> n <span class="token keyword">in</span> counts<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        w <span class="token operator">=</span> total <span class="token operator">/</span> <span class="token punctuation">(</span>n_classes <span class="token operator">*</span> n<span class="token punctuation">)</span>
+        weights<span class="token punctuation">[</span>cls<span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token builtin">min</span><span class="token punctuation">(</span>w<span class="token punctuation">,</span> cap<span class="token punctuation">)</span> <span class="token keyword">if</span> strategy <span class="token operator">==</span> <span class="token string">"balanced_capped"</span> <span class="token keyword">else</span> w
+    <span class="token keyword">return</span> weights
+
+<span class="token keyword">def</span> <span class="token function">subsample_majority</span><span class="token punctuation">(</span>X<span class="token punctuation">,</span> y<span class="token punctuation">,</span> idx<span class="token punctuation">,</span> max_per_class<span class="token operator">=</span><span class="token number">400_000</span><span class="token punctuation">,</span> seed<span class="token operator">=</span><span class="token number">11</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Cheaper than weighting and often as effective: cap each class's training points."""</span>
+    rng <span class="token operator">=</span> np<span class="token punctuation">.</span>random<span class="token punctuation">.</span>default_rng<span class="token punctuation">(</span>seed<span class="token punctuation">)</span>
+    keep <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    <span class="token keyword">for</span> cls <span class="token keyword">in</span> np<span class="token punctuation">.</span>unique<span class="token punctuation">(</span>y<span class="token punctuation">[</span>idx<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        members <span class="token operator">=</span> idx<span class="token punctuation">[</span>y<span class="token punctuation">[</span>idx<span class="token punctuation">]</span> <span class="token operator">==</span> cls<span class="token punctuation">]</span>
+        <span class="token keyword">if</span> <span class="token builtin">len</span><span class="token punctuation">(</span>members<span class="token punctuation">)</span> <span class="token operator">></span> max_per_class<span class="token punctuation">:</span>
+            members <span class="token operator">=</span> rng<span class="token punctuation">.</span>choice<span class="token punctuation">(</span>members<span class="token punctuation">,</span> size<span class="token operator">=</span>max_per_class<span class="token punctuation">,</span> replace<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">)</span>
+        keep<span class="token punctuation">.</span>append<span class="token punctuation">(</span>members<span class="token punctuation">)</span>
+    out <span class="token operator">=</span> np<span class="token punctuation">.</span>concatenate<span class="token punctuation">(</span>keep<span class="token punctuation">)</span>
+    rng<span class="token punctuation">.</span>shuffle<span class="token punctuation">(</span>out<span class="token punctuation">)</span>
+    <span class="token keyword">return</span> out<span class="token punctuation">,</span> <span class="token punctuation">{</span>cls<span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span><span class="token punctuation">(</span>y<span class="token punctuation">[</span>out<span class="token punctuation">]</span> <span class="token operator">==</span> cls<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token keyword">for</span> cls <span class="token keyword">in</span> np<span class="token punctuation">.</span>unique<span class="token punctuation">(</span>y<span class="token punctuation">[</span>out<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">}</span>
+</code></pre></div>
+<p>Airborne lidar over a city is roughly 55% ground, 30% vegetation, 12% building and 3% everything else — and an unweighted forest will happily ignore the 3%, achieving high accuracy by never predicting it. Weighting or subsampling is not optional if those classes matter.</p>
+<p>Capping the weight at 20 rather than using the raw inverse frequency matters for a class with a few hundred points: an uncapped weight of 4,000 makes every one of those points dominate a tree’s splits and produces wild over-prediction of that class.</p>
+<p>Subsampling the majority classes is usually the better choice because it also makes training faster, and a random forest does not benefit much from 20 million ground points over 400,000.</p>
+<h3 id="4-train-with-parameters-that-matter" tabindex="-1"><a class="heading-link" href="#4-train-with-parameters-that-matter"><span>4. Train, with parameters that matter</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">train</span><span class="token punctuation">(</span>X<span class="token punctuation">,</span> y<span class="token punctuation">,</span> train_idx<span class="token punctuation">,</span> weights<span class="token operator">=</span><span class="token boolean">None</span><span class="token punctuation">,</span> n_estimators<span class="token operator">=</span><span class="token number">300</span><span class="token punctuation">,</span> max_depth<span class="token operator">=</span><span class="token boolean">None</span><span class="token punctuation">,</span>
+          min_samples_leaf<span class="token operator">=</span><span class="token number">5</span><span class="token punctuation">,</span> max_features<span class="token operator">=</span><span class="token string">"sqrt"</span><span class="token punctuation">,</span> n_jobs<span class="token operator">=</span><span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">,</span> seed<span class="token operator">=</span><span class="token number">7</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    clf <span class="token operator">=</span> RandomForestClassifier<span class="token punctuation">(</span>
+        n_estimators<span class="token operator">=</span>n_estimators<span class="token punctuation">,</span>
+        max_depth<span class="token operator">=</span>max_depth<span class="token punctuation">,</span>
+        min_samples_leaf<span class="token operator">=</span>min_samples_leaf<span class="token punctuation">,</span>
+        max_features<span class="token operator">=</span>max_features<span class="token punctuation">,</span>
+        class_weight<span class="token operator">=</span>weights<span class="token punctuation">,</span>
+        n_jobs<span class="token operator">=</span>n_jobs<span class="token punctuation">,</span>
+        random_state<span class="token operator">=</span>seed<span class="token punctuation">,</span>
+        oob_score<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span>
+        bootstrap<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span>
+    <span class="token punctuation">)</span>
+    clf<span class="token punctuation">.</span>fit<span class="token punctuation">(</span>X<span class="token punctuation">[</span>train_idx<span class="token punctuation">]</span><span class="token punctuation">,</span> y<span class="token punctuation">[</span>train_idx<span class="token punctuation">]</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> clf<span class="token punctuation">,</span> <span class="token punctuation">{</span>
+        <span class="token string">"trees"</span><span class="token punctuation">:</span> n_estimators<span class="token punctuation">,</span>
+        <span class="token string">"oob_score"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>clf<span class="token punctuation">.</span>oob_score_<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"features"</span><span class="token punctuation">:</span> X<span class="token punctuation">.</span>shape<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+        <span class="token string">"train_points"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>train_idx<span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"classes"</span><span class="token punctuation">:</span> clf<span class="token punctuation">.</span>classes_<span class="token punctuation">.</span>tolist<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"note"</span><span class="token punctuation">:</span> <span class="token string">"oob_score is optimistic on point clouds — it is not spatially blocked"</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+</code></pre></div>
+<p><code>min_samples_leaf=5</code> rather than the default 1 is a deliberate regularisation. A leaf holding one point memorises that point, which on data this correlated is a near-guarantee of overfitting; five is enough to blunt it without losing the minority classes.</p>
+<p><code>oob_score</code> is reported and should not be believed. Out-of-bag samples are drawn randomly, so they suffer exactly the leakage the blocked split exists to avoid — the OOB score will be several points above the blocked test score, and the gap between them is a useful measure of how correlated the data is.</p>
+<p>Three hundred trees is comfortably past the point of diminishing returns; the accuracy curve is flat above about 150 and the cost is linear.</p>
+<h3 id="5-read-the-feature-importances-and-prune" tabindex="-1"><a class="heading-link" href="#5-read-the-feature-importances-and-prune"><span>5. Read the feature importances and prune</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">from</span> sklearn<span class="token punctuation">.</span>inspection <span class="token keyword">import</span> permutation_importance
+
+<span class="token keyword">def</span> <span class="token function">importance_report</span><span class="token punctuation">(</span>clf<span class="token punctuation">,</span> X<span class="token punctuation">,</span> y<span class="token punctuation">,</span> test_idx<span class="token punctuation">,</span> feature_names<span class="token punctuation">,</span> n_repeats<span class="token operator">=</span><span class="token number">5</span><span class="token punctuation">,</span> seed<span class="token operator">=</span><span class="token number">7</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    impurity <span class="token operator">=</span> clf<span class="token punctuation">.</span>feature_importances_
+    perm <span class="token operator">=</span> permutation_importance<span class="token punctuation">(</span>clf<span class="token punctuation">,</span> X<span class="token punctuation">[</span>test_idx<span class="token punctuation">]</span><span class="token punctuation">,</span> y<span class="token punctuation">[</span>test_idx<span class="token punctuation">]</span><span class="token punctuation">,</span>
+                                  n_repeats<span class="token operator">=</span>n_repeats<span class="token punctuation">,</span> random_state<span class="token operator">=</span>seed<span class="token punctuation">,</span> n_jobs<span class="token operator">=</span><span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">)</span>
+    rows <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    <span class="token keyword">for</span> i<span class="token punctuation">,</span> name <span class="token keyword">in</span> <span class="token builtin">enumerate</span><span class="token punctuation">(</span>feature_names<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        rows<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span>
+            <span class="token string">"feature"</span><span class="token punctuation">:</span> name<span class="token punctuation">,</span>
+            <span class="token string">"impurity_importance"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>impurity<span class="token punctuation">[</span>i<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">5</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"permutation_importance"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>perm<span class="token punctuation">.</span>importances_mean<span class="token punctuation">[</span>i<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">5</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"permutation_std"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>perm<span class="token punctuation">.</span>importances_std<span class="token punctuation">[</span>i<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">5</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token punctuation">}</span><span class="token punctuation">)</span>
+    rows<span class="token punctuation">.</span>sort<span class="token punctuation">(</span>key<span class="token operator">=</span><span class="token keyword">lambda</span> r<span class="token punctuation">:</span> <span class="token operator">-</span>r<span class="token punctuation">[</span><span class="token string">"permutation_importance"</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    useless <span class="token operator">=</span> <span class="token punctuation">[</span>r<span class="token punctuation">[</span><span class="token string">"feature"</span><span class="token punctuation">]</span> <span class="token keyword">for</span> r <span class="token keyword">in</span> rows <span class="token keyword">if</span> r<span class="token punctuation">[</span><span class="token string">"permutation_importance"</span><span class="token punctuation">]</span> <span class="token operator">&lt;=</span> <span class="token number">0.0005</span><span class="token punctuation">]</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"top"</span><span class="token punctuation">:</span> rows<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token number">8</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token string">"candidates_to_drop"</span><span class="token punctuation">:</span> useless<span class="token punctuation">,</span>
+            <span class="token string">"note"</span><span class="token punctuation">:</span> <span class="token string">"impurity importance favours high-cardinality features; "</span>
+                    <span class="token string">"trust the permutation figure"</span><span class="token punctuation">}</span>
+
+<span class="token keyword">def</span> <span class="token function">retrain_without</span><span class="token punctuation">(</span>X<span class="token punctuation">,</span> y<span class="token punctuation">,</span> train_idx<span class="token punctuation">,</span> test_idx<span class="token punctuation">,</span> feature_names<span class="token punctuation">,</span> drop<span class="token punctuation">,</span> <span class="token operator">**</span>kwargs<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    keep <span class="token operator">=</span> <span class="token punctuation">[</span>i <span class="token keyword">for</span> i<span class="token punctuation">,</span> n <span class="token keyword">in</span> <span class="token builtin">enumerate</span><span class="token punctuation">(</span>feature_names<span class="token punctuation">)</span> <span class="token keyword">if</span> n <span class="token keyword">not</span> <span class="token keyword">in</span> <span class="token builtin">set</span><span class="token punctuation">(</span>drop<span class="token punctuation">)</span><span class="token punctuation">]</span>
+    clf<span class="token punctuation">,</span> info <span class="token operator">=</span> train<span class="token punctuation">(</span>X<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> keep<span class="token punctuation">]</span><span class="token punctuation">,</span> y<span class="token punctuation">,</span> train_idx<span class="token punctuation">,</span> <span class="token operator">**</span>kwargs<span class="token punctuation">)</span>
+    score <span class="token operator">=</span> clf<span class="token punctuation">.</span>score<span class="token punctuation">(</span>X<span class="token punctuation">[</span>np<span class="token punctuation">.</span>ix_<span class="token punctuation">(</span>test_idx<span class="token punctuation">,</span> keep<span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">,</span> y<span class="token punctuation">[</span>test_idx<span class="token punctuation">]</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> clf<span class="token punctuation">,</span> <span class="token punctuation">{</span><span class="token string">"features_before"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>feature_names<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"features_after"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>keep<span class="token punctuation">)</span><span class="token punctuation">,</span>
+                 <span class="token string">"dropped"</span><span class="token punctuation">:</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span><span class="token builtin">set</span><span class="token punctuation">(</span>drop<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                 <span class="token string">"test_accuracy"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>score<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token operator">**</span>info<span class="token punctuation">}</span>
+</code></pre></div>
+<p>Permutation importance measured on the <strong>blocked test set</strong> is the figure to act on. Impurity importance is computed during training and systematically favours continuous features with many distinct values, so it over-rates density and intensity and under-rates the binary-ish return features.</p>
+<p>Dropping features that contribute nothing is worth doing for a practical reason: each feature scale costs a full neighbour search at inference time, so dropping the 0.5 m scale entirely — if the importances say it adds nothing — cuts a third off the feature computation on every future tile.</p>
+<p>Intensity is the feature most often worth dropping. It is uncalibrated between flight lines, so a model that learns from it generalises badly to the next survey, and its importance is usually modest.</p>
+<figure class="diagram">
+<svg viewBox="4 6 732 278" role="img" aria-labelledby="rf-features-t rf-features-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="rf-features-t">Feature groups and whether they transfer</title>
+  <desc id="rf-features-d">A table of five feature groups with their importance and whether they transfer to another survey. Height above ground is the most important feature and transfers because it is geometric. Eigenvalue features at several scales transfer for the same reason. Return counts are useful and depend on the sensor. Density depends on flying height. Intensity is uncalibrated between surveys and is usually worth dropping.</desc>
+  <rect class="svg-bg" x="4" y="6" width="732" height="278" fill="#ffffff"/>
+  <g stroke-width="1.5">
+    <rect x="18" y="20" width="264" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="282" y="20" width="176" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="458" y="20" width="264" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="18" y="54" width="264" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="282" y="54" width="176" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="458" y="54" width="264" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="18" y="88" width="264" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="282" y="88" width="176" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="458" y="88" width="264" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="18" y="122" width="264" height="34" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="282" y="122" width="176" height="34" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="458" y="122" width="264" height="34" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="18" y="156" width="264" height="34" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="282" y="156" width="176" height="34" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="458" y="156" width="264" height="34" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="18" y="190" width="264" height="34" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="282" y="190" width="176" height="34" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="458" y="190" width="264" height="34" fill="#f7dfdc" stroke="#b0413e"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="150" y="42">feature group</text><text x="370" y="42">importance</text><text x="590" y="42">transfers to a new survey?</text>
+    <text x="150" y="76">height above ground</text><text x="370" y="76">highest</text><text x="590" y="76">yes — geometric</text>
+    <text x="150" y="110">eigenvalue features, 3 scales</text><text x="370" y="110">high</text><text x="590" y="110">yes — geometric</text>
+    <text x="150" y="144">return counts</text><text x="370" y="144">moderate</text><text x="590" y="144">depends on the sensor</text>
+    <text x="150" y="178">local density</text><text x="370" y="178">moderate</text><text x="590" y="178">depends on flying height</text>
+    <text x="150" y="212">intensity</text><text x="370" y="212">low</text><text x="590" y="212">no — uncalibrated between surveys</text>
+  </g>
+  <text x="20" y="244" fill="#1f2937" font-size="12.5">A model whose importance is mostly geometric transfers; one leaning on density does not.</text>
+  <text x="20" y="266" fill="#5b6471" font-size="12">Drop intensity unless it has been radiometrically calibrated across the whole survey.</text>
+</svg>
+<figcaption>The two geometric groups carry the model and transfer; intensity is useful here and useless next time.</figcaption>
+</figure>
+<h3 id="6-report-per-class-error-not-accuracy" tabindex="-1"><a class="heading-link" href="#6-report-per-class-error-not-accuracy"><span>6. Report per-class error, not accuracy</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">from</span> sklearn<span class="token punctuation">.</span>metrics <span class="token keyword">import</span> confusion_matrix<span class="token punctuation">,</span> classification_report
+
+CLASS_NAMES <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token number">1</span><span class="token punctuation">:</span> <span class="token string">"unclassified"</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">:</span> <span class="token string">"ground"</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">:</span> <span class="token string">"low_veg"</span><span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">:</span> <span class="token string">"med_veg"</span><span class="token punctuation">,</span>
+               <span class="token number">5</span><span class="token punctuation">:</span> <span class="token string">"high_veg"</span><span class="token punctuation">,</span> <span class="token number">6</span><span class="token punctuation">:</span> <span class="token string">"building"</span><span class="token punctuation">,</span> <span class="token number">9</span><span class="token punctuation">:</span> <span class="token string">"water"</span><span class="token punctuation">,</span> <span class="token number">11</span><span class="token punctuation">:</span> <span class="token string">"road"</span><span class="token punctuation">}</span>
+
+<span class="token keyword">def</span> <span class="token function">evaluate</span><span class="token punctuation">(</span>clf<span class="token punctuation">,</span> X<span class="token punctuation">,</span> y<span class="token punctuation">,</span> test_idx<span class="token punctuation">,</span> class_names<span class="token operator">=</span>CLASS_NAMES<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    pred <span class="token operator">=</span> clf<span class="token punctuation">.</span>predict<span class="token punctuation">(</span>X<span class="token punctuation">[</span>test_idx<span class="token punctuation">]</span><span class="token punctuation">)</span>
+    truth <span class="token operator">=</span> y<span class="token punctuation">[</span>test_idx<span class="token punctuation">]</span>
+    labels <span class="token operator">=</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span><span class="token builtin">set</span><span class="token punctuation">(</span>truth<span class="token punctuation">.</span>tolist<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">|</span> <span class="token builtin">set</span><span class="token punctuation">(</span>pred<span class="token punctuation">.</span>tolist<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    cm <span class="token operator">=</span> confusion_matrix<span class="token punctuation">(</span>truth<span class="token punctuation">,</span> pred<span class="token punctuation">,</span> labels<span class="token operator">=</span>labels<span class="token punctuation">)</span>
+    report <span class="token operator">=</span> classification_report<span class="token punctuation">(</span>truth<span class="token punctuation">,</span> pred<span class="token punctuation">,</span> labels<span class="token operator">=</span>labels<span class="token punctuation">,</span> output_dict<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span>
+                                   zero_division<span class="token operator">=</span><span class="token number">0</span><span class="token punctuation">)</span>
+
+    per_class <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    <span class="token keyword">for</span> i<span class="token punctuation">,</span> label <span class="token keyword">in</span> <span class="token builtin">enumerate</span><span class="token punctuation">(</span>labels<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        support <span class="token operator">=</span> <span class="token builtin">int</span><span class="token punctuation">(</span>cm<span class="token punctuation">[</span>i<span class="token punctuation">]</span><span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+        per_class<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span>
+            <span class="token string">"class"</span><span class="token punctuation">:</span> label<span class="token punctuation">,</span>
+            <span class="token string">"name"</span><span class="token punctuation">:</span> class_names<span class="token punctuation">.</span>get<span class="token punctuation">(</span>label<span class="token punctuation">,</span> <span class="token builtin">str</span><span class="token punctuation">(</span>label<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"support"</span><span class="token punctuation">:</span> support<span class="token punctuation">,</span>
+            <span class="token string">"recall"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>report<span class="token punctuation">[</span><span class="token builtin">str</span><span class="token punctuation">(</span>label<span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token string">"recall"</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"precision"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>report<span class="token punctuation">[</span><span class="token builtin">str</span><span class="token punctuation">(</span>label<span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token string">"precision"</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"f1"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>report<span class="token punctuation">[</span><span class="token builtin">str</span><span class="token punctuation">(</span>label<span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token string">"f1-score"</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"worst_confusion"</span><span class="token punctuation">:</span> class_names<span class="token punctuation">.</span>get<span class="token punctuation">(</span>
+                labels<span class="token punctuation">[</span><span class="token builtin">int</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>argmax<span class="token punctuation">(</span>np<span class="token punctuation">.</span>where<span class="token punctuation">(</span>np<span class="token punctuation">.</span>arange<span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>labels<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">==</span> i<span class="token punctuation">,</span> <span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">,</span> cm<span class="token punctuation">[</span>i<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+                <span class="token string">"—"</span><span class="token punctuation">)</span> <span class="token keyword">if</span> support <span class="token keyword">else</span> <span class="token string">"—"</span><span class="token punctuation">,</span>
+        <span class="token punctuation">}</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token string">"overall_accuracy"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span><span class="token punctuation">(</span>pred <span class="token operator">==</span> truth<span class="token punctuation">)</span><span class="token punctuation">.</span>mean<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"balanced_accuracy"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>mean<span class="token punctuation">(</span><span class="token punctuation">[</span>p<span class="token punctuation">[</span><span class="token string">"recall"</span><span class="token punctuation">]</span> <span class="token keyword">for</span> p <span class="token keyword">in</span> per_class
+                                                  <span class="token keyword">if</span> p<span class="token punctuation">[</span><span class="token string">"support"</span><span class="token punctuation">]</span> <span class="token operator">></span> <span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"per_class"</span><span class="token punctuation">:</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span>per_class<span class="token punctuation">,</span> key<span class="token operator">=</span><span class="token keyword">lambda</span> p<span class="token punctuation">:</span> p<span class="token punctuation">[</span><span class="token string">"f1"</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"confusion_matrix"</span><span class="token punctuation">:</span> <span class="token punctuation">{</span><span class="token string">"labels"</span><span class="token punctuation">:</span> labels<span class="token punctuation">,</span> <span class="token string">"counts"</span><span class="token punctuation">:</span> cm<span class="token punctuation">.</span>tolist<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+
+<span class="token keyword">def</span> <span class="token function">compare_splits</span><span class="token punctuation">(</span>X<span class="token punctuation">,</span> y<span class="token punctuation">,</span> xyz<span class="token punctuation">,</span> feature_names<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""The demonstration that random splitting lies."""</span>
+    blocked <span class="token operator">=</span> blocked_split<span class="token punctuation">(</span>xyz<span class="token punctuation">,</span> y<span class="token punctuation">)</span>
+    random <span class="token operator">=</span> random_split_for_comparison<span class="token punctuation">(</span>y<span class="token punctuation">)</span>
+    results <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token punctuation">}</span>
+    <span class="token keyword">for</span> name<span class="token punctuation">,</span> split <span class="token keyword">in</span> <span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token string">"blocked"</span><span class="token punctuation">,</span> blocked<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token punctuation">(</span><span class="token string">"random"</span><span class="token punctuation">,</span> random<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        clf<span class="token punctuation">,</span> _ <span class="token operator">=</span> train<span class="token punctuation">(</span>X<span class="token punctuation">,</span> y<span class="token punctuation">,</span> split<span class="token punctuation">[</span><span class="token string">"train"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+                       weights<span class="token operator">=</span>class_weights<span class="token punctuation">(</span>y<span class="token punctuation">[</span>split<span class="token punctuation">[</span><span class="token string">"train"</span><span class="token punctuation">]</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+        ev <span class="token operator">=</span> evaluate<span class="token punctuation">(</span>clf<span class="token punctuation">,</span> X<span class="token punctuation">,</span> y<span class="token punctuation">,</span> split<span class="token punctuation">[</span><span class="token string">"test"</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+        results<span class="token punctuation">[</span>name<span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token string">"overall_accuracy"</span><span class="token punctuation">:</span> ev<span class="token punctuation">[</span><span class="token string">"overall_accuracy"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+                         <span class="token string">"balanced_accuracy"</span><span class="token punctuation">:</span> ev<span class="token punctuation">[</span><span class="token string">"balanced_accuracy"</span><span class="token punctuation">]</span><span class="token punctuation">}</span>
+    results<span class="token punctuation">[</span><span class="token string">"optimism"</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token builtin">round</span><span class="token punctuation">(</span>results<span class="token punctuation">[</span><span class="token string">"random"</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token string">"overall_accuracy"</span><span class="token punctuation">]</span>
+                                <span class="token operator">-</span> results<span class="token punctuation">[</span><span class="token string">"blocked"</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token string">"overall_accuracy"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> results
+
+<span class="token keyword">print</span><span class="token punctuation">(</span>json<span class="token punctuation">.</span>dumps<span class="token punctuation">(</span>compare_splits<span class="token punctuation">(</span>X<span class="token punctuation">,</span> y<span class="token punctuation">,</span> xyz<span class="token punctuation">,</span> names<span class="token punctuation">)</span><span class="token punctuation">,</span> indent<span class="token operator">=</span><span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Balanced accuracy — the mean per-class recall — is the headline figure for an imbalanced problem. Overall accuracy on a cloud that is 55% ground can reach 0.93 while low vegetation has a recall of 0.31, and the two numbers describe very different classifiers.</p>
+<p>The <code>worst_confusion</code> column is what turns the report into a work list. “Low vegetation is most often confused with ground” points at the feature that should separate them, which is usually a finer height-above-ground resolution or a smaller feature scale.</p>
+<figure class="diagram">
+<svg viewBox="4 6 732 238" role="img" aria-labelledby="rf-split-t rf-split-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="rf-split-t">Random splitting versus spatially blocked splitting</title>
+  <desc id="rf-split-d">Two evaluation results for the same model and data. With a random point-level split, overall accuracy is 0.991 and balanced accuracy 0.978, and the model appears excellent. With a spatially blocked split at 50 metre blocks, overall accuracy is 0.934 and balanced accuracy 0.812. On a completely held-out tile, accuracy is 0.911 and balanced accuracy 0.774. The random split overstates accuracy by 5.7 points and balanced accuracy by 16.6 points.</desc>
+  <rect class="svg-bg" x="4" y="6" width="732" height="238" fill="#ffffff"/>
+  <g stroke-width="1.5">
+    <rect x="18" y="20" width="268" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="286" y="20" width="148" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="434" y="20" width="148" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="582" y="20" width="140" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="18" y="54" width="268" height="40" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="286" y="54" width="148" height="40" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="434" y="54" width="148" height="40" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="582" y="54" width="140" height="40" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="18" y="94" width="268" height="40" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="286" y="94" width="148" height="40" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="434" y="94" width="148" height="40" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="582" y="94" width="140" height="40" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="18" y="134" width="268" height="40" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="286" y="134" width="148" height="40" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="434" y="134" width="148" height="40" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="582" y="134" width="140" height="40" fill="#eef5e9" stroke="#4f7a4d"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="152" y="41">evaluation method</text><text x="360" y="41">accuracy</text>
+    <text x="508" y="41">balanced acc.</text><text x="652" y="41">trustworthy?</text>
+    <text x="152" y="70">random point-level split</text><text x="152" y="86">(neighbours leak across)</text>
+    <text x="360" y="78">0.991</text><text x="508" y="78">0.978</text><text x="652" y="78">no</text>
+    <text x="152" y="110">spatially blocked, 50 m</text><text x="152" y="126">held-out blocks</text>
+    <text x="360" y="118">0.934</text><text x="508" y="118">0.812</text><text x="652" y="118">yes</text>
+    <text x="152" y="150">completely held-out tile</text><text x="152" y="166">different flight line</text>
+    <text x="360" y="158">0.911</text><text x="508" y="158">0.774</text><text x="652" y="158">yes — the real figure</text>
+  </g>
+  <text x="370" y="204" fill="#1f2937" font-size="12.5" text-anchor="middle">the random split overstates accuracy by 5.7 points and balanced accuracy by 16.6</text>
+  <text x="370" y="226" fill="#5b6471" font-size="12" text-anchor="middle">on a held-out tile the minority classes are where the difference lands</text>
+</svg>
+<figcaption>Same model, same data, three evaluation methods; only the bottom row predicts what happens on the next tile.</figcaption>
+</figure>
+<h2 id="expected-output-verification" tabindex="-1"><a class="heading-link" href="#expected-output-verification"><span>Expected Output &amp; Verification</span></a></h2>
+<div class="codeblock" data-lang="text"><div class="codeblock__bar"><span class="codeblock__lang">text</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-text" tabindex="0" role="group" aria-label="text code sample"><code class="language-text">{'blocks_total': 400, 'blocks_test': 120, 'train_points': 29184102,
+ 'test_points': 12636316,
+ 'train_class_mix': {2: 16082418, 5: 6418204, 3: 1884102, 6: 3418204, 1: 1381174},
+ 'test_class_mix': {2: 6982104, 5: 2818402, 3: 812004, 6: 1481806, 1: 542000}}
+{'trees': 300, 'oob_score': 0.9881, 'features': 26, 'train_points': 1602418,
+ 'classes': [1, 2, 3, 4, 5, 6, 9, 11]}
+{
+  "top": [
+    {"feature": "height_above_ground", "impurity_importance": 0.28412,
+     "permutation_importance": 0.19841, "permutation_std": 0.00211},
+    {"feature": "planarity_r4.0", "impurity_importance": 0.09104,
+     "permutation_importance": 0.07412, "permutation_std": 0.00184},
+    {"feature": "scattering_r1.5", "impurity_importance": 0.08218,
+     "permutation_importance": 0.06104, "permutation_std": 0.00162},
+    {"feature": "returns_after", "impurity_importance": 0.02104,
+     "permutation_importance": 0.04418, "permutation_std": 0.00121}
+  ],
+  "candidates_to_drop": ["intensity", "linearity_r0.5", "eigenentropy_r0.5"]
+}
+{
+  "overall_accuracy": 0.9341,
+  "balanced_accuracy": 0.8122,
+  "per_class": [
+    {"class": 3, "name": "low_veg", "support": 812004, "recall": 0.6418,
+     "precision": 0.7104, "f1": 0.6744, "worst_confusion": "ground"},
+    {"class": 4, "name": "med_veg", "support": 418204, "recall": 0.7218,
+     "precision": 0.6884, "f1": 0.7047, "worst_confusion": "high_veg"},
+    {"class": 6, "name": "building", "support": 1481806, "recall": 0.9418,
+     "precision": 0.9604, "f1": 0.951, "worst_confusion": "ground"},
+    {"class": 2, "name": "ground", "support": 6982104, "recall": 0.9784,
+     "precision": 0.9641, "f1": 0.9712, "worst_confusion": "low_veg"}
+  ]
+}
+{'blocked': {'overall_accuracy': 0.9341, 'balanced_accuracy': 0.8122},
+ 'random': {'overall_accuracy': 0.9912, 'balanced_accuracy': 0.9784},
+ 'optimism': 0.0571}
+</code></pre></div>
+<p>The 0.0571 optimism figure is the demonstration that matters: the random split reports 99.1% and the blocked split 93.4% for the same model. Reporting the random figure would be misleading, and it is the figure most tutorials produce.</p>
+<p>Low vegetation at 0.64 recall, confused with ground, is the honest weak point and it is typical — the boundary between 20 cm grass and bare earth is genuinely ambiguous at airborne point density, and no feature set fixes it entirely.</p>
+<p>Verify on a completely held-out tile, because blocked validation still shares the flight:</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">holdout_tile_check</span><span class="token punctuation">(</span>clf<span class="token punctuation">,</span> feature_names<span class="token punctuation">,</span> holdout_las<span class="token punctuation">,</span> keep_features<span class="token operator">=</span><span class="token boolean">None</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    X_h<span class="token punctuation">,</span> y_h<span class="token punctuation">,</span> names_h<span class="token punctuation">,</span> xyz_h <span class="token operator">=</span> build_features<span class="token punctuation">(</span>holdout_las<span class="token punctuation">)</span>
+    <span class="token keyword">if</span> names_h <span class="token operator">!=</span> feature_names<span class="token punctuation">:</span>
+        <span class="token keyword">raise</span> ValueError<span class="token punctuation">(</span><span class="token string">"feature order differs between tiles; rebuild consistently"</span><span class="token punctuation">)</span>
+    <span class="token keyword">if</span> keep_features<span class="token punctuation">:</span>
+        keep <span class="token operator">=</span> <span class="token punctuation">[</span>i <span class="token keyword">for</span> i<span class="token punctuation">,</span> n <span class="token keyword">in</span> <span class="token builtin">enumerate</span><span class="token punctuation">(</span>feature_names<span class="token punctuation">)</span> <span class="token keyword">if</span> n <span class="token keyword">in</span> <span class="token builtin">set</span><span class="token punctuation">(</span>keep_features<span class="token punctuation">)</span><span class="token punctuation">]</span>
+        X_h <span class="token operator">=</span> X_h<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> keep<span class="token punctuation">]</span>
+    pred <span class="token operator">=</span> clf<span class="token punctuation">.</span>predict<span class="token punctuation">(</span>X_h<span class="token punctuation">)</span>
+    ev_labels <span class="token operator">=</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span><span class="token builtin">set</span><span class="token punctuation">(</span>y_h<span class="token punctuation">.</span>tolist<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    cm <span class="token operator">=</span> confusion_matrix<span class="token punctuation">(</span>y_h<span class="token punctuation">,</span> pred<span class="token punctuation">,</span> labels<span class="token operator">=</span>ev_labels<span class="token punctuation">)</span>
+    recalls <span class="token operator">=</span> <span class="token punctuation">[</span>cm<span class="token punctuation">[</span>i<span class="token punctuation">,</span> i<span class="token punctuation">]</span> <span class="token operator">/</span> <span class="token builtin">max</span><span class="token punctuation">(</span>cm<span class="token punctuation">[</span>i<span class="token punctuation">]</span><span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span> <span class="token keyword">for</span> i <span class="token keyword">in</span> <span class="token builtin">range</span><span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>ev_labels<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">]</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token string">"tile"</span><span class="token punctuation">:</span> Path<span class="token punctuation">(</span>holdout_las<span class="token punctuation">)</span><span class="token punctuation">.</span>name<span class="token punctuation">,</span>
+        <span class="token string">"points"</span><span class="token punctuation">:</span> <span class="token builtin">int</span><span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>y_h<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"overall_accuracy"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span><span class="token punctuation">(</span>pred <span class="token operator">==</span> y_h<span class="token punctuation">)</span><span class="token punctuation">.</span>mean<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"balanced_accuracy"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>mean<span class="token punctuation">(</span>recalls<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"per_class_recall"</span><span class="token punctuation">:</span> <span class="token punctuation">{</span>CLASS_NAMES<span class="token punctuation">.</span>get<span class="token punctuation">(</span>l<span class="token punctuation">,</span> <span class="token builtin">str</span><span class="token punctuation">(</span>l<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span><span class="token builtin">float</span><span class="token punctuation">(</span>r<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span>
+                             <span class="token keyword">for</span> l<span class="token punctuation">,</span> r <span class="token keyword">in</span> <span class="token builtin">zip</span><span class="token punctuation">(</span>ev_labels<span class="token punctuation">,</span> recalls<span class="token punctuation">)</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+        <span class="token string">"classes_in_holdout_not_in_training"</span><span class="token punctuation">:</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span>
+            <span class="token builtin">set</span><span class="token punctuation">(</span>y_h<span class="token punctuation">.</span>tolist<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token operator">-</span> <span class="token builtin">set</span><span class="token punctuation">(</span>clf<span class="token punctuation">.</span>classes_<span class="token punctuation">.</span>tolist<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+
+<span class="token keyword">print</span><span class="token punctuation">(</span>json<span class="token punctuation">.</span>dumps<span class="token punctuation">(</span>holdout_tile_check<span class="token punctuation">(</span>clf<span class="token punctuation">,</span> names<span class="token punctuation">,</span> <span class="token string">"input/tile_b_classified.laz"</span><span class="token punctuation">)</span><span class="token punctuation">,</span> indent<span class="token operator">=</span><span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>A class present in the holdout and absent from training is the failure that produces a confidently wrong result across a whole region — a tile with water where the training tile had none will have every water point assigned to something else. Checking for it explicitly costs one set difference.</p>
+<p>Then verify the model is not relying on something that will not generalise:</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">generalisation_risk_check</span><span class="token punctuation">(</span>importance_report_result<span class="token punctuation">,</span> feature_names<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Features that vary between surveys are a generalisation risk however useful."""</span>
+    FRAGILE <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token string">"intensity"</span><span class="token punctuation">,</span> <span class="token string">"density"</span><span class="token punctuation">,</span> <span class="token string">"number_of_returns"</span><span class="token punctuation">,</span> <span class="token string">"return_number"</span><span class="token punctuation">,</span>
+               <span class="token string">"returns_after"</span><span class="token punctuation">}</span>
+    rows <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    <span class="token keyword">for</span> r <span class="token keyword">in</span> importance_report_result<span class="token punctuation">[</span><span class="token string">"top"</span><span class="token punctuation">]</span><span class="token punctuation">:</span>
+        base <span class="token operator">=</span> r<span class="token punctuation">[</span><span class="token string">"feature"</span><span class="token punctuation">]</span><span class="token punctuation">.</span>split<span class="token punctuation">(</span><span class="token string">"_r"</span><span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span>
+        rows<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span>
+            <span class="token string">"feature"</span><span class="token punctuation">:</span> r<span class="token punctuation">[</span><span class="token string">"feature"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+            <span class="token string">"permutation_importance"</span><span class="token punctuation">:</span> r<span class="token punctuation">[</span><span class="token string">"permutation_importance"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+            <span class="token string">"fragile"</span><span class="token punctuation">:</span> base <span class="token keyword">in</span> FRAGILE<span class="token punctuation">,</span>
+            <span class="token string">"why"</span><span class="token punctuation">:</span> <span class="token string">"varies with sensor, altitude and calibration between surveys"</span>
+                   <span class="token keyword">if</span> base <span class="token keyword">in</span> FRAGILE <span class="token keyword">else</span> <span class="token string">"geometric — stable across surveys"</span><span class="token punctuation">,</span>
+        <span class="token punctuation">}</span><span class="token punctuation">)</span>
+    fragile_share <span class="token operator">=</span> <span class="token builtin">sum</span><span class="token punctuation">(</span>r<span class="token punctuation">[</span><span class="token string">"permutation_importance"</span><span class="token punctuation">]</span> <span class="token keyword">for</span> r <span class="token keyword">in</span> rows <span class="token keyword">if</span> r<span class="token punctuation">[</span><span class="token string">"fragile"</span><span class="token punctuation">]</span><span class="token punctuation">)</span> \
+        <span class="token operator">/</span> <span class="token builtin">max</span><span class="token punctuation">(</span><span class="token builtin">sum</span><span class="token punctuation">(</span>r<span class="token punctuation">[</span><span class="token string">"permutation_importance"</span><span class="token punctuation">]</span> <span class="token keyword">for</span> r <span class="token keyword">in</span> rows<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token number">1e-9</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token string">"rows"</span><span class="token punctuation">:</span> rows<span class="token punctuation">,</span>
+        <span class="token string">"fragile_importance_share"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>fragile_share<span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"verdict"</span><span class="token punctuation">:</span> <span class="token string">"model leans on survey-specific features; expect degradation "</span>
+                   <span class="token string">"on a new sensor"</span> <span class="token keyword">if</span> fragile_share <span class="token operator">></span> <span class="token number">0.3</span>
+                   <span class="token keyword">else</span> <span class="token string">"mostly geometric features — should transfer"</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+</code></pre></div>
+<p>Density and return counts are genuinely useful and genuinely survey-specific. A model whose importance is a third density will do well on this survey and worse on the next one flown at a different altitude, and knowing that in advance is better than discovering it.</p>
+<h2 id="performance-notes" tabindex="-1"><a class="heading-link" href="#performance-notes"><span>Performance Notes</span></a></h2>
+<ul>
+<li><strong>Feature computation dominates</strong>: three scales on 40 million points is 30–60 minutes single-threaded. <code>workers=-1</code> on the neighbour search and a per-block loop parallelise it.</li>
+<li><strong>Training on 1.6 million subsampled points with 300 trees takes 2–4 minutes</strong> on 8 cores. More points buy very little.</li>
+<li><strong>Inference is 1–2 million points per second</strong> with 300 trees, so a tile predicts in under a minute once the features exist.</li>
+<li><strong>Memory is the constraint at feature time.</strong> 26 float32 features on 40 million points is 4 GB; compute and predict per block rather than holding the whole tile.</li>
+<li><strong>Drop the finest scale if its importance is low</strong> — it is a third of the feature cost.</li>
+<li><strong>Cache features alongside the tile.</strong> Re-training happens far more often than re-featurising.</li>
+</ul>
+<h2 id="common-errors" tabindex="-1"><a class="heading-link" href="#common-errors"><span>Common Errors</span></a></h2>
+<p><strong>99% accuracy that collapses on a new tile.</strong> Random splitting. Use blocks.</p>
+<p><strong>A minority class is never predicted.</strong> No class weighting and no subsampling.</p>
+<p><strong><code>ValueError: Input contains NaN</code>.</strong> Points with too few neighbours produced NaN features. Fill with zeros or a sentinel and let the forest learn the pattern.</p>
+<p><strong>Feature order differs between tiles.</strong> <code>build_features</code> included intensity on one tile and not another. Build the feature list once and enforce it.</p>
+<p><strong>Predictions are blocky at tile boundaries.</strong> Features computed per tile without overlap, so points near the edge have truncated neighbourhoods. Featurise with a buffer.</p>
+<p><strong>The model is worse than PMF at ground.</strong> Likely true, and fine — use PMF for ground and the forest for the classes it does better. A hybrid beats either.</p>
+<p><strong>Permutation importance takes hours.</strong> It refits nothing but predicts once per feature per repeat. Reduce <code>n_repeats</code> and subsample the test set.</p>
+<h2 id="frequently-asked-questions" tabindex="-1"><a class="heading-link" href="#frequently-asked-questions"><span>Frequently Asked Questions</span></a></h2>
+<h3 id="random-forest-or-a-neural-network" tabindex="-1"><a class="heading-link" href="#random-forest-or-a-neural-network"><span>Random forest or a neural network?</span></a></h3>
+<p>A random forest is the right first model: it trains in minutes, needs no tuning to be reasonable and tells you what it used. Point-based deep learning does better on the hard classes given enough labelled data and a GPU, and the features here are a good baseline to beat.</p>
+<h3 id="how-much-labelled-data-do-i-need" tabindex="-1"><a class="heading-link" href="#how-much-labelled-data-do-i-need"><span>How much labelled data do I need?</span></a></h3>
+<p>Two or three well-classified tiles covering the terrain types you care about. What matters far more than volume is that every class you want to predict appears in training with a few thousand examples.</p>
+<h3 id="should-i-use-the-forest-for-ground" tabindex="-1"><a class="heading-link" href="#should-i-use-the-forest-for-ground"><span>Should I use the forest for ground?</span></a></h3>
+<p>Usually not. PMF or SMRF is faster, more predictable and at least as accurate for ground, and using it first also gives you height above ground, which is the forest’s most important feature.</p>
+<h2 id="related-guides" tabindex="-1"><a class="heading-link" href="#related-guides"><span>Related Guides</span></a></h2>
+<ul>
+<li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/ground-classification-with-pdal-pmf/">Ground Classification with PDAL PMF</a> — the rule-based step this complements</li>
+<li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/detecting-power-lines-in-lidar/">Detecting Power Lines in Lidar</a> — the same features used as explicit rules</li>
+<li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/checking-point-cloud-classification-completeness/">Checking Point Cloud Classification Completeness</a> — auditing a classification in production</li>
+</ul>
+<p>Back to <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">Lidar Classification and Ground Extraction</a>.</p>
+
+
+      
+      
+
+      <div class="related-nav">
+        
+
+        
+          <div>
+            <h3>Related</h3>
+            <div class="related-grid">
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/detecting-power-lines-in-lidar/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Detecting Power Lines in Lidar</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/extracting-building-footprints-from-classified-lidar/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Extracting Building Footprints from Classified LiDAR</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/ground-classification-with-pdal-pmf/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Ground Classification with PDAL PMF</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/pdal-smrf-vs-csf-ground-classification/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">PDAL SMRF vs CSF Ground Classification</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/reclassifying-noise-and-overlap-points-with-pdal/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Reclassifying Noise and Overlap Points with PDAL</span>
+                </a>
+              
+            </div>
+          </div>
+        
+      </div>
+    </article>
+
+    
+    <aside class="toc" aria-label="On this page" data-toc hidden>
+      <h4>On this page</h4>
+      <ul></ul>
+    </aside>
+  </div>
+</div>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+  <div class="container site-footer__inner">
+    <div class="site-footer__brand">
+      <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+        <img src="/assets/img/logo-mark.svg" alt="" class="brand__mark" width="36" height="36">
+        <span class="brand__name">
+          3D Geospatial
+          <small>Digital Twin Automation</small>
+        </span>
+      </a>
+      <p>Engineering-grade guides on point cloud processing, mesh pipelines, LOD strategies, and CI/CD automation for digital twin platforms.</p>
+      <a class="footer-social" href="https://github.com/3d-geospatial" aria-label="3D Geospatial on GitHub" rel="noopener" target="_blank">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+          <path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.53-1.34-1.3-1.7-1.3-1.7-1.06-.72.08-.71.08-.71 1.17.08 1.79 1.2 1.79 1.2 1.04 1.79 2.73 1.27 3.4.97.1-.75.4-1.27.73-1.56-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.19-3.08-.12-.3-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.75.11 3.05.74.8 1.19 1.83 1.19 3.08 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.07.78 2.15v3.18c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5Z"/>
+        </svg>
+        <span>GitHub</span>
+      </a>
+    </div>
+
+    <div class="site-footer__col">
+      <h4>Sections</h4>
+      <ul>
+        <li><a href="https://www.3d-geospatial.com/">Home</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management &amp; Optimization</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/">Point Cloud &amp; Mesh Pipelines</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/">Troubleshooting &amp; Reliability</a></li>
+        
+      </ul>
+    </div>
+
+    
+      <div class="site-footer__col">
+        <h4>3D Geospatial Fundamentals</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/">3D Format Standards Comparison</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/">BIM and IFC Georeferencing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/">CityGML and CityJSON Processing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems for 3D Assets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/">Digital Elevation Model Workflows</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/">Spatial Indexing and Tiling Schemes for 3D Data</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>LOD Management &amp; Optimization</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/">Automated Tile Generation for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/">Cesium ion Upload Automation for 3D Tilesets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/">glTF LOD Generation With Draco Compression</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/">Streaming Sync Patterns for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/">Tileset Metadata and 3D Tiles Next</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/">Vector Overlays on 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Point Cloud &amp; Mesh Pipelines</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/">Automated Mesh Decimation for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/">Change Detection Between LiDAR Scan Epochs</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/">CI/CD Automation for Spatial Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">LiDAR Classification and Ground Extraction</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/photogrammetry-processing-pipelines/">Photogrammetry Processing Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/">Point Cloud Filtering Techniques</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/">Surface Reconstruction for Geospatial Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/">Texture Mapping Workflows for Digital Twins</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Troubleshooting &amp; Reliability</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/">Cross-Section Failure Modes in Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/">Data Validation &amp; QA Gates for 3D Tiles</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/">Performance Profiling and Benchmarking</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/">Pipeline Observability and Monitoring</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/">Streaming &amp; Runtime Diagnostics for 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+  </div>
+  <div class="container site-footer__bottom">
+    <span>© 2026 3D Geospatial &amp; Digital Twin Automation</span>
+    <span>Built with Eleventy · PWA-enabled</span>
+  </div>
+</footer>
+
+
+  <script src="/assets/js/site.js?v=b99aa9f971" defer></script>
+  
+</body>
+</html>

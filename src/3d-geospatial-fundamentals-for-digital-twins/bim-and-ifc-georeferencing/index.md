@@ -359,5 +359,8 @@ Treat the site grid as an engineering CRS and register it to the national one wi
 - [Georeferencing IFC2x3 Models Without IfcMapConversion](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/georeferencing-ifc2x3-models-without-map-conversion/) — property sets and control-point fits
 - [Handling Vertical Datums and Geoid Separation](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/handling-vertical-datums-and-geoid-separation/) — the height half of the problem
 - [CityGML vs 3D Tiles for Municipal Twin Delivery](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/citygml-vs-3d-tiles-for-municipal-twin-delivery/) — where the placed building goes next
+- [Extracting IFC Properties into Tile Metadata](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/extracting-ifc-properties-into-tile-metadata/) — carry IFC property sets into 3D Tiles metadata
+- [Simplifying IFC Geometry for Web Tiles](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/simplifying-ifc-geometry-for-web-tiles/) — cut a BIM model down to streamable geometry
+- [Validating IFC Georeferencing in CI](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/validating-ifc-georeferencing-in-ci/) — gate every IFC delivery automatically
 
 Back to [3D Geospatial Fundamentals for Digital Twins](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/).

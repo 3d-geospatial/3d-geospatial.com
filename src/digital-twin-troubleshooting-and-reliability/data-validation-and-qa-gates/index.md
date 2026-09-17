@@ -387,5 +387,8 @@ One last practical point: keep the gate runnable outside CI. A developer who can
 - [Asserting CRS and Units with pyproj](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/asserting-crs-and-units-with-pyproj/) — the CRS gate in full, EPSG:32618 versus EPSG:4326
 - [CI/CD Automation for Spatial Pipelines](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/) — the runner that executes these gates before deploy
 - [Automated Tile Generation for 3D Geospatial](https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/) — the tiling step whose output these gates validate
+- [Checking Point Cloud Classification Completeness](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/checking-point-cloud-classification-completeness/) — audit a delivered classification before you depend on it
+- [Validating Attribute Tables with Pandera](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/validating-attribute-tables-with-pandera/) — catch bad building attributes before they reach a tileset
+- [Validating Tileset Bounding Volumes Against Content](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/validating-tileset-bounding-volumes-against-content/) — prove every tile's bounding volume contains its geometry
 
 Back to [Digital Twin Troubleshooting & Reliability](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/).

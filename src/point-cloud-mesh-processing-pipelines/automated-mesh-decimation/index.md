@@ -361,5 +361,8 @@ No — decimation operates on triangulated meshes, so the surface must already e
 - [Point Cloud Filtering Techniques](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/) — cleaning the cloud before reconstruction
 - [Texture Mapping Workflows for Digital Twins](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/) — preserving UVs through decimation
 - [LOD Management & Optimization Strategies](https://www.3d-geospatial.com/lod-management-optimization-strategies/) — tiling and streaming the decimated chain
+- [Decimating Meshes with PyMeshLab](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/decimating-meshes-with-pymeshlab/) — reduce a photogrammetric mesh with PyMeshLab
+- [Measuring Hausdorff Distance After Decimation](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/measuring-hausdorff-distance-after-decimation/) — quantify decimation error properly
+- [Planar Region Simplification for Facades](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/planar-region-simplification-for-facades/) — replace a noisy photogrammetric facade with clean planes
 
 Back to [Point Cloud & Mesh Processing Pipelines](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/).

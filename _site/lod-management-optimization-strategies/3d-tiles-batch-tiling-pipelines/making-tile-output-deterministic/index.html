@@ -1,0 +1,835 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <title>Making Tile Output Deterministic — 3D Geospatial</title>
+  <meta name="description" content="Get byte-identical tiles from identical inputs: pin versions, sort inputs, remove timestamps, fix float rounding and prove determinism with a double-build">
+  <meta name="keywords" content="3D geospatial, digital twin, point cloud, mesh pipeline, LOD, 3D Tiles, Cesium, PDAL, Open3D, Python, CI/CD">
+  <meta name="author" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta name="theme-color" content="#1f6b8a" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f171d" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+
+  
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem("theme");
+        var theme = (stored === "dark" || stored === "light") ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    })();
+  </script>
+  <meta name="generator" content="Eleventy">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="googlebot" content="index,follow,max-image-preview:large">
+
+  
+  <link rel="canonical" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/making-tile-output-deterministic/">
+  <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">
+
+  
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/icon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+
+  
+  <link rel="apple-touch-icon" href="/assets/img/icon-180.png">
+  <link rel="mask-icon" href="/assets/img/logo.svg" color="#1f6b8a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="3D Geospatial">
+  <meta name="application-name" content="3D Geospatial">
+
+  
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Making Tile Output Deterministic — 3D Geospatial">
+  <meta property="og:description" content="Get byte-identical tiles from identical inputs: pin versions, sort inputs, remove timestamps, fix float rounding and prove determinism with a double-build">
+  <meta property="og:url" content="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/making-tile-output-deterministic/">
+  <meta property="og:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+  <meta property="og:site_name" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta property="og:locale" content="en_US">
+  
+  <meta property="article:published_time" content="2026-09-17T23:36:56.452Z">
+  <meta property="article:modified_time" content="2026-09-17T23:36:56.452Z">
+  <meta property="article:publisher" content="https://www.3d-geospatial.com/">
+  
+
+  
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Making Tile Output Deterministic — 3D Geospatial">
+  <meta name="twitter:description" content="Get byte-identical tiles from identical inputs: pin versions, sort inputs, remove timestamps, fix float rounding and prove determinism with a double-build">
+  <meta name="twitter:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta name="twitter:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+
+  
+  <link rel="preload" href="/assets/css/styles.css?v=8c46394d6c" as="style">
+  
+
+  <link rel="stylesheet" href="/assets/css/styles.css?v=8c46394d6c">
+
+  
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.3d-geospatial.com/#organization",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "url": "https://www.3d-geospatial.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/icon-512.png",
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://www.3d-geospatial.com/#website",
+      "url": "https://www.3d-geospatial.com/",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "description": "Build reliable 3D spatial data pipelines for digital twins — point clouds, meshes, LOD strategies, Python processing, and CI/CD automation.",
+      "inLanguage": "en",
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      }
+    },
+    {
+      "@type": "TechArticle",
+      "@id": "https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/making-tile-output-deterministic/#article",
+      "isPartOf": {
+        "@id": "https://www.3d-geospatial.com/#website"
+      },
+      "headline": "Making Tile Output Deterministic",
+      "name": "Making Tile Output Deterministic",
+      "description": "Get byte-identical tiles from identical inputs: pin versions, sort inputs, remove timestamps, fix float rounding and prove determinism with a double-build",
+      "url": "https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/making-tile-output-deterministic/",
+      "mainEntityOfPage": "https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/making-tile-output-deterministic/",
+      "inLanguage": "en",
+      "datePublished": "2026-09-17T23:36:56.452Z",
+      "dateModified": "2026-09-17T23:36:56.452Z",
+      "author": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "image": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/og-cover.png",
+        "width": 1200,
+        "height": 630
+      },
+      "breadcrumb": {
+        "@id": "https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/making-tile-output-deterministic/#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/making-tile-output-deterministic/#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://www.3d-geospatial.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "LOD Management Optimization Strategies",
+          "item": "https://www.3d-geospatial.com/lod-management-optimization-strategies/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "3D Tiles Batch Tiling Pipelines",
+          "item": "https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "name": "Making Tile Output Deterministic",
+          "item": "https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/making-tile-output-deterministic/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  
+<header class="site-header" role="banner">
+  <div class="container site-header__inner">
+    <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+      <img src="/assets/img/logo.svg" alt="" class="brand__mark" width="36" height="36">
+      <span class="brand__name">
+        3D Geospatial
+        <small>Digital Twin Automation</small>
+      </span>
+    </a>
+
+    <button class="theme-toggle" type="button" data-theme-toggle
+            aria-label="Switch to dark theme" title="Switch to dark theme">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4.2"/>
+        <path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/>
+      </svg>
+    </button>
+
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>
+      <span class="nav-toggle__icon" aria-hidden="true"><span></span></span>
+      Menu
+    </button>
+
+    <nav class="primary-nav" id="primary-nav" aria-label="Primary">
+      
+      <a href="https://www.3d-geospatial.com/" >
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/>
+        </svg>
+        Home
+      </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2 3 7l9 5 9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 17l9 5 9-5"/>
+            </svg>
+          
+          3D Geospatial Fundamentals
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/" aria-current="page">
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+          
+          LOD Management &amp; Optimization
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="6" cy="6" r="1.5"/><circle cx="12" cy="6" r="1.5"/><circle cx="18" cy="6" r="1.5"/>
+              <circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/>
+              <circle cx="6" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="18" cy="18" r="1.5"/>
+            </svg>
+          
+          Point Cloud &amp; Mesh Pipelines
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <path d="M12 9v4"/><path d="M12 17h.01"/>
+            </svg>
+          
+          Troubleshooting &amp; Reliability
+        </a>
+      
+    </nav>
+  </div>
+</header>
+
+
+  <main id="main">
+    
+
+
+<div class="container">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    
+      
+        <a href="https://www.3d-geospatial.com/">Home</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management Optimization Strategies</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <span class="current">Making Tile Output Deterministic</span>
+      
+    
+  </nav>
+
+  <div class="content-page">
+    <article class="article">
+      <h1 id="making-tile-output-deterministic" tabindex="-1"><a class="heading-link" href="#making-tile-output-deterministic"><span>Making Tile Output Deterministic</span></a></h1>
+<p>This page makes a tiling pipeline produce byte-identical output from identical inputs — pinning tool versions, sorting every input collection, removing embedded timestamps and hostnames, controlling floating-point rounding and thread non-determinism, and proving it with a double build that compares hashes, for a city tiled from EPSG:25832 into EPSG:4978.</p>
+<h2 id="why-you-hit-this" tabindex="-1"><a class="heading-link" href="#why-you-hit-this"><span>Why you hit this</span></a></h2>
+<p>Determinism sounds like a purity concern and is the foundation of three practical things. Incremental builds rely on it: if re-tiling an unchanged shard produces different bytes, the content hash changes, the CDN cache is invalidated and “incremental” means rebuilding the city. Caching relies on it, because an immutable URL whose content varies is a lie. And debugging relies on it — a difference between two builds is either a real change or noise, and a pipeline with noise cannot tell you which. The incremental machinery that depends on this is in <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/incremental-retiling-of-changed-city-blocks/">incremental retiling of changed city blocks</a>.</p>
+<h2 id="prerequisites" tabindex="-1"><a class="heading-link" href="#prerequisites"><span>Prerequisites</span></a></h2>
+<ul>
+<li>Python 3.10+ with <code>numpy&gt;=1.24</code>; the tiling pipeline itself and whatever encoders it calls.</li>
+<li>A container image for the build, or at least a lock file pinning every dependency.</li>
+<li>A shard whose inputs you can hold fixed, for the double-build test.</li>
+</ul>
+<h2 id="step-by-step" tabindex="-1"><a class="heading-link" href="#step-by-step"><span>Step-by-Step</span></a></h2>
+<h3 id="1-find-the-sources-of-non-determinism" tabindex="-1"><a class="heading-link" href="#1-find-the-sources-of-non-determinism"><span>1. Find the sources of non-determinism</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> hashlib
+<span class="token keyword">import</span> json
+<span class="token keyword">import</span> os
+<span class="token keyword">import</span> subprocess
+<span class="token keyword">from</span> pathlib <span class="token keyword">import</span> Path
+
+<span class="token keyword">def</span> <span class="token function">file_digest</span><span class="token punctuation">(</span>path<span class="token punctuation">,</span> chunk<span class="token operator">=</span><span class="token number">1</span> <span class="token operator">&lt;&lt;</span> <span class="token number">20</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    h <span class="token operator">=</span> hashlib<span class="token punctuation">.</span>sha256<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    <span class="token keyword">with</span> <span class="token builtin">open</span><span class="token punctuation">(</span>path<span class="token punctuation">,</span> <span class="token string">"rb"</span><span class="token punctuation">)</span> <span class="token keyword">as</span> f<span class="token punctuation">:</span>
+        <span class="token keyword">while</span> block <span class="token operator">:=</span> f<span class="token punctuation">.</span>read<span class="token punctuation">(</span>chunk<span class="token punctuation">)</span><span class="token punctuation">:</span>
+            h<span class="token punctuation">.</span>update<span class="token punctuation">(</span>block<span class="token punctuation">)</span>
+    <span class="token keyword">return</span> h<span class="token punctuation">.</span>hexdigest<span class="token punctuation">(</span><span class="token punctuation">)</span>
+
+<span class="token keyword">def</span> <span class="token function">tree_digests</span><span class="token punctuation">(</span>root<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token builtin">str</span><span class="token punctuation">(</span>p<span class="token punctuation">.</span>relative_to<span class="token punctuation">(</span>root<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">:</span> file_digest<span class="token punctuation">(</span>p<span class="token punctuation">)</span>
+            <span class="token keyword">for</span> p <span class="token keyword">in</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span>Path<span class="token punctuation">(</span>root<span class="token punctuation">)</span><span class="token punctuation">.</span>rglob<span class="token punctuation">(</span><span class="token string">"*"</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token keyword">if</span> p<span class="token punctuation">.</span>is_file<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">}</span>
+
+<span class="token keyword">def</span> <span class="token function">diff_digests</span><span class="token punctuation">(</span>a<span class="token punctuation">,</span> b<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    keys <span class="token operator">=</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span><span class="token builtin">set</span><span class="token punctuation">(</span>a<span class="token punctuation">)</span> <span class="token operator">|</span> <span class="token builtin">set</span><span class="token punctuation">(</span>b<span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">[</span><span class="token punctuation">{</span><span class="token string">"path"</span><span class="token punctuation">:</span> k<span class="token punctuation">,</span> <span class="token string">"a"</span><span class="token punctuation">:</span> a<span class="token punctuation">.</span>get<span class="token punctuation">(</span>k<span class="token punctuation">,</span> <span class="token string">"missing"</span><span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token number">12</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token string">"b"</span><span class="token punctuation">:</span> b<span class="token punctuation">.</span>get<span class="token punctuation">(</span>k<span class="token punctuation">,</span> <span class="token string">"missing"</span><span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token number">12</span><span class="token punctuation">]</span><span class="token punctuation">}</span>
+            <span class="token keyword">for</span> k <span class="token keyword">in</span> keys <span class="token keyword">if</span> a<span class="token punctuation">.</span>get<span class="token punctuation">(</span>k<span class="token punctuation">)</span> <span class="token operator">!=</span> b<span class="token punctuation">.</span>get<span class="token punctuation">(</span>k<span class="token punctuation">)</span><span class="token punctuation">]</span>
+
+first <span class="token operator">=</span> tree_digests<span class="token punctuation">(</span><span class="token string">"build/run_a/shards/120210233010"</span><span class="token punctuation">)</span>
+second <span class="token operator">=</span> tree_digests<span class="token punctuation">(</span><span class="token string">"build/run_b/shards/120210233010"</span><span class="token punctuation">)</span>
+differences <span class="token operator">=</span> diff_digests<span class="token punctuation">(</span>first<span class="token punctuation">,</span> second<span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span><span class="token builtin">len</span><span class="token punctuation">(</span>differences<span class="token punctuation">)</span><span class="token punctuation">}</span></span><span class="token string"> of </span><span class="token interpolation"><span class="token punctuation">{</span><span class="token builtin">len</span><span class="token punctuation">(</span>first<span class="token punctuation">)</span><span class="token punctuation">}</span></span><span class="token string"> files differ between two builds of the same shard"</span></span><span class="token punctuation">)</span>
+<span class="token keyword">for</span> d <span class="token keyword">in</span> differences<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token number">6</span><span class="token punctuation">]</span><span class="token punctuation">:</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"  </span><span class="token interpolation"><span class="token punctuation">{</span>d<span class="token punctuation">[</span><span class="token string">'path'</span><span class="token punctuation">]</span><span class="token punctuation">:</span><span class="token format-spec">&lt;32</span><span class="token punctuation">}</span></span><span class="token interpolation"><span class="token punctuation">{</span>d<span class="token punctuation">[</span><span class="token string">'a'</span><span class="token punctuation">]</span><span class="token punctuation">}</span></span><span class="token string">  </span><span class="token interpolation"><span class="token punctuation">{</span>d<span class="token punctuation">[</span><span class="token string">'b'</span><span class="token punctuation">]</span><span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Running the same shard twice and diffing the hashes is the whole diagnostic. Almost every pipeline fails it the first time, and the files that differ point straight at the cause: a <code>tileset.json</code> that differs means a timestamp or a key order, a <code>.glb</code> that differs means the encoder or the geometry order, and a difference in every file means a tool version or a path baked into the output.</p>
+<figure class="diagram">
+<svg viewBox="6 6 748 222" role="img" aria-labelledby="det-sources-t det-sources-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="det-sources-t">Where non-determinism comes from</title>
+  <desc id="det-sources-d">A table of causes and the file each one changes. An embedded build timestamp changes the tileset JSON. Unsorted input order changes vertex order in the geometry file. Dictionary or set iteration changes JSON key order. Parallel reduction changes floating-point sums. A tool version change alters the encoded bytes. An absolute path recorded in metadata changes with the working directory.</desc>
+  <rect class="svg-bg" x="6" y="6" width="748" height="222" fill="#ffffff"/>
+  <g stroke-width="1.5">
+    <rect x="20" y="20" width="300" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="320" y="20" width="230" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="550" y="20" width="190" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="20" y="54" width="300" height="32" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="320" y="54" width="230" height="32" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="550" y="54" width="190" height="32" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="20" y="86" width="300" height="32" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="320" y="86" width="230" height="32" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="550" y="86" width="190" height="32" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="20" y="118" width="300" height="32" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="320" y="118" width="230" height="32" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="550" y="118" width="190" height="32" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="20" y="150" width="300" height="32" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="320" y="150" width="230" height="32" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="550" y="150" width="190" height="32" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="20" y="182" width="300" height="32" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="320" y="182" width="230" height="32" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="550" y="182" width="190" height="32" fill="#eef5e9" stroke="#4f7a4d"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="170" y="43">cause</text><text x="435" y="43">what changes</text><text x="645" y="43">fix</text>
+    <text x="170" y="75">build timestamp in metadata</text><text x="435" y="75">tileset.json</text><text x="645" y="75">omit or pin it</text>
+    <text x="170" y="107">unsorted input iteration</text><text x="435" y="107">vertex order in .glb</text><text x="645" y="107">sort by a stable key</text>
+    <text x="170" y="139">dict or set iteration order</text><text x="435" y="139">JSON key order</text><text x="645" y="139">sort_keys=True</text>
+    <text x="170" y="171">parallel float reduction</text><text x="435" y="171">bounding volumes</text><text x="645" y="171">fixed-order sums</text>
+    <text x="170" y="203">tool version or path</text><text x="435" y="203">every encoded file</text><text x="645" y="203">pin the image</text>
+  </g>
+</svg>
+<figcaption>Five causes, and the file that differs tells you which one you have before you read any code.</figcaption>
+</figure>
+<h3 id="2-sort-every-input-by-a-key-that-cannot-change" tabindex="-1"><a class="heading-link" href="#2-sort-every-input-by-a-key-that-cannot-change"><span>2. Sort every input, by a key that cannot change</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">stable_feature_order</span><span class="token punctuation">(</span>features<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Deterministic order: by identifier, which is stable across runs and deliveries."""</span>
+    <span class="token keyword">return</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span>features<span class="token punctuation">,</span> key<span class="token operator">=</span><span class="token keyword">lambda</span> f<span class="token punctuation">:</span> <span class="token punctuation">(</span><span class="token builtin">str</span><span class="token punctuation">(</span>f<span class="token punctuation">[</span><span class="token string">"feature_id"</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">,</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+
+<span class="token keyword">def</span> <span class="token function">stable_shard_order</span><span class="token punctuation">(</span>shard_keys<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">return</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span>shard_keys<span class="token punctuation">)</span>                         <span class="token comment"># quadkeys sort lexicographically</span>
+
+<span class="token keyword">def</span> <span class="token function">stable_file_list</span><span class="token punctuation">(</span>root<span class="token punctuation">,</span> pattern<span class="token operator">=</span><span class="token string">"*.laz"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">return</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span>Path<span class="token punctuation">(</span>root<span class="token punctuation">)</span><span class="token punctuation">.</span>glob<span class="token punctuation">(</span>pattern<span class="token punctuation">)</span><span class="token punctuation">,</span> key<span class="token operator">=</span><span class="token keyword">lambda</span> p<span class="token punctuation">:</span> p<span class="token punctuation">.</span>name<span class="token punctuation">)</span>
+</code></pre></div>
+<p>Filesystem iteration order is not defined — <code>Path.glob</code> and <code>os.listdir</code> return entries in whatever order the filesystem provides, which differs between ext4 and XFS, between a local disk and object storage, and sometimes between two runs on the same directory. Sorting by name is one call and removes the whole class of problem.</p>
+<p>Sorting features by identifier rather than by position matters for a subtler reason: a spatial sort is stable only if the coordinates are identical, and a delivery that shifts one building by a millimetre reorders everything after it. An identifier sort survives that, so a shard whose contents did not change produces the same vertex order even when a neighbour moved.</p>
+<h3 id="3-remove-the-timestamps-and-the-environment" tabindex="-1"><a class="heading-link" href="#3-remove-the-timestamps-and-the-environment"><span>3. Remove the timestamps and the environment</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">deterministic_tileset</span><span class="token punctuation">(</span>root_tile<span class="token punctuation">,</span> dataset_version<span class="token punctuation">,</span> geometric_error<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""No build time, no hostname, no absolute paths — only inputs."""</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token string">"asset"</span><span class="token punctuation">:</span> <span class="token punctuation">{</span>
+            <span class="token string">"version"</span><span class="token punctuation">:</span> <span class="token string">"1.1"</span><span class="token punctuation">,</span>
+            <span class="token string">"tilesetVersion"</span><span class="token punctuation">:</span> dataset_version<span class="token punctuation">,</span>          <span class="token comment"># the data's version, not the build's time</span>
+        <span class="token punctuation">}</span><span class="token punctuation">,</span>
+        <span class="token string">"geometricError"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>geometric_error<span class="token punctuation">,</span> <span class="token number">6</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"root"</span><span class="token punctuation">:</span> root_tile<span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+
+<span class="token keyword">def</span> <span class="token function">write_json_deterministic</span><span class="token punctuation">(</span>path<span class="token punctuation">,</span> obj<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    text <span class="token operator">=</span> json<span class="token punctuation">.</span>dumps<span class="token punctuation">(</span>obj<span class="token punctuation">,</span> sort_keys<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> separators<span class="token operator">=</span><span class="token punctuation">(</span><span class="token string">","</span><span class="token punctuation">,</span> <span class="token string">":"</span><span class="token punctuation">)</span><span class="token punctuation">,</span> ensure_ascii<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span>
+                      allow_nan<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">)</span>
+    Path<span class="token punctuation">(</span>path<span class="token punctuation">)</span><span class="token punctuation">.</span>write_text<span class="token punctuation">(</span>text<span class="token punctuation">,</span> encoding<span class="token operator">=</span><span class="token string">"utf-8"</span><span class="token punctuation">,</span> newline<span class="token operator">=</span><span class="token string">"\n"</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> file_digest<span class="token punctuation">(</span>path<span class="token punctuation">)</span>
+
+<span class="token keyword">def</span> <span class="token function">deterministic_zip</span><span class="token punctuation">(</span>out_path<span class="token punctuation">,</span> files<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""A zip with fixed timestamps and order, for packaged outputs."""</span>
+    <span class="token keyword">import</span> zipfile
+    <span class="token keyword">with</span> zipfile<span class="token punctuation">.</span>ZipFile<span class="token punctuation">(</span>out_path<span class="token punctuation">,</span> <span class="token string">"w"</span><span class="token punctuation">,</span> compression<span class="token operator">=</span>zipfile<span class="token punctuation">.</span>ZIP_DEFLATED<span class="token punctuation">)</span> <span class="token keyword">as</span> z<span class="token punctuation">:</span>
+        <span class="token keyword">for</span> arcname<span class="token punctuation">,</span> src <span class="token keyword">in</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span>files<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+            info <span class="token operator">=</span> zipfile<span class="token punctuation">.</span>ZipInfo<span class="token punctuation">(</span>arcname<span class="token punctuation">,</span> date_time<span class="token operator">=</span><span class="token punctuation">(</span><span class="token number">1980</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+            info<span class="token punctuation">.</span>compress_type <span class="token operator">=</span> zipfile<span class="token punctuation">.</span>ZIP_DEFLATED
+            info<span class="token punctuation">.</span>external_attr <span class="token operator">=</span> <span class="token number">0o644</span> <span class="token operator">&lt;&lt;</span> <span class="token number">16</span>
+            z<span class="token punctuation">.</span>writestr<span class="token punctuation">(</span>info<span class="token punctuation">,</span> Path<span class="token punctuation">(</span>src<span class="token punctuation">)</span><span class="token punctuation">.</span>read_bytes<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> file_digest<span class="token punctuation">(</span>out_path<span class="token punctuation">)</span>
+</code></pre></div>
+<p><code>sort_keys=True</code> fixes JSON key order, which in CPython is insertion order and therefore depends on the code path that built the dictionary. <code>allow_nan=False</code> turns a NaN — which would serialise as the non-standard <code>NaN</code> token — into an error, which is better than a tileset that some parsers reject.</p>
+<p>The version string is the substantive change: replacing a build timestamp with the <em>data’s</em> version means two builds of the same data produce the same file, while a new delivery still changes it. Where a build time is genuinely needed, the standard approach is to honour <code>SOURCE_DATE_EPOCH</code> from the environment so a rebuild can reproduce an earlier one.</p>
+<h3 id="4-control-the-arithmetic" tabindex="-1"><a class="heading-link" href="#4-control-the-arithmetic"><span>4. Control the arithmetic</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> numpy <span class="token keyword">as</span> np
+
+<span class="token keyword">def</span> <span class="token function">deterministic_bounds</span><span class="token punctuation">(</span>points<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Min/max are exact; means and sums need a fixed reduction order."""</span>
+    lo <span class="token operator">=</span> points<span class="token punctuation">.</span><span class="token builtin">min</span><span class="token punctuation">(</span>axis<span class="token operator">=</span><span class="token number">0</span><span class="token punctuation">)</span>
+    hi <span class="token operator">=</span> points<span class="token punctuation">.</span><span class="token builtin">max</span><span class="token punctuation">(</span>axis<span class="token operator">=</span><span class="token number">0</span><span class="token punctuation">)</span>
+    centre <span class="token operator">=</span> <span class="token punctuation">(</span>lo <span class="token operator">+</span> hi<span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token number">2.0</span>                        <span class="token comment"># from extremes, not from a mean</span>
+    half <span class="token operator">=</span> <span class="token punctuation">(</span>hi <span class="token operator">-</span> lo<span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token number">2.0</span>
+    <span class="token keyword">return</span> np<span class="token punctuation">.</span><span class="token builtin">round</span><span class="token punctuation">(</span>centre<span class="token punctuation">,</span> <span class="token number">6</span><span class="token punctuation">)</span><span class="token punctuation">,</span> np<span class="token punctuation">.</span><span class="token builtin">round</span><span class="token punctuation">(</span>half<span class="token punctuation">,</span> <span class="token number">6</span><span class="token punctuation">)</span>
+
+<span class="token keyword">def</span> <span class="token function">deterministic_mean</span><span class="token punctuation">(</span>values<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Pairwise summation in a fixed order, independent of thread count."""</span>
+    v <span class="token operator">=</span> np<span class="token punctuation">.</span>sort<span class="token punctuation">(</span>np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>values<span class="token punctuation">,</span> dtype<span class="token operator">=</span>np<span class="token punctuation">.</span>float64<span class="token punctuation">)</span><span class="token punctuation">)</span>   <span class="token comment"># sorting makes the order reproducible</span>
+    <span class="token keyword">return</span> <span class="token builtin">float</span><span class="token punctuation">(</span>v<span class="token punctuation">.</span><span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token builtin">len</span><span class="token punctuation">(</span>v<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token keyword">if</span> <span class="token builtin">len</span><span class="token punctuation">(</span>v<span class="token punctuation">)</span> <span class="token keyword">else</span> <span class="token number">0.0</span>
+
+<span class="token keyword">def</span> <span class="token function">quantise</span><span class="token punctuation">(</span>values<span class="token punctuation">,</span> scale<span class="token operator">=</span><span class="token number">1e-3</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Round to a fixed grid so tiny input differences cannot flip a rounding decision."""</span>
+    <span class="token keyword">return</span> np<span class="token punctuation">.</span><span class="token builtin">round</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>values<span class="token punctuation">,</span> dtype<span class="token operator">=</span>np<span class="token punctuation">.</span>float64<span class="token punctuation">)</span> <span class="token operator">/</span> scale<span class="token punctuation">)</span><span class="token punctuation">.</span>astype<span class="token punctuation">(</span>np<span class="token punctuation">.</span>int64<span class="token punctuation">)</span> <span class="token operator">*</span> scale
+</code></pre></div>
+<p>Floating-point addition is not associative, so a sum computed by four threads and a sum computed by one differ in the last bits, and a bounding volume derived from a mean differs between runs on machines with different core counts. Deriving the centre from the extremes avoids the reduction entirely. Where a mean is genuinely needed, sorting before summing makes the order reproducible at a small cost.</p>
+<p>Quantising before writing is the other half. Two runs that compute a coordinate as <code>12.000000000000002</code> and <code>11.999999999999998</code> write different bytes unless the value is snapped to a grid first — and the grid is the tile’s quantisation step anyway, so nothing is lost.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">set_deterministic_env</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Environment variables that remove thread and hash non-determinism."""</span>
+    os<span class="token punctuation">.</span>environ<span class="token punctuation">.</span>setdefault<span class="token punctuation">(</span><span class="token string">"PYTHONHASHSEED"</span><span class="token punctuation">,</span> <span class="token string">"0"</span><span class="token punctuation">)</span>
+    <span class="token keyword">for</span> var <span class="token keyword">in</span> <span class="token punctuation">(</span><span class="token string">"OMP_NUM_THREADS"</span><span class="token punctuation">,</span> <span class="token string">"OPENBLAS_NUM_THREADS"</span><span class="token punctuation">,</span> <span class="token string">"MKL_NUM_THREADS"</span><span class="token punctuation">,</span>
+                <span class="token string">"NUMEXPR_NUM_THREADS"</span><span class="token punctuation">,</span> <span class="token string">"GDAL_NUM_THREADS"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        os<span class="token punctuation">.</span>environ<span class="token punctuation">.</span>setdefault<span class="token punctuation">(</span>var<span class="token punctuation">,</span> <span class="token string">"1"</span><span class="token punctuation">)</span>
+    os<span class="token punctuation">.</span>environ<span class="token punctuation">.</span>setdefault<span class="token punctuation">(</span><span class="token string">"SOURCE_DATE_EPOCH"</span><span class="token punctuation">,</span> <span class="token string">"1758067200"</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>k<span class="token punctuation">:</span> os<span class="token punctuation">.</span>environ<span class="token punctuation">[</span>k<span class="token punctuation">]</span> <span class="token keyword">for</span> k <span class="token keyword">in</span> <span class="token punctuation">(</span><span class="token string">"PYTHONHASHSEED"</span><span class="token punctuation">,</span> <span class="token string">"OMP_NUM_THREADS"</span><span class="token punctuation">,</span> <span class="token string">"SOURCE_DATE_EPOCH"</span><span class="token punctuation">)</span><span class="token punctuation">}</span>
+
+<span class="token keyword">print</span><span class="token punctuation">(</span>set_deterministic_env<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p><code>PYTHONHASHSEED</code> matters because set iteration order depends on it, and a pipeline that iterates a set of feature identifiers anywhere produces a different order on every run. Setting the thread counts to one is a blunt instrument that guarantees reproducible reductions; the alternative is to keep threads and make every reduction order-independent, which is more work and faster.</p>
+<figure class="diagram">
+<svg viewBox="4 6 732 244" role="img" aria-labelledby="det-env-t det-env-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="det-env-t">Environment variables that decide whether a build repeats</title>
+  <desc id="det-env-d">A table of four environment settings and what each one fixes. PYTHONHASHSEED set to zero fixes set and dictionary iteration order. The OpenMP and BLAS thread counts set to one fix the order of floating-point reductions. SOURCE_DATE_EPOCH fixes any timestamp a format requires. GDAL_NUM_THREADS set to one fixes raster block ordering. Each is one line and each removes a whole class of non-reproducible output.</desc>
+  <rect class="svg-bg" x="4" y="6" width="732" height="244" fill="#ffffff"/>
+  <g stroke-width="1.5">
+    <rect x="18" y="20" width="196" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="214" y="20" width="96" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="310" y="20" width="246" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="556" y="20" width="166" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="18" y="54" width="196" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="214" y="54" width="96" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="310" y="54" width="246" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="556" y="54" width="166" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="18" y="88" width="196" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="214" y="88" width="96" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="310" y="88" width="246" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="556" y="88" width="166" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="18" y="122" width="196" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="214" y="122" width="96" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="310" y="122" width="246" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="556" y="122" width="166" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="18" y="156" width="196" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="214" y="156" width="96" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="310" y="156" width="246" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="556" y="156" width="166" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="116" y="42">setting</text><text x="262" y="42">value</text><text x="433" y="42">what it fixes</text><text x="639" y="42">cost</text>
+    <text x="116" y="76">PYTHONHASHSEED</text><text x="262" y="76">0</text><text x="433" y="76">set and dict iteration order</text><text x="639" y="76">none</text>
+    <text x="116" y="110">OMP_NUM_THREADS</text><text x="262" y="110">1</text><text x="433" y="110">float reduction order</text><text x="639" y="110">single-threaded maths</text>
+    <text x="116" y="144">SOURCE_DATE_EPOCH</text><text x="262" y="144">fixed</text><text x="433" y="144">timestamps a format demands</text><text x="639" y="144">none</text>
+    <text x="116" y="178">GDAL_NUM_THREADS</text><text x="262" y="178">1</text><text x="433" y="178">raster block ordering</text><text x="639" y="178">slower raster I/O</text>
+  </g>
+  <text x="20" y="210" fill="#1f2937" font-size="12.5">Four lines in the container's environment, and three of them cost nothing.</text>
+  <text x="20" y="232" fill="#5b6471" font-size="12">The thread counts are the only trade: reproducible reductions against parallel speed.</text>
+</svg>
+<figcaption>The cheapest determinism available: four environment variables, set once in the build image.</figcaption>
+</figure>
+<h3 id="5-record-what-produced-the-output" tabindex="-1"><a class="heading-link" href="#5-record-what-produced-the-output"><span>5. Record what produced the output</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">provenance</span><span class="token punctuation">(</span>params<span class="token punctuation">,</span> tool_versions<span class="token punctuation">,</span> inputs<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Everything that affects the bytes, hashed into one value."""</span>
+    payload <span class="token operator">=</span> <span class="token punctuation">{</span>
+        <span class="token string">"params"</span><span class="token punctuation">:</span> params<span class="token punctuation">,</span>
+        <span class="token string">"tools"</span><span class="token punctuation">:</span> tool_versions<span class="token punctuation">,</span>
+        <span class="token string">"inputs"</span><span class="token punctuation">:</span> <span class="token punctuation">{</span>name<span class="token punctuation">:</span> file_digest<span class="token punctuation">(</span>path<span class="token punctuation">)</span> <span class="token keyword">for</span> name<span class="token punctuation">,</span> path <span class="token keyword">in</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span>inputs<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+    canonical <span class="token operator">=</span> json<span class="token punctuation">.</span>dumps<span class="token punctuation">(</span>payload<span class="token punctuation">,</span> sort_keys<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> separators<span class="token operator">=</span><span class="token punctuation">(</span><span class="token string">","</span><span class="token punctuation">,</span> <span class="token string">":"</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"provenance"</span><span class="token punctuation">:</span> payload<span class="token punctuation">,</span>
+            <span class="token string">"provenance_hash"</span><span class="token punctuation">:</span> hashlib<span class="token punctuation">.</span>sha256<span class="token punctuation">(</span>canonical<span class="token punctuation">.</span>encode<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">.</span>hexdigest<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">}</span>
+
+TOOLS <span class="token operator">=</span> <span class="token punctuation">{</span>
+    <span class="token string">"python"</span><span class="token punctuation">:</span> subprocess<span class="token punctuation">.</span>run<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token string">"python"</span><span class="token punctuation">,</span> <span class="token string">"-VV"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> capture_output<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> text<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span><span class="token punctuation">.</span>stdout<span class="token punctuation">.</span>strip<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token string">"tiler"</span><span class="token punctuation">:</span> <span class="token string">"twin-tiler 4.2.1"</span><span class="token punctuation">,</span>
+    <span class="token string">"draco"</span><span class="token punctuation">:</span> <span class="token string">"1.5.6"</span><span class="token punctuation">,</span>
+    <span class="token string">"gltf-transform"</span><span class="token punctuation">:</span> <span class="token string">"4.0.1"</span><span class="token punctuation">,</span>
+    <span class="token string">"image"</span><span class="token punctuation">:</span> <span class="token string">"ghcr.io/example/twin-tiler@sha256:3f0a…"</span><span class="token punctuation">,</span>
+<span class="token punctuation">}</span>
+prov <span class="token operator">=</span> provenance<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"max_per_tile"</span><span class="token punctuation">:</span> <span class="token number">2000</span><span class="token punctuation">,</span> <span class="token string">"quantize_position"</span><span class="token punctuation">:</span> <span class="token number">14</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+                  TOOLS<span class="token punctuation">,</span> <span class="token punctuation">{</span><span class="token string">"footprints"</span><span class="token punctuation">:</span> <span class="token string">"source/footprints.gpkg"</span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span>prov<span class="token punctuation">[</span><span class="token string">"provenance_hash"</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token number">16</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token string">"…"</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>The provenance hash is what makes determinism useful rather than merely satisfying. Two tiles with the same provenance hash and different content hashes mean the pipeline is non-deterministic; the same content hash with a different provenance hash means something irrelevant changed. Storing it per shard turns the incremental build’s “is this shard up to date?” into a comparison of two strings.</p>
+<h3 id="6-prove-it-with-a-double-build-in-ci" tabindex="-1"><a class="heading-link" href="#6-prove-it-with-a-double-build-in-ci"><span>6. Prove it with a double build in CI</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">double_build_check</span><span class="token punctuation">(</span>build_fn<span class="token punctuation">,</span> shard<span class="token punctuation">,</span> work_root<span class="token operator">=</span><span class="token string">"build/determinism"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    digests <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    <span class="token keyword">for</span> run <span class="token keyword">in</span> <span class="token punctuation">(</span><span class="token string">"a"</span><span class="token punctuation">,</span> <span class="token string">"b"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        out <span class="token operator">=</span> Path<span class="token punctuation">(</span>work_root<span class="token punctuation">)</span> <span class="token operator">/</span> run
+        <span class="token keyword">if</span> out<span class="token punctuation">.</span>exists<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+            <span class="token keyword">import</span> shutil
+            shutil<span class="token punctuation">.</span>rmtree<span class="token punctuation">(</span>out<span class="token punctuation">)</span>
+        out<span class="token punctuation">.</span>mkdir<span class="token punctuation">(</span>parents<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+        build_fn<span class="token punctuation">(</span>shard<span class="token punctuation">,</span> out<span class="token punctuation">)</span>                        <span class="token comment"># the real pipeline, twice</span>
+        digests<span class="token punctuation">.</span>append<span class="token punctuation">(</span>tree_digests<span class="token punctuation">(</span>out<span class="token punctuation">)</span><span class="token punctuation">)</span>
+    diffs <span class="token operator">=</span> diff_digests<span class="token punctuation">(</span><span class="token operator">*</span>digests<span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"files"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>digests<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"differing"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>diffs<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"deterministic"</span><span class="token punctuation">:</span> <span class="token keyword">not</span> diffs<span class="token punctuation">,</span>
+            <span class="token string">"first_differences"</span><span class="token punctuation">:</span> diffs<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token number">5</span><span class="token punctuation">]</span><span class="token punctuation">}</span>
+
+result <span class="token operator">=</span> double_build_check<span class="token punctuation">(</span>build_shard_to<span class="token punctuation">,</span> <span class="token string">"120210233010"</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span>json<span class="token punctuation">.</span>dumps<span class="token punctuation">(</span>result<span class="token punctuation">,</span> indent<span class="token operator">=</span><span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+<span class="token keyword">assert</span> result<span class="token punctuation">[</span><span class="token string">"deterministic"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token string">"tiling is not deterministic; see first_differences"</span>
+</code></pre></div>
+<p>Running the check on one representative shard in CI, on every merge, is enough: non-determinism is almost never shard-specific, and one shard takes seconds. Adding a second shard with textures is worthwhile, because image encoders are a common source — several JPEG and Basis encoders embed a library version or vary with thread count.</p>
+<figure class="diagram">
+<svg viewBox="6 20 748 194" role="img" aria-labelledby="det-loop-t det-loop-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="det-loop-t">The double-build check in CI</title>
+  <desc id="det-loop-d">One shard is built twice from identical inputs in the same container image. The two output trees are hashed file by file and compared. Identical hashes pass the check. Any difference fails the build and names the first files that differ, which identifies the cause without further investigation.</desc>
+  <rect class="svg-bg" x="6" y="20" width="748" height="194" fill="#ffffff"/>
+  <defs>
+    <marker id="det-loop-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
+    </marker>
+  </defs>
+  <rect x="20" y="90" width="130" height="56" rx="8" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <rect x="210" y="34" width="140" height="50" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="210" y="150" width="140" height="50" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="410" y="90" width="150" height="56" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="620" y="34" width="120" height="50" rx="8" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <rect x="620" y="150" width="120" height="50" rx="8" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <g stroke="#5b6471" stroke-width="2" fill="none" marker-end="url(#det-loop-arrow)">
+    <path d="M150 106 L208 70"/><path d="M150 130 L208 168"/>
+    <path d="M350 60 L408 100"/><path d="M350 176 L408 138"/>
+    <path d="M560 106 L618 66"/><path d="M560 130 L618 170"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="85" y="112">fixed inputs</text><text x="85" y="132">+ pinned image</text>
+    <text x="280" y="54">build run A</text><text x="280" y="72">output tree</text>
+    <text x="280" y="170">build run B</text><text x="280" y="188">output tree</text>
+    <text x="485" y="112">hash every file,</text><text x="485" y="132">compare</text>
+    <text x="680" y="54">identical:</text><text x="680" y="72">pass</text>
+    <text x="680" y="170">differs: fail,</text><text x="680" y="188">name the files</text>
+  </g>
+</svg>
+<figcaption>A few seconds per merge, and the check that keeps every incremental build and every cache header honest.</figcaption>
+</figure>
+<h2 id="expected-output-verification" tabindex="-1"><a class="heading-link" href="#expected-output-verification"><span>Expected Output &amp; Verification</span></a></h2>
+<div class="codeblock" data-lang="text"><div class="codeblock__bar"><span class="codeblock__lang">text</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-text" tabindex="0" role="group" aria-label="text code sample"><code class="language-text">3 of 5 files differ between two builds of the same shard
+  tileset.json                    a41f0c2b9e14  7d2e88b41c03
+  content/0/0/0.glb               9b02c4e7f1aa  1c8e4470a9d2
+  content/0/0/1.glb               44a1e0b9c83f  2fe70c1ab884
+{'PYTHONHASHSEED': '0', 'OMP_NUM_THREADS': '1', 'SOURCE_DATE_EPOCH': '1758067200'}
+c41d9f8a2b703e55 …
+{
+  "files": 5,
+  "differing": 0,
+  "deterministic": true,
+  "first_differences": []
+}
+</code></pre></div>
+<p>The first block is the before state and the last is the after. Three of five files differed: <code>tileset.json</code> from a build timestamp, and the two <code>.glb</code> files from unsorted feature iteration — which is the typical pair, and both are fixed by the changes above.</p>
+<p>Verify that determinism survives the things that legitimately vary, which is the property that makes it useful:</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">determinism_matrix</span><span class="token punctuation">(</span>build_fn<span class="token punctuation">,</span> shard<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Same inputs must give the same bytes across worker counts and working directories."""</span>
+    <span class="token keyword">import</span> shutil
+    cases <span class="token operator">=</span> <span class="token punctuation">{</span>
+        <span class="token string">"baseline"</span><span class="token punctuation">:</span> <span class="token punctuation">{</span><span class="token string">"workers"</span><span class="token punctuation">:</span> <span class="token number">1</span><span class="token punctuation">,</span> <span class="token string">"cwd"</span><span class="token punctuation">:</span> <span class="token string">"build/case_a"</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+        <span class="token string">"more_workers"</span><span class="token punctuation">:</span> <span class="token punctuation">{</span><span class="token string">"workers"</span><span class="token punctuation">:</span> <span class="token number">8</span><span class="token punctuation">,</span> <span class="token string">"cwd"</span><span class="token punctuation">:</span> <span class="token string">"build/case_b"</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+        <span class="token string">"other_cwd"</span><span class="token punctuation">:</span> <span class="token punctuation">{</span><span class="token string">"workers"</span><span class="token punctuation">:</span> <span class="token number">1</span><span class="token punctuation">,</span> <span class="token string">"cwd"</span><span class="token punctuation">:</span> <span class="token string">"build/case_c/nested/deeper"</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+    digests <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token punctuation">}</span>
+    <span class="token keyword">for</span> name<span class="token punctuation">,</span> cfg <span class="token keyword">in</span> cases<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        out <span class="token operator">=</span> Path<span class="token punctuation">(</span>cfg<span class="token punctuation">[</span><span class="token string">"cwd"</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token string">"out"</span>
+        <span class="token keyword">if</span> out<span class="token punctuation">.</span>exists<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+            shutil<span class="token punctuation">.</span>rmtree<span class="token punctuation">(</span>out<span class="token punctuation">)</span>
+        out<span class="token punctuation">.</span>mkdir<span class="token punctuation">(</span>parents<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+        build_fn<span class="token punctuation">(</span>shard<span class="token punctuation">,</span> out<span class="token punctuation">,</span> workers<span class="token operator">=</span>cfg<span class="token punctuation">[</span><span class="token string">"workers"</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+        digests<span class="token punctuation">[</span>name<span class="token punctuation">]</span> <span class="token operator">=</span> tree_digests<span class="token punctuation">(</span>out<span class="token punctuation">)</span>
+    base <span class="token operator">=</span> digests<span class="token punctuation">[</span><span class="token string">"baseline"</span><span class="token punctuation">]</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>name<span class="token punctuation">:</span> <span class="token punctuation">{</span><span class="token string">"identical"</span><span class="token punctuation">:</span> d <span class="token operator">==</span> base<span class="token punctuation">,</span> <span class="token string">"differing"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>diff_digests<span class="token punctuation">(</span>base<span class="token punctuation">,</span> d<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">}</span>
+            <span class="token keyword">for</span> name<span class="token punctuation">,</span> d <span class="token keyword">in</span> digests<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">}</span>
+
+<span class="token keyword">print</span><span class="token punctuation">(</span>json<span class="token punctuation">.</span>dumps<span class="token punctuation">(</span>determinism_matrix<span class="token punctuation">(</span>build_shard_to<span class="token punctuation">,</span> <span class="token string">"120210233010"</span><span class="token punctuation">)</span><span class="token punctuation">,</span> indent<span class="token operator">=</span><span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Worker count and working directory are the two variables that differ between a developer’s laptop and the build server, so a pipeline that is deterministic only at one worker count will still produce cache-invalidating output in production. Testing the matrix rather than a single repeat is what catches the parallel-reduction and absolute-path cases.</p>
+<p>Then verify that a <em>real</em> change does change the bytes, which is the other half of the contract:</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">change_detection_check</span><span class="token punctuation">(</span>build_fn<span class="token punctuation">,</span> shard<span class="token punctuation">,</span> out_root<span class="token operator">=</span><span class="token string">"build/change"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    base <span class="token operator">=</span> Path<span class="token punctuation">(</span>out_root<span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token string">"base"</span><span class="token punctuation">;</span> base<span class="token punctuation">.</span>mkdir<span class="token punctuation">(</span>parents<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> exist_ok<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+    build_fn<span class="token punctuation">(</span>shard<span class="token punctuation">,</span> base<span class="token punctuation">)</span>
+    moved <span class="token operator">=</span> Path<span class="token punctuation">(</span>out_root<span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token string">"moved"</span><span class="token punctuation">;</span> moved<span class="token punctuation">.</span>mkdir<span class="token punctuation">(</span>parents<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> exist_ok<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+    build_fn<span class="token punctuation">(</span>shard<span class="token punctuation">,</span> moved<span class="token punctuation">,</span> nudge_one_building_m<span class="token operator">=</span><span class="token number">0.02</span><span class="token punctuation">)</span>      <span class="token comment"># 2 cm on one building</span>
+    diffs <span class="token operator">=</span> diff_digests<span class="token punctuation">(</span>tree_digests<span class="token punctuation">(</span>base<span class="token punctuation">)</span><span class="token punctuation">,</span> tree_digests<span class="token punctuation">(</span>moved<span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"differing_files"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>diffs<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"detects_change"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>diffs<span class="token punctuation">)</span> <span class="token operator">></span> <span class="token number">0</span><span class="token punctuation">}</span>
+
+<span class="token keyword">print</span><span class="token punctuation">(</span>change_detection_check<span class="token punctuation">(</span>build_shard_to<span class="token punctuation">,</span> <span class="token string">"120210233010"</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>A pipeline so aggressively quantised that a 2 cm move produces identical bytes is deterministic and useless, because the incremental build will never notice the change. The quantisation grid has to be finer than the smallest change the twin must reflect.</p>
+<h2 id="performance-notes" tabindex="-1"><a class="heading-link" href="#performance-notes"><span>Performance Notes</span></a></h2>
+<ul>
+<li><strong>Determinism costs a few percent</strong>, almost all of it in sorting inputs and in single-threaded reductions. On a city job that is minutes against hours, and it is repaid the first time an incremental build skips 4,000 unchanged shards.</li>
+<li><strong>Sorting is cheap; re-sorting is not.</strong> Sort once, at the point the collection is formed, and keep the order through the pipeline.</li>
+<li><strong>Single-threaded native libraries are the expensive part.</strong> Where a stage is reduction-heavy, prefer an order-independent algorithm over disabling threads.</li>
+<li><strong>Hash with <code>sha256</code> and be done.</strong> Hashing a 1 MB tile takes microseconds, and a faster non-cryptographic hash saves nothing measurable while making collisions a conversation.</li>
+<li><strong>Run the double-build check on one shard</strong>, not the city. It is a property of the code, not of the data.</li>
+</ul>
+<h2 id="common-errors" tabindex="-1"><a class="heading-link" href="#common-errors"><span>Common Errors</span></a></h2>
+<p><strong>Only the tileset JSON differs.</strong> A timestamp, a hostname or a key order. The three fixes in step 3 cover all of them.</p>
+<p><strong>Only the compressed geometry differs.</strong> The encoder is non-deterministic, or its version changed. Pin the encoder in the image and check whether it has a deterministic flag; several accept a fixed random seed.</p>
+<p><strong>Output differs between the laptop and CI but not between two CI runs.</strong> An absolute path, a locale, or a different library build. The pinned image removes all three, which is why the double build must run in the same image the pipeline uses.</p>
+<p><strong>Everything is identical and the incremental build still rebuilds everything.</strong> The provenance hash includes something that changes per run — a build timestamp, a run identifier, an absolute path. It should contain only inputs, parameters and tool versions.</p>
+<p><strong>A textured tile is deterministic on one machine and not another.</strong> Image encoders vary with SIMD availability. Either pin the encoder’s instruction-set level or accept per-machine variation and always build on one class of runner.</p>
+<h2 id="frequently-asked-questions" tabindex="-1"><a class="heading-link" href="#frequently-asked-questions"><span>Frequently Asked Questions</span></a></h2>
+<h3 id="is-bit-for-bit-determinism-necessary-or-is-semantically-equal-enough" tabindex="-1"><a class="heading-link" href="#is-bit-for-bit-determinism-necessary-or-is-semantically-equal-enough"><span>Is bit-for-bit determinism necessary, or is “semantically equal” enough?</span></a></h3>
+<p>For caching and incremental builds it must be bit-for-bit, because the comparison is a hash. For validation, semantic equality is enough — and a pipeline that can only manage the second cannot have immutable URLs.</p>
+<h3 id="what-about-source_date_epoch" tabindex="-1"><a class="heading-link" href="#what-about-source_date_epoch"><span>What about <code>SOURCE_DATE_EPOCH</code>?</span></a></h3>
+<p>It is the reproducible-builds convention for injecting a fixed timestamp, and honouring it is the right way to keep a build time in the output without losing determinism. Any format with a mandatory timestamp field — zip archives, some image containers — should read it.</p>
+<h3 id="does-quantisation-hide-real-changes" tabindex="-1"><a class="heading-link" href="#does-quantisation-hide-real-changes"><span>Does quantisation hide real changes?</span></a></h3>
+<p>It can, which is why the change-detection check exists. Choose the grid from the smallest change the twin must reflect — a centimetre for building geometry — and verify that a change at that scale alters the bytes.</p>
+<h2 id="related-guides" tabindex="-1"><a class="heading-link" href="#related-guides"><span>Related Guides</span></a></h2>
+<ul>
+<li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/incremental-retiling-of-changed-city-blocks/">Incremental Retiling of Changed City Blocks</a> — what determinism makes possible</li>
+<li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/resuming-failed-tiling-runs-from-checkpoints/">Resuming Failed Tiling Runs from Checkpoints</a> — the manifest that records the hashes</li>
+<li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/versioning-tilesets-with-immutable-prefixes/">Versioning Tilesets with Immutable Prefixes</a> — the caching contract this underwrites</li>
+</ul>
+<p>Back to <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a>.</p>
+
+
+      
+      
+
+      <div class="related-nav">
+        
+
+        
+          <div>
+            <h3>Related</h3>
+            <div class="related-grid">
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/choosing-shard-sizes-for-city-scale-tiling/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Choosing Shard Sizes for City-Scale Tiling</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/merging-shard-tilesets-into-a-root-tileset/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Merging Shard Tilesets into a Root Tileset</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/orchestrating-tiling-jobs-with-dask/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Orchestrating Tiling Jobs with Dask</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/parallel-b3dm-encoding-with-process-pools/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Parallel b3dm Encoding with Process Pools</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/resuming-failed-tiling-runs-from-checkpoints/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Resuming Failed Tiling Runs from Checkpoints</span>
+                </a>
+              
+            </div>
+          </div>
+        
+      </div>
+    </article>
+
+    
+    <aside class="toc" aria-label="On this page" data-toc hidden>
+      <h4>On this page</h4>
+      <ul></ul>
+    </aside>
+  </div>
+</div>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+  <div class="container site-footer__inner">
+    <div class="site-footer__brand">
+      <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+        <img src="/assets/img/logo-mark.svg" alt="" class="brand__mark" width="36" height="36">
+        <span class="brand__name">
+          3D Geospatial
+          <small>Digital Twin Automation</small>
+        </span>
+      </a>
+      <p>Engineering-grade guides on point cloud processing, mesh pipelines, LOD strategies, and CI/CD automation for digital twin platforms.</p>
+      <a class="footer-social" href="https://github.com/3d-geospatial" aria-label="3D Geospatial on GitHub" rel="noopener" target="_blank">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+          <path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.53-1.34-1.3-1.7-1.3-1.7-1.06-.72.08-.71.08-.71 1.17.08 1.79 1.2 1.79 1.2 1.04 1.79 2.73 1.27 3.4.97.1-.75.4-1.27.73-1.56-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.19-3.08-.12-.3-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.75.11 3.05.74.8 1.19 1.83 1.19 3.08 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.07.78 2.15v3.18c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5Z"/>
+        </svg>
+        <span>GitHub</span>
+      </a>
+    </div>
+
+    <div class="site-footer__col">
+      <h4>Sections</h4>
+      <ul>
+        <li><a href="https://www.3d-geospatial.com/">Home</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management &amp; Optimization</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/">Point Cloud &amp; Mesh Pipelines</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/">Troubleshooting &amp; Reliability</a></li>
+        
+      </ul>
+    </div>
+
+    
+      <div class="site-footer__col">
+        <h4>3D Geospatial Fundamentals</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/">3D Format Standards Comparison</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/">BIM and IFC Georeferencing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/">CityGML and CityJSON Processing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems for 3D Assets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/">Digital Elevation Model Workflows</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/">Spatial Indexing and Tiling Schemes for 3D Data</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>LOD Management &amp; Optimization</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/">Automated Tile Generation for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/">Cesium ion Upload Automation for 3D Tilesets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/">glTF LOD Generation With Draco Compression</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/">Streaming Sync Patterns for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/">Tileset Metadata and 3D Tiles Next</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/">Vector Overlays on 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Point Cloud &amp; Mesh Pipelines</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/">Automated Mesh Decimation for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/">Change Detection Between LiDAR Scan Epochs</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/">CI/CD Automation for Spatial Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">LiDAR Classification and Ground Extraction</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/photogrammetry-processing-pipelines/">Photogrammetry Processing Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/">Point Cloud Filtering Techniques</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/">Surface Reconstruction for Geospatial Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/">Texture Mapping Workflows for Digital Twins</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Troubleshooting &amp; Reliability</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/">Cross-Section Failure Modes in Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/">Data Validation &amp; QA Gates for 3D Tiles</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/">Performance Profiling and Benchmarking</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/">Pipeline Observability and Monitoring</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/">Streaming &amp; Runtime Diagnostics for 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+  </div>
+  <div class="container site-footer__bottom">
+    <span>© 2026 3D Geospatial &amp; Digital Twin Automation</span>
+    <span>Built with Eleventy · PWA-enabled</span>
+  </div>
+</footer>
+
+
+  <script src="/assets/js/site.js?v=b99aa9f971" defer></script>
+  
+</body>
+</html>

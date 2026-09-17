@@ -263,7 +263,17 @@ Getting this wrong produces the most visible class of twin defect — a hospital
 
 ---
 
-## 7. Cross-Section Integration
+## 7. CityGML and CityJSON Processing
+
+Most national and municipal building models are delivered as CityGML, and almost nothing consumes CityGML directly. It is verbose, deeply nested and expensive to parse at city scale; CityJSON carries the same data model in a form a pipeline can read in one pass. [CityGML and CityJSON Processing for Digital Twins](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/) covers the conversion, the validation that has to follow it, and the geometry and attribute extraction that feeds the tiling pipeline.
+
+The order matters. [Converting CityGML to CityJSON with citygml-tools](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/converting-citygml-to-cityjson-with-citygml-tools/) comes first, [validating CityJSON with cjval](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/validating-cityjson-with-cjval/) immediately after, and [reprojecting and upgrading CityJSON files](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/reprojecting-and-upgrading-cityjson-files/) before anything reads geometry. [Reading and filtering CityJSON with cjio](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/reading-and-filtering-cityjson-with-cjio/) is the working interface; [extracting LOD2 roof surfaces from CityJSON](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/extracting-lod2-roof-surfaces-from-cityjson/) and [computing building heights and volumes from CityJSON](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/computing-building-heights-and-volumes-from-cityjson/) are the two extractions almost every twin needs.
+
+**Key Practice:** Validate after every conversion, not once at the end. A CityGML file that converts without error can still contain non-planar surfaces, inverted shells and duplicate vertices that only fail later — and the conversion step is where the provenance is still clear enough to raise them with the supplier.
+
+---
+
+## 8. Cross-Section Integration
 
 The fundamentals are the input contract for the two production sections. Outputs from this layer flow downstream in a predictable order, and most pipeline failures trace back to a contract being violated at the boundary between them:
 
@@ -275,7 +285,7 @@ The fundamentals are the input contract for the two production sections. Outputs
 
 ---
 
-## 8. Production Validation & Troubleshooting Matrix
+## 9. Production Validation & Troubleshooting Matrix
 
 A digital twin is only as reliable as its validation pipeline. Automated spatial checks must run at every ingestion, transformation, and export stage. The matrix below maps the failure modes that span these fundamentals to their usual root cause and the concrete fix.
 
@@ -290,7 +300,7 @@ A digital twin is only as reliable as its validation pipeline. Automated spatial
 
 ---
 
-## 9. Implementation Checklist for Engineering Teams
+## 10. Implementation Checklist for Engineering Teams
 
 Deploying a spatially rigorous digital twin requires disciplined engineering practice. Use this checklist as a release gate before production rollout:
 
@@ -340,3 +350,4 @@ No. A void under a bridge deck or over open water is a measurement, and filling 
 - [BIM and IFC Georeferencing](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/) — placing building models on the map
 - [Point Cloud & Mesh Processing Pipelines](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/) — the downstream processing section
 - [LOD Management & Optimization Strategies](https://www.3d-geospatial.com/lod-management-optimization-strategies/) — streaming and level-of-detail
+- [CityGML and CityJSON Processing for Digital Twins](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/) — CityGML to CityJSON conversion, validation and attribute extraction

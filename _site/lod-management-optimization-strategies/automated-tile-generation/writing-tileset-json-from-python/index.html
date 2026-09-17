@@ -1,0 +1,910 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <title>Writing Tileset JSON from Python — 3D Geospatial</title>
+  <meta name="description" content="Generate 3D Tiles 1.1 tileset.json in Python: quadtree from your own index, correct bounding volumes, monotonic geometric error">
+  <meta name="keywords" content="3D geospatial, digital twin, point cloud, mesh pipeline, LOD, 3D Tiles, Cesium, PDAL, Open3D, Python, CI/CD">
+  <meta name="author" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta name="theme-color" content="#1f6b8a" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f171d" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+
+  
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem("theme");
+        var theme = (stored === "dark" || stored === "light") ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    })();
+  </script>
+  <meta name="generator" content="Eleventy">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="googlebot" content="index,follow,max-image-preview:large">
+
+  
+  <link rel="canonical" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/writing-tileset-json-from-python/">
+  <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">
+
+  
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/icon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+
+  
+  <link rel="apple-touch-icon" href="/assets/img/icon-180.png">
+  <link rel="mask-icon" href="/assets/img/logo.svg" color="#1f6b8a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="3D Geospatial">
+  <meta name="application-name" content="3D Geospatial">
+
+  
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Writing Tileset JSON from Python — 3D Geospatial">
+  <meta property="og:description" content="Generate 3D Tiles 1.1 tileset.json in Python: quadtree from your own index, correct bounding volumes, monotonic geometric error">
+  <meta property="og:url" content="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/writing-tileset-json-from-python/">
+  <meta property="og:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+  <meta property="og:site_name" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta property="og:locale" content="en_US">
+  
+  <meta property="article:published_time" content="2026-09-17T23:36:56.453Z">
+  <meta property="article:modified_time" content="2026-09-17T23:36:56.453Z">
+  <meta property="article:publisher" content="https://www.3d-geospatial.com/">
+  
+
+  
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Writing Tileset JSON from Python — 3D Geospatial">
+  <meta name="twitter:description" content="Generate 3D Tiles 1.1 tileset.json in Python: quadtree from your own index, correct bounding volumes, monotonic geometric error">
+  <meta name="twitter:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta name="twitter:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+
+  
+  <link rel="preload" href="/assets/css/styles.css?v=8c46394d6c" as="style">
+  
+
+  <link rel="stylesheet" href="/assets/css/styles.css?v=8c46394d6c">
+
+  
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.3d-geospatial.com/#organization",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "url": "https://www.3d-geospatial.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/icon-512.png",
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://www.3d-geospatial.com/#website",
+      "url": "https://www.3d-geospatial.com/",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "description": "Build reliable 3D spatial data pipelines for digital twins — point clouds, meshes, LOD strategies, Python processing, and CI/CD automation.",
+      "inLanguage": "en",
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      }
+    },
+    {
+      "@type": "TechArticle",
+      "@id": "https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/writing-tileset-json-from-python/#article",
+      "isPartOf": {
+        "@id": "https://www.3d-geospatial.com/#website"
+      },
+      "headline": "Writing Tileset JSON from Python",
+      "name": "Writing Tileset JSON from Python",
+      "description": "Generate 3D Tiles 1.1 tileset.json in Python: quadtree from your own index, correct bounding volumes, monotonic geometric error",
+      "url": "https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/writing-tileset-json-from-python/",
+      "mainEntityOfPage": "https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/writing-tileset-json-from-python/",
+      "inLanguage": "en",
+      "datePublished": "2026-09-17T23:36:56.453Z",
+      "dateModified": "2026-09-17T23:36:56.453Z",
+      "author": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "image": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/og-cover.png",
+        "width": 1200,
+        "height": 630
+      },
+      "breadcrumb": {
+        "@id": "https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/writing-tileset-json-from-python/#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/writing-tileset-json-from-python/#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://www.3d-geospatial.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "LOD Management Optimization Strategies",
+          "item": "https://www.3d-geospatial.com/lod-management-optimization-strategies/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Automated Tile Generation",
+          "item": "https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "name": "Writing Tileset Json From Python",
+          "item": "https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/writing-tileset-json-from-python/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  
+<header class="site-header" role="banner">
+  <div class="container site-header__inner">
+    <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+      <img src="/assets/img/logo.svg" alt="" class="brand__mark" width="36" height="36">
+      <span class="brand__name">
+        3D Geospatial
+        <small>Digital Twin Automation</small>
+      </span>
+    </a>
+
+    <button class="theme-toggle" type="button" data-theme-toggle
+            aria-label="Switch to dark theme" title="Switch to dark theme">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4.2"/>
+        <path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/>
+      </svg>
+    </button>
+
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>
+      <span class="nav-toggle__icon" aria-hidden="true"><span></span></span>
+      Menu
+    </button>
+
+    <nav class="primary-nav" id="primary-nav" aria-label="Primary">
+      
+      <a href="https://www.3d-geospatial.com/" >
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/>
+        </svg>
+        Home
+      </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2 3 7l9 5 9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 17l9 5 9-5"/>
+            </svg>
+          
+          3D Geospatial Fundamentals
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/" aria-current="page">
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+          
+          LOD Management &amp; Optimization
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="6" cy="6" r="1.5"/><circle cx="12" cy="6" r="1.5"/><circle cx="18" cy="6" r="1.5"/>
+              <circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/>
+              <circle cx="6" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="18" cy="18" r="1.5"/>
+            </svg>
+          
+          Point Cloud &amp; Mesh Pipelines
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <path d="M12 9v4"/><path d="M12 17h.01"/>
+            </svg>
+          
+          Troubleshooting &amp; Reliability
+        </a>
+      
+    </nav>
+  </div>
+</header>
+
+
+  <main id="main">
+    
+
+
+<div class="container">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    
+      
+        <a href="https://www.3d-geospatial.com/">Home</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management Optimization Strategies</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/">Automated Tile Generation</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <span class="current">Writing Tileset Json From Python</span>
+      
+    
+  </nav>
+
+  <div class="content-page">
+    <article class="article">
+      <h1 id="writing-tileset-json-from-python" tabindex="-1"><a class="heading-link" href="#writing-tileset-json-from-python"><span>Writing Tileset JSON from Python</span></a></h1>
+<p>This page generates <code>tileset.json</code> directly in Python — building the tile tree from your own spatial index, emitting correct region and box bounding volumes, assigning geometric errors that decrease with depth, splitting large trees into external tilesets, and self-checking the result before it is published.</p>
+<h2 id="why-you-hit-this" tabindex="-1"><a class="heading-link" href="#why-you-hit-this"><span>Why you hit this</span></a></h2>
+<p>The reference tooling in <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/converting-glb-to-3d-tiles-with-3d-tiles-tools/">converting GLB to 3D Tiles with 3d-tiles-tools</a> produces a flat root-plus-leaves tree from a folder of content, which is the right answer up to a few hundred tiles. Beyond that the client needs a hierarchy, and the hierarchy has to match the one your tiling pipeline already used to shard the work — the quadkeys from <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/">spatial indexing and tiling schemes</a>. At that point generating the JSON yourself is less work than persuading a tool to reproduce your tree, and it puts the geometric error policy under your control.</p>
+<p>The format is small. A tile has a bounding volume, a geometric error, an optional refinement mode, optional content and optional children. Everything else is detail.</p>
+<h2 id="prerequisites" tabindex="-1"><a class="heading-link" href="#prerequisites"><span>Prerequisites</span></a></h2>
+<ul>
+<li>Python 3.10+ with <code>numpy</code> and <code>pyproj</code>; <code>3d-tiles-validator</code> available via <code>npx</code> for the final gate.</li>
+<li>A per-tile inventory: key, geographic extent, height range, content path, triangle count.</li>
+<li>Content already written — this page produces only the JSON that references it.</li>
+</ul>
+<h2 id="step-by-step" tabindex="-1"><a class="heading-link" href="#step-by-step"><span>Step-by-Step</span></a></h2>
+<h3 id="1-model-a-tile-as-a-dataclass-not-a-dict" tabindex="-1"><a class="heading-link" href="#1-model-a-tile-as-a-dataclass-not-a-dict"><span>1. Model a tile as a dataclass, not a dict</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> json
+<span class="token keyword">import</span> math
+<span class="token keyword">from</span> dataclasses <span class="token keyword">import</span> dataclass<span class="token punctuation">,</span> field
+<span class="token keyword">from</span> pathlib <span class="token keyword">import</span> Path
+
+<span class="token keyword">import</span> numpy <span class="token keyword">as</span> np
+
+<span class="token decorator annotation punctuation">@dataclass</span>
+<span class="token keyword">class</span> <span class="token class-name">Region</span><span class="token punctuation">:</span>
+    west<span class="token punctuation">:</span> <span class="token builtin">float</span>      <span class="token comment"># radians</span>
+    south<span class="token punctuation">:</span> <span class="token builtin">float</span>
+    east<span class="token punctuation">:</span> <span class="token builtin">float</span>
+    north<span class="token punctuation">:</span> <span class="token builtin">float</span>
+    min_h<span class="token punctuation">:</span> <span class="token builtin">float</span>     <span class="token comment"># metres above the ellipsoid</span>
+    max_h<span class="token punctuation">:</span> <span class="token builtin">float</span>
+
+    <span class="token keyword">def</span> <span class="token function">to_json</span><span class="token punctuation">(</span>self<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"region"</span><span class="token punctuation">:</span> <span class="token punctuation">[</span>self<span class="token punctuation">.</span>west<span class="token punctuation">,</span> self<span class="token punctuation">.</span>south<span class="token punctuation">,</span> self<span class="token punctuation">.</span>east<span class="token punctuation">,</span> self<span class="token punctuation">.</span>north<span class="token punctuation">,</span>
+                           self<span class="token punctuation">.</span>min_h<span class="token punctuation">,</span> self<span class="token punctuation">.</span>max_h<span class="token punctuation">]</span><span class="token punctuation">}</span>
+
+    <span class="token keyword">def</span> <span class="token function">union</span><span class="token punctuation">(</span>self<span class="token punctuation">,</span> other<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">return</span> Region<span class="token punctuation">(</span><span class="token builtin">min</span><span class="token punctuation">(</span>self<span class="token punctuation">.</span>west<span class="token punctuation">,</span> other<span class="token punctuation">.</span>west<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token builtin">min</span><span class="token punctuation">(</span>self<span class="token punctuation">.</span>south<span class="token punctuation">,</span> other<span class="token punctuation">.</span>south<span class="token punctuation">)</span><span class="token punctuation">,</span>
+                      <span class="token builtin">max</span><span class="token punctuation">(</span>self<span class="token punctuation">.</span>east<span class="token punctuation">,</span> other<span class="token punctuation">.</span>east<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token builtin">max</span><span class="token punctuation">(</span>self<span class="token punctuation">.</span>north<span class="token punctuation">,</span> other<span class="token punctuation">.</span>north<span class="token punctuation">)</span><span class="token punctuation">,</span>
+                      <span class="token builtin">min</span><span class="token punctuation">(</span>self<span class="token punctuation">.</span>min_h<span class="token punctuation">,</span> other<span class="token punctuation">.</span>min_h<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token builtin">max</span><span class="token punctuation">(</span>self<span class="token punctuation">.</span>max_h<span class="token punctuation">,</span> other<span class="token punctuation">.</span>max_h<span class="token punctuation">)</span><span class="token punctuation">)</span>
+
+<span class="token decorator annotation punctuation">@dataclass</span>
+<span class="token keyword">class</span> <span class="token class-name">Tile</span><span class="token punctuation">:</span>
+    key<span class="token punctuation">:</span> <span class="token builtin">str</span>
+    region<span class="token punctuation">:</span> Region
+    geometric_error<span class="token punctuation">:</span> <span class="token builtin">float</span>
+    content_uri<span class="token punctuation">:</span> <span class="token builtin">str</span> <span class="token operator">|</span> <span class="token boolean">None</span> <span class="token operator">=</span> <span class="token boolean">None</span>
+    children<span class="token punctuation">:</span> <span class="token builtin">list</span><span class="token punctuation">[</span><span class="token string">"Tile"</span><span class="token punctuation">]</span> <span class="token operator">=</span> field<span class="token punctuation">(</span>default_factory<span class="token operator">=</span><span class="token builtin">list</span><span class="token punctuation">)</span>
+    refine<span class="token punctuation">:</span> <span class="token builtin">str</span> <span class="token operator">|</span> <span class="token boolean">None</span> <span class="token operator">=</span> <span class="token boolean">None</span>
+    triangles<span class="token punctuation">:</span> <span class="token builtin">int</span> <span class="token operator">=</span> <span class="token number">0</span>
+
+    <span class="token keyword">def</span> <span class="token function">to_json</span><span class="token punctuation">(</span>self<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        out <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token string">"boundingVolume"</span><span class="token punctuation">:</span> self<span class="token punctuation">.</span>region<span class="token punctuation">.</span>to_json<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+               <span class="token string">"geometricError"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>self<span class="token punctuation">.</span>geometric_error<span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">}</span>
+        <span class="token keyword">if</span> self<span class="token punctuation">.</span>refine<span class="token punctuation">:</span>
+            out<span class="token punctuation">[</span><span class="token string">"refine"</span><span class="token punctuation">]</span> <span class="token operator">=</span> self<span class="token punctuation">.</span>refine
+        <span class="token keyword">if</span> self<span class="token punctuation">.</span>content_uri<span class="token punctuation">:</span>
+            out<span class="token punctuation">[</span><span class="token string">"content"</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token string">"uri"</span><span class="token punctuation">:</span> self<span class="token punctuation">.</span>content_uri<span class="token punctuation">}</span>
+        <span class="token keyword">if</span> self<span class="token punctuation">.</span>children<span class="token punctuation">:</span>
+            out<span class="token punctuation">[</span><span class="token string">"children"</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token punctuation">[</span>c<span class="token punctuation">.</span>to_json<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">for</span> c <span class="token keyword">in</span> self<span class="token punctuation">.</span>children<span class="token punctuation">]</span>
+        <span class="token keyword">return</span> out
+</code></pre></div>
+<p>A <code>region</code> bounding volume takes longitude and latitude in <strong>radians</strong> and heights in metres above the ellipsoid, which is the single most common mistake in hand-written tilesets — degrees produce a volume wrapping the globe many times, and the client either culls everything or nothing. Keeping radians inside a <code>Region</code> type and converting only at the boundary is why this is a dataclass rather than a dict.</p>
+<p>Regions are also the easiest volume to get right, because they compose: a parent’s region is the union of its children’s, computed in step 3, with no matrix maths involved.</p>
+<h3 id="2-turn-quadkeys-into-a-tree" tabindex="-1"><a class="heading-link" href="#2-turn-quadkeys-into-a-tree"><span>2. Turn quadkeys into a tree</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">quadkey_children</span><span class="token punctuation">(</span>key<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">return</span> <span class="token punctuation">[</span>key <span class="token operator">+</span> d <span class="token keyword">for</span> d <span class="token keyword">in</span> <span class="token string">"0123"</span><span class="token punctuation">]</span>
+
+<span class="token keyword">def</span> <span class="token function">quadkey_to_region</span><span class="token punctuation">(</span>key<span class="token punctuation">,</span> min_h<span class="token punctuation">,</span> max_h<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Web-Mercator-style quadkey to a geographic region in radians."""</span>
+    x <span class="token operator">=</span> y <span class="token operator">=</span> <span class="token number">0</span>
+    level <span class="token operator">=</span> <span class="token builtin">len</span><span class="token punctuation">(</span>key<span class="token punctuation">)</span>
+    <span class="token keyword">for</span> i<span class="token punctuation">,</span> ch <span class="token keyword">in</span> <span class="token builtin">enumerate</span><span class="token punctuation">(</span>key<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        bit <span class="token operator">=</span> level <span class="token operator">-</span> i <span class="token operator">-</span> <span class="token number">1</span>
+        mask <span class="token operator">=</span> <span class="token number">1</span> <span class="token operator">&lt;&lt;</span> bit
+        d <span class="token operator">=</span> <span class="token builtin">int</span><span class="token punctuation">(</span>ch<span class="token punctuation">)</span>
+        <span class="token keyword">if</span> d <span class="token operator">&amp;</span> <span class="token number">1</span><span class="token punctuation">:</span>
+            x <span class="token operator">|</span><span class="token operator">=</span> mask
+        <span class="token keyword">if</span> d <span class="token operator">&amp;</span> <span class="token number">2</span><span class="token punctuation">:</span>
+            y <span class="token operator">|</span><span class="token operator">=</span> mask
+    n <span class="token operator">=</span> <span class="token number">1</span> <span class="token operator">&lt;&lt;</span> level
+    lon_w <span class="token operator">=</span> x <span class="token operator">/</span> n <span class="token operator">*</span> <span class="token number">360.0</span> <span class="token operator">-</span> <span class="token number">180.0</span>
+    lon_e <span class="token operator">=</span> <span class="token punctuation">(</span>x <span class="token operator">+</span> <span class="token number">1</span><span class="token punctuation">)</span> <span class="token operator">/</span> n <span class="token operator">*</span> <span class="token number">360.0</span> <span class="token operator">-</span> <span class="token number">180.0</span>
+    lat_n <span class="token operator">=</span> math<span class="token punctuation">.</span>degrees<span class="token punctuation">(</span>math<span class="token punctuation">.</span>atan<span class="token punctuation">(</span>math<span class="token punctuation">.</span>sinh<span class="token punctuation">(</span>math<span class="token punctuation">.</span>pi <span class="token operator">*</span> <span class="token punctuation">(</span><span class="token number">1</span> <span class="token operator">-</span> <span class="token number">2</span> <span class="token operator">*</span> y <span class="token operator">/</span> n<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    lat_s <span class="token operator">=</span> math<span class="token punctuation">.</span>degrees<span class="token punctuation">(</span>math<span class="token punctuation">.</span>atan<span class="token punctuation">(</span>math<span class="token punctuation">.</span>sinh<span class="token punctuation">(</span>math<span class="token punctuation">.</span>pi <span class="token operator">*</span> <span class="token punctuation">(</span><span class="token number">1</span> <span class="token operator">-</span> <span class="token number">2</span> <span class="token operator">*</span> <span class="token punctuation">(</span>y <span class="token operator">+</span> <span class="token number">1</span><span class="token punctuation">)</span> <span class="token operator">/</span> n<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> Region<span class="token punctuation">(</span>math<span class="token punctuation">.</span>radians<span class="token punctuation">(</span>lon_w<span class="token punctuation">)</span><span class="token punctuation">,</span> math<span class="token punctuation">.</span>radians<span class="token punctuation">(</span>lat_s<span class="token punctuation">)</span><span class="token punctuation">,</span>
+                  math<span class="token punctuation">.</span>radians<span class="token punctuation">(</span>lon_e<span class="token punctuation">)</span><span class="token punctuation">,</span> math<span class="token punctuation">.</span>radians<span class="token punctuation">(</span>lat_n<span class="token punctuation">)</span><span class="token punctuation">,</span> min_h<span class="token punctuation">,</span> max_h<span class="token punctuation">)</span>
+
+<span class="token keyword">def</span> <span class="token function">build_tree</span><span class="token punctuation">(</span>inventory<span class="token punctuation">,</span> root_key<span class="token punctuation">,</span> root_geometric_error<span class="token punctuation">,</span> refine<span class="token operator">=</span><span class="token string">"REPLACE"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""inventory: {quadkey: {"uri": str, "min_h": float, "max_h": float, "triangles": int}}"""</span>
+    keys <span class="token operator">=</span> <span class="token builtin">set</span><span class="token punctuation">(</span>inventory<span class="token punctuation">)</span>
+    max_level <span class="token operator">=</span> <span class="token builtin">max</span><span class="token punctuation">(</span><span class="token builtin">len</span><span class="token punctuation">(</span>k<span class="token punctuation">)</span> <span class="token keyword">for</span> k <span class="token keyword">in</span> keys<span class="token punctuation">)</span>
+
+    <span class="token keyword">def</span> <span class="token function">node</span><span class="token punctuation">(</span>key<span class="token punctuation">,</span> ge<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        item <span class="token operator">=</span> inventory<span class="token punctuation">.</span>get<span class="token punctuation">(</span>key<span class="token punctuation">)</span>
+        kids <span class="token operator">=</span> <span class="token punctuation">[</span>k <span class="token keyword">for</span> k <span class="token keyword">in</span> quadkey_children<span class="token punctuation">(</span>key<span class="token punctuation">)</span> <span class="token keyword">if</span> <span class="token builtin">any</span><span class="token punctuation">(</span>c<span class="token punctuation">.</span>startswith<span class="token punctuation">(</span>k<span class="token punctuation">)</span> <span class="token keyword">for</span> c <span class="token keyword">in</span> keys<span class="token punctuation">)</span><span class="token punctuation">]</span>
+        child_tiles <span class="token operator">=</span> <span class="token punctuation">[</span>node<span class="token punctuation">(</span>k<span class="token punctuation">,</span> ge <span class="token operator">/</span> <span class="token number">2.0</span><span class="token punctuation">)</span> <span class="token keyword">for</span> k <span class="token keyword">in</span> kids<span class="token punctuation">]</span>
+        <span class="token keyword">if</span> item <span class="token keyword">is</span> <span class="token keyword">not</span> <span class="token boolean">None</span><span class="token punctuation">:</span>
+            region <span class="token operator">=</span> quadkey_to_region<span class="token punctuation">(</span>key<span class="token punctuation">,</span> item<span class="token punctuation">[</span><span class="token string">"min_h"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> item<span class="token punctuation">[</span><span class="token string">"max_h"</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+        <span class="token keyword">elif</span> child_tiles<span class="token punctuation">:</span>
+            region <span class="token operator">=</span> child_tiles<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">.</span>region
+            <span class="token keyword">for</span> c <span class="token keyword">in</span> child_tiles<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">:</span><span class="token punctuation">]</span><span class="token punctuation">:</span>
+                region <span class="token operator">=</span> region<span class="token punctuation">.</span>union<span class="token punctuation">(</span>c<span class="token punctuation">.</span>region<span class="token punctuation">)</span>
+        <span class="token keyword">else</span><span class="token punctuation">:</span>
+            <span class="token keyword">return</span> <span class="token boolean">None</span>
+        <span class="token keyword">if</span> child_tiles<span class="token punctuation">:</span>
+            <span class="token keyword">for</span> c <span class="token keyword">in</span> child_tiles<span class="token punctuation">:</span>
+                region <span class="token operator">=</span> region<span class="token punctuation">.</span>union<span class="token punctuation">(</span>c<span class="token punctuation">.</span>region<span class="token punctuation">)</span>
+        <span class="token keyword">return</span> Tile<span class="token punctuation">(</span>key<span class="token operator">=</span>key<span class="token punctuation">,</span> region<span class="token operator">=</span>region<span class="token punctuation">,</span>
+                    geometric_error<span class="token operator">=</span>ge <span class="token keyword">if</span> child_tiles <span class="token keyword">else</span> <span class="token number">0.0</span><span class="token punctuation">,</span>
+                    content_uri<span class="token operator">=</span>item<span class="token punctuation">[</span><span class="token string">"uri"</span><span class="token punctuation">]</span> <span class="token keyword">if</span> item <span class="token keyword">else</span> <span class="token boolean">None</span><span class="token punctuation">,</span>
+                    children<span class="token operator">=</span><span class="token punctuation">[</span>c <span class="token keyword">for</span> c <span class="token keyword">in</span> child_tiles <span class="token keyword">if</span> c<span class="token punctuation">]</span><span class="token punctuation">,</span>
+                    refine<span class="token operator">=</span>refine <span class="token keyword">if</span> key <span class="token operator">==</span> root_key <span class="token keyword">else</span> <span class="token boolean">None</span><span class="token punctuation">,</span>
+                    triangles<span class="token operator">=</span>item<span class="token punctuation">[</span><span class="token string">"triangles"</span><span class="token punctuation">]</span> <span class="token keyword">if</span> item <span class="token keyword">else</span> <span class="token number">0</span><span class="token punctuation">)</span>
+
+    <span class="token keyword">return</span> node<span class="token punctuation">(</span>root_key<span class="token punctuation">,</span> root_geometric_error<span class="token punctuation">)</span><span class="token punctuation">,</span> max_level
+</code></pre></div>
+<p>Halving the geometric error per level is the convention and it matches how screen-space error scales: a tile covering half the ground distance at the same pixel budget tolerates half the error. Leaves get zero, which tells the client there is nothing finer to load.</p>
+<p>Setting <code>refine</code> only on the root is deliberate — refinement is inherited, so repeating it on every tile bloats the JSON for no effect. <code>REPLACE</code> is right for meshes where the child fully covers the parent; <code>ADD</code> is right for point clouds and for additive detail, where the child’s content supplements rather than replaces.</p>
+<figure class="diagram">
+<svg viewBox="26 10 688 244" role="img" aria-labelledby="tsj-tree-t tsj-tree-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="tsj-tree-t">Quadkey tree with geometric error per level</title>
+  <desc id="tsj-tree-d">A three-level tree. The root at level twelve has a geometric error of 512 metres and no content. Its four children at level thirteen have 256 metres. Their children at level fourteen are leaves with a geometric error of zero and one content file each. Each parent's bounding region is the union of its children's regions, so no content falls outside its ancestors.</desc>
+  <rect class="svg-bg" x="26" y="10" width="688" height="244" fill="#ffffff"/>
+  <defs>
+    <marker id="tsj-tree-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
+    </marker>
+  </defs>
+  <rect x="300" y="24" width="140" height="42" rx="7" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="140" y="112" width="130" height="42" rx="7" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="470" y="112" width="130" height="42" rx="7" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="40" y="198" width="120" height="42" rx="7" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <rect x="190" y="198" width="120" height="42" rx="7" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <rect x="430" y="198" width="120" height="42" rx="7" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <rect x="580" y="198" width="120" height="42" rx="7" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <g stroke="#5b6471" stroke-width="1.8" fill="none" marker-end="url(#tsj-tree-arrow)">
+    <path d="M340 66 L215 110"/><path d="M400 66 L525 110"/>
+    <path d="M180 154 L110 196"/><path d="M230 154 L260 196"/>
+    <path d="M510 154 L480 196"/><path d="M560 154 L630 196"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="370" y="42">root 120210 · ge 512</text><text x="370" y="58">no content</text>
+    <text x="205" y="130">1202100 · ge 256</text><text x="205" y="146">no content</text>
+    <text x="535" y="130">1202101 · ge 256</text><text x="535" y="146">no content</text>
+    <text x="100" y="216">12021000 · ge 0</text><text x="100" y="232">0.glb</text>
+    <text x="250" y="216">12021001 · ge 0</text><text x="250" y="232">1.glb</text>
+    <text x="490" y="216">12021010 · ge 0</text><text x="490" y="232">2.glb</text>
+    <text x="640" y="216">12021011 · ge 0</text><text x="640" y="232">3.glb</text>
+  </g>
+  <text x="370" y="94" fill="#5b6471" font-size="12">region = union of children; ge halves each level</text>
+</svg>
+<figcaption>The tree the client walks: halve the error per level, union the regions upward, zero at the leaves.</figcaption>
+</figure>
+<h3 id="3-write-the-document-with-the-asset-block-the-spec-requires" tabindex="-1"><a class="heading-link" href="#3-write-the-document-with-the-asset-block-the-spec-requires"><span>3. Write the document, with the asset block the spec requires</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">write_tileset</span><span class="token punctuation">(</span>root_tile<span class="token punctuation">,</span> out_path<span class="token punctuation">,</span> tileset_version<span class="token operator">=</span><span class="token boolean">None</span><span class="token punctuation">,</span> extras<span class="token operator">=</span><span class="token boolean">None</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    doc <span class="token operator">=</span> <span class="token punctuation">{</span>
+        <span class="token string">"asset"</span><span class="token punctuation">:</span> <span class="token punctuation">{</span><span class="token string">"version"</span><span class="token punctuation">:</span> <span class="token string">"1.1"</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+        <span class="token string">"geometricError"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>root_tile<span class="token punctuation">.</span>geometric_error<span class="token punctuation">,</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"root"</span><span class="token punctuation">:</span> root_tile<span class="token punctuation">.</span>to_json<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+    <span class="token keyword">if</span> tileset_version<span class="token punctuation">:</span>
+        doc<span class="token punctuation">[</span><span class="token string">"asset"</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token string">"tilesetVersion"</span><span class="token punctuation">]</span> <span class="token operator">=</span> tileset_version
+    <span class="token keyword">if</span> extras<span class="token punctuation">:</span>
+        doc<span class="token punctuation">[</span><span class="token string">"extras"</span><span class="token punctuation">]</span> <span class="token operator">=</span> extras
+    text <span class="token operator">=</span> json<span class="token punctuation">.</span>dumps<span class="token punctuation">(</span>doc<span class="token punctuation">,</span> sort_keys<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> separators<span class="token operator">=</span><span class="token punctuation">(</span><span class="token string">","</span><span class="token punctuation">,</span> <span class="token string">":"</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    Path<span class="token punctuation">(</span>out_path<span class="token punctuation">)</span><span class="token punctuation">.</span>parent<span class="token punctuation">.</span>mkdir<span class="token punctuation">(</span>parents<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> exist_ok<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+    Path<span class="token punctuation">(</span>out_path<span class="token punctuation">)</span><span class="token punctuation">.</span>write_text<span class="token punctuation">(</span>text<span class="token punctuation">,</span> encoding<span class="token operator">=</span><span class="token string">"utf-8"</span><span class="token punctuation">,</span> newline<span class="token operator">=</span><span class="token string">"\n"</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"path"</span><span class="token punctuation">:</span> out_path<span class="token punctuation">,</span> <span class="token string">"bytes"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>text<span class="token punctuation">)</span><span class="token punctuation">}</span>
+
+INVENTORY <span class="token operator">=</span> <span class="token punctuation">{</span>
+    <span class="token string">"12021000"</span><span class="token punctuation">:</span> <span class="token punctuation">{</span><span class="token string">"uri"</span><span class="token punctuation">:</span> <span class="token string">"content/12021000.glb"</span><span class="token punctuation">,</span> <span class="token string">"min_h"</span><span class="token punctuation">:</span> <span class="token number">18.0</span><span class="token punctuation">,</span> <span class="token string">"max_h"</span><span class="token punctuation">:</span> <span class="token number">74.0</span><span class="token punctuation">,</span> <span class="token string">"triangles"</span><span class="token punctuation">:</span> <span class="token number">41200</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+    <span class="token string">"12021001"</span><span class="token punctuation">:</span> <span class="token punctuation">{</span><span class="token string">"uri"</span><span class="token punctuation">:</span> <span class="token string">"content/12021001.glb"</span><span class="token punctuation">,</span> <span class="token string">"min_h"</span><span class="token punctuation">:</span> <span class="token number">16.5</span><span class="token punctuation">,</span> <span class="token string">"max_h"</span><span class="token punctuation">:</span> <span class="token number">91.0</span><span class="token punctuation">,</span> <span class="token string">"triangles"</span><span class="token punctuation">:</span> <span class="token number">38800</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+    <span class="token string">"12021010"</span><span class="token punctuation">:</span> <span class="token punctuation">{</span><span class="token string">"uri"</span><span class="token punctuation">:</span> <span class="token string">"content/12021010.glb"</span><span class="token punctuation">,</span> <span class="token string">"min_h"</span><span class="token punctuation">:</span> <span class="token number">14.0</span><span class="token punctuation">,</span> <span class="token string">"max_h"</span><span class="token punctuation">:</span> <span class="token number">66.0</span><span class="token punctuation">,</span> <span class="token string">"triangles"</span><span class="token punctuation">:</span> <span class="token number">51000</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+    <span class="token string">"12021011"</span><span class="token punctuation">:</span> <span class="token punctuation">{</span><span class="token string">"uri"</span><span class="token punctuation">:</span> <span class="token string">"content/12021011.glb"</span><span class="token punctuation">,</span> <span class="token string">"min_h"</span><span class="token punctuation">:</span> <span class="token number">15.0</span><span class="token punctuation">,</span> <span class="token string">"max_h"</span><span class="token punctuation">:</span> <span class="token number">58.0</span><span class="token punctuation">,</span> <span class="token string">"triangles"</span><span class="token punctuation">:</span> <span class="token number">29700</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+<span class="token punctuation">}</span>
+root<span class="token punctuation">,</span> levels <span class="token operator">=</span> build_tree<span class="token punctuation">(</span>INVENTORY<span class="token punctuation">,</span> root_key<span class="token operator">=</span><span class="token string">"120210"</span><span class="token punctuation">,</span> root_geometric_error<span class="token operator">=</span><span class="token number">512.0</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span>write_tileset<span class="token punctuation">(</span>root<span class="token punctuation">,</span> <span class="token string">"output/city/tileset.json"</span><span class="token punctuation">,</span> tileset_version<span class="token operator">=</span><span class="token string">"2026-09-17"</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p><code>asset.version</code> is mandatory and <code>&quot;1.1&quot;</code> is what you want — it permits glTF directly as tile content, so no <code>b3dm</code> wrapper is involved. <code>tilesetVersion</code> is free-form and the right place for the data’s version, which lets a client tell two builds apart without a timestamp; see <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/making-tile-output-deterministic/">making tile output deterministic</a> for why that distinction matters.</p>
+<p>Sorted keys and no whitespace keep the output byte-identical between runs and about 30% smaller, which matters when the root JSON for a city reaches several megabytes.</p>
+<h3 id="4-split-large-trees-into-external-tilesets" tabindex="-1"><a class="heading-link" href="#4-split-large-trees-into-external-tilesets"><span>4. Split large trees into external tilesets</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">split_external</span><span class="token punctuation">(</span>root_tile<span class="token punctuation">,</span> out_dir<span class="token punctuation">,</span> max_tiles_per_file<span class="token operator">=</span><span class="token number">2000</span><span class="token punctuation">,</span> prefix<span class="token operator">=</span><span class="token string">"subtree"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Emit subtrees as their own tileset.json files, referenced as content."""</span>
+    written <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+
+    <span class="token keyword">def</span> <span class="token function">count</span><span class="token punctuation">(</span>tile<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token number">1</span> <span class="token operator">+</span> <span class="token builtin">sum</span><span class="token punctuation">(</span>count<span class="token punctuation">(</span>c<span class="token punctuation">)</span> <span class="token keyword">for</span> c <span class="token keyword">in</span> tile<span class="token punctuation">.</span>children<span class="token punctuation">)</span>
+
+    <span class="token keyword">def</span> <span class="token function">emit</span><span class="token punctuation">(</span>tile<span class="token punctuation">,</span> depth<span class="token operator">=</span><span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">if</span> depth <span class="token operator">></span> <span class="token number">0</span> <span class="token keyword">and</span> count<span class="token punctuation">(</span>tile<span class="token punctuation">)</span> <span class="token operator">></span> max_tiles_per_file <span class="token keyword">and</span> tile<span class="token punctuation">.</span>children<span class="token punctuation">:</span>
+            name <span class="token operator">=</span> <span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>prefix<span class="token punctuation">}</span></span><span class="token string">_</span><span class="token interpolation"><span class="token punctuation">{</span>tile<span class="token punctuation">.</span>key<span class="token punctuation">}</span></span><span class="token string">.json"</span></span>
+            sub <span class="token operator">=</span> Tile<span class="token punctuation">(</span>key<span class="token operator">=</span>tile<span class="token punctuation">.</span>key<span class="token punctuation">,</span> region<span class="token operator">=</span>tile<span class="token punctuation">.</span>region<span class="token punctuation">,</span>
+                       geometric_error<span class="token operator">=</span>tile<span class="token punctuation">.</span>geometric_error<span class="token punctuation">,</span>
+                       children<span class="token operator">=</span><span class="token punctuation">[</span>emit<span class="token punctuation">(</span>c<span class="token punctuation">,</span> depth <span class="token operator">+</span> <span class="token number">1</span><span class="token punctuation">)</span> <span class="token keyword">for</span> c <span class="token keyword">in</span> tile<span class="token punctuation">.</span>children<span class="token punctuation">]</span><span class="token punctuation">,</span>
+                       content_uri<span class="token operator">=</span>tile<span class="token punctuation">.</span>content_uri<span class="token punctuation">)</span>
+            write_tileset<span class="token punctuation">(</span>sub<span class="token punctuation">,</span> <span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>out_dir<span class="token punctuation">}</span></span><span class="token string">/</span><span class="token interpolation"><span class="token punctuation">{</span>name<span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+            written<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"file"</span><span class="token punctuation">:</span> name<span class="token punctuation">,</span> <span class="token string">"tiles"</span><span class="token punctuation">:</span> count<span class="token punctuation">(</span>tile<span class="token punctuation">)</span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+            <span class="token keyword">return</span> Tile<span class="token punctuation">(</span>key<span class="token operator">=</span>tile<span class="token punctuation">.</span>key<span class="token punctuation">,</span> region<span class="token operator">=</span>tile<span class="token punctuation">.</span>region<span class="token punctuation">,</span>
+                        geometric_error<span class="token operator">=</span>tile<span class="token punctuation">.</span>geometric_error<span class="token punctuation">,</span>
+                        content_uri<span class="token operator">=</span>name<span class="token punctuation">)</span>               <span class="token comment"># a tileset.json as content</span>
+        <span class="token keyword">return</span> Tile<span class="token punctuation">(</span>key<span class="token operator">=</span>tile<span class="token punctuation">.</span>key<span class="token punctuation">,</span> region<span class="token operator">=</span>tile<span class="token punctuation">.</span>region<span class="token punctuation">,</span>
+                    geometric_error<span class="token operator">=</span>tile<span class="token punctuation">.</span>geometric_error<span class="token punctuation">,</span>
+                    content_uri<span class="token operator">=</span>tile<span class="token punctuation">.</span>content_uri<span class="token punctuation">,</span>
+                    children<span class="token operator">=</span><span class="token punctuation">[</span>emit<span class="token punctuation">(</span>c<span class="token punctuation">,</span> depth <span class="token operator">+</span> <span class="token number">1</span><span class="token punctuation">)</span> <span class="token keyword">for</span> c <span class="token keyword">in</span> tile<span class="token punctuation">.</span>children<span class="token punctuation">]</span><span class="token punctuation">,</span>
+                    refine<span class="token operator">=</span>tile<span class="token punctuation">.</span>refine<span class="token punctuation">)</span>
+
+    top <span class="token operator">=</span> emit<span class="token punctuation">(</span>root_tile<span class="token punctuation">)</span>
+    write_tileset<span class="token punctuation">(</span>top<span class="token punctuation">,</span> <span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>out_dir<span class="token punctuation">}</span></span><span class="token string">/tileset.json"</span></span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"external_files"</span><span class="token punctuation">:</span> written<span class="token punctuation">,</span> <span class="token string">"root_tiles"</span><span class="token punctuation">:</span> count<span class="token punctuation">(</span>top<span class="token punctuation">)</span><span class="token punctuation">}</span>
+</code></pre></div>
+<p>A tile whose <code>content.uri</code> points at another <code>tileset.json</code> grafts that document’s root in place of the tile, which is how a city keeps its entry-point JSON small. The client fetches the root, sees a few hundred tiles, and pulls subtree documents only for regions the camera actually approaches — the difference between a 12 MB first request and a 200 KB one.</p>
+<p>The external subtree’s root must repeat the bounding volume and geometric error of the tile that references it. Where they disagree, clients differ in which they honour, and the symptom is a district that refines at the wrong distance.</p>
+<p>Implicit tiling is the other answer to the same problem and is better for uniformly dense trees, because the structure is described by a subtree availability bitstream rather than by JSON. External tilesets stay easier when the tree is sparse and irregular, which a city usually is.</p>
+<h3 id="5-self-check-before-publishing" tabindex="-1"><a class="heading-link" href="#5-self-check-before-publishing"><span>5. Self-check before publishing</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">check_tileset</span><span class="token punctuation">(</span>path<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    doc <span class="token operator">=</span> json<span class="token punctuation">.</span>loads<span class="token punctuation">(</span>Path<span class="token punctuation">(</span>path<span class="token punctuation">)</span><span class="token punctuation">.</span>read_text<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    problems <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+
+    <span class="token keyword">def</span> <span class="token function">walk</span><span class="token punctuation">(</span>tile<span class="token punctuation">,</span> parent_ge<span class="token punctuation">,</span> parent_region<span class="token punctuation">,</span> depth<span class="token punctuation">,</span> path_keys<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        bv <span class="token operator">=</span> tile<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"boundingVolume"</span><span class="token punctuation">,</span> <span class="token punctuation">{</span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+        <span class="token keyword">if</span> <span class="token string">"region"</span> <span class="token keyword">not</span> <span class="token keyword">in</span> bv <span class="token keyword">and</span> <span class="token string">"box"</span> <span class="token keyword">not</span> <span class="token keyword">in</span> bv <span class="token keyword">and</span> <span class="token string">"sphere"</span> <span class="token keyword">not</span> <span class="token keyword">in</span> bv<span class="token punctuation">:</span>
+            problems<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"at"</span><span class="token punctuation">:</span> path_keys<span class="token punctuation">,</span> <span class="token string">"issue"</span><span class="token punctuation">:</span> <span class="token string">"no bounding volume"</span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+        ge <span class="token operator">=</span> tile<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"geometricError"</span><span class="token punctuation">)</span>
+        <span class="token keyword">if</span> ge <span class="token keyword">is</span> <span class="token boolean">None</span><span class="token punctuation">:</span>
+            problems<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"at"</span><span class="token punctuation">:</span> path_keys<span class="token punctuation">,</span> <span class="token string">"issue"</span><span class="token punctuation">:</span> <span class="token string">"missing geometricError"</span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+        <span class="token keyword">elif</span> parent_ge <span class="token keyword">is</span> <span class="token keyword">not</span> <span class="token boolean">None</span> <span class="token keyword">and</span> ge <span class="token operator">>=</span> parent_ge<span class="token punctuation">:</span>
+            problems<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"at"</span><span class="token punctuation">:</span> path_keys<span class="token punctuation">,</span> <span class="token string">"issue"</span><span class="token punctuation">:</span> <span class="token string-interpolation"><span class="token string">f"ge </span><span class="token interpolation"><span class="token punctuation">{</span>ge<span class="token punctuation">}</span></span><span class="token string"> not &lt; parent </span><span class="token interpolation"><span class="token punctuation">{</span>parent_ge<span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+        <span class="token keyword">if</span> <span class="token string">"region"</span> <span class="token keyword">in</span> bv<span class="token punctuation">:</span>
+            w<span class="token punctuation">,</span> s<span class="token punctuation">,</span> e<span class="token punctuation">,</span> n<span class="token punctuation">,</span> lo<span class="token punctuation">,</span> hi <span class="token operator">=</span> bv<span class="token punctuation">[</span><span class="token string">"region"</span><span class="token punctuation">]</span>
+            <span class="token keyword">if</span> <span class="token keyword">not</span> <span class="token punctuation">(</span><span class="token operator">-</span>math<span class="token punctuation">.</span>pi <span class="token operator">-</span> <span class="token number">1e-9</span> <span class="token operator">&lt;=</span> w <span class="token operator">&lt;</span> e <span class="token operator">&lt;=</span> math<span class="token punctuation">.</span>pi <span class="token operator">+</span> <span class="token number">1e-9</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+                problems<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"at"</span><span class="token punctuation">:</span> path_keys<span class="token punctuation">,</span> <span class="token string">"issue"</span><span class="token punctuation">:</span> <span class="token string-interpolation"><span class="token string">f"longitude out of range or inverted: </span><span class="token interpolation"><span class="token punctuation">{</span>w<span class="token punctuation">}</span></span><span class="token string">, </span><span class="token interpolation"><span class="token punctuation">{</span>e<span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+            <span class="token keyword">if</span> <span class="token keyword">not</span> <span class="token punctuation">(</span><span class="token operator">-</span>math<span class="token punctuation">.</span>pi <span class="token operator">/</span> <span class="token number">2</span> <span class="token operator">-</span> <span class="token number">1e-9</span> <span class="token operator">&lt;=</span> s <span class="token operator">&lt;</span> n <span class="token operator">&lt;=</span> math<span class="token punctuation">.</span>pi <span class="token operator">/</span> <span class="token number">2</span> <span class="token operator">+</span> <span class="token number">1e-9</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+                problems<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"at"</span><span class="token punctuation">:</span> path_keys<span class="token punctuation">,</span> <span class="token string">"issue"</span><span class="token punctuation">:</span> <span class="token string-interpolation"><span class="token string">f"latitude out of range or inverted: </span><span class="token interpolation"><span class="token punctuation">{</span>s<span class="token punctuation">}</span></span><span class="token string">, </span><span class="token interpolation"><span class="token punctuation">{</span>n<span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+            <span class="token keyword">if</span> hi <span class="token operator">&lt;</span> lo<span class="token punctuation">:</span>
+                problems<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"at"</span><span class="token punctuation">:</span> path_keys<span class="token punctuation">,</span> <span class="token string">"issue"</span><span class="token punctuation">:</span> <span class="token string">"height range inverted"</span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+            <span class="token keyword">if</span> parent_region <span class="token keyword">is</span> <span class="token keyword">not</span> <span class="token boolean">None</span><span class="token punctuation">:</span>
+                pw<span class="token punctuation">,</span> ps<span class="token punctuation">,</span> pe<span class="token punctuation">,</span> pn<span class="token punctuation">,</span> plo<span class="token punctuation">,</span> phi <span class="token operator">=</span> parent_region
+                <span class="token keyword">if</span> w <span class="token operator">&lt;</span> pw <span class="token operator">-</span> <span class="token number">1e-9</span> <span class="token keyword">or</span> e <span class="token operator">></span> pe <span class="token operator">+</span> <span class="token number">1e-9</span> <span class="token keyword">or</span> s <span class="token operator">&lt;</span> ps <span class="token operator">-</span> <span class="token number">1e-9</span> <span class="token keyword">or</span> n <span class="token operator">></span> pn <span class="token operator">+</span> <span class="token number">1e-9</span><span class="token punctuation">:</span>
+                    problems<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"at"</span><span class="token punctuation">:</span> path_keys<span class="token punctuation">,</span> <span class="token string">"issue"</span><span class="token punctuation">:</span> <span class="token string">"not contained in parent region"</span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+            parent_region <span class="token operator">=</span> bv<span class="token punctuation">[</span><span class="token string">"region"</span><span class="token punctuation">]</span>
+        uri <span class="token operator">=</span> tile<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"content"</span><span class="token punctuation">,</span> <span class="token punctuation">{</span><span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"uri"</span><span class="token punctuation">)</span>
+        <span class="token keyword">if</span> uri <span class="token keyword">and</span> <span class="token keyword">not</span> uri<span class="token punctuation">.</span>endswith<span class="token punctuation">(</span><span class="token string">".json"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+            target <span class="token operator">=</span> Path<span class="token punctuation">(</span>path<span class="token punctuation">)</span><span class="token punctuation">.</span>parent <span class="token operator">/</span> uri
+            <span class="token keyword">if</span> <span class="token keyword">not</span> target<span class="token punctuation">.</span>exists<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+                problems<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"at"</span><span class="token punctuation">:</span> path_keys<span class="token punctuation">,</span> <span class="token string">"issue"</span><span class="token punctuation">:</span> <span class="token string-interpolation"><span class="token string">f"missing content </span><span class="token interpolation"><span class="token punctuation">{</span>uri<span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+        <span class="token keyword">for</span> i<span class="token punctuation">,</span> child <span class="token keyword">in</span> <span class="token builtin">enumerate</span><span class="token punctuation">(</span>tile<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"children"</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+            walk<span class="token punctuation">(</span>child<span class="token punctuation">,</span> ge<span class="token punctuation">,</span> parent_region<span class="token punctuation">,</span> depth <span class="token operator">+</span> <span class="token number">1</span><span class="token punctuation">,</span> <span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>path_keys<span class="token punctuation">}</span></span><span class="token string">/</span><span class="token interpolation"><span class="token punctuation">{</span>i<span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+
+    walk<span class="token punctuation">(</span>doc<span class="token punctuation">[</span><span class="token string">"root"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> doc<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"geometricError"</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token boolean">None</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token string">"root"</span><span class="token punctuation">)</span>
+    leaves <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    <span class="token keyword">def</span> <span class="token function">count_leaves</span><span class="token punctuation">(</span>t<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">if</span> t<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"children"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+            <span class="token keyword">for</span> c <span class="token keyword">in</span> t<span class="token punctuation">[</span><span class="token string">"children"</span><span class="token punctuation">]</span><span class="token punctuation">:</span>
+                count_leaves<span class="token punctuation">(</span>c<span class="token punctuation">)</span>
+        <span class="token keyword">else</span><span class="token punctuation">:</span>
+            leaves<span class="token punctuation">.</span>append<span class="token punctuation">(</span>t<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"content"</span><span class="token punctuation">,</span> <span class="token punctuation">{</span><span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"uri"</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    count_leaves<span class="token punctuation">(</span>doc<span class="token punctuation">[</span><span class="token string">"root"</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"problems"</span><span class="token punctuation">:</span> problems<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token number">8</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token string">"problem_count"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>problems<span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"leaves"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>leaves<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"leaves_without_content"</span><span class="token punctuation">:</span> <span class="token builtin">sum</span><span class="token punctuation">(</span><span class="token number">1</span> <span class="token keyword">for</span> l <span class="token keyword">in</span> leaves <span class="token keyword">if</span> <span class="token keyword">not</span> l<span class="token punctuation">)</span><span class="token punctuation">}</span>
+
+<span class="token keyword">print</span><span class="token punctuation">(</span>json<span class="token punctuation">.</span>dumps<span class="token punctuation">(</span>check_tileset<span class="token punctuation">(</span><span class="token string">"output/city/tileset.json"</span><span class="token punctuation">)</span><span class="token punctuation">,</span> indent<span class="token operator">=</span><span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Four checks catch nearly everything that goes wrong in a generated tileset: radians in range and not inverted, geometric error strictly decreasing, every region contained in its parent’s, and every referenced content file present on disk. Running them on the document you just wrote takes milliseconds and finds the degrees-for-radians error immediately.</p>
+<p>The reference validator is still the gate — it checks things this cannot, including that the glTF content is itself valid and that the content geometry fits its volume — but a fast self-check keeps the slow gate from being the first place you learn about a typo.</p>
+<figure class="diagram">
+<svg viewBox="26 20 635 220" role="img" aria-labelledby="tsj-check-t tsj-check-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="tsj-check-t">What the self-check catches</title>
+  <desc id="tsj-check-d">A bar chart of issues found in a first generated tileset. Degrees used instead of radians accounts for 61 tiles, geometric error not decreasing 18 tiles, region not contained in parent 7 tiles, missing content file 3 tiles, and inverted height range 1 tile. The radian error dominates and is caught by a range test alone.</desc>
+  <rect class="svg-bg" x="26" y="20" width="635" height="220" fill="#ffffff"/>
+  <path d="M40 26 V206" stroke="#5b6471" stroke-width="1.5" fill="none"/>
+  <g stroke-width="1.5">
+    <rect x="40" y="34" width="420" height="26" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="40" y="70" width="124" height="26" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="40" y="106" width="48" height="26" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="40" y="142" width="21" height="26" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="40" y="178" width="7" height="26" fill="#e3f0f4" stroke="#1f6b8a"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5">
+    <text x="470" y="52">degrees instead of radians: 61</text>
+    <text x="174" y="88">geometric error not decreasing: 18</text>
+    <text x="98" y="124">region outside parent: 7</text>
+    <text x="71" y="160">missing content file: 3</text>
+    <text x="57" y="196">inverted height range: 1</text>
+  </g>
+  <text x="40" y="222" fill="#5b6471" font-size="12">tiles flagged in the first run of a hand-generated city tileset</text>
+</svg>
+<figcaption>One range test on six numbers accounts for two-thirds of the findings, which is why the self-check runs before the validator.</figcaption>
+</figure>
+<figure class="diagram">
+<svg viewBox="4 6 732 244" role="img" aria-labelledby="tsj-volumes-t tsj-volumes-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="tsj-volumes-t">Choosing a bounding volume type</title>
+  <desc id="tsj-volumes-d">A table of the three bounding volume types. A region takes six numbers as radians and heights and suits geographic tiles aligned to longitude and latitude. An oriented box takes twelve numbers and is tightest for rotated or tall content under a transform. A sphere takes four numbers and is only appropriate for isotropic extents such as a point-cloud blob. Region volumes compose upward by union, which is why they are the easiest to generate correctly.</desc>
+  <rect class="svg-bg" x="4" y="6" width="732" height="244" fill="#ffffff"/>
+  <g stroke-width="1.5">
+    <rect x="18" y="20" width="136" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="154" y="20" width="116" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="270" y="20" width="200" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="470" y="20" width="252" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="18" y="54" width="136" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="154" y="54" width="116" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="270" y="54" width="200" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="470" y="54" width="252" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="18" y="88" width="136" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="154" y="88" width="116" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="270" y="88" width="200" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="470" y="88" width="252" height="34" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="18" y="122" width="136" height="34" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="154" y="122" width="116" height="34" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="270" y="122" width="200" height="34" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="470" y="122" width="252" height="34" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="18" y="156" width="136" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="154" y="156" width="116" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="270" y="156" width="200" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="470" y="156" width="252" height="34" fill="#e3f0f4" stroke="#1f6b8a"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="86" y="42">type</text><text x="212" y="42">numbers</text><text x="370" y="42">units</text><text x="596" y="42">use it for</text>
+    <text x="86" y="76">region</text><text x="212" y="76">6</text><text x="370" y="76">radians + metres</text><text x="596" y="76">geographic city tiles</text>
+    <text x="86" y="110">box</text><text x="212" y="110">12</text><text x="370" y="110">metres, local frame</text><text x="596" y="110">rotated or tall content</text>
+    <text x="86" y="144">sphere</text><text x="212" y="144">4</text><text x="370" y="144">metres, ECEF</text><text x="596" y="144">isotropic extents only</text>
+    <text x="86" y="178">composition</text><text x="212" y="178">—</text><text x="370" y="178">—</text><text x="596" y="178">regions union upward for free</text>
+  </g>
+  <text x="20" y="210" fill="#1f2937" font-size="12.5">A region is the only type whose parent volume is the union of its children with no matrix maths.</text>
+  <text x="20" y="232" fill="#5b6471" font-size="12">Degrees in a region is the single most common error: the values must be radians.</text>
+</svg>
+<figcaption>Region for geography, box for anything rotated, sphere almost never — and regions compose for free.</figcaption>
+</figure>
+<h3 id="6-gate-on-the-reference-validator" tabindex="-1"><a class="heading-link" href="#6-gate-on-the-reference-validator"><span>6. Gate on the reference validator</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> subprocess
+
+<span class="token keyword">def</span> <span class="token function">validate</span><span class="token punctuation">(</span>path<span class="token punctuation">,</span> report<span class="token operator">=</span><span class="token string">"output/city/validation.json"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    proc <span class="token operator">=</span> subprocess<span class="token punctuation">.</span>run<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token string">"npx"</span><span class="token punctuation">,</span> <span class="token string">"3d-tiles-validator"</span><span class="token punctuation">,</span> <span class="token string">"--tilesetFile"</span><span class="token punctuation">,</span> path<span class="token punctuation">,</span>
+                           <span class="token string">"--reportFile"</span><span class="token punctuation">,</span> report<span class="token punctuation">]</span><span class="token punctuation">,</span> capture_output<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> text<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+    issues <span class="token operator">=</span> json<span class="token punctuation">.</span>loads<span class="token punctuation">(</span>Path<span class="token punctuation">(</span>report<span class="token punctuation">)</span><span class="token punctuation">.</span>read_text<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"issues"</span><span class="token punctuation">)</span> <span class="token keyword">or</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    by_sev <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token punctuation">}</span>
+    <span class="token keyword">for</span> i <span class="token keyword">in</span> issues<span class="token punctuation">:</span>
+        by_sev<span class="token punctuation">.</span>setdefault<span class="token punctuation">(</span>i<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"severity"</span><span class="token punctuation">,</span> <span class="token string">"UNKNOWN"</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">.</span>append<span class="token punctuation">(</span>i<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"type"</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    errors <span class="token operator">=</span> by_sev<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"ERROR"</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"exit"</span><span class="token punctuation">:</span> proc<span class="token punctuation">.</span>returncode<span class="token punctuation">,</span> <span class="token string">"counts"</span><span class="token punctuation">:</span> <span class="token punctuation">{</span>k<span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>v<span class="token punctuation">)</span> <span class="token keyword">for</span> k<span class="token punctuation">,</span> v <span class="token keyword">in</span> by_sev<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+            <span class="token string">"error_types"</span><span class="token punctuation">:</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span><span class="token builtin">set</span><span class="token punctuation">(</span>errors<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token number">5</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token string">"ok"</span><span class="token punctuation">:</span> <span class="token keyword">not</span> errors<span class="token punctuation">}</span>
+
+result <span class="token operator">=</span> validate<span class="token punctuation">(</span><span class="token string">"output/city/tileset.json"</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span>result<span class="token punctuation">)</span>
+<span class="token keyword">assert</span> result<span class="token punctuation">[</span><span class="token string">"ok"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token string-interpolation"><span class="token string">f"tileset invalid: </span><span class="token interpolation"><span class="token punctuation">{</span>result<span class="token punctuation">[</span><span class="token string">'error_types'</span><span class="token punctuation">]</span><span class="token punctuation">}</span></span><span class="token string">"</span></span>
+</code></pre></div>
+<h2 id="expected-output-verification" tabindex="-1"><a class="heading-link" href="#expected-output-verification"><span>Expected Output &amp; Verification</span></a></h2>
+<div class="codeblock" data-lang="text"><div class="codeblock__bar"><span class="codeblock__lang">text</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-text" tabindex="0" role="group" aria-label="text code sample"><code class="language-text">{'path': 'output/city/tileset.json', 'bytes': 1284}
+{
+  "problems": [],
+  "problem_count": 0,
+  "leaves": 4,
+  "leaves_without_content": 0
+}
+{'exit': 0, 'counts': {'INFO': 2}, 'error_types': [], 'ok': True}
+</code></pre></div>
+<p>A clean self-check followed by a clean validator run is the whole success criterion. The <code>leaves_without_content</code> count deserves attention on real data: a leaf with no content is a hole in the dataset, and it arises whenever the inventory is missing a key whose siblings exist.</p>
+<p>Verify the tree against the inventory, so a silently dropped shard cannot slip through:</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">coverage_check</span><span class="token punctuation">(</span>tileset_path<span class="token punctuation">,</span> inventory<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    doc <span class="token operator">=</span> json<span class="token punctuation">.</span>loads<span class="token punctuation">(</span>Path<span class="token punctuation">(</span>tileset_path<span class="token punctuation">)</span><span class="token punctuation">.</span>read_text<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    found <span class="token operator">=</span> <span class="token builtin">set</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+    <span class="token keyword">def</span> <span class="token function">walk</span><span class="token punctuation">(</span>t<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        uri <span class="token operator">=</span> t<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"content"</span><span class="token punctuation">,</span> <span class="token punctuation">{</span><span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"uri"</span><span class="token punctuation">)</span>
+        <span class="token keyword">if</span> uri <span class="token keyword">and</span> <span class="token keyword">not</span> uri<span class="token punctuation">.</span>endswith<span class="token punctuation">(</span><span class="token string">".json"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+            found<span class="token punctuation">.</span>add<span class="token punctuation">(</span>uri<span class="token punctuation">)</span>
+        <span class="token keyword">for</span> c <span class="token keyword">in</span> t<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"children"</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+            walk<span class="token punctuation">(</span>c<span class="token punctuation">)</span>
+    walk<span class="token punctuation">(</span>doc<span class="token punctuation">[</span><span class="token string">"root"</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    expected <span class="token operator">=</span> <span class="token punctuation">{</span>v<span class="token punctuation">[</span><span class="token string">"uri"</span><span class="token punctuation">]</span> <span class="token keyword">for</span> v <span class="token keyword">in</span> inventory<span class="token punctuation">.</span>values<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">}</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span><span class="token string">"expected"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>expected<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"referenced"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>found<span class="token punctuation">)</span><span class="token punctuation">,</span>
+            <span class="token string">"missing"</span><span class="token punctuation">:</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span>expected <span class="token operator">-</span> found<span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token number">5</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token string">"extra"</span><span class="token punctuation">:</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span>found <span class="token operator">-</span> expected<span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token number">5</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+            <span class="token string">"complete"</span><span class="token punctuation">:</span> found <span class="token operator">==</span> expected<span class="token punctuation">}</span>
+
+<span class="token keyword">print</span><span class="token punctuation">(</span>coverage_check<span class="token punctuation">(</span><span class="token string">"output/city/tileset.json"</span><span class="token punctuation">,</span> INVENTORY<span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Then verify the refinement behaviour numerically rather than by eye, by computing at what camera distance each level should activate:</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">refinement_distances</span><span class="token punctuation">(</span>tileset_path<span class="token punctuation">,</span> screen_height_px<span class="token operator">=</span><span class="token number">1080</span><span class="token punctuation">,</span> sse_px<span class="token operator">=</span><span class="token number">16</span><span class="token punctuation">,</span> fov_deg<span class="token operator">=</span><span class="token number">60.0</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Distance at which each geometric error crosses the screen-space error budget."""</span>
+    doc <span class="token operator">=</span> json<span class="token punctuation">.</span>loads<span class="token punctuation">(</span>Path<span class="token punctuation">(</span>tileset_path<span class="token punctuation">)</span><span class="token punctuation">.</span>read_text<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    k <span class="token operator">=</span> screen_height_px <span class="token operator">/</span> <span class="token punctuation">(</span><span class="token number">2.0</span> <span class="token operator">*</span> math<span class="token punctuation">.</span>tan<span class="token punctuation">(</span>math<span class="token punctuation">.</span>radians<span class="token punctuation">(</span>fov_deg<span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token number">2.0</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    rows <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    <span class="token keyword">def</span> <span class="token function">walk</span><span class="token punctuation">(</span>t<span class="token punctuation">,</span> depth<span class="token operator">=</span><span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        ge <span class="token operator">=</span> t<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"geometricError"</span><span class="token punctuation">,</span> <span class="token number">0.0</span><span class="token punctuation">)</span>
+        <span class="token keyword">if</span> ge <span class="token operator">></span> <span class="token number">0</span><span class="token punctuation">:</span>
+            rows<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"depth"</span><span class="token punctuation">:</span> depth<span class="token punctuation">,</span> <span class="token string">"ge_m"</span><span class="token punctuation">:</span> ge<span class="token punctuation">,</span>
+                         <span class="token string">"refines_within_m"</span><span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>ge <span class="token operator">*</span> k <span class="token operator">/</span> sse_px<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+        <span class="token keyword">for</span> c <span class="token keyword">in</span> t<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"children"</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+            walk<span class="token punctuation">(</span>c<span class="token punctuation">,</span> depth <span class="token operator">+</span> <span class="token number">1</span><span class="token punctuation">)</span>
+    walk<span class="token punctuation">(</span>doc<span class="token punctuation">[</span><span class="token string">"root"</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    seen<span class="token punctuation">,</span> out <span class="token operator">=</span> <span class="token builtin">set</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    <span class="token keyword">for</span> r <span class="token keyword">in</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span>rows<span class="token punctuation">,</span> key<span class="token operator">=</span><span class="token keyword">lambda</span> r<span class="token punctuation">:</span> r<span class="token punctuation">[</span><span class="token string">"depth"</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">if</span> r<span class="token punctuation">[</span><span class="token string">"depth"</span><span class="token punctuation">]</span> <span class="token keyword">not</span> <span class="token keyword">in</span> seen<span class="token punctuation">:</span>
+            seen<span class="token punctuation">.</span>add<span class="token punctuation">(</span>r<span class="token punctuation">[</span><span class="token string">"depth"</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span> out<span class="token punctuation">.</span>append<span class="token punctuation">(</span>r<span class="token punctuation">)</span>
+    <span class="token keyword">return</span> out
+
+<span class="token keyword">for</span> row <span class="token keyword">in</span> refinement_distances<span class="token punctuation">(</span><span class="token string">"output/city/tileset.json"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span>row<span class="token punctuation">)</span>
+</code></pre></div>
+<p>If the deepest level only refines within 40 m, the tiles are too fine for the geometric errors assigned and the client will never show full detail at a normal viewing distance; if the root refines at 200 km, the first request will pull half the city.</p>
+<h2 id="performance-notes" tabindex="-1"><a class="heading-link" href="#performance-notes"><span>Performance Notes</span></a></h2>
+<ul>
+<li><strong>JSON size grows with tile count</strong>: roughly 300 bytes per tile with a region volume and sorted compact output. 20,000 tiles is about 6 MB, which is when external subtrees or implicit tiling become necessary.</li>
+<li><strong>Serve the root gzipped.</strong> Tileset JSON compresses 8–12×, and it is a text file on the critical path of every session.</li>
+<li><strong>Region volumes are cheaper to compute than boxes</strong> and slightly worse at culling. For city tiles with vertical extents under a couple of hundred metres the difference is not measurable.</li>
+<li><strong>Build the tree once, in memory.</strong> Recursive <code>count()</code> calls over a large tree during splitting are the only place this script gets slow; memoise if a city takes more than a few seconds.</li>
+<li><strong>Keep leaf geometric error at exactly 0.</strong> Small non-zero values make some clients keep requesting refinement that does not exist.</li>
+</ul>
+<h2 id="common-errors" tabindex="-1"><a class="heading-link" href="#common-errors"><span>Common Errors</span></a></h2>
+<p><strong>Nothing renders, no errors.</strong> Degrees in a <code>region</code>. The values must be radians; longitude in −π…π and latitude in −π/2…π/2.</p>
+<p><strong>Validator: “tile’s geometric error is not less than its parent’s”.</strong> A level where the halving was skipped, usually because a subtree was grafted with the parent’s value copied.</p>
+<p><strong>Validator: “content bounding volume is not within tile bounding volume”.</strong> The region’s height range does not cover the content. Take <code>min_h</code>/<code>max_h</code> from the actual geometry, with a small margin.</p>
+<p><strong>External subtree loads at the wrong distance.</strong> The referencing tile’s geometric error and the subtree root’s disagree. Write the same value in both.</p>
+<p><strong>Tiles pop in and out at a fixed distance.</strong> <code>refine</code> is <code>ADD</code> where <code>REPLACE</code> was meant, so parent and child render together and the child’s depth fights the parent’s.</p>
+<p><strong><code>KeyError: 'root'</code> in a consumer.</strong> An external subtree was written with the tile object rather than a full document. Every <code>.json</code> referenced as content needs its own <code>asset</code> and <code>root</code>.</p>
+<h2 id="frequently-asked-questions" tabindex="-1"><a class="heading-link" href="#frequently-asked-questions"><span>Frequently Asked Questions</span></a></h2>
+<h3 id="region-box-or-sphere" tabindex="-1"><a class="heading-link" href="#region-box-or-sphere"><span>Region, box or sphere?</span></a></h3>
+<p>Region for anything geographic and roughly axis-aligned to lon/lat, which covers most city tiling. Oriented box for content in a local frame under a transform, and for tall or rotated extents where a region wastes volume. Sphere only where the extent is genuinely isotropic, such as a point-cloud blob.</p>
+<h3 id="should-i-use-implicit-tiling-instead" tabindex="-1"><a class="heading-link" href="#should-i-use-implicit-tiling-instead"><span>Should I use implicit tiling instead?</span></a></h3>
+<p>If the tree is dense and uniform — terrain, a complete quadtree — implicit tiling removes the JSON entirely and is the better answer. For a sparse city tree with per-tile metadata, explicit JSON stays simpler to generate and debug.</p>
+<h3 id="how-do-i-attach-per-tile-metadata" tabindex="-1"><a class="heading-link" href="#how-do-i-attach-per-tile-metadata"><span>How do I attach per-tile metadata?</span></a></h3>
+<p>Through the 3D Tiles 1.1 metadata system, with a schema at the tileset level and property values on tiles or groups; see <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/defining-tileset-and-group-metadata/">defining tileset and group metadata</a>. Avoid <code>extras</code> for anything a client needs to style by.</p>
+<h2 id="related-guides" tabindex="-1"><a class="heading-link" href="#related-guides"><span>Related Guides</span></a></h2>
+<ul>
+<li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/converting-glb-to-3d-tiles-with-3d-tiles-tools/">Converting GLB to 3D Tiles with 3d-tiles-tools</a> — the tooling route, for flat trees</li>
+<li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/defining-tileset-and-group-metadata/">Defining Tileset and Group Metadata</a> — adding properties to the tiles this writes</li>
+<li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/validating-tileset-bounding-volumes-against-content/">Validating Tileset Bounding Volumes Against Content</a> — the containment gate in CI</li>
+</ul>
+<p>Back to <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/">Automated Tile Generation</a>.</p>
+
+
+      
+      
+
+      <div class="related-nav">
+        
+
+        
+          <div>
+            <h3>Related</h3>
+            <div class="related-grid">
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/converting-glb-to-3d-tiles-with-3d-tiles-tools/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Converting GLB to 3D Tiles with 3d-tiles-tools</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/converting-point-clouds-to-3d-tiles-with-py3dtiles/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Converting Point Clouds to 3D Tiles with py3dtiles</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/generating-instanced-tiles-for-trees/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Generating Instanced Tiles for Trees</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/incremental-retiling-of-changed-city-blocks/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Incremental Retiling of Changed City Blocks</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/tiling-photogrammetry-obj-meshes/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Tiling Photogrammetry OBJ Meshes</span>
+                </a>
+              
+            </div>
+          </div>
+        
+      </div>
+    </article>
+
+    
+    <aside class="toc" aria-label="On this page" data-toc hidden>
+      <h4>On this page</h4>
+      <ul></ul>
+    </aside>
+  </div>
+</div>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+  <div class="container site-footer__inner">
+    <div class="site-footer__brand">
+      <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+        <img src="/assets/img/logo-mark.svg" alt="" class="brand__mark" width="36" height="36">
+        <span class="brand__name">
+          3D Geospatial
+          <small>Digital Twin Automation</small>
+        </span>
+      </a>
+      <p>Engineering-grade guides on point cloud processing, mesh pipelines, LOD strategies, and CI/CD automation for digital twin platforms.</p>
+      <a class="footer-social" href="https://github.com/3d-geospatial" aria-label="3D Geospatial on GitHub" rel="noopener" target="_blank">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+          <path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.53-1.34-1.3-1.7-1.3-1.7-1.06-.72.08-.71.08-.71 1.17.08 1.79 1.2 1.79 1.2 1.04 1.79 2.73 1.27 3.4.97.1-.75.4-1.27.73-1.56-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.19-3.08-.12-.3-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.75.11 3.05.74.8 1.19 1.83 1.19 3.08 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.07.78 2.15v3.18c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5Z"/>
+        </svg>
+        <span>GitHub</span>
+      </a>
+    </div>
+
+    <div class="site-footer__col">
+      <h4>Sections</h4>
+      <ul>
+        <li><a href="https://www.3d-geospatial.com/">Home</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management &amp; Optimization</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/">Point Cloud &amp; Mesh Pipelines</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/">Troubleshooting &amp; Reliability</a></li>
+        
+      </ul>
+    </div>
+
+    
+      <div class="site-footer__col">
+        <h4>3D Geospatial Fundamentals</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/">3D Format Standards Comparison</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/">BIM and IFC Georeferencing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/citygml-and-cityjson-processing/">CityGML and CityJSON Processing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems for 3D Assets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/">Digital Elevation Model Workflows</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/">Spatial Indexing and Tiling Schemes for 3D Data</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>LOD Management &amp; Optimization</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/">Automated Tile Generation for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/">Cesium ion Upload Automation for 3D Tilesets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/">glTF LOD Generation With Draco Compression</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/">Streaming Sync Patterns for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/">Tileset Metadata and 3D Tiles Next</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/vector-overlays-on-3d-tiles/">Vector Overlays on 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Point Cloud &amp; Mesh Pipelines</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/">Automated Mesh Decimation for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/">Change Detection Between LiDAR Scan Epochs</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/">CI/CD Automation for Spatial Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">LiDAR Classification and Ground Extraction</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/photogrammetry-processing-pipelines/">Photogrammetry Processing Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/">Point Cloud Filtering Techniques</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/">Surface Reconstruction for Geospatial Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/">Texture Mapping Workflows for Digital Twins</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Troubleshooting &amp; Reliability</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/">Cross-Section Failure Modes in Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/">Data Validation &amp; QA Gates for 3D Tiles</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/">Performance Profiling and Benchmarking</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/pipeline-observability-and-monitoring/">Pipeline Observability and Monitoring</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/">Streaming &amp; Runtime Diagnostics for 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+  </div>
+  <div class="container site-footer__bottom">
+    <span>© 2026 3D Geospatial &amp; Digital Twin Automation</span>
+    <span>Built with Eleventy · PWA-enabled</span>
+  </div>
+</footer>
+
+
+  <script src="/assets/js/site.js?v=b99aa9f971" defer></script>
+  
+</body>
+</html>
