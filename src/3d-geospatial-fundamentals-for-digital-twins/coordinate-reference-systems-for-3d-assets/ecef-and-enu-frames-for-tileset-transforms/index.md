@@ -77,7 +77,7 @@ The cross-product assertion is what catches a sign error. East cross north must 
   <path d="M330 118 L352 40" fill="none" stroke="#1f6b8a" stroke-width="2.5"/>
   <path d="M330 118 L330 40" fill="none" stroke="#c46a3d" stroke-width="2.5" stroke-dasharray="5 4"/>
   <text x="362" y="36" fill="#1f6b8a" font-size="12" text-anchor="start">ellipsoid normal — local up</text>
-  <text x="318" y="36" fill="#c46a3d" font-size="12" text-anchor="end">geocentric radial</text>
+  <text x="318" y="36" fill="#9a4f26" font-size="12" text-anchor="end">geocentric radial</text>
   <text x="344" y="240" fill="#5b6471" font-size="12" text-anchor="start">toward the geocentre</text>
   <text x="140" y="188" fill="#4f7a4d" font-size="12" text-anchor="start">ellipsoid surface</text>
   <text x="370" y="272" fill="#15384a" font-size="12.5" text-anchor="middle">Up to about 0.2° apart at mid-latitudes — several metres of tilt across a kilometre-wide tile</text>

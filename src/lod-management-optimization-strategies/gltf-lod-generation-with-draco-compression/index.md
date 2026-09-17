@@ -61,11 +61,11 @@ Draco is orthogonal to the LOD chain. It compresses one mesh by quantizing each 
     <text x="690" y="84" fill="#15384a">LOD 2 · 9k tris</text>
     <text x="690" y="105" fill="#1f2937">geometricError 1.40 m</text>
     <text x="130" y="241" fill="#1f2937">Draco b3dm</text>
-    <text x="130" y="261" fill="#c46a3d">2.9 MB</text>
+    <text x="130" y="261" fill="#9a4f26">2.9 MB</text>
     <text x="410" y="241" fill="#1f2937">Draco b3dm</text>
-    <text x="410" y="261" fill="#c46a3d">0.72 MB</text>
+    <text x="410" y="261" fill="#9a4f26">0.72 MB</text>
     <text x="690" y="241" fill="#1f2937">Draco b3dm</text>
-    <text x="690" y="261" fill="#c46a3d">0.17 MB</text>
+    <text x="690" y="261" fill="#9a4f26">0.17 MB</text>
   </g>
   <text x="410" y="305" fill="#5b6471" font-size="12" text-anchor="middle">POSITION 14 bit · TEXCOORD 12 · NORMAL 10 — authored in local ENU metres, placed to EPSG:4978</text>
 </svg>
@@ -304,7 +304,7 @@ print(verify_encode("lods_raw/building_LOD0.glb", "lods_draco/building_LOD0.glb"
   <path d="M514 56 V250" fill="none" stroke="#4f7a4d" stroke-width="2" stroke-dasharray="6 4"/>
   <text x="514" y="48" fill="#4f7a4d" font-size="12" text-anchor="middle">level 7</text>
   <text x="196" y="112" fill="#1f6b8a" font-size="12" text-anchor="start">output size</text>
-  <text x="590" y="120" fill="#c46a3d" font-size="12" text-anchor="middle">encode time</text>
+  <text x="590" y="120" fill="#9a4f26" font-size="12" text-anchor="middle">encode time</text>
   <g fill="#1f2937" font-size="11.5" text-anchor="middle">
     <text x="80" y="272">0</text>
     <text x="204" y="272">2</text>
@@ -371,6 +371,7 @@ Not meaningfully if you quantize sensibly. `geometricError` is dominated by deci
 
 ## Related Guides
 
+- [Draco vs Meshopt Compression for glTF Tiles](https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/draco-vs-meshopt-compression-for-gltf-tiles/) — choose between Draco and meshopt for glTF tile content
 - [Automated Tile Generation for 3D Geospatial](https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/) — assembling these b3dm levels into a tileset.json with correct bounding volumes
 - [3D Tiles Batch Tiling Pipelines](https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/) — encoding these Draco levels in parallel across a city-scale dataset
 - [Tuning Draco Quantization for Building Meshes](https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/tuning-draco-quantization-for-building-meshes/) — choosing position/texcoord/normal bits from mesh extent

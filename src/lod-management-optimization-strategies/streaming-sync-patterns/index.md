@@ -375,6 +375,7 @@ Target 100–500 KB per tile payload. Smaller tiles raise request overhead and H
 
 ## Related Guides
 
+- [Tuning Tileset Cache Bytes for Memory-Constrained Clients](https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/tuning-tileset-cache-bytes-for-memory-constrained-clients/) — size CesiumJS cacheBytes and maximumCacheOverflowBytes from measured tile memory
 - [Hierarchical LOD Structuring for Digital Twins](https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/) — the parent/child tile relationships the scorer depends on
 - [Implementing Quadtree LOD for Urban Models](https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/implementing-quadtree-lod-for-urban-models/) — building the spatial index that feeds streaming
 - [Automated Tile Generation for 3D Geospatial](https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/) — producing the 3D Tiles payloads and metadata this pipeline streams

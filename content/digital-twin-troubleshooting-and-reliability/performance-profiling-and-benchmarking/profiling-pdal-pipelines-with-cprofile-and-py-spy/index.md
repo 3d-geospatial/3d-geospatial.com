@@ -181,7 +181,7 @@ A monotonically climbing curve is accumulation, a sawtooth is streaming working 
   <text x="700" y="64" fill="#b0413e" font-size="11.5" text-anchor="end">machine RAM</text>
   <text x="190" y="212" fill="#b0413e" font-size="12" text-anchor="middle">accumulating</text>
   <text x="414" y="212" fill="#4f7a4d" font-size="12" text-anchor="middle">streaming correctly</text>
-  <text x="610" y="212" fill="#c46a3d" font-size="12" text-anchor="middle">swapping</text>
+  <text x="610" y="212" fill="#9a4f26" font-size="12" text-anchor="middle">swapping</text>
   <text x="370" y="238" fill="#15384a" font-size="12.5" text-anchor="middle">A CPU profile reports all three as &quot;slow in some function&quot; — the RSS curve names which one you have</text>
 </svg>
 <figcaption>One extra sampling thread distinguishes three failures that a CPU profile cannot tell apart.</figcaption>

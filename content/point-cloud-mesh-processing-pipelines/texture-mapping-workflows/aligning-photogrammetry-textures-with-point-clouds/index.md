@@ -83,14 +83,14 @@ print(f"loaded {len(cameras)} cameras, first centre = {(-cameras[0]['R'].T @ cam
     </marker>
   </defs>
   <g stroke="#1f6b8a" stroke-width="2.5" marker-end="url(#ap-conv-a)">
-    <path d="M150 150 L300 150"/>
-    <path d="M150 150 L150 236"/>
-    <path d="M150 150 L92 96"/>
+    <path fill="none" d="M150 150 L300 150"/>
+    <path fill="none" d="M150 150 L150 236"/>
+    <path fill="none" d="M150 150 L92 96"/>
   </g>
   <g stroke="#c46a3d" stroke-width="2.5" marker-end="url(#ap-conv-b)">
-    <path d="M530 150 L680 150"/>
-    <path d="M530 150 L530 64"/>
-    <path d="M530 150 L472 204"/>
+    <path fill="none" d="M530 150 L680 150"/>
+    <path fill="none" d="M530 150 L530 64"/>
+    <path fill="none" d="M530 150 L472 204"/>
   </g>
   <g fill="#1f2937" font-size="12.5" font-weight="600">
     <text x="308" y="155">X</text>
@@ -101,7 +101,7 @@ print(f"loaded {len(cameras)} cameras, first centre = {(-cameras[0]['R'].T @ cam
     <text x="440" y="222">−Z (forward)</text>
   </g>
   <text x="190" y="42" fill="#1f6b8a" font-size="12.5" text-anchor="middle" font-weight="600">computer vision — COLMAP, OpenCV</text>
-  <text x="570" y="42" fill="#c46a3d" font-size="12.5" text-anchor="middle" font-weight="600">graphics — OpenGL, glTF, Metashape export</text>
+  <text x="570" y="42" fill="#9a4f26" font-size="12.5" text-anchor="middle" font-weight="600">graphics — OpenGL, glTF, Metashape export</text>
   <text x="380" y="270" fill="#15384a" font-size="12.5" text-anchor="middle">Get it wrong and every point projects behind the camera, or the image lands upside down with no error raised</text>
   <text x="380" y="286" fill="#5b6471" font-size="12" text-anchor="middle">Test it on one point you can identify by eye before running the whole cloud</text>
 </svg>

@@ -248,7 +248,7 @@ summariseNetwork();
   <path d="M296 40 V96" fill="none" stroke="#5b6471" stroke-width="1.5" stroke-dasharray="4 4"/>
   <path d="M296 138 V194" fill="none" stroke="#5b6471" stroke-width="1.5" stroke-dasharray="4 4"/>
   <text x="640" y="72" fill="#4f7a4d" font-size="12" text-anchor="start">p50 11.2, p95 14.1</text>
-  <text x="640" y="170" fill="#c46a3d" font-size="12" text-anchor="start">p50 11.4, p95 28.9</text>
+  <text x="640" y="170" fill="#9a4f26" font-size="12" text-anchor="start">p50 11.4, p95 28.9</text>
   <text x="296" y="112" fill="#5b6471" font-size="11" text-anchor="middle">16.7 ms</text>
   <text x="296" y="214" fill="#5b6471" font-size="11" text-anchor="middle">16.7 ms</text>
   <text x="370" y="240" fill="#15384a" font-size="12.5" text-anchor="middle">Same mean, and only the second one stutters. Report p95 and the fraction over budget, never the average.</text>

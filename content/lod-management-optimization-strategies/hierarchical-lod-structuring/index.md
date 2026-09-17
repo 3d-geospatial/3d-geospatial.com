@@ -222,7 +222,7 @@ print(f"root SSE at 800 m = {sse:.1f} px  ->",
   <path d="M600 120 V172" fill="none" stroke="#c46a3d" stroke-width="3.5"/>
   <path d="M96 268 H600" fill="none" stroke="#5b6471" stroke-width="1.5" marker-start="url(#hl-sse-a)" marker-end="url(#hl-sse-a)"/>
   <text x="348" y="262" fill="#5b6471" font-size="12" text-anchor="middle">d — distance from camera to tile centre</text>
-  <text x="620" y="146" fill="#c46a3d" font-size="12" text-anchor="start">e — geometric error, in metres</text>
+  <text x="620" y="146" fill="#9a4f26" font-size="12" text-anchor="start">e — geometric error, in metres</text>
   <text x="200" y="118" fill="#1f6b8a" font-size="12" text-anchor="middle">ρ — pixels</text>
   <text x="200" y="192" fill="#5b6471" font-size="11.5" text-anchor="middle">viewport</text>
   <text x="78" y="186" fill="#5b6471" font-size="11.5" text-anchor="middle">camera</text>
@@ -335,6 +335,7 @@ Let the `max_per_leaf` density threshold decide depth rather than forcing a fixe
 
 ## Related Guides
 
+- [Choosing ADD vs REPLACE Refinement for 3D Tiles](https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/choosing-add-vs-replace-refinement/) — decide between ADD and REPLACE refinement per 3D Tiles subtree
 - [Implementing Quadtree LOD for Urban Models](https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/implementing-quadtree-lod-for-urban-models/) — the concrete building-clustering walkthrough that extends this index
 - [Automated Tile Generation for 3D Geospatial](https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/) — serializing this tree to a 3D Tiles tileset
 - [Streaming Sync Patterns for 3D Geospatial](https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/) — runtime cache eviction and request batching for the tiles produced here

@@ -155,7 +155,7 @@ A `boundary_weight` of `1000` makes collapsing a seam edge astronomically expens
   </g>
   <text x="208" y="60" fill="#1f2937" font-size="12.5" text-anchor="middle" font-weight="600">split on islands, decimate separately</text>
   <text x="570" y="60" fill="#1f2937" font-size="12.5" text-anchor="middle" font-weight="600">one mesh, seam vertices locked</text>
-  <text x="208" y="226" fill="#c46a3d" font-size="12" text-anchor="middle">seam survives, but stays at full density</text>
+  <text x="208" y="226" fill="#9a4f26" font-size="12" text-anchor="middle">seam survives, but stays at full density</text>
   <text x="570" y="226" fill="#4f7a4d" font-size="12" text-anchor="middle">seam simplifies with the rest, if the tool honours the lock</text>
   <text x="370" y="258" fill="#15384a" font-size="12.5" text-anchor="middle">Splitting is guaranteed and wasteful; locking is efficient and depends on the decimator. Verify with a UV-island count either way.</text>
 </svg>

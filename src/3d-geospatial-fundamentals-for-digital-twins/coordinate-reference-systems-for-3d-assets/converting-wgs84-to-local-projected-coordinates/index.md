@@ -89,10 +89,10 @@ The flag matters because nothing downstream will tell you it was missing. Both o
   <path d="M20 46 H340 V226 H20 Z" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
   <path d="M380 46 H700 V226 H380 Z" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
   <g stroke="#e6e0d4" stroke-width="1.5">
-    <path d="M100 46 V226 M180 46 V226 M260 46 V226"/>
-    <path d="M20 96 H340 M20 136 H340 M20 176 H340"/>
-    <path d="M460 46 V226 M540 46 V226 M620 46 V226"/>
-    <path d="M380 96 H700 M380 136 H700 M380 176 H700"/>
+    <path fill="none" d="M100 46 V226 M180 46 V226 M260 46 V226"/>
+    <path fill="none" d="M20 96 H340 M20 136 H340 M20 176 H340"/>
+    <path fill="none" d="M460 46 V226 M540 46 V226 M620 46 V226"/>
+    <path fill="none" d="M380 96 H700 M380 136 H700 M380 176 H700"/>
   </g>
   <circle cx="180" cy="136" r="8" fill="#1f6b8a"/>
   <circle cx="646" cy="86" r="8" fill="#b0413e"/>

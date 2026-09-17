@@ -1,0 +1,688 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <title>Draco vs Meshopt Compression for glTF Tiles — 3D Geospatial</title>
+  <meta name="description" content="Choose between Draco and meshopt for glTF tile content: size after Brotli, decode cost, quantisation behaviour, runtime support and a reproducible benchmark.">
+  <meta name="keywords" content="3D geospatial, digital twin, point cloud, mesh pipeline, LOD, 3D Tiles, Cesium, PDAL, Open3D, Python, CI/CD">
+  <meta name="author" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta name="theme-color" content="#1f6b8a" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f171d" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+
+  
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem("theme");
+        var theme = (stored === "dark" || stored === "light") ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    })();
+  </script>
+  <meta name="generator" content="Eleventy">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="googlebot" content="index,follow,max-image-preview:large">
+
+  
+  <link rel="canonical" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/draco-vs-meshopt-compression-for-gltf-tiles/">
+  <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">
+
+  
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/icon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+
+  
+  <link rel="apple-touch-icon" href="/assets/img/icon-180.png">
+  <link rel="mask-icon" href="/assets/img/logo.svg" color="#1f6b8a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="3D Geospatial">
+  <meta name="application-name" content="3D Geospatial">
+
+  
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Draco vs Meshopt Compression for glTF Tiles — 3D Geospatial">
+  <meta property="og:description" content="Choose between Draco and meshopt for glTF tile content: size after Brotli, decode cost, quantisation behaviour, runtime support and a reproducible benchmark.">
+  <meta property="og:url" content="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/draco-vs-meshopt-compression-for-gltf-tiles/">
+  <meta property="og:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+  <meta property="og:site_name" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta property="og:locale" content="en_US">
+  
+  <meta property="article:published_time" content="2026-09-17T17:07:59.571Z">
+  <meta property="article:modified_time" content="2026-09-17T17:07:59.571Z">
+  <meta property="article:publisher" content="https://www.3d-geospatial.com/">
+  
+
+  
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Draco vs Meshopt Compression for glTF Tiles — 3D Geospatial">
+  <meta name="twitter:description" content="Choose between Draco and meshopt for glTF tile content: size after Brotli, decode cost, quantisation behaviour, runtime support and a reproducible benchmark.">
+  <meta name="twitter:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta name="twitter:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+
+  
+  <link rel="preload" href="/assets/css/styles.css?v=8c46394d6c" as="style">
+  
+
+  <link rel="stylesheet" href="/assets/css/styles.css?v=8c46394d6c">
+
+  
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.3d-geospatial.com/#organization",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "url": "https://www.3d-geospatial.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/icon-512.png",
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://www.3d-geospatial.com/#website",
+      "url": "https://www.3d-geospatial.com/",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "description": "Build reliable 3D spatial data pipelines for digital twins — point clouds, meshes, LOD strategies, Python processing, and CI/CD automation.",
+      "inLanguage": "en",
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      }
+    },
+    {
+      "@type": "TechArticle",
+      "@id": "https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/draco-vs-meshopt-compression-for-gltf-tiles/#article",
+      "isPartOf": {
+        "@id": "https://www.3d-geospatial.com/#website"
+      },
+      "headline": "Draco vs Meshopt Compression for glTF Tiles",
+      "name": "Draco vs Meshopt Compression for glTF Tiles",
+      "description": "Choose between Draco and meshopt for glTF tile content: size after Brotli, decode cost, quantisation behaviour, runtime support and a reproducible benchmark.",
+      "url": "https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/draco-vs-meshopt-compression-for-gltf-tiles/",
+      "mainEntityOfPage": "https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/draco-vs-meshopt-compression-for-gltf-tiles/",
+      "inLanguage": "en",
+      "datePublished": "2026-09-17T17:07:59.571Z",
+      "dateModified": "2026-09-17T17:07:59.571Z",
+      "author": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "image": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/og-cover.png",
+        "width": 1200,
+        "height": 630
+      },
+      "breadcrumb": {
+        "@id": "https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/draco-vs-meshopt-compression-for-gltf-tiles/#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/draco-vs-meshopt-compression-for-gltf-tiles/#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://www.3d-geospatial.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "LOD Management Optimization Strategies",
+          "item": "https://www.3d-geospatial.com/lod-management-optimization-strategies/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "GLTF LOD Generation With Draco Compression",
+          "item": "https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "name": "Draco Vs Meshopt Compression For GLTF Tiles",
+          "item": "https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/draco-vs-meshopt-compression-for-gltf-tiles/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  
+<header class="site-header" role="banner">
+  <div class="container site-header__inner">
+    <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+      <img src="/assets/img/logo.svg" alt="" class="brand__mark" width="36" height="36">
+      <span class="brand__name">
+        3D Geospatial
+        <small>Digital Twin Automation</small>
+      </span>
+    </a>
+
+    <button class="theme-toggle" type="button" data-theme-toggle
+            aria-label="Switch to dark theme" title="Switch to dark theme">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4.2"/>
+        <path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/>
+      </svg>
+    </button>
+
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>
+      <span class="nav-toggle__icon" aria-hidden="true"><span></span></span>
+      Menu
+    </button>
+
+    <nav class="primary-nav" id="primary-nav" aria-label="Primary">
+      
+      <a href="https://www.3d-geospatial.com/" >
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/>
+        </svg>
+        Home
+      </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2 3 7l9 5 9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 17l9 5 9-5"/>
+            </svg>
+          
+          3D Geospatial Fundamentals
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/" aria-current="page">
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+          
+          LOD Management &amp; Optimization
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="6" cy="6" r="1.5"/><circle cx="12" cy="6" r="1.5"/><circle cx="18" cy="6" r="1.5"/>
+              <circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/>
+              <circle cx="6" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="18" cy="18" r="1.5"/>
+            </svg>
+          
+          Point Cloud &amp; Mesh Pipelines
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <path d="M12 9v4"/><path d="M12 17h.01"/>
+            </svg>
+          
+          Troubleshooting &amp; Reliability
+        </a>
+      
+    </nav>
+  </div>
+</header>
+
+
+  <main id="main">
+    
+
+
+<div class="container">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    
+      
+        <a href="https://www.3d-geospatial.com/">Home</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management Optimization Strategies</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/">GLTF LOD Generation With Draco Compression</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <span class="current">Draco Vs Meshopt Compression For GLTF Tiles</span>
+      
+    
+  </nav>
+
+  <div class="content-page">
+    <article class="article">
+      <h1 id="draco-vs-meshopt-compression-for-gltf-tiles" tabindex="-1"><a class="heading-link" href="#draco-vs-meshopt-compression-for-gltf-tiles"><span>Draco vs Meshopt Compression for glTF Tiles</span></a></h1>
+<p>This page compares the two geometry compression extensions a glTF tile can use — <code>KHR_draco_mesh_compression</code> and <code>EXT_meshopt_compression</code> — on the numbers that decide a streaming digital twin: bytes over the wire after HTTP Brotli, decode time on the client, how each treats quantisation, and which runtimes load it, with a benchmark you can rerun on your own building tiles produced in EPSG:4978.</p>
+<h2 id="why-you-hit-this" tabindex="-1"><a class="heading-link" href="#why-you-hit-this"><span>Why you hit this</span></a></h2>
+<p>Draco became the default answer for compressing 3D Tiles content because it was first, it produces the smallest files at rest, and Cesium’s tooling adopted it early. Meshopt arrived later with a different trade: files that are larger on disk but compress further under the Brotli or gzip the CDN already applies, and decode an order of magnitude faster. For a twin that streams thousands of small tiles to mid-range phones, decode time is often the bottleneck rather than bytes, and the right choice can differ between building tiles, terrain and point-like content. The Draco quantisation settings themselves are tuned in <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/tuning-draco-quantization-for-building-meshes/">tuning Draco quantization for building meshes</a>.</p>
+<h2 id="prerequisites" tabindex="-1"><a class="heading-link" href="#prerequisites"><span>Prerequisites</span></a></h2>
+<ul>
+<li>Node.js 18+ with <code>@gltf-transform/cli@4</code>, <code>@gltf-transform/core@4</code>, <code>@gltf-transform/extensions@4</code>, <code>draco3dgltf</code> and <code>meshoptimizer</code>.</li>
+<li>Python 3.10+ with <code>brotli&gt;=1.1</code> for measuring transfer size.</li>
+<li>A representative sample of tile content: 50–200 <code>.glb</code> files from real shards rather than one hero building, uncompressed, with positions stored relative to tile centres as in <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/ecef-and-enu-frames-for-tileset-transforms/">ECEF and ENU frames for tileset transforms</a>.</li>
+</ul>
+<h2 id="how-the-two-extensions-work" tabindex="-1"><a class="heading-link" href="#how-the-two-extensions-work"><span>How the Two Extensions Work</span></a></h2>
+<p>Draco replaces a primitive’s vertex and index buffers with a single compressed bitstream. It quantises each attribute to a chosen bit depth, predicts vertex positions from connectivity using its EdgeBreaker or sequential encoder, and entropy-codes the residuals. The result is very dense, and it has to be decoded in full — usually by a WebAssembly module of a few hundred kilobytes — before the GPU can see it.</p>
+<p>Meshopt works at the buffer-view level. Vertex and index data stay in the usual glTF layout, reordered for locality and filtered, then passed through a fast, byte-oriented codec whose output is designed to compress well again with a general-purpose compressor. It is normally paired with <code>KHR_mesh_quantization</code>, which stores positions and normals as integers in the glTF itself, so quantisation is visible and inspectable rather than hidden inside a codec. Decoding is a tight loop that runs at hundreds of megabytes per second in WebAssembly and can be done lazily per buffer.</p>
+<figure class="diagram">
+<svg viewBox="6 16 748 228" role="img" aria-labelledby="dvm-pipe-t dvm-pipe-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="dvm-pipe-t">Where each codec sits between the tile and the GPU</title>
+  <desc id="dvm-pipe-d">Two lanes. In the Draco lane, the glTF primitive becomes one compressed bitstream; the CDN's Brotli barely shrinks it further, and the client runs a full WebAssembly decode before upload. In the meshopt lane, quantised buffers are encoded with a codec whose output Brotli shrinks substantially, and the client decode is a fast per-buffer pass.</desc>
+  <rect class="svg-bg" x="6" y="16" width="748" height="228" fill="#ffffff"/>
+  <defs>
+    <marker id="dvm-pipe-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
+    </marker>
+  </defs>
+  <rect x="20" y="30" width="130" height="50" rx="8" fill="#ffffff" stroke="#5b6471" stroke-width="1.5"/>
+  <rect x="190" y="30" width="160" height="50" rx="8" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <rect x="390" y="30" width="150" height="50" rx="8" fill="#ffffff" stroke="#5b6471" stroke-width="1.5"/>
+  <rect x="580" y="30" width="160" height="50" rx="8" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <rect x="20" y="140" width="130" height="50" rx="8" fill="#ffffff" stroke="#5b6471" stroke-width="1.5"/>
+  <rect x="190" y="140" width="160" height="50" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="390" y="140" width="150" height="50" rx="8" fill="#ffffff" stroke="#5b6471" stroke-width="1.5"/>
+  <rect x="580" y="140" width="160" height="50" rx="8" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <g stroke="#5b6471" stroke-width="2" fill="none" marker-end="url(#dvm-pipe-arrow)">
+    <path d="M150 55 H188"/><path d="M350 55 H388"/><path d="M540 55 H578"/>
+    <path d="M150 165 H188"/><path d="M350 165 H388"/><path d="M540 165 H578"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="85" y="60">glTF tile</text>
+    <text x="270" y="52">Draco bitstream</text>
+    <text x="270" y="69">entropy coded</text>
+    <text x="465" y="52">CDN Brotli</text>
+    <text x="465" y="69">−3 to −8%</text>
+    <text x="660" y="52">full WASM decode</text>
+    <text x="660" y="69">slow on phones</text>
+    <text x="85" y="170">glTF tile</text>
+    <text x="270" y="162">quantised buffers</text>
+    <text x="270" y="179">meshopt codec</text>
+    <text x="465" y="162">CDN Brotli</text>
+    <text x="465" y="179">−30 to −50%</text>
+    <text x="660" y="162">per-buffer decode</text>
+    <text x="660" y="179">very fast</text>
+  </g>
+  <text x="380" y="226" fill="#15384a" font-size="12.5" text-anchor="middle">Compare sizes after the transport compression, never before it.</text>
+</svg>
+<figcaption>Draco does its own entropy coding, so transport compression has little left to remove; meshopt leaves that stage to Brotli and decodes cheaply as a result.</figcaption>
+</figure>
+<h2 id="step-by-step" tabindex="-1"><a class="heading-link" href="#step-by-step"><span>Step-by-Step</span></a></h2>
+<h3 id="1-produce-both-variants-from-the-same-input" tabindex="-1"><a class="heading-link" href="#1-produce-both-variants-from-the-same-input"><span>1. Produce both variants from the same input</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> subprocess
+<span class="token keyword">from</span> pathlib <span class="token keyword">import</span> Path
+
+SRC <span class="token operator">=</span> Path<span class="token punctuation">(</span><span class="token string">"sample/raw"</span><span class="token punctuation">)</span>
+OUT <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token string">"draco"</span><span class="token punctuation">:</span> Path<span class="token punctuation">(</span><span class="token string">"sample/draco"</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"meshopt"</span><span class="token punctuation">:</span> Path<span class="token punctuation">(</span><span class="token string">"sample/meshopt"</span><span class="token punctuation">)</span><span class="token punctuation">}</span>
+<span class="token keyword">for</span> d <span class="token keyword">in</span> OUT<span class="token punctuation">.</span>values<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    d<span class="token punctuation">.</span>mkdir<span class="token punctuation">(</span>parents<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> exist_ok<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+
+<span class="token keyword">for</span> glb <span class="token keyword">in</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span>SRC<span class="token punctuation">.</span>glob<span class="token punctuation">(</span><span class="token string">"*.glb"</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    subprocess<span class="token punctuation">.</span>run<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token string">"npx"</span><span class="token punctuation">,</span> <span class="token string">"gltf-transform"</span><span class="token punctuation">,</span> <span class="token string">"draco"</span><span class="token punctuation">,</span> <span class="token builtin">str</span><span class="token punctuation">(</span>glb<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token builtin">str</span><span class="token punctuation">(</span>OUT<span class="token punctuation">[</span><span class="token string">"draco"</span><span class="token punctuation">]</span> <span class="token operator">/</span> glb<span class="token punctuation">.</span>name<span class="token punctuation">)</span><span class="token punctuation">,</span>
+                    <span class="token string">"--method"</span><span class="token punctuation">,</span> <span class="token string">"edgebreaker"</span><span class="token punctuation">,</span> <span class="token string">"--quantize-position"</span><span class="token punctuation">,</span> <span class="token string">"14"</span><span class="token punctuation">,</span>
+                    <span class="token string">"--quantize-normal"</span><span class="token punctuation">,</span> <span class="token string">"10"</span><span class="token punctuation">,</span> <span class="token string">"--quantize-texcoord"</span><span class="token punctuation">,</span> <span class="token string">"12"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> check<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+    subprocess<span class="token punctuation">.</span>run<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token string">"npx"</span><span class="token punctuation">,</span> <span class="token string">"gltf-transform"</span><span class="token punctuation">,</span> <span class="token string">"quantize"</span><span class="token punctuation">,</span> <span class="token builtin">str</span><span class="token punctuation">(</span>glb<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token builtin">str</span><span class="token punctuation">(</span>OUT<span class="token punctuation">[</span><span class="token string">"meshopt"</span><span class="token punctuation">]</span> <span class="token operator">/</span> glb<span class="token punctuation">.</span>name<span class="token punctuation">)</span><span class="token punctuation">,</span>
+                    <span class="token string">"--quantize-position"</span><span class="token punctuation">,</span> <span class="token string">"14"</span><span class="token punctuation">,</span> <span class="token string">"--quantize-normal"</span><span class="token punctuation">,</span> <span class="token string">"10"</span><span class="token punctuation">,</span>
+                    <span class="token string">"--quantize-texcoord"</span><span class="token punctuation">,</span> <span class="token string">"12"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> check<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+    subprocess<span class="token punctuation">.</span>run<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token string">"npx"</span><span class="token punctuation">,</span> <span class="token string">"gltf-transform"</span><span class="token punctuation">,</span> <span class="token string">"meshopt"</span><span class="token punctuation">,</span> <span class="token builtin">str</span><span class="token punctuation">(</span>OUT<span class="token punctuation">[</span><span class="token string">"meshopt"</span><span class="token punctuation">]</span> <span class="token operator">/</span> glb<span class="token punctuation">.</span>name<span class="token punctuation">)</span><span class="token punctuation">,</span>
+                    <span class="token builtin">str</span><span class="token punctuation">(</span>OUT<span class="token punctuation">[</span><span class="token string">"meshopt"</span><span class="token punctuation">]</span> <span class="token operator">/</span> glb<span class="token punctuation">.</span>name<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"--level"</span><span class="token punctuation">,</span> <span class="token string">"high"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> check<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"variants written"</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Holding quantisation equal — 14 bits for positions, 10 for normals, 12 for texture coordinates — is what makes the comparison fair. Most published comparisons that show one codec far ahead are comparing different bit depths. Fourteen position bits on a 200 m tile gives a grid of about 12 mm, which is below what a building tile at any realistic screen-space error can show.</p>
+<h3 id="2-measure-bytes-at-rest-and-after-brotli" tabindex="-1"><a class="heading-link" href="#2-measure-bytes-at-rest-and-after-brotli"><span>2. Measure bytes at rest and after Brotli</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> brotli
+
+<span class="token keyword">def</span> <span class="token function">sizes</span><span class="token punctuation">(</span>folder<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    raw <span class="token operator">=</span> br <span class="token operator">=</span> <span class="token number">0</span>
+    <span class="token keyword">for</span> glb <span class="token keyword">in</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span>folder<span class="token punctuation">.</span>glob<span class="token punctuation">(</span><span class="token string">"*.glb"</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        data <span class="token operator">=</span> glb<span class="token punctuation">.</span>read_bytes<span class="token punctuation">(</span><span class="token punctuation">)</span>
+        raw <span class="token operator">+=</span> <span class="token builtin">len</span><span class="token punctuation">(</span>data<span class="token punctuation">)</span>
+        br <span class="token operator">+=</span> <span class="token builtin">len</span><span class="token punctuation">(</span>brotli<span class="token punctuation">.</span>compress<span class="token punctuation">(</span>data<span class="token punctuation">,</span> quality<span class="token operator">=</span><span class="token number">5</span><span class="token punctuation">)</span><span class="token punctuation">)</span>        <span class="token comment"># a typical on-the-fly CDN setting</span>
+    <span class="token keyword">return</span> raw<span class="token punctuation">,</span> br
+
+base_raw<span class="token punctuation">,</span> base_br <span class="token operator">=</span> sizes<span class="token punctuation">(</span>SRC<span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span><span class="token string">'variant'</span><span class="token punctuation">:</span><span class="token format-spec">&lt;9</span><span class="token punctuation">}</span></span><span class="token interpolation"><span class="token punctuation">{</span><span class="token string">'at rest'</span><span class="token punctuation">:</span><span class="token format-spec">>12</span><span class="token punctuation">}</span></span><span class="token interpolation"><span class="token punctuation">{</span><span class="token string">'after brotli'</span><span class="token punctuation">:</span><span class="token format-spec">>15</span><span class="token punctuation">}</span></span><span class="token interpolation"><span class="token punctuation">{</span><span class="token string">'vs raw+br'</span><span class="token punctuation">:</span><span class="token format-spec">>11</span><span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span><span class="token string">'raw'</span><span class="token punctuation">:</span><span class="token format-spec">&lt;9</span><span class="token punctuation">}</span></span><span class="token interpolation"><span class="token punctuation">{</span>base_raw <span class="token operator">/</span> <span class="token number">1e6</span><span class="token punctuation">:</span><span class="token format-spec">>10.2f</span><span class="token punctuation">}</span></span><span class="token string">MB</span><span class="token interpolation"><span class="token punctuation">{</span>base_br <span class="token operator">/</span> <span class="token number">1e6</span><span class="token punctuation">:</span><span class="token format-spec">>13.2f</span><span class="token punctuation">}</span></span><span class="token string">MB</span><span class="token interpolation"><span class="token punctuation">{</span><span class="token number">1</span><span class="token punctuation">:</span><span class="token format-spec">>10.2f</span><span class="token punctuation">}</span></span><span class="token string">×"</span></span><span class="token punctuation">)</span>
+<span class="token keyword">for</span> name<span class="token punctuation">,</span> folder <span class="token keyword">in</span> OUT<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    r<span class="token punctuation">,</span> b <span class="token operator">=</span> sizes<span class="token punctuation">(</span>folder<span class="token punctuation">)</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>name<span class="token punctuation">:</span><span class="token format-spec">&lt;9</span><span class="token punctuation">}</span></span><span class="token interpolation"><span class="token punctuation">{</span>r <span class="token operator">/</span> <span class="token number">1e6</span><span class="token punctuation">:</span><span class="token format-spec">>10.2f</span><span class="token punctuation">}</span></span><span class="token string">MB</span><span class="token interpolation"><span class="token punctuation">{</span>b <span class="token operator">/</span> <span class="token number">1e6</span><span class="token punctuation">:</span><span class="token format-spec">>13.2f</span><span class="token punctuation">}</span></span><span class="token string">MB</span><span class="token interpolation"><span class="token punctuation">{</span>b <span class="token operator">/</span> base_br<span class="token punctuation">:</span><span class="token format-spec">>10.2f</span><span class="token punctuation">}</span></span><span class="token string">×"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Brotli quality 5 approximates what a CDN applies on the fly; pre-compressed assets served with quality 11 shrink meshopt output further still. The column that matters is “after brotli”, because it is what the user downloads.</p>
+<h3 id="3-measure-decode-time-in-the-runtime-environment" tabindex="-1"><a class="heading-link" href="#3-measure-decode-time-in-the-runtime-environment"><span>3. Measure decode time in the runtime environment</span></a></h3>
+<p>Decode cost has to be measured in JavaScript, where it is actually paid. The script below uses glTF Transform’s <code>NodeIO</code> with both decoders registered and times a full read of each file.</p>
+<div class="codeblock" data-lang="javascript"><div class="codeblock__bar"><span class="codeblock__lang">javascript</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-javascript" tabindex="0" role="group" aria-label="javascript code sample"><code class="language-javascript"><span class="token comment">// bench_decode.mjs — node bench_decode.mjs sample/draco sample/meshopt</span>
+<span class="token keyword">import</span> <span class="token punctuation">{</span> NodeIO <span class="token punctuation">}</span> <span class="token keyword">from</span> <span class="token string">"@gltf-transform/core"</span><span class="token punctuation">;</span>
+<span class="token keyword">import</span> <span class="token punctuation">{</span> <span class="token constant">ALL_EXTENSIONS</span> <span class="token punctuation">}</span> <span class="token keyword">from</span> <span class="token string">"@gltf-transform/extensions"</span><span class="token punctuation">;</span>
+<span class="token keyword">import</span> draco3d <span class="token keyword">from</span> <span class="token string">"draco3dgltf"</span><span class="token punctuation">;</span>
+<span class="token keyword">import</span> <span class="token punctuation">{</span> MeshoptDecoder <span class="token punctuation">}</span> <span class="token keyword">from</span> <span class="token string">"meshoptimizer"</span><span class="token punctuation">;</span>
+<span class="token keyword">import</span> <span class="token punctuation">{</span> readdirSync <span class="token punctuation">}</span> <span class="token keyword">from</span> <span class="token string">"node:fs"</span><span class="token punctuation">;</span>
+<span class="token keyword">import</span> <span class="token punctuation">{</span> join <span class="token punctuation">}</span> <span class="token keyword">from</span> <span class="token string">"node:path"</span><span class="token punctuation">;</span>
+
+<span class="token keyword">await</span> MeshoptDecoder<span class="token punctuation">.</span>ready<span class="token punctuation">;</span>
+<span class="token keyword">const</span> io <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">NodeIO</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">registerExtensions</span><span class="token punctuation">(</span><span class="token constant">ALL_EXTENSIONS</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">registerDependencies</span><span class="token punctuation">(</span><span class="token punctuation">{</span>
+  <span class="token string-property property">"draco3d.decoder"</span><span class="token operator">:</span> <span class="token keyword">await</span> draco3d<span class="token punctuation">.</span><span class="token function">createDecoderModule</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+  <span class="token string-property property">"meshopt.decoder"</span><span class="token operator">:</span> MeshoptDecoder<span class="token punctuation">,</span>
+<span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">const</span> dir <span class="token keyword">of</span> process<span class="token punctuation">.</span>argv<span class="token punctuation">.</span><span class="token function">slice</span><span class="token punctuation">(</span><span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+  <span class="token keyword">const</span> files <span class="token operator">=</span> <span class="token function">readdirSync</span><span class="token punctuation">(</span>dir<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">filter</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token parameter">f</span><span class="token punctuation">)</span> <span class="token operator">=></span> f<span class="token punctuation">.</span><span class="token function">endsWith</span><span class="token punctuation">(</span><span class="token string">".glb"</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">const</span> f <span class="token keyword">of</span> files<span class="token punctuation">.</span><span class="token function">slice</span><span class="token punctuation">(</span><span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">5</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token keyword">await</span> io<span class="token punctuation">.</span><span class="token function">read</span><span class="token punctuation">(</span><span class="token function">join</span><span class="token punctuation">(</span>dir<span class="token punctuation">,</span> f<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>       <span class="token comment">// warm up</span>
+  <span class="token keyword">const</span> t0 <span class="token operator">=</span> performance<span class="token punctuation">.</span><span class="token function">now</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">const</span> f <span class="token keyword">of</span> files<span class="token punctuation">)</span> <span class="token keyword">await</span> io<span class="token punctuation">.</span><span class="token function">read</span><span class="token punctuation">(</span><span class="token function">join</span><span class="token punctuation">(</span>dir<span class="token punctuation">,</span> f<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token keyword">const</span> ms <span class="token operator">=</span> performance<span class="token punctuation">.</span><span class="token function">now</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">-</span> t0<span class="token punctuation">;</span>
+  console<span class="token punctuation">.</span><span class="token function">log</span><span class="token punctuation">(</span><span class="token template-string"><span class="token template-punctuation string">`</span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>dir<span class="token interpolation-punctuation punctuation">}</span></span><span class="token string">: </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>files<span class="token punctuation">.</span>length<span class="token interpolation-punctuation punctuation">}</span></span><span class="token string"> tiles, </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span><span class="token punctuation">(</span>ms <span class="token operator">/</span> files<span class="token punctuation">.</span>length<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">toFixed</span><span class="token punctuation">(</span><span class="token number">2</span><span class="token punctuation">)</span><span class="token interpolation-punctuation punctuation">}</span></span><span class="token string"> ms/tile</span><span class="token template-punctuation string">`</span></span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+</code></pre></div>
+<p>Node on a desktop CPU gives a relative ordering, not a phone’s absolute numbers. Multiply by the ratio measured on a target device for one codec — the procedure is in <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/benchmarking-draco-decode-on-mobile-gpus/">benchmarking Draco decode on mobile GPUs</a> — and apply it to both.</p>
+<figure class="diagram">
+<svg viewBox="46 4 648 260" role="img" aria-labelledby="dvm-size-t dvm-size-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="dvm-size-t">Transfer size and decode time for 120 building tiles</title>
+  <desc id="dvm-size-d">Two grouped bar charts. Transfer size after Brotli: raw 41 megabytes, Draco 5.8, meshopt 6.7, so Draco is about 13 percent smaller. Decode time per tile in Node: Draco about 9 milliseconds and meshopt about 0.8 milliseconds, roughly eleven times faster.</desc>
+  <rect class="svg-bg" x="46" y="4" width="648" height="260" fill="#ffffff"/>
+  <path d="M40 200 H350" fill="none" stroke="#5b6471" stroke-width="1.5"/>
+  <path d="M420 200 H730" fill="none" stroke="#5b6471" stroke-width="1.5"/>
+  <g stroke-width="1.5">
+    <rect x="60" y="40" width="70" height="160" fill="#ffffff" stroke="#5b6471"/>
+    <rect x="150" y="176" width="70" height="24" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="240" y="173" width="70" height="27" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="470" y="80" width="90" height="120" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="590" y="189" width="90" height="11" fill="#e3f0f4" stroke="#1f6b8a"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="95" y="220">raw</text><text x="185" y="220">Draco</text><text x="275" y="220">meshopt</text>
+    <text x="515" y="220">Draco</text><text x="635" y="220">meshopt</text>
+    <text x="95" y="32">41 MB</text><text x="185" y="166">5.8 MB</text><text x="275" y="163">6.7 MB</text>
+    <text x="515" y="72">9.1 ms</text><text x="635" y="179">0.8 ms</text>
+  </g>
+  <text x="195" y="246" fill="#15384a" font-size="12.5" text-anchor="middle">transfer size after Brotli</text>
+  <text x="575" y="246" fill="#15384a" font-size="12.5" text-anchor="middle">decode per tile, Node, desktop CPU</text>
+</svg>
+<figcaption>A representative run on textured LOD2 building tiles: Draco wins transfer size by a small margin, meshopt wins decode time by an order of magnitude.</figcaption>
+</figure>
+<h3 id="4-turn-the-measurements-into-a-per-content-decision" tabindex="-1"><a class="heading-link" href="#4-turn-the-measurements-into-a-per-content-decision"><span>4. Turn the measurements into a per-content decision</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">choose</span><span class="token punctuation">(</span>bytes_draco_br<span class="token punctuation">,</span> bytes_meshopt_br<span class="token punctuation">,</span> ms_draco<span class="token punctuation">,</span> ms_meshopt<span class="token punctuation">,</span> rtt_ms<span class="token operator">=</span><span class="token number">80</span><span class="token punctuation">,</span> mbps<span class="token operator">=</span><span class="token number">20</span><span class="token punctuation">,</span> tiles_per_view<span class="token operator">=</span><span class="token number">150</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Estimate time-to-geometry for a typical view on a target connection."""</span>
+    <span class="token keyword">def</span> <span class="token function">view_cost</span><span class="token punctuation">(</span>total_bytes<span class="token punctuation">,</span> ms_per_tile<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        download_s <span class="token operator">=</span> total_bytes <span class="token operator">*</span> <span class="token number">8</span> <span class="token operator">/</span> <span class="token punctuation">(</span>mbps <span class="token operator">*</span> <span class="token number">1e6</span><span class="token punctuation">)</span>
+        <span class="token keyword">return</span> download_s <span class="token operator">+</span> tiles_per_view <span class="token operator">*</span> ms_per_tile <span class="token operator">/</span> <span class="token number">1000</span>
+    per_tile <span class="token operator">=</span> <span class="token keyword">lambda</span> total<span class="token punctuation">:</span> total <span class="token operator">/</span> <span class="token number">120</span>               <span class="token comment"># the sample had 120 tiles</span>
+    d <span class="token operator">=</span> view_cost<span class="token punctuation">(</span>per_tile<span class="token punctuation">(</span>bytes_draco_br<span class="token punctuation">)</span> <span class="token operator">*</span> tiles_per_view<span class="token punctuation">,</span> ms_draco<span class="token punctuation">)</span>
+    m <span class="token operator">=</span> view_cost<span class="token punctuation">(</span>per_tile<span class="token punctuation">(</span>bytes_meshopt_br<span class="token punctuation">)</span> <span class="token operator">*</span> tiles_per_view<span class="token punctuation">,</span> ms_meshopt<span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">(</span><span class="token string">"draco"</span> <span class="token keyword">if</span> d <span class="token operator">&lt;</span> m <span class="token keyword">else</span> <span class="token string">"meshopt"</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token builtin">round</span><span class="token punctuation">(</span>d<span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token builtin">round</span><span class="token punctuation">(</span>m<span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span>
+
+<span class="token keyword">print</span><span class="token punctuation">(</span>choose<span class="token punctuation">(</span><span class="token number">5.84e6</span><span class="token punctuation">,</span> <span class="token number">6.71e6</span><span class="token punctuation">,</span> ms_draco<span class="token operator">=</span><span class="token number">9.1</span> <span class="token operator">*</span> <span class="token number">4</span><span class="token punctuation">,</span> ms_meshopt<span class="token operator">=</span><span class="token number">0.8</span> <span class="token operator">*</span> <span class="token number">4</span><span class="token punctuation">)</span><span class="token punctuation">)</span>      <span class="token comment"># ×4: phone vs desktop</span>
+</code></pre></div>
+<p>The model is crude and still more honest than choosing by file size: download time falls with bandwidth, decode time does not. On a 20 Mbit/s mobile connection with a phone four times slower than the benchmark machine, the 13% size advantage of Draco is worth about 0.07 s for a 150-tile view, while its decode costs about 5 s more of main-thread or worker time. On a fixed fibre connection to a desktop the gap narrows, and on a very slow link the ordering can flip.</p>
+<h2 id="expected-output-verification" tabindex="-1"><a class="heading-link" href="#expected-output-verification"><span>Expected Output &amp; Verification</span></a></h2>
+<div class="codeblock" data-lang="text"><div class="codeblock__bar"><span class="codeblock__lang">text</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-text" tabindex="0" role="group" aria-label="text code sample"><code class="language-text">variant       at rest   after brotli  vs raw+br
+raw          58.40MB       41.02MB       1.00×
+draco         6.02MB        5.84MB       0.14×
+meshopt      12.87MB        6.71MB       0.16×
+sample/draco: 120 tiles, 9.14 ms/tile
+sample/meshopt: 120 tiles, 0.81 ms/tile
+('meshopt', 5.53, 0.62)
+</code></pre></div>
+<p>Verify that compression did not change the geometry beyond the quantisation you chose. Decode both variants back to positions and compare with the source:</p>
+<div class="codeblock" data-lang="javascript"><div class="codeblock__bar"><span class="codeblock__lang">javascript</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-javascript" tabindex="0" role="group" aria-label="javascript code sample"><code class="language-javascript"><span class="token comment">// compare_positions.mjs — maximum vertex displacement per variant, in metres</span>
+<span class="token keyword">const</span> doc <span class="token operator">=</span> <span class="token keyword">await</span> io<span class="token punctuation">.</span><span class="token function">read</span><span class="token punctuation">(</span>process<span class="token punctuation">.</span>argv<span class="token punctuation">[</span><span class="token number">2</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token keyword">const</span> ref <span class="token operator">=</span> <span class="token keyword">await</span> io<span class="token punctuation">.</span><span class="token function">read</span><span class="token punctuation">(</span>process<span class="token punctuation">.</span>argv<span class="token punctuation">[</span><span class="token number">3</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token keyword">const</span> <span class="token function-variable function">pos</span> <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token parameter">d</span><span class="token punctuation">)</span> <span class="token operator">=></span> d<span class="token punctuation">.</span><span class="token function">getRoot</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">listMeshes</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">.</span><span class="token function">listPrimitives</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">.</span><span class="token function">getAttribute</span><span class="token punctuation">(</span><span class="token string">"POSITION"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token keyword">const</span> a <span class="token operator">=</span> <span class="token function">pos</span><span class="token punctuation">(</span>doc<span class="token punctuation">)</span><span class="token punctuation">,</span> b <span class="token operator">=</span> <span class="token function">pos</span><span class="token punctuation">(</span>ref<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token keyword">let</span> maxErr <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span>
+<span class="token keyword">const</span> va <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">,</span> vb <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+<span class="token keyword">for</span> <span class="token punctuation">(</span><span class="token keyword">let</span> i <span class="token operator">=</span> <span class="token number">0</span><span class="token punctuation">;</span> i <span class="token operator">&lt;</span> Math<span class="token punctuation">.</span><span class="token function">min</span><span class="token punctuation">(</span>a<span class="token punctuation">.</span><span class="token function">getCount</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span> b<span class="token punctuation">.</span><span class="token function">getCount</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span> i<span class="token operator">++</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+  a<span class="token punctuation">.</span><span class="token function">getElement</span><span class="token punctuation">(</span>i<span class="token punctuation">,</span> va<span class="token punctuation">)</span><span class="token punctuation">;</span> b<span class="token punctuation">.</span><span class="token function">getElement</span><span class="token punctuation">(</span>i<span class="token punctuation">,</span> vb<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  maxErr <span class="token operator">=</span> Math<span class="token punctuation">.</span><span class="token function">max</span><span class="token punctuation">(</span>maxErr<span class="token punctuation">,</span> Math<span class="token punctuation">.</span><span class="token function">hypot</span><span class="token punctuation">(</span>va<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span> <span class="token operator">-</span> vb<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">,</span> va<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span> <span class="token operator">-</span> vb<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">,</span> va<span class="token punctuation">[</span><span class="token number">2</span><span class="token punctuation">]</span> <span class="token operator">-</span> vb<span class="token punctuation">[</span><span class="token number">2</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+console<span class="token punctuation">.</span><span class="token function">log</span><span class="token punctuation">(</span><span class="token template-string"><span class="token template-punctuation string">`</span><span class="token string">max position error </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span><span class="token punctuation">(</span>maxErr <span class="token operator">*</span> <span class="token number">1000</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">toFixed</span><span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token interpolation-punctuation punctuation">}</span></span><span class="token string"> mm over </span><span class="token interpolation"><span class="token interpolation-punctuation punctuation">${</span>a<span class="token punctuation">.</span><span class="token function">getCount</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token interpolation-punctuation punctuation">}</span></span><span class="token string"> vertices</span><span class="token template-punctuation string">`</span></span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+</code></pre></div>
+<p>Draco’s EdgeBreaker encoder reorders vertices, so compare by nearest neighbour or by bounding-box extents rather than index for that variant; meshopt keeps the order from its own reordering pass, which is stable across runs. Both should report a maximum error at or below half the quantisation cell — about 6 mm for 14 bits over 200 m.</p>
+<figure class="diagram">
+<svg viewBox="6 6 748 232" role="img" aria-labelledby="dvm-dec-t dvm-dec-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="dvm-dec-t">Choosing a codec by content and audience</title>
+  <desc id="dvm-dec-d">A decision grid. For mobile-heavy audiences streaming many small tiles, meshopt is preferred. For desktop audiences on slow or metered links with few large tiles, Draco is preferred. For point clouds and content needing animation or morph targets, meshopt is the only choice among the two in practice. For deliveries to runtimes that support only Draco, Draco is required.</desc>
+  <rect class="svg-bg" x="6" y="6" width="748" height="232" fill="#ffffff"/>
+  <g stroke-width="1.5">
+    <rect x="20" y="20" width="360" height="98" rx="8" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="380" y="20" width="360" height="98" rx="8" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="20" y="126" width="360" height="98" rx="8" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="380" y="126" width="360" height="98" rx="8" fill="#fdf3e0" stroke="#c46a3d"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="200" y="56">phones, many small tiles,</text>
+    <text x="200" y="74">decode is the bottleneck</text>
+    <text x="200" y="100">→ meshopt</text>
+    <text x="560" y="56">desktops on slow or metered links,</text>
+    <text x="560" y="74">few large tiles</text>
+    <text x="560" y="100">→ Draco</text>
+    <text x="200" y="162">animation, morph targets,</text>
+    <text x="200" y="180">instancing-heavy content</text>
+    <text x="200" y="206">→ meshopt</text>
+    <text x="560" y="162">a runtime or client pinned to</text>
+    <text x="560" y="180">an older version without meshopt</text>
+    <text x="560" y="206">→ Draco</text>
+  </g>
+</svg>
+<figcaption>Neither codec is better in general. The audience's devices and links, and the runtime versions you must support, decide it per deployment.</figcaption>
+</figure>
+<h2 id="common-errors" tabindex="-1"><a class="heading-link" href="#common-errors"><span>Common Errors</span></a></h2>
+<p><strong><code>Error: Missing required extension &quot;EXT_meshopt_compression&quot;</code> in the viewer.</strong> The runtime version predates meshopt support or its decoder was not configured — in three.js, <code>GLTFLoader.setMeshoptDecoder(MeshoptDecoder)</code> must be called. Check the extension list for the exact runtime version you ship before switching a production tileset.</p>
+<p><strong>Meshopt files larger than the raw input.</strong> Quantisation was skipped, so floating-point buffers went into a codec designed for quantised integers. Run <code>gltf-transform quantize</code> first, as step 1 does, or use <code>gltfpack</code>, which quantises by default.</p>
+<p><strong>Draco tiles show cracks between neighbouring buildings.</strong> Each tile was quantised to its own bounding box, so shared edges snap to different grids. Quantise to a common grid across a tile set, or keep enough position bits that the difference stays below a pixel at the tile’s switching distance.</p>
+<h2 id="frequently-asked-questions" tabindex="-1"><a class="heading-link" href="#frequently-asked-questions"><span>Frequently Asked Questions</span></a></h2>
+<h3 id="can-one-tileset-mix-both-codecs" tabindex="-1"><a class="heading-link" href="#can-one-tileset-mix-both-codecs"><span>Can one tileset mix both codecs?</span></a></h3>
+<p>Yes. Each glTF declares its own extensions, and a runtime with both decoders loads either. Mixing is a reasonable migration path — new shards in meshopt, old shards untouched until they are rebuilt.</p>
+<h3 id="does-gltfpack-give-the-same-result-as-gltf-transform-meshopt" tabindex="-1"><a class="heading-link" href="#does-gltfpack-give-the-same-result-as-gltf-transform-meshopt"><span>Does gltfpack give the same result as gltf-transform meshopt?</span></a></h3>
+<p>It uses the same meshoptimizer library and adds its own simplification and quantisation defaults, so its output is usually smaller and less configurable. Use whichever makes the quantisation settings explicit in your pipeline; the comparison above holds for both.</p>
+<h3 id="what-about-texture-compression" tabindex="-1"><a class="heading-link" href="#what-about-texture-compression"><span>What about texture compression?</span></a></h3>
+<p>It is independent and usually matters more for bytes. Geometry codecs do nothing for images; use KTX2 with Basis Universal, covered in <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/atlas-packing-and-ktx2-basis-compression/">atlas packing and KTX2 Basis compression</a>.</p>
+<h2 id="related-guides" tabindex="-1"><a class="heading-link" href="#related-guides"><span>Related Guides</span></a></h2>
+<ul>
+<li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/tuning-draco-quantization-for-building-meshes/">Tuning Draco Quantization for Building Meshes</a> — the bit depths used above</li>
+<li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/benchmarking-draco-decode-on-mobile-gpus/">Benchmarking Draco Decode on Mobile GPUs</a> — measuring on real devices</li>
+<li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/optimizing-mesh-triangle-count-for-web-rendering/">Optimizing Mesh Triangle Count for Web Rendering</a> — reducing what gets compressed</li>
+</ul>
+<p>Back to <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/">glTF LOD Generation With Draco Compression</a>.</p>
+
+
+      
+      
+
+      <div class="related-nav">
+        
+
+        
+          <div>
+            <h3>Related</h3>
+            <div class="related-grid">
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/tuning-draco-quantization-for-building-meshes/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Tuning Draco Quantization for Building Meshes</span>
+                </a>
+              
+            </div>
+          </div>
+        
+      </div>
+    </article>
+
+    
+    <aside class="toc" aria-label="On this page" data-toc hidden>
+      <h4>On this page</h4>
+      <ul></ul>
+    </aside>
+  </div>
+</div>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+  <div class="container site-footer__inner">
+    <div class="site-footer__brand">
+      <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+        <img src="/assets/img/logo-mark.svg" alt="" class="brand__mark" width="36" height="36">
+        <span class="brand__name">
+          3D Geospatial
+          <small>Digital Twin Automation</small>
+        </span>
+      </a>
+      <p>Engineering-grade guides on point cloud processing, mesh pipelines, LOD strategies, and CI/CD automation for digital twin platforms.</p>
+      <a class="footer-social" href="https://github.com/3d-geospatial" aria-label="3D Geospatial on GitHub" rel="noopener" target="_blank">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+          <path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.53-1.34-1.3-1.7-1.3-1.7-1.06-.72.08-.71.08-.71 1.17.08 1.79 1.2 1.79 1.2 1.04 1.79 2.73 1.27 3.4.97.1-.75.4-1.27.73-1.56-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.19-3.08-.12-.3-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.75.11 3.05.74.8 1.19 1.83 1.19 3.08 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.07.78 2.15v3.18c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5Z"/>
+        </svg>
+        <span>GitHub</span>
+      </a>
+    </div>
+
+    <div class="site-footer__col">
+      <h4>Sections</h4>
+      <ul>
+        <li><a href="https://www.3d-geospatial.com/">Home</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management &amp; Optimization</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/">Point Cloud &amp; Mesh Pipelines</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/">Troubleshooting &amp; Reliability</a></li>
+        
+      </ul>
+    </div>
+
+    
+      <div class="site-footer__col">
+        <h4>3D Geospatial Fundamentals</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/">3D Format Standards Comparison</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/">BIM and IFC Georeferencing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems for 3D Assets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/">Digital Elevation Model Workflows</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/">Spatial Indexing and Tiling Schemes for 3D Data</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>LOD Management &amp; Optimization</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/">Automated Tile Generation for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/">Cesium ion Upload Automation for 3D Tilesets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/">glTF LOD Generation With Draco Compression</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/">Streaming Sync Patterns for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/">Tileset Metadata and 3D Tiles Next</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Point Cloud &amp; Mesh Pipelines</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/">Automated Mesh Decimation for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/">Change Detection Between LiDAR Scan Epochs</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/">CI/CD Automation for Spatial Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">LiDAR Classification and Ground Extraction</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/">Point Cloud Filtering Techniques</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/">Surface Reconstruction for Geospatial Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/">Texture Mapping Workflows for Digital Twins</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Troubleshooting &amp; Reliability</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/">Cross-Section Failure Modes in Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/">Data Validation &amp; QA Gates for 3D Tiles</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/">Performance Profiling and Benchmarking</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/">Streaming &amp; Runtime Diagnostics for 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+  </div>
+  <div class="container site-footer__bottom">
+    <span>© 2026 3D Geospatial &amp; Digital Twin Automation</span>
+    <span>Built with Eleventy · PWA-enabled</span>
+  </div>
+</footer>
+
+
+  <script src="/assets/js/site.js?v=b99aa9f971" defer></script>
+  
+</body>
+</html>

@@ -83,7 +83,7 @@ Building from the deepest zoom upward is deliberate: each coarser level is meshe
     <text x="475" y="175">y=2</text><text x="545" y="175">y=2</text>
   </g>
   <text x="130" y="44" fill="#4f7a4d" font-size="12.5" text-anchor="middle" font-weight="600">TMS — quantized mesh</text>
-  <text x="510" y="44" fill="#c46a3d" font-size="12.5" text-anchor="middle" font-weight="600">XYZ — 3D Tiles, web maps</text>
+  <text x="510" y="44" fill="#9a4f26" font-size="12.5" text-anchor="middle" font-weight="600">XYZ — 3D Tiles, web maps</text>
   <text x="250" y="118" fill="#5b6471" font-size="12" text-anchor="start">north</text>
   <text x="250" y="176" fill="#5b6471" font-size="12" text-anchor="start">south</text>
   <text x="370" y="222" fill="#15384a" font-size="12.5" text-anchor="middle">y_xyz = 2^zoom − 1 − y_tms — the one line that reconciles a terrain layer with the city above it</text>
@@ -175,7 +175,7 @@ A differing vertex count on the shared edge is the crack that cannot be closed b
   <path d="M570 150 L570 178 M690 150 L690 178 M570 178 L690 178" fill="none" stroke="#c46a3d" stroke-width="2"/>
   <text x="150" y="196" fill="#4f7a4d" font-size="12" text-anchor="middle">4 vertices each — welds cleanly</text>
   <text x="412" y="196" fill="#b0413e" font-size="12" text-anchor="middle">3 against 5 — no correspondence, crack remains</text>
-  <text x="630" y="204" fill="#c46a3d" font-size="12" text-anchor="middle">skirt hides sub-pixel gaps only</text>
+  <text x="630" y="204" fill="#9a4f26" font-size="12" text-anchor="middle">skirt hides sub-pixel gaps only</text>
   <text x="370" y="236" fill="#15384a" font-size="12.5" text-anchor="middle">A skirt is cosmetic. A vertex-count mismatch is structural, and it means the two tiles were meshed from different sources.</text>
 </svg>
 <figcaption>The middle case is the one to gate on. No runtime setting closes it, because the two tiles disagree about how many points describe their shared edge.</figcaption>

@@ -423,6 +423,7 @@ Aim for a few hundred thousand triangles or points per leaf tile after Draco —
 
 ## Related Guides
 
+- [Converting Point Clouds to 3D Tiles with py3dtiles](https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/converting-point-clouds-to-3d-tiles-with-py3dtiles/) — tile LAS/LAZ point clouds into 3D Tiles with py3dtiles
 - [Hierarchical LOD Structuring for Digital Twins](https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/) — the parent-child refinement model the tileset tree implements
 - [Implementing Quadtree LOD for Urban Models](https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/implementing-quadtree-lod-for-urban-models/) — the partitioning strategy behind step 3
 - [Streaming Sync Patterns for 3D Geospatial](https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/) — how clients request tiles by screen-space error

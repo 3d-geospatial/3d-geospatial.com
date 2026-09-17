@@ -1,0 +1,705 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <title>Polling Cesium ion Asset Status and Handling Tiling Errors — 3D Geospatial</title>
+  <meta name="description" content="Wait for Cesium ion tiling jobs reliably: poll asset status with backoff, detect stalls, tell DATA_ERROR from transient ERROR, retry safely and clean up failed assets.">
+  <meta name="keywords" content="3D geospatial, digital twin, point cloud, mesh pipeline, LOD, 3D Tiles, Cesium, PDAL, Open3D, Python, CI/CD">
+  <meta name="author" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta name="theme-color" content="#1f6b8a" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f171d" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+
+  
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem("theme");
+        var theme = (stored === "dark" || stored === "light") ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    })();
+  </script>
+  <meta name="generator" content="Eleventy">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="googlebot" content="index,follow,max-image-preview:large">
+
+  
+  <link rel="canonical" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/polling-ion-asset-status-and-handling-tiling-errors/">
+  <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">
+
+  
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/icon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+
+  
+  <link rel="apple-touch-icon" href="/assets/img/icon-180.png">
+  <link rel="mask-icon" href="/assets/img/logo.svg" color="#1f6b8a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="3D Geospatial">
+  <meta name="application-name" content="3D Geospatial">
+
+  
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Polling Cesium ion Asset Status and Handling Tiling Errors — 3D Geospatial">
+  <meta property="og:description" content="Wait for Cesium ion tiling jobs reliably: poll asset status with backoff, detect stalls, tell DATA_ERROR from transient ERROR, retry safely and clean up failed assets.">
+  <meta property="og:url" content="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/polling-ion-asset-status-and-handling-tiling-errors/">
+  <meta property="og:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+  <meta property="og:site_name" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta property="og:locale" content="en_US">
+  
+  <meta property="article:published_time" content="2026-09-17T17:07:58.800Z">
+  <meta property="article:modified_time" content="2026-09-17T17:07:58.800Z">
+  <meta property="article:publisher" content="https://www.3d-geospatial.com/">
+  
+
+  
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Polling Cesium ion Asset Status and Handling Tiling Errors — 3D Geospatial">
+  <meta name="twitter:description" content="Wait for Cesium ion tiling jobs reliably: poll asset status with backoff, detect stalls, tell DATA_ERROR from transient ERROR, retry safely and clean up failed assets.">
+  <meta name="twitter:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta name="twitter:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+
+  
+  <link rel="preload" href="/assets/css/styles.css?v=8c46394d6c" as="style">
+  
+
+  <link rel="stylesheet" href="/assets/css/styles.css?v=8c46394d6c">
+
+  
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.3d-geospatial.com/#organization",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "url": "https://www.3d-geospatial.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/icon-512.png",
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://www.3d-geospatial.com/#website",
+      "url": "https://www.3d-geospatial.com/",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "description": "Build reliable 3D spatial data pipelines for digital twins — point clouds, meshes, LOD strategies, Python processing, and CI/CD automation.",
+      "inLanguage": "en",
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      }
+    },
+    {
+      "@type": "TechArticle",
+      "@id": "https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/polling-ion-asset-status-and-handling-tiling-errors/#article",
+      "isPartOf": {
+        "@id": "https://www.3d-geospatial.com/#website"
+      },
+      "headline": "Polling Cesium ion Asset Status and Handling Tiling Errors",
+      "name": "Polling Cesium ion Asset Status and Handling Tiling Errors",
+      "description": "Wait for Cesium ion tiling jobs reliably: poll asset status with backoff, detect stalls, tell DATA_ERROR from transient ERROR, retry safely and clean up failed assets.",
+      "url": "https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/polling-ion-asset-status-and-handling-tiling-errors/",
+      "mainEntityOfPage": "https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/polling-ion-asset-status-and-handling-tiling-errors/",
+      "inLanguage": "en",
+      "datePublished": "2026-09-17T17:07:58.800Z",
+      "dateModified": "2026-09-17T17:07:58.800Z",
+      "author": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "image": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/og-cover.png",
+        "width": 1200,
+        "height": 630
+      },
+      "breadcrumb": {
+        "@id": "https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/polling-ion-asset-status-and-handling-tiling-errors/#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/polling-ion-asset-status-and-handling-tiling-errors/#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://www.3d-geospatial.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "LOD Management Optimization Strategies",
+          "item": "https://www.3d-geospatial.com/lod-management-optimization-strategies/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Cesium Ion Upload Automation",
+          "item": "https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "name": "Polling Ion Asset Status And Handling Tiling Errors",
+          "item": "https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/polling-ion-asset-status-and-handling-tiling-errors/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  
+<header class="site-header" role="banner">
+  <div class="container site-header__inner">
+    <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+      <img src="/assets/img/logo.svg" alt="" class="brand__mark" width="36" height="36">
+      <span class="brand__name">
+        3D Geospatial
+        <small>Digital Twin Automation</small>
+      </span>
+    </a>
+
+    <button class="theme-toggle" type="button" data-theme-toggle
+            aria-label="Switch to dark theme" title="Switch to dark theme">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4.2"/>
+        <path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/>
+      </svg>
+    </button>
+
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>
+      <span class="nav-toggle__icon" aria-hidden="true"><span></span></span>
+      Menu
+    </button>
+
+    <nav class="primary-nav" id="primary-nav" aria-label="Primary">
+      
+      <a href="https://www.3d-geospatial.com/" >
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/>
+        </svg>
+        Home
+      </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2 3 7l9 5 9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 17l9 5 9-5"/>
+            </svg>
+          
+          3D Geospatial Fundamentals
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/" aria-current="page">
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+          
+          LOD Management &amp; Optimization
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="6" cy="6" r="1.5"/><circle cx="12" cy="6" r="1.5"/><circle cx="18" cy="6" r="1.5"/>
+              <circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/>
+              <circle cx="6" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="18" cy="18" r="1.5"/>
+            </svg>
+          
+          Point Cloud &amp; Mesh Pipelines
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <path d="M12 9v4"/><path d="M12 17h.01"/>
+            </svg>
+          
+          Troubleshooting &amp; Reliability
+        </a>
+      
+    </nav>
+  </div>
+</header>
+
+
+  <main id="main">
+    
+
+
+<div class="container">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    
+      
+        <a href="https://www.3d-geospatial.com/">Home</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management Optimization Strategies</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/">Cesium Ion Upload Automation</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <span class="current">Polling Ion Asset Status And Handling Tiling Errors</span>
+      
+    
+  </nav>
+
+  <div class="content-page">
+    <article class="article">
+      <h1 id="polling-cesium-ion-asset-status-and-handling-tiling-errors" tabindex="-1"><a class="heading-link" href="#polling-cesium-ion-asset-status-and-handling-tiling-errors"><span>Polling Cesium ion Asset Status and Handling Tiling Errors</span></a></h1>
+<p>This page makes the wait after a Cesium ion upload dependable — polling <code>GET /v1/assets/{id}</code> with backoff and jitter, recognising each status the tiling job can report, detecting a job whose <code>percentComplete</code> has stopped moving, separating input errors that must fail the build from service errors worth one retry, and deleting the assets a failed run leaves behind.</p>
+<h2 id="why-you-hit-this" tabindex="-1"><a class="heading-link" href="#why-you-hit-this"><span>Why you hit this</span></a></h2>
+<p>Uploading to ion is the quick part. The asset then spends minutes to hours in a tiling queue, and a pipeline has to wait for it before it can publish a viewer link, update a tileset reference or declare a nightly build green. The first version of that wait is usually <code>while status != &quot;COMPLETE&quot;: sleep(10)</code>, and it fails in every interesting way: it loops forever on <code>DATA_ERROR</code>, it hammers the API from a dozen parallel jobs, it treats a job that stopped at 43% for two hours as healthy, and every retry creates another orphaned asset in the account. The upload half of the workflow is covered in <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/automating-ion-tileset-uploads-with-the-rest-api/">automating ion tileset uploads with the REST API</a>.</p>
+<h2 id="prerequisites" tabindex="-1"><a class="heading-link" href="#prerequisites"><span>Prerequisites</span></a></h2>
+<ul>
+<li>Python 3.10+ with <code>requests&gt;=2.31</code>.</li>
+<li>A Cesium ion access token with <code>assets:read</code>, <code>assets:write</code> and <code>assets:list</code> scopes, supplied as the <code>CESIUM_ION_TOKEN</code> environment variable — never committed.</li>
+<li>An upload step that returns the new asset’s <code>id</code> after calling the <code>onComplete</code> endpoint.</li>
+<li>Source data already validated locally; for example, a CityGML or glTF source in EPSG:4326 or with an explicit <code>srsName</code>, or LAZ in EPSG:32618 with a CRS in its header.</li>
+</ul>
+<h2 id="step-by-step" tabindex="-1"><a class="heading-link" href="#step-by-step"><span>Step-by-Step</span></a></h2>
+<h3 id="1-build-a-session-that-retries-transport-errors-only" tabindex="-1"><a class="heading-link" href="#1-build-a-session-that-retries-transport-errors-only"><span>1. Build a session that retries transport errors only</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> os
+<span class="token keyword">import</span> requests
+<span class="token keyword">from</span> requests<span class="token punctuation">.</span>adapters <span class="token keyword">import</span> HTTPAdapter
+<span class="token keyword">from</span> urllib3<span class="token punctuation">.</span>util<span class="token punctuation">.</span>retry <span class="token keyword">import</span> Retry
+
+API <span class="token operator">=</span> <span class="token string">"https://api.cesium.com/v1"</span>
+
+<span class="token keyword">def</span> <span class="token function">ion_session</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    s <span class="token operator">=</span> requests<span class="token punctuation">.</span>Session<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    s<span class="token punctuation">.</span>headers<span class="token punctuation">[</span><span class="token string">"Authorization"</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token string-interpolation"><span class="token string">f"Bearer </span><span class="token interpolation"><span class="token punctuation">{</span>os<span class="token punctuation">.</span>environ<span class="token punctuation">[</span><span class="token string">'CESIUM_ION_TOKEN'</span><span class="token punctuation">]</span><span class="token punctuation">}</span></span><span class="token string">"</span></span>
+    retry <span class="token operator">=</span> Retry<span class="token punctuation">(</span>total<span class="token operator">=</span><span class="token number">5</span><span class="token punctuation">,</span> backoff_factor<span class="token operator">=</span><span class="token number">1.5</span><span class="token punctuation">,</span> status_forcelist<span class="token operator">=</span><span class="token punctuation">(</span><span class="token number">429</span><span class="token punctuation">,</span> <span class="token number">502</span><span class="token punctuation">,</span> <span class="token number">503</span><span class="token punctuation">,</span> <span class="token number">504</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                  allowed_methods<span class="token operator">=</span><span class="token punctuation">(</span><span class="token string">"GET"</span><span class="token punctuation">,</span> <span class="token string">"DELETE"</span><span class="token punctuation">)</span><span class="token punctuation">,</span> respect_retry_after_header<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+    s<span class="token punctuation">.</span>mount<span class="token punctuation">(</span><span class="token string">"https://"</span><span class="token punctuation">,</span> HTTPAdapter<span class="token punctuation">(</span>max_retries<span class="token operator">=</span>retry<span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> s
+
+session <span class="token operator">=</span> ion_session<span class="token punctuation">(</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Transport-level retries belong in the HTTP adapter, where they are invisible to the polling logic: a 503 during one poll should look like a slightly slower poll, not like a failed job. <code>POST</code> is deliberately excluded from automatic retries, because retrying an asset-creation request that actually succeeded creates a duplicate asset.</p>
+<h3 id="2-poll-with-backoff-jitter-and-a-stall-detector" tabindex="-1"><a class="heading-link" href="#2-poll-with-backoff-jitter-and-a-stall-detector"><span>2. Poll with backoff, jitter and a stall detector</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> random
+<span class="token keyword">import</span> time
+<span class="token keyword">from</span> dataclasses <span class="token keyword">import</span> dataclass
+
+TERMINAL <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token string">"COMPLETE"</span><span class="token punctuation">,</span> <span class="token string">"ERROR"</span><span class="token punctuation">,</span> <span class="token string">"DATA_ERROR"</span><span class="token punctuation">}</span>
+
+<span class="token decorator annotation punctuation">@dataclass</span>
+<span class="token keyword">class</span> <span class="token class-name">PollResult</span><span class="token punctuation">:</span>
+    status<span class="token punctuation">:</span> <span class="token builtin">str</span>
+    percent<span class="token punctuation">:</span> <span class="token builtin">int</span>
+    elapsed_s<span class="token punctuation">:</span> <span class="token builtin">float</span>
+    reason<span class="token punctuation">:</span> <span class="token builtin">str</span>
+
+<span class="token keyword">def</span> <span class="token function">wait_for_asset</span><span class="token punctuation">(</span>asset_id<span class="token punctuation">,</span> timeout_s<span class="token operator">=</span><span class="token number">4</span> <span class="token operator">*</span> <span class="token number">3600</span><span class="token punctuation">,</span> stall_s<span class="token operator">=</span><span class="token number">45</span> <span class="token operator">*</span> <span class="token number">60</span><span class="token punctuation">,</span> first_delay<span class="token operator">=</span><span class="token number">10</span><span class="token punctuation">,</span> max_delay<span class="token operator">=</span><span class="token number">120</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    start <span class="token operator">=</span> time<span class="token punctuation">.</span>monotonic<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    delay <span class="token operator">=</span> first_delay
+    last_percent<span class="token punctuation">,</span> last_progress_at <span class="token operator">=</span> <span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">,</span> start
+    <span class="token keyword">while</span> <span class="token boolean">True</span><span class="token punctuation">:</span>
+        r <span class="token operator">=</span> session<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>API<span class="token punctuation">}</span></span><span class="token string">/assets/</span><span class="token interpolation"><span class="token punctuation">{</span>asset_id<span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">,</span> timeout<span class="token operator">=</span><span class="token number">30</span><span class="token punctuation">)</span>
+        r<span class="token punctuation">.</span>raise_for_status<span class="token punctuation">(</span><span class="token punctuation">)</span>
+        asset <span class="token operator">=</span> r<span class="token punctuation">.</span>json<span class="token punctuation">(</span><span class="token punctuation">)</span>
+        status<span class="token punctuation">,</span> percent <span class="token operator">=</span> asset<span class="token punctuation">[</span><span class="token string">"status"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token builtin">int</span><span class="token punctuation">(</span>asset<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"percentComplete"</span><span class="token punctuation">)</span> <span class="token keyword">or</span> <span class="token number">0</span><span class="token punctuation">)</span>
+        now <span class="token operator">=</span> time<span class="token punctuation">.</span>monotonic<span class="token punctuation">(</span><span class="token punctuation">)</span>
+
+        <span class="token keyword">if</span> percent <span class="token operator">></span> last_percent<span class="token punctuation">:</span>
+            last_percent<span class="token punctuation">,</span> last_progress_at <span class="token operator">=</span> percent<span class="token punctuation">,</span> now
+        <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"[</span><span class="token interpolation"><span class="token punctuation">{</span>now <span class="token operator">-</span> start<span class="token punctuation">:</span><span class="token format-spec">7.0f</span><span class="token punctuation">}</span></span><span class="token string">s] asset </span><span class="token interpolation"><span class="token punctuation">{</span>asset_id<span class="token punctuation">}</span></span><span class="token string">: </span><span class="token interpolation"><span class="token punctuation">{</span>status<span class="token punctuation">}</span></span><span class="token string"> </span><span class="token interpolation"><span class="token punctuation">{</span>percent<span class="token punctuation">}</span></span><span class="token string">%"</span></span><span class="token punctuation">)</span>
+
+        <span class="token keyword">if</span> status <span class="token keyword">in</span> TERMINAL<span class="token punctuation">:</span>
+            <span class="token keyword">return</span> PollResult<span class="token punctuation">(</span>status<span class="token punctuation">,</span> percent<span class="token punctuation">,</span> now <span class="token operator">-</span> start<span class="token punctuation">,</span> <span class="token string">"terminal"</span><span class="token punctuation">)</span>
+        <span class="token keyword">if</span> status <span class="token operator">==</span> <span class="token string">"AWAITING_FILES"</span> <span class="token keyword">and</span> now <span class="token operator">-</span> start <span class="token operator">></span> <span class="token number">15</span> <span class="token operator">*</span> <span class="token number">60</span><span class="token punctuation">:</span>
+            <span class="token keyword">return</span> PollResult<span class="token punctuation">(</span>status<span class="token punctuation">,</span> percent<span class="token punctuation">,</span> now <span class="token operator">-</span> start<span class="token punctuation">,</span> <span class="token string">"upload never completed"</span><span class="token punctuation">)</span>
+        <span class="token keyword">if</span> status <span class="token operator">==</span> <span class="token string">"IN_PROGRESS"</span> <span class="token keyword">and</span> now <span class="token operator">-</span> last_progress_at <span class="token operator">></span> stall_s<span class="token punctuation">:</span>
+            <span class="token keyword">return</span> PollResult<span class="token punctuation">(</span>status<span class="token punctuation">,</span> percent<span class="token punctuation">,</span> now <span class="token operator">-</span> start<span class="token punctuation">,</span> <span class="token string-interpolation"><span class="token string">f"no progress for </span><span class="token interpolation"><span class="token punctuation">{</span>stall_s <span class="token operator">//</span> <span class="token number">60</span><span class="token punctuation">}</span></span><span class="token string"> min"</span></span><span class="token punctuation">)</span>
+        <span class="token keyword">if</span> now <span class="token operator">-</span> start <span class="token operator">></span> timeout_s<span class="token punctuation">:</span>
+            <span class="token keyword">return</span> PollResult<span class="token punctuation">(</span>status<span class="token punctuation">,</span> percent<span class="token punctuation">,</span> now <span class="token operator">-</span> start<span class="token punctuation">,</span> <span class="token string">"timeout"</span><span class="token punctuation">)</span>
+
+        time<span class="token punctuation">.</span>sleep<span class="token punctuation">(</span>delay <span class="token operator">*</span> random<span class="token punctuation">.</span>uniform<span class="token punctuation">(</span><span class="token number">0.8</span><span class="token punctuation">,</span> <span class="token number">1.2</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+        delay <span class="token operator">=</span> <span class="token builtin">min</span><span class="token punctuation">(</span>max_delay<span class="token punctuation">,</span> delay <span class="token operator">*</span> <span class="token number">1.6</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>The poll interval starts short, so a small asset that tiles in a minute is noticed quickly, and grows to two minutes, so a four-hour city job costs about 130 requests rather than 1,400. Jitter keeps twenty parallel CI jobs from polling in lockstep. The stall detector watches <code>percentComplete</code> rather than wall-clock time alone: a big job progressing slowly is healthy, while a job whose percentage has not moved for 45 minutes is not, whatever the total elapsed time.</p>
+<figure class="diagram">
+<svg viewBox="6 6 748 248" role="img" aria-labelledby="ion-state-t ion-state-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="ion-state-t">Asset status transitions during tiling</title>
+  <desc id="ion-state-d">An asset starts in AWAITING_FILES until the upload's completion call is made, moves to NOT_STARTED while queued, then IN_PROGRESS while tiling, and ends in one of three terminal states: COMPLETE, DATA_ERROR for a problem with the input, or ERROR for a problem in the service. Two non-terminal traps are marked: AWAITING_FILES that never advances, and IN_PROGRESS with a stalled percentage.</desc>
+  <rect class="svg-bg" x="6" y="6" width="748" height="248" fill="#ffffff"/>
+  <defs>
+    <marker id="ion-state-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
+    </marker>
+  </defs>
+  <rect x="20" y="90" width="140" height="44" rx="8" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <rect x="200" y="90" width="130" height="44" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="370" y="90" width="130" height="44" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="580" y="20" width="160" height="44" rx="8" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <rect x="580" y="90" width="160" height="44" rx="8" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <rect x="580" y="160" width="160" height="44" rx="8" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <g stroke="#5b6471" stroke-width="2" fill="none" marker-end="url(#ion-state-arrow)">
+    <path d="M160 112 H198"/>
+    <path d="M330 112 H368"/>
+    <path d="M500 104 L578 46"/>
+    <path d="M500 112 H578"/>
+    <path d="M500 120 L578 178"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="90" y="117">AWAITING_FILES</text>
+    <text x="265" y="117">NOT_STARTED</text>
+    <text x="435" y="117">IN_PROGRESS</text>
+    <text x="660" y="47">COMPLETE</text>
+    <text x="660" y="117">DATA_ERROR</text>
+    <text x="660" y="187">ERROR</text>
+  </g>
+  <text x="90" y="160" fill="#9a4f26" font-size="12" text-anchor="middle">trap: onComplete</text>
+  <text x="90" y="176" fill="#9a4f26" font-size="12" text-anchor="middle">never called</text>
+  <text x="435" y="160" fill="#9a4f26" font-size="12" text-anchor="middle">trap: percent stalls</text>
+  <text x="380" y="236" fill="#15384a" font-size="12.5" text-anchor="middle">Three terminal states, two traps that look like waiting.</text>
+</svg>
+<figcaption>The poller needs an exit for every terminal state and a limit for each of the two states that can wait forever.</figcaption>
+</figure>
+<h3 id="3-classify-the-outcome-and-decide-whether-to-retry" tabindex="-1"><a class="heading-link" href="#3-classify-the-outcome-and-decide-whether-to-retry"><span>3. Classify the outcome and decide whether to retry</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">decide</span><span class="token punctuation">(</span>result<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">if</span> result<span class="token punctuation">.</span>status <span class="token operator">==</span> <span class="token string">"COMPLETE"</span><span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token string">"publish"</span>
+    <span class="token keyword">if</span> result<span class="token punctuation">.</span>status <span class="token operator">==</span> <span class="token string">"DATA_ERROR"</span><span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token string">"fail"</span>          <span class="token comment"># the input is wrong; retrying uploads the same wrong input</span>
+    <span class="token keyword">if</span> result<span class="token punctuation">.</span>status <span class="token operator">==</span> <span class="token string">"ERROR"</span><span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token string">"retry"</span>         <span class="token comment"># service-side failure; one fresh attempt is reasonable</span>
+    <span class="token keyword">if</span> result<span class="token punctuation">.</span>reason <span class="token operator">==</span> <span class="token string">"upload never completed"</span><span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token string">"retry"</span>         <span class="token comment"># the onComplete call was lost; start again cleanly</span>
+    <span class="token keyword">return</span> <span class="token string">"fail"</span>              <span class="token comment"># stalls and timeouts need a human, not a loop</span>
+</code></pre></div>
+<p>The asymmetry between the two error states is the whole policy. <code>DATA_ERROR</code> means ion could not process what it was given — a CityGML file with no geometry in the expected LOD, a glTF with invalid accessors, a point cloud with no CRS. Uploading the same bytes again produces the same result, an hour later, and hides the real problem behind a retry log. <code>ERROR</code> indicates something went wrong on the service side; one retry with a fresh asset is proportionate, more than one is a loop.</p>
+<h3 id="4-retry-with-a-fresh-asset-and-delete-the-failed-one" tabindex="-1"><a class="heading-link" href="#4-retry-with-a-fresh-asset-and-delete-the-failed-one"><span>4. Retry with a fresh asset and delete the failed one</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">delete_asset</span><span class="token punctuation">(</span>asset_id<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    r <span class="token operator">=</span> session<span class="token punctuation">.</span>delete<span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>API<span class="token punctuation">}</span></span><span class="token string">/assets/</span><span class="token interpolation"><span class="token punctuation">{</span>asset_id<span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">,</span> timeout<span class="token operator">=</span><span class="token number">30</span><span class="token punctuation">)</span>
+    <span class="token keyword">if</span> r<span class="token punctuation">.</span>status_code <span class="token keyword">not</span> <span class="token keyword">in</span> <span class="token punctuation">(</span><span class="token number">204</span><span class="token punctuation">,</span> <span class="token number">404</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        r<span class="token punctuation">.</span>raise_for_status<span class="token punctuation">(</span><span class="token punctuation">)</span>
+
+<span class="token keyword">def</span> <span class="token function">upload_and_wait</span><span class="token punctuation">(</span>upload_fn<span class="token punctuation">,</span> max_attempts<span class="token operator">=</span><span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    history <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    <span class="token keyword">for</span> attempt <span class="token keyword">in</span> <span class="token builtin">range</span><span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">,</span> max_attempts <span class="token operator">+</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        asset_id <span class="token operator">=</span> upload_fn<span class="token punctuation">(</span><span class="token punctuation">)</span>
+        result <span class="token operator">=</span> wait_for_asset<span class="token punctuation">(</span>asset_id<span class="token punctuation">)</span>
+        action <span class="token operator">=</span> decide<span class="token punctuation">(</span>result<span class="token punctuation">)</span>
+        history<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">(</span>attempt<span class="token punctuation">,</span> asset_id<span class="token punctuation">,</span> result<span class="token punctuation">.</span>status<span class="token punctuation">,</span> result<span class="token punctuation">.</span>reason<span class="token punctuation">,</span> action<span class="token punctuation">)</span><span class="token punctuation">)</span>
+        <span class="token keyword">if</span> action <span class="token operator">==</span> <span class="token string">"publish"</span><span class="token punctuation">:</span>
+            <span class="token keyword">return</span> asset_id<span class="token punctuation">,</span> history
+        delete_asset<span class="token punctuation">(</span>asset_id<span class="token punctuation">)</span>
+        <span class="token keyword">if</span> action <span class="token operator">==</span> <span class="token string">"fail"</span><span class="token punctuation">:</span>
+            <span class="token keyword">break</span>
+    <span class="token keyword">raise</span> RuntimeError<span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"ion tiling failed: </span><span class="token interpolation"><span class="token punctuation">{</span>history<span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Deleting the failed asset before retrying keeps the account clean and makes the pipeline idempotent from the account’s point of view: after any run, success or failure, exactly zero or one asset exists for that build. A <code>404</code> on delete is treated as success, because a previous run may already have removed it.</p>
+<figure class="diagram">
+<svg viewBox="32 64 681 160" role="img" aria-labelledby="ion-poll-t ion-poll-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="ion-poll-t">Poll interval growth over a long tiling job</title>
+  <desc id="ion-poll-d">A timeline of poll requests over a four-hour job. Early polls are ten seconds apart and the gap grows by a factor of 1.6 until it reaches two minutes, after which it stays constant. A fixed ten-second interval would make about 1,440 requests over the same period; the growing interval makes about 130.</desc>
+  <rect class="svg-bg" x="32" y="64" width="681" height="160" fill="#ffffff"/>
+  <path d="M40 120 H720" fill="none" stroke="#5b6471" stroke-width="1.5"/>
+  <g stroke="#1f6b8a" stroke-width="2" fill="none">
+    <path d="M50 104 V136"/><path d="M58 104 V136"/><path d="M70 104 V136"/><path d="M90 104 V136"/><path d="M120 104 V136"/>
+    <path d="M168 104 V136"/><path d="M240 104 V136"/><path d="M330 104 V136"/><path d="M420 104 V136"/><path d="M510 104 V136"/>
+    <path d="M600 104 V136"/><path d="M690 104 V136"/>
+  </g>
+  <g stroke="#b0413e" stroke-width="1" fill="none">
+    <path d="M50 160 V176"/><path d="M60 160 V176"/><path d="M70 160 V176"/><path d="M80 160 V176"/><path d="M90 160 V176"/><path d="M100 160 V176"/>
+    <path d="M110 160 V176"/><path d="M120 160 V176"/><path d="M130 160 V176"/><path d="M140 160 V176"/><path d="M150 160 V176"/><path d="M160 160 V176"/>
+    <path d="M170 160 V176"/><path d="M180 160 V176"/><path d="M190 160 V176"/><path d="M200 160 V176"/><path d="M210 160 V176"/><path d="M220 160 V176"/>
+  </g>
+  <text x="80" y="92" fill="#1f6b8a" font-size="12.5" text-anchor="start">backoff: 10 s growing to 120 s → ≈130 requests</text>
+  <text x="240" y="174" fill="#b0413e" font-size="12.5" text-anchor="start">fixed 10 s → ≈1,440 requests …</text>
+  <g fill="#1f2937" font-size="12" text-anchor="middle">
+    <text x="50" y="206">0</text><text x="240" y="206">20 min</text><text x="470" y="206">2 h</text><text x="690" y="206">4 h</text>
+  </g>
+</svg>
+<figcaption>Most of a long job is spent at the capped interval, which is where nearly all of the saved requests come from.</figcaption>
+</figure>
+<h3 id="5-report-the-result-to-ci" tabindex="-1"><a class="heading-link" href="#5-report-the-result-to-ci"><span>5. Report the result to CI</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> json
+<span class="token keyword">import</span> sys
+
+<span class="token keyword">try</span><span class="token punctuation">:</span>
+    asset_id<span class="token punctuation">,</span> history <span class="token operator">=</span> upload_and_wait<span class="token punctuation">(</span><span class="token keyword">lambda</span><span class="token punctuation">:</span> upload_citygml<span class="token punctuation">(</span><span class="token string">"build/district_09.gml"</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+<span class="token keyword">except</span> RuntimeError <span class="token keyword">as</span> exc<span class="token punctuation">:</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"::error title=Cesium ion tiling failed::</span><span class="token interpolation"><span class="token punctuation">{</span>exc<span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+    sys<span class="token punctuation">.</span>exit<span class="token punctuation">(</span><span class="token number">2</span><span class="token punctuation">)</span>
+
+summary <span class="token operator">=</span> os<span class="token punctuation">.</span>environ<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"GITHUB_STEP_SUMMARY"</span><span class="token punctuation">)</span>
+<span class="token keyword">if</span> summary<span class="token punctuation">:</span>
+    <span class="token keyword">with</span> <span class="token builtin">open</span><span class="token punctuation">(</span>summary<span class="token punctuation">,</span> <span class="token string">"a"</span><span class="token punctuation">)</span> <span class="token keyword">as</span> f<span class="token punctuation">:</span>
+        f<span class="token punctuation">.</span>write<span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"### Cesium ion asset </span><span class="token interpolation"><span class="token punctuation">{</span>asset_id<span class="token punctuation">}</span></span><span class="token string">\n\n| attempt | asset | status | note |\n|---|---|---|---|\n"</span></span><span class="token punctuation">)</span>
+        <span class="token keyword">for</span> attempt<span class="token punctuation">,</span> aid<span class="token punctuation">,</span> status<span class="token punctuation">,</span> reason<span class="token punctuation">,</span> _ <span class="token keyword">in</span> history<span class="token punctuation">:</span>
+            f<span class="token punctuation">.</span>write<span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"| </span><span class="token interpolation"><span class="token punctuation">{</span>attempt<span class="token punctuation">}</span></span><span class="token string"> | </span><span class="token interpolation"><span class="token punctuation">{</span>aid<span class="token punctuation">}</span></span><span class="token string"> | </span><span class="token interpolation"><span class="token punctuation">{</span>status<span class="token punctuation">}</span></span><span class="token string"> | </span><span class="token interpolation"><span class="token punctuation">{</span>reason<span class="token punctuation">}</span></span><span class="token string"> |\n"</span></span><span class="token punctuation">)</span>
+<span class="token keyword">with</span> <span class="token builtin">open</span><span class="token punctuation">(</span><span class="token string">"build/ion_asset.json"</span><span class="token punctuation">,</span> <span class="token string">"w"</span><span class="token punctuation">)</span> <span class="token keyword">as</span> f<span class="token punctuation">:</span>
+    json<span class="token punctuation">.</span>dump<span class="token punctuation">(</span><span class="token punctuation">{</span><span class="token string">"asset_id"</span><span class="token punctuation">:</span> asset_id<span class="token punctuation">,</span> <span class="token string">"attempts"</span><span class="token punctuation">:</span> <span class="token builtin">len</span><span class="token punctuation">(</span>history<span class="token punctuation">)</span><span class="token punctuation">}</span><span class="token punctuation">,</span> f<span class="token punctuation">)</span>
+</code></pre></div>
+<p>A distinct exit code for tiling failure lets the workflow tell “ion rejected the data” from “the job crashed”, and the step summary puts the attempt history where a reviewer will see it without opening logs. <code>upload_citygml</code> stands for whatever function your upload step exposes that returns the new asset id.</p>
+<h2 id="expected-output-verification" tabindex="-1"><a class="heading-link" href="#expected-output-verification"><span>Expected Output &amp; Verification</span></a></h2>
+<div class="codeblock" data-lang="text"><div class="codeblock__bar"><span class="codeblock__lang">text</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-text" tabindex="0" role="group" aria-label="text code sample"><code class="language-text">[      0s] asset 2718281: NOT_STARTED 0%
+[     11s] asset 2718281: IN_PROGRESS 0%
+[     27s] asset 2718281: IN_PROGRESS 4%
+…
+[   2911s] asset 2718281: IN_PROGRESS 97%
+[   3033s] asset 2718281: COMPLETE 100%
+</code></pre></div>
+<p>Verify the outcome rather than the status. After <code>COMPLETE</code>, request an endpoint for the asset — <code>GET /v1/assets/{id}/endpoint</code> returns the tileset URL and a short-lived access token — and fetch its <code>tileset.json</code>. Confirm the root bounding volume encloses the source data’s extent after converting that extent to radians, so that a job which completed on the wrong coordinates, for example a CityGML file with an ignored <code>srsName</code>, is caught before anyone opens a viewer.</p>
+<figure class="diagram">
+<svg viewBox="6 6 748 218" role="img" aria-labelledby="ion-dec-t ion-dec-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="ion-dec-t">Outcome to action</title>
+  <desc id="ion-dec-d">A table maps each poll outcome to an action. COMPLETE leads to publish after verifying bounds. DATA_ERROR fails the build immediately and deletes the asset. ERROR deletes the asset and retries once. AWAITING_FILES beyond fifteen minutes deletes and retries once. A stall or timeout deletes the asset and fails for a human to investigate.</desc>
+  <rect class="svg-bg" x="6" y="6" width="748" height="218" fill="#ffffff"/>
+  <g stroke-width="1.5">
+    <rect x="20" y="20" width="300" height="38" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="320" y="20" width="420" height="38" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="20" y="58" width="300" height="38" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="320" y="58" width="420" height="38" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="20" y="96" width="300" height="38" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="320" y="96" width="420" height="38" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="20" y="134" width="300" height="38" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="320" y="134" width="420" height="38" fill="#fdf3e0" stroke="#c46a3d"/>
+    <rect x="20" y="172" width="300" height="38" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="320" y="172" width="420" height="38" fill="#e3f0f4" stroke="#1f6b8a"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="start">
+    <text x="36" y="44">COMPLETE</text>
+    <text x="336" y="44">verify bounds, then publish</text>
+    <text x="36" y="82">DATA_ERROR</text>
+    <text x="336" y="82">delete, fail now: fix the input</text>
+    <text x="36" y="120">ERROR</text>
+    <text x="336" y="120">delete, retry once with a new asset</text>
+    <text x="36" y="158">AWAITING_FILES &gt; 15 min</text>
+    <text x="336" y="158">delete, retry once: onComplete was lost</text>
+    <text x="36" y="196">stalled or timed out</text>
+    <text x="336" y="196">delete, fail for a human to investigate</text>
+  </g>
+</svg>
+<figcaption>Only the service-side and lost-completion cases are retried, and only once; everything else either succeeds or fails loudly.</figcaption>
+</figure>
+<h2 id="common-errors" tabindex="-1"><a class="heading-link" href="#common-errors"><span>Common Errors</span></a></h2>
+<p><strong><code>401 Unauthorized</code> partway through a long poll.</strong> The token was a short-lived one issued for the upload rather than a long-lived access token with <code>assets:read</code>. Use a dedicated CI token with the scopes listed in the prerequisites.</p>
+<p><strong>The asset sits in <code>AWAITING_FILES</code> indefinitely.</strong> The files reached S3 but the <code>onComplete</code> request was never sent, often because the upload function raised after the last part and the completion call was in a <code>finally</code> that did not run. The fifteen-minute rule above turns this into a retry instead of a four-hour timeout.</p>
+<p><strong><code>DATA_ERROR</code> on a CityGML file that opens fine locally.</strong> Check the geometry LOD and <code>srsName</code>: ion tiles the geometry it can find and needs a recognisable CRS, and a file that only contains LOD1 solids when the upload options expected LOD2 surfaces, or one whose <code>srsName</code> is a local engineering system, fails as a data error.</p>
+<h2 id="frequently-asked-questions" tabindex="-1"><a class="heading-link" href="#frequently-asked-questions"><span>Frequently Asked Questions</span></a></h2>
+<h3 id="can-i-get-a-callback-instead-of-polling" tabindex="-1"><a class="heading-link" href="#can-i-get-a-callback-instead-of-polling"><span>Can I get a callback instead of polling?</span></a></h3>
+<p>The asset REST API is poll-based. For many parallel jobs, a single scheduler that polls all pending asset ids at a shared, capped interval is cheaper than one poller per job.</p>
+<h3 id="how-long-is-a-reasonable-timeout" tabindex="-1"><a class="heading-link" href="#how-long-is-a-reasonable-timeout"><span>How long is a reasonable timeout?</span></a></h3>
+<p>Scale it with the input. A few hundred megabytes of glTF typically finishes in minutes; multi-gigabyte point clouds or city-wide CityGML can take hours. Record elapsed time per asset type and size from past runs and set the timeout at two to three times the 95th percentile.</p>
+<h3 id="should-a-failed-nightly-build-keep-the-previous-asset-live" tabindex="-1"><a class="heading-link" href="#should-a-failed-nightly-build-keep-the-previous-asset-live"><span>Should a failed nightly build keep the previous asset live?</span></a></h3>
+<p>Yes. Publish by switching a reference — a tileset id in configuration, or a CDN alias — only after verification passes, so a failure leaves users on yesterday’s data rather than on nothing. The same pattern is used for self-hosted tilesets in <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/cache-invalidation-for-versioned-tilesets/">cache invalidation for versioned tilesets</a>.</p>
+<h2 id="related-guides" tabindex="-1"><a class="heading-link" href="#related-guides"><span>Related Guides</span></a></h2>
+<ul>
+<li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/automating-ion-tileset-uploads-with-the-rest-api/">Automating ion Tileset Uploads with the REST API</a> — the upload step this waits on</li>
+<li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/github-actions-gdal-pdal-pipeline-jobs/">GitHub Actions GDAL/PDAL Pipeline Jobs</a> — the CI job that runs it</li>
+<li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/automated-3d-tiles-deployment-to-cdn/">Automated 3D Tiles Deployment to CDN</a> — the self-hosted alternative</li>
+</ul>
+<p>Back to <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/">Cesium ion Upload Automation for 3D Tilesets</a>.</p>
+
+
+      
+      
+
+      <div class="related-nav">
+        
+
+        
+          <div>
+            <h3>Related</h3>
+            <div class="related-grid">
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/automating-ion-tileset-uploads-with-the-rest-api/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Automating ion Tileset Uploads With the REST API</span>
+                </a>
+              
+            </div>
+          </div>
+        
+      </div>
+    </article>
+
+    
+    <aside class="toc" aria-label="On this page" data-toc hidden>
+      <h4>On this page</h4>
+      <ul></ul>
+    </aside>
+  </div>
+</div>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+  <div class="container site-footer__inner">
+    <div class="site-footer__brand">
+      <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+        <img src="/assets/img/logo-mark.svg" alt="" class="brand__mark" width="36" height="36">
+        <span class="brand__name">
+          3D Geospatial
+          <small>Digital Twin Automation</small>
+        </span>
+      </a>
+      <p>Engineering-grade guides on point cloud processing, mesh pipelines, LOD strategies, and CI/CD automation for digital twin platforms.</p>
+      <a class="footer-social" href="https://github.com/3d-geospatial" aria-label="3D Geospatial on GitHub" rel="noopener" target="_blank">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+          <path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.53-1.34-1.3-1.7-1.3-1.7-1.06-.72.08-.71.08-.71 1.17.08 1.79 1.2 1.79 1.2 1.04 1.79 2.73 1.27 3.4.97.1-.75.4-1.27.73-1.56-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.19-3.08-.12-.3-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.75.11 3.05.74.8 1.19 1.83 1.19 3.08 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.07.78 2.15v3.18c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5Z"/>
+        </svg>
+        <span>GitHub</span>
+      </a>
+    </div>
+
+    <div class="site-footer__col">
+      <h4>Sections</h4>
+      <ul>
+        <li><a href="https://www.3d-geospatial.com/">Home</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management &amp; Optimization</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/">Point Cloud &amp; Mesh Pipelines</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/">Troubleshooting &amp; Reliability</a></li>
+        
+      </ul>
+    </div>
+
+    
+      <div class="site-footer__col">
+        <h4>3D Geospatial Fundamentals</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/">3D Format Standards Comparison</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/">BIM and IFC Georeferencing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems for 3D Assets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/">Digital Elevation Model Workflows</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/">Spatial Indexing and Tiling Schemes for 3D Data</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>LOD Management &amp; Optimization</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/">Automated Tile Generation for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/">Cesium ion Upload Automation for 3D Tilesets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/">glTF LOD Generation With Draco Compression</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/">Streaming Sync Patterns for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/">Tileset Metadata and 3D Tiles Next</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Point Cloud &amp; Mesh Pipelines</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/">Automated Mesh Decimation for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/">Change Detection Between LiDAR Scan Epochs</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/">CI/CD Automation for Spatial Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">LiDAR Classification and Ground Extraction</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/">Point Cloud Filtering Techniques</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/">Surface Reconstruction for Geospatial Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/">Texture Mapping Workflows for Digital Twins</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Troubleshooting &amp; Reliability</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/">Cross-Section Failure Modes in Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/">Data Validation &amp; QA Gates for 3D Tiles</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/">Performance Profiling and Benchmarking</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/">Streaming &amp; Runtime Diagnostics for 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+  </div>
+  <div class="container site-footer__bottom">
+    <span>© 2026 3D Geospatial &amp; Digital Twin Automation</span>
+    <span>Built with Eleventy · PWA-enabled</span>
+  </div>
+</footer>
+
+
+  <script src="/assets/js/site.js?v=b99aa9f971" defer></script>
+  
+</body>
+</html>

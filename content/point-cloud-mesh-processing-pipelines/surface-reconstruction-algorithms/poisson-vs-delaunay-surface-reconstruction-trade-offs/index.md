@@ -174,9 +174,9 @@ Poisson exposes a smooth continuum of resolution through `depth` (each step roug
     <circle cx="670" cy="180" r="3"/><circle cx="704" cy="176" r="3"/>
   </g>
   <path d="M440 180 L576 178 M670 180 L704 176" fill="none" stroke="#4f7a4d" stroke-width="2.5"/>
-  <text x="200" y="52" fill="#c46a3d" font-size="12.5" text-anchor="middle" font-weight="600">Poisson — always closes</text>
+  <text x="200" y="52" fill="#9a4f26" font-size="12.5" text-anchor="middle" font-weight="600">Poisson — always closes</text>
   <text x="570" y="52" fill="#4f7a4d" font-size="12.5" text-anchor="middle" font-weight="600">ball pivoting — leaves the boundary</text>
-  <text x="253" y="132" fill="#c46a3d" font-size="11.5" text-anchor="middle">invented shell</text>
+  <text x="253" y="132" fill="#9a4f26" font-size="11.5" text-anchor="middle">invented shell</text>
   <text x="623" y="200" fill="#4f7a4d" font-size="11.5" text-anchor="middle">open</text>
   <text x="200" y="230" fill="#1f2937" font-size="12" text-anchor="middle">watertight, but the doorway is now a wall</text>
   <text x="570" y="230" fill="#1f2937" font-size="12" text-anchor="middle">faithful, but no volume can be computed from it</text>

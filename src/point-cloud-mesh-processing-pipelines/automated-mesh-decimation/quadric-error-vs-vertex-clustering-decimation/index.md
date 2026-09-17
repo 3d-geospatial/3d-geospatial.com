@@ -65,7 +65,7 @@ Note that clustering takes a cell size rather than a triangle count. You cannot 
   <polyline points="420,206 546,202 574,124 700,116" fill="none" stroke="#c46a3d" stroke-width="2.5" stroke-dasharray="6 4"/>
   <text x="180" y="222" fill="#5b6471" font-size="12" text-anchor="middle">source — 11 vertices</text>
   <text x="490" y="70" fill="#4f7a4d" font-size="12" text-anchor="middle">QEM — 4 vertices, corner intact</text>
-  <text x="620" y="230" fill="#c46a3d" font-size="12" text-anchor="middle">clustering — corner rounded into one cell</text>
+  <text x="620" y="230" fill="#9a4f26" font-size="12" text-anchor="middle">clustering — corner rounded into one cell</text>
 </svg>
 <figcaption>Both reach four vertices. Only one of them still has a corner, and on a facade that corner is what the building looks like.</figcaption>
 </figure>

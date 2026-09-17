@@ -96,7 +96,7 @@ Alpha is an inverse length: larger values follow finer concavities and eventuall
         fill="none" stroke="#c46a3d" stroke-width="2.5"/>
   <text x="95" y="222" fill="#b0413e" font-size="12.5" text-anchor="middle">convex hull — notch filled</text>
   <text x="345" y="222" fill="#4f7a4d" font-size="12.5" text-anchor="middle">alpha ≈ 0.35 — notch followed</text>
-  <text x="605" y="222" fill="#c46a3d" font-size="12.5" text-anchor="middle">alpha too large — boundary ragged</text>
+  <text x="605" y="222" fill="#9a4f26" font-size="12.5" text-anchor="middle">alpha too large — boundary ragged</text>
   <text x="380" y="34" fill="#1f2937" font-size="13" text-anchor="middle" font-weight="600">One L-shaped roof, three boundary choices</text>
   <text x="380" y="266" fill="#15384a" font-size="12" text-anchor="middle">Check alpha on a courtyard block: the courtyard should be a hole, not filled and not cut open</text>
 </svg>
@@ -247,7 +247,7 @@ An IoU median above about 0.85 with more than 90% of footprints over 0.7 is a us
   </g>
   <text x="340" y="256" fill="#5b6471" font-size="12" text-anchor="middle">intersection over union</text>
   <text x="620" y="112" fill="#4f7a4d" font-size="12" text-anchor="start">good match — ship</text>
-  <text x="620" y="172" fill="#c46a3d" font-size="12" text-anchor="start">edge trimming — tune alpha</text>
+  <text x="620" y="172" fill="#9a4f26" font-size="12" text-anchor="start">edge trimming — tune alpha</text>
   <text x="620" y="200" fill="#b0413e" font-size="12" text-anchor="start">merged or split — tune eps</text>
   <text x="370" y="34" fill="#1f2937" font-size="13" text-anchor="middle" font-weight="600">Where a footprint lands on this axis names the parameter to change</text>
 </svg>

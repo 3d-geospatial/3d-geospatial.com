@@ -378,6 +378,7 @@ One last practical point: keep the gate runnable outside CI. A developer who can
 
 ## Related Guides
 
+- [Validating glTF Assets with the Khronos Validator](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/validating-gltf-assets-with-the-khronos-validator/) — run the Khronos glTF-Validator over tile content in CI
 - [Writing 3D Tiles Validator Checks in CI](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/writing-3d-tiles-validator-checks-in-ci/) — the geometry and transform gates as a CI job
 - [Asserting CRS and Units with pyproj](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/asserting-crs-and-units-with-pyproj/) — the CRS gate in full, EPSG:32618 versus EPSG:4326
 - [CI/CD Automation for Spatial Pipelines](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/) — the runner that executes these gates before deploy

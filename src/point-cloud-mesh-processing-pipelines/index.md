@@ -241,6 +241,16 @@ For oblique surfaces — building facades that a top-down ortho cannot see — p
 
 ---
 
+## Change Detection Between Epochs
+
+A twin that is resurveyed turns into a record of change, and the difference between two epochs of LiDAR is where that record comes from: a demolished block, a new extension, a stockpile that shrank, a wall that moved. It is also where registration error, vegetation growth, occlusion shadows and density differences between two contractors' surveys all masquerade as change. [Change Detection Between LiDAR Scan Epochs](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/) covers aligning epochs on stable ground, a fast DSM difference to see where to look, and M3C2 distances with a per-point level of detection that separates measurable change from noise.
+
+The methods trade speed for defensibility. [Cloud-to-cloud distance with Open3D](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/cloud-to-cloud-distance-with-open3d/) is a one-call screening step whose nearest-neighbour bias a local-plane fit largely removes; [M3C2 change detection with py4dgeo](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/m3c2-change-detection-with-py4dgeo/) produces signed distances and uncertainties that can be reported. The output feeds the LOD pipeline directly: [flagging changed buildings for retiling](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/flagging-changed-buildings-for-retiling/) turns change polygons into the dirty shard list an incremental tiler rebuilds.
+
+**Key Practice:** Never report a change without its level of detection. Feed the stable-ground registration residual into M3C2, classify every core point as gain, loss, no detectable change or unknown, and test the pipeline on a surface that did not move — about 5% of core points flagged at 95% confidence is correct, much more means the uncertainty is underestimated.
+
+---
+
 ## Cross-Section Integration
 
 This pipeline is the middle link in a three-stage chain. It consumes the outputs of the fundamentals and feeds the LOD pipeline, and almost every production failure traces back to one of those two boundaries being crossed with unvalidated data.
@@ -358,6 +368,7 @@ A closing word on sequencing. The stages above are presented in order because ea
 - [Surface Reconstruction for Geospatial Twins](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/) — Poisson, Delaunay, and ball-pivoting trade-offs
 - [Automated Mesh Decimation for Digital Twins](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/) — QEM edge collapse and LOD chains
 - [Texture Mapping Workflows for Digital Twins](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/) — UV unwrapping and orthophoto projection
+- [Change Detection Between LiDAR Scan Epochs](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/) — measuring what changed between surveys
 - [LOD Management & Optimization Strategies](https://www.3d-geospatial.com/lod-management-optimization-strategies/) — where the decimated LOD chain gets tiled and streamed
 
 Back to [3D Geospatial Fundamentals for Digital Twins](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/) — the input contract for this pipeline.

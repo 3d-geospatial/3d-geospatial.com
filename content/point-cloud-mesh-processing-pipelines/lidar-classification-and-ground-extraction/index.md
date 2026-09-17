@@ -29,11 +29,11 @@ Ground filters all solve the same problem: the terrain is the lower envelope of 
   <path d="M40 157 L110 153 L150 153 L230 154 L250 155 L330 147 L360 148 L380 148 L400 151 L470 147"
         fill="none" stroke="#4f7a4d" stroke-width="2.5"/>
   <path d="M148 103 h84 v52 h-84 Z" fill="none" stroke="#c46a3d" stroke-width="1.5" stroke-dasharray="5 3"/>
-  <text x="190" y="95" fill="#c46a3d" font-size="11.5" text-anchor="middle">window grows past the roof</text>
+  <text x="190" y="95" fill="#9a4f26" font-size="11.5" text-anchor="middle">window grows past the roof</text>
   <path d="M540 108 L610 112 L650 158 L730 158" fill="none" stroke="#5b6471" stroke-width="2"/>
   <path d="M540 90 L610 94 L650 96 L730 98" fill="none" stroke="#1f6b8a" stroke-width="2.5"/>
   <g stroke="#1f6b8a" stroke-width="1.2">
-    <path d="M560 90 V62 M600 93 V62 M640 95 V62 M680 97 V62 M720 98 V62"/>
+    <path fill="none" d="M560 90 V62 M600 93 V62 M640 95 V62 M680 97 V62 M720 98 V62"/>
   </g>
   <text x="636" y="54" fill="#1f6b8a" font-size="11.5" text-anchor="middle">cloth falls from above</text>
   <text x="255" y="196" fill="#4f7a4d" font-size="12.5" text-anchor="middle">SMRF — opening of the minimum surface</text>

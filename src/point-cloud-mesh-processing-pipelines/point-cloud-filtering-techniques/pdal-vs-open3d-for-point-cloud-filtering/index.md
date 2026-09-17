@@ -163,7 +163,7 @@ ground.execute()
   <path d="M70 96 H700" fill="none" stroke="#b0413e" stroke-width="2" stroke-dasharray="6 4"/>
   <text x="700" y="90" fill="#b0413e" font-size="12" text-anchor="end">machine RAM</text>
   <text x="392" y="196" fill="#4f7a4d" font-size="12" text-anchor="middle">PDAL — flat, set by the view size</text>
-  <text x="440" y="112" fill="#c46a3d" font-size="12" text-anchor="middle">Open3D — one array per filter, per cloud</text>
+  <text x="440" y="112" fill="#9a4f26" font-size="12" text-anchor="middle">Open3D — one array per filter, per cloud</text>
   <g fill="#1f2937" font-size="11.5" text-anchor="middle">
     <text x="90" y="238">50 M</text>
     <text x="200" y="238">100 M</text>

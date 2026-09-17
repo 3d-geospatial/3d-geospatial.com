@@ -17,13 +17,13 @@ You hit this whenever two datasets that "look" co-registered disagree in Z: a GN
   <path d="M40 90 Q 250 70 400 82 T 760 90" fill="none" stroke="#1f6b8a" stroke-width="2"/>
   <path d="M40 150 Q 250 175 400 150 T 760 152" fill="none" stroke="#c46a3d" stroke-width="2"/>
   <text x="90" y="82" fill="#1f6b8a" font-size="12">ellipsoid (EPSG:4979)</text>
-  <text x="90" y="168" fill="#c46a3d" font-size="12">geoid (NAVD88 / EGM2008)</text>
+  <text x="90" y="168" fill="#9a4f26" font-size="12">geoid (NAVD88 / EGM2008)</text>
   <line x1="400" y1="82" x2="400" y2="150" stroke="#5b6471" stroke-width="2" stroke-dasharray="4 3"/>
   <text x="415" y="120" fill="#1f2937" font-size="13">N</text>
   <rect x="160" y="210" width="230" height="44" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
   <rect x="410" y="238" width="230" height="44" rx="8" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
   <line x1="390" y1="232" x2="410" y2="260" stroke="#5b6471" stroke-width="2" marker-end="url(#vdatum-arrow)"/>
-  <text x="400" y="300" fill="#c46a3d" font-size="13" text-anchor="middle">Z step = N at the seam</text>
+  <text x="400" y="300" fill="#9a4f26" font-size="13" text-anchor="middle">Z step = N at the seam</text>
   <g font-size="13" text-anchor="middle" fill="#15384a">
     <text x="275" y="237">tile A: ellipsoidal Z</text>
   </g>
@@ -94,7 +94,7 @@ The three values that come back are close to each other, and that closeness is t
     <text x="238" y="172">B</text>
     <text x="388" y="209">C</text>
   </g>
-  <g fill="#c46a3d" font-size="11.5" text-anchor="end">
+  <g fill="#9a4f26" font-size="11.5" text-anchor="end">
     <text x="466" y="68">N = −33.2 m</text>
     <text x="466" y="138">N = −33.4 m</text>
     <text x="466" y="208">N = −33.6 m</text>

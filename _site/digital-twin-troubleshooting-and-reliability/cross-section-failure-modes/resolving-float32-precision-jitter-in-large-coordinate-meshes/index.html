@@ -1,0 +1,661 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <title>Resolving Float32 Precision Jitter in Large-Coordinate Meshes</title>
+  <meta name="description" content="Stop vertices shaking and tiles cracking when geometry uses UTM or ECEF coordinates: float32 spacing, storage vs transform precision, re-centring and a floating origin.">
+  <meta name="keywords" content="3D geospatial, digital twin, point cloud, mesh pipeline, LOD, 3D Tiles, Cesium, PDAL, Open3D, Python, CI/CD">
+  <meta name="author" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta name="theme-color" content="#1f6b8a" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f171d" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+
+  
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem("theme");
+        var theme = (stored === "dark" || stored === "light") ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    })();
+  </script>
+  <meta name="generator" content="Eleventy">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="googlebot" content="index,follow,max-image-preview:large">
+
+  
+  <link rel="canonical" href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/resolving-float32-precision-jitter-in-large-coordinate-meshes/">
+  <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">
+
+  
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/icon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+
+  
+  <link rel="apple-touch-icon" href="/assets/img/icon-180.png">
+  <link rel="mask-icon" href="/assets/img/logo.svg" color="#1f6b8a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="3D Geospatial">
+  <meta name="application-name" content="3D Geospatial">
+
+  
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Resolving Float32 Precision Jitter in Large-Coordinate Meshes">
+  <meta property="og:description" content="Stop vertices shaking and tiles cracking when geometry uses UTM or ECEF coordinates: float32 spacing, storage vs transform precision, re-centring and a floating origin.">
+  <meta property="og:url" content="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/resolving-float32-precision-jitter-in-large-coordinate-meshes/">
+  <meta property="og:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+  <meta property="og:site_name" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta property="og:locale" content="en_US">
+  
+  <meta property="article:published_time" content="2026-09-17T17:17:15.351Z">
+  <meta property="article:modified_time" content="2026-09-17T17:17:15.351Z">
+  <meta property="article:publisher" content="https://www.3d-geospatial.com/">
+  
+
+  
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Resolving Float32 Precision Jitter in Large-Coordinate Meshes">
+  <meta name="twitter:description" content="Stop vertices shaking and tiles cracking when geometry uses UTM or ECEF coordinates: float32 spacing, storage vs transform precision, re-centring and a floating origin.">
+  <meta name="twitter:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta name="twitter:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+
+  
+  <link rel="preload" href="/assets/css/styles.css?v=8c46394d6c" as="style">
+  
+
+  <link rel="stylesheet" href="/assets/css/styles.css?v=8c46394d6c">
+
+  
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.3d-geospatial.com/#organization",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "url": "https://www.3d-geospatial.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/icon-512.png",
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://www.3d-geospatial.com/#website",
+      "url": "https://www.3d-geospatial.com/",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "description": "Build reliable 3D spatial data pipelines for digital twins — point clouds, meshes, LOD strategies, Python processing, and CI/CD automation.",
+      "inLanguage": "en",
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      }
+    },
+    {
+      "@type": "TechArticle",
+      "@id": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/resolving-float32-precision-jitter-in-large-coordinate-meshes/#article",
+      "isPartOf": {
+        "@id": "https://www.3d-geospatial.com/#website"
+      },
+      "headline": "Resolving Float32 Precision Jitter in Large-Coordinate Meshes",
+      "name": "Resolving Float32 Precision Jitter in Large-Coordinate Meshes",
+      "description": "Stop vertices shaking and tiles cracking when geometry uses UTM or ECEF coordinates: float32 spacing, storage vs transform precision, re-centring and a floating origin.",
+      "url": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/resolving-float32-precision-jitter-in-large-coordinate-meshes/",
+      "mainEntityOfPage": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/resolving-float32-precision-jitter-in-large-coordinate-meshes/",
+      "inLanguage": "en",
+      "datePublished": "2026-09-17T17:17:15.351Z",
+      "dateModified": "2026-09-17T17:17:15.351Z",
+      "author": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "image": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/og-cover.png",
+        "width": 1200,
+        "height": 630
+      },
+      "breadcrumb": {
+        "@id": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/resolving-float32-precision-jitter-in-large-coordinate-meshes/#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/resolving-float32-precision-jitter-in-large-coordinate-meshes/#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://www.3d-geospatial.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Digital Twin Troubleshooting And Reliability",
+          "item": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Cross Section Failure Modes",
+          "item": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "name": "Resolving Float32 Precision Jitter In Large Coordinate Meshes",
+          "item": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/resolving-float32-precision-jitter-in-large-coordinate-meshes/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  
+<header class="site-header" role="banner">
+  <div class="container site-header__inner">
+    <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+      <img src="/assets/img/logo.svg" alt="" class="brand__mark" width="36" height="36">
+      <span class="brand__name">
+        3D Geospatial
+        <small>Digital Twin Automation</small>
+      </span>
+    </a>
+
+    <button class="theme-toggle" type="button" data-theme-toggle
+            aria-label="Switch to dark theme" title="Switch to dark theme">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4.2"/>
+        <path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/>
+      </svg>
+    </button>
+
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>
+      <span class="nav-toggle__icon" aria-hidden="true"><span></span></span>
+      Menu
+    </button>
+
+    <nav class="primary-nav" id="primary-nav" aria-label="Primary">
+      
+      <a href="https://www.3d-geospatial.com/" >
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/>
+        </svg>
+        Home
+      </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2 3 7l9 5 9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 17l9 5 9-5"/>
+            </svg>
+          
+          3D Geospatial Fundamentals
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+          
+          LOD Management &amp; Optimization
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="6" cy="6" r="1.5"/><circle cx="12" cy="6" r="1.5"/><circle cx="18" cy="6" r="1.5"/>
+              <circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/>
+              <circle cx="6" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="18" cy="18" r="1.5"/>
+            </svg>
+          
+          Point Cloud &amp; Mesh Pipelines
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/" aria-current="page">
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <path d="M12 9v4"/><path d="M12 17h.01"/>
+            </svg>
+          
+          Troubleshooting &amp; Reliability
+        </a>
+      
+    </nav>
+  </div>
+</header>
+
+
+  <main id="main">
+    
+
+
+<div class="container">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    
+      
+        <a href="https://www.3d-geospatial.com/">Home</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/">Digital Twin Troubleshooting And Reliability</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/">Cross Section Failure Modes</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <span class="current">Resolving Float32 Precision Jitter In Large Coordinate Meshes</span>
+      
+    
+  </nav>
+
+  <div class="content-page">
+    <article class="article">
+      <h1 id="resolving-float32-precision-jitter-in-large-coordinate-meshes" tabindex="-1"><a class="heading-link" href="#resolving-float32-precision-jitter-in-large-coordinate-meshes"><span>Resolving Float32 Precision Jitter in Large-Coordinate Meshes</span></a></h1>
+<p>This page resolves the shaking vertices, cracked tile seams and stair-stepped silhouettes that appear when mesh geometry carries full UTM (EPSG:32618) or Earth-centred (EPSG:4978) coordinates into single-precision buffers and GPU math — measuring the float32 spacing at the coordinates you actually have, separating storage precision from transform precision, re-centring vertex data behind a tile transform, and moving the render origin with the camera in engines that do not do it for you.</p>
+<h2 id="why-you-hit-this" tabindex="-1"><a class="heading-link" href="#why-you-hit-this"><span>Why you hit this</span></a></h2>
+<p>The failure crosses every section of a twin pipeline, which is why it is hard to pin down. The CRS work in <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">coordinate reference systems for 3D assets</a> is correct: the coordinates are right, to the millimetre, in float64. The mesh processing is correct: decimation and export preserve every vertex. Then the exporter writes positions into a glTF <code>FLOAT</code> accessor — 32 bits — or a custom viewer multiplies a camera matrix built from ECEF values in a <code>Float32Array</code>, and precision the whole pipeline protected disappears in the last step. A float32 value near 6.4 million can only take values half a metre apart. Buildings built from such vertices are rendered on a half-metre grid, and as the camera moves, rounding in the transform chain changes frame by frame, so geometry visibly vibrates.</p>
+<h2 id="prerequisites" tabindex="-1"><a class="heading-link" href="#prerequisites"><span>Prerequisites</span></a></h2>
+<ul>
+<li>Python 3.10+ with <code>numpy&gt;=1.24</code>, <code>trimesh&gt;=4.0</code> and <code>pygltflib&gt;=1.16</code>.</li>
+<li>Meshes or tiles whose vertices are, or might be, stored in absolute projected or geocentric coordinates — for example buildings in EPSG:32618 exported from a GIS, or ECEF tiles from a custom tiler.</li>
+<li>For the runtime section, a three.js or custom WebGL viewer; CesiumJS already renders relative to the eye and needs only the storage fix.</li>
+</ul>
+<h2 id="step-by-step" tabindex="-1"><a class="heading-link" href="#step-by-step"><span>Step-by-Step</span></a></h2>
+<h3 id="1-measure-float32-spacing-at-your-coordinates" tabindex="-1"><a class="heading-link" href="#1-measure-float32-spacing-at-your-coordinates"><span>1. Measure float32 spacing at your coordinates</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> numpy <span class="token keyword">as</span> np
+
+<span class="token keyword">for</span> label<span class="token punctuation">,</span> value <span class="token keyword">in</span> <span class="token punctuation">[</span><span class="token punctuation">(</span><span class="token string">"local tile, 200 m"</span><span class="token punctuation">,</span> <span class="token number">200.0</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token punctuation">(</span><span class="token string">"district, 5 km"</span><span class="token punctuation">,</span> <span class="token number">5_000.0</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                     <span class="token punctuation">(</span><span class="token string">"UTM easting"</span><span class="token punctuation">,</span> <span class="token number">585_412.0</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token punctuation">(</span><span class="token string">"UTM northing"</span><span class="token punctuation">,</span> <span class="token number">4_511_203.0</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+                     <span class="token punctuation">(</span><span class="token string">"ECEF"</span><span class="token punctuation">,</span> <span class="token number">6_378_137.0</span><span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">:</span>
+    step <span class="token operator">=</span> <span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>spacing<span class="token punctuation">(</span>np<span class="token punctuation">.</span>float32<span class="token punctuation">(</span>value<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>label<span class="token punctuation">:</span><span class="token format-spec">&lt;18</span><span class="token punctuation">}</span></span><span class="token string"> </span><span class="token interpolation"><span class="token punctuation">{</span>value<span class="token punctuation">:</span><span class="token format-spec">>14,.1f</span><span class="token punctuation">}</span></span><span class="token string">  float32 step </span><span class="token interpolation"><span class="token punctuation">{</span>step <span class="token operator">*</span> <span class="token number">1000</span><span class="token punctuation">:</span><span class="token format-spec">>10.3f</span><span class="token punctuation">}</span></span><span class="token string"> mm"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p><code>np.spacing</code> returns the gap between a value and the next representable float of the same type. Float32 has 24 bits of mantissa, so its spacing doubles every time the magnitude doubles: around 15 µm at 200 m, half a millimetre at 5 km, over 6 cm at a UTM easting and half a metre at a UTM northing or any ECEF coordinate. The easting and northing of the same vertex are quantised to different grids, which is why jitter often looks stronger north-south than east-west.</p>
+<figure class="diagram">
+<svg viewBox="66 3 668 263" role="img" aria-labelledby="fj-ulp-t fj-ulp-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="fj-ulp-t">Float32 spacing against coordinate magnitude</title>
+  <desc id="fj-ulp-d">A log-log step chart of float32 spacing against the magnitude of a coordinate. Local tile coordinates of a few hundred metres have spacing in micrometres. A 5 kilometre district reaches half a millimetre. UTM eastings around 585 kilometres reach 6 centimetres, and UTM northings and ECEF coordinates in the millions reach half a metre. A horizontal line marks 1 millimetre, the practical limit for building geometry.</desc>
+  <rect class="svg-bg" x="66" y="3" width="668" height="263" fill="#ffffff"/>
+  <path d="M80 20 V200 H720" fill="none" stroke="#5b6471" stroke-width="1.5"/>
+  <path d="M80 118 H720" fill="none" stroke="#4f7a4d" stroke-width="2" stroke-dasharray="6 4"/>
+  <path d="M100 190 H180 V172 H260 V150 H340 V128 H420 V106 H500 V76 H580 V50 H660 V34 H710" fill="none" stroke="#b0413e" stroke-width="2.5"/>
+  <g fill="#1f6b8a">
+    <circle cx="170" cy="190" r="6"/><circle cx="330" cy="128" r="6"/><circle cx="520" cy="76" r="6"/><circle cx="650" cy="34" r="6"/><circle cx="690" cy="34" r="6"/>
+  </g>
+  <text x="712" y="112" fill="#4f7a4d" font-size="12" text-anchor="end">1 mm</text>
+  <g fill="#1f2937" font-size="12" text-anchor="middle">
+    <text x="170" y="220">200 m</text><text x="330" y="220">5 km</text><text x="520" y="220">585 km</text><text x="670" y="220">4.5–6.4 Mm</text>
+  </g>
+  <g fill="#1f2937" font-size="12" text-anchor="start">
+    <text x="186" y="184">15 µm</text><text x="346" y="146">0.5 mm</text><text x="530" y="98">6 cm</text><text x="540" y="30">0.5 m</text>
+  </g>
+  <text x="400" y="248" fill="#15384a" font-size="12.5" text-anchor="middle">coordinate magnitude (log) — spacing doubles with each doubling of magnitude</text>
+</svg>
+<figcaption>Below a few kilometres from the origin, float32 is finer than any survey. At projected or geocentric magnitudes it is coarser than the buildings' details.</figcaption>
+</figure>
+<h3 id="2-scan-tiles-for-large-stored-coordinates" tabindex="-1"><a class="heading-link" href="#2-scan-tiles-for-large-stored-coordinates"><span>2. Scan tiles for large stored coordinates</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">from</span> pathlib <span class="token keyword">import</span> Path
+<span class="token keyword">from</span> pygltflib <span class="token keyword">import</span> GLTF2
+
+<span class="token keyword">def</span> <span class="token function">position_extent</span><span class="token punctuation">(</span>glb_path<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    g <span class="token operator">=</span> GLTF2<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span>load_binary<span class="token punctuation">(</span><span class="token builtin">str</span><span class="token punctuation">(</span>glb_path<span class="token punctuation">)</span><span class="token punctuation">)</span>
+    worst <span class="token operator">=</span> <span class="token number">0.0</span>
+    <span class="token keyword">for</span> mesh <span class="token keyword">in</span> g<span class="token punctuation">.</span>meshes<span class="token punctuation">:</span>
+        <span class="token keyword">for</span> prim <span class="token keyword">in</span> mesh<span class="token punctuation">.</span>primitives<span class="token punctuation">:</span>
+            acc <span class="token operator">=</span> g<span class="token punctuation">.</span>accessors<span class="token punctuation">[</span>prim<span class="token punctuation">.</span>attributes<span class="token punctuation">.</span>POSITION<span class="token punctuation">]</span>
+            <span class="token keyword">if</span> acc<span class="token punctuation">.</span><span class="token builtin">max</span> <span class="token keyword">and</span> acc<span class="token punctuation">.</span><span class="token builtin">min</span><span class="token punctuation">:</span>
+                worst <span class="token operator">=</span> <span class="token builtin">max</span><span class="token punctuation">(</span>worst<span class="token punctuation">,</span> <span class="token builtin">max</span><span class="token punctuation">(</span><span class="token builtin">abs</span><span class="token punctuation">(</span>v<span class="token punctuation">)</span> <span class="token keyword">for</span> v <span class="token keyword">in</span> acc<span class="token punctuation">.</span><span class="token builtin">max</span> <span class="token operator">+</span> acc<span class="token punctuation">.</span><span class="token builtin">min</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    has_rtc <span class="token operator">=</span> <span class="token string">"CESIUM_RTC"</span> <span class="token keyword">in</span> <span class="token punctuation">(</span>g<span class="token punctuation">.</span>extensionsUsed <span class="token keyword">or</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> worst<span class="token punctuation">,</span> has_rtc
+
+flagged <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+<span class="token keyword">for</span> p <span class="token keyword">in</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span>Path<span class="token punctuation">(</span><span class="token string">"tiles/city/content"</span><span class="token punctuation">)</span><span class="token punctuation">.</span>rglob<span class="token punctuation">(</span><span class="token string">"*.glb"</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    extent<span class="token punctuation">,</span> rtc <span class="token operator">=</span> position_extent<span class="token punctuation">(</span>p<span class="token punctuation">)</span>
+    step <span class="token operator">=</span> <span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>spacing<span class="token punctuation">(</span>np<span class="token punctuation">.</span>float32<span class="token punctuation">(</span>extent<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token keyword">if</span> extent <span class="token keyword">else</span> <span class="token number">0.0</span>
+    <span class="token keyword">if</span> step <span class="token operator">></span> <span class="token number">0.001</span><span class="token punctuation">:</span>
+        flagged<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">(</span>p<span class="token punctuation">.</span>name<span class="token punctuation">,</span> <span class="token builtin">round</span><span class="token punctuation">(</span>extent<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token builtin">round</span><span class="token punctuation">(</span>step <span class="token operator">*</span> <span class="token number">1000</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span> rtc<span class="token punctuation">)</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span><span class="token builtin">len</span><span class="token punctuation">(</span>flagged<span class="token punctuation">)</span><span class="token punctuation">}</span></span><span class="token string"> tiles store positions with float32 steps above 1 mm"</span></span><span class="token punctuation">,</span> flagged<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token number">5</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>The accessor <code>min</code> and <code>max</code> are required for positions and give the extent without decoding the buffer. Any tile whose largest absolute coordinate exceeds roughly 8 km has a float32 step above a millimetre and is a candidate for visible artifacts; values in the hundreds of thousands or millions are a certain cause. The check is cheap enough to run on every tile in CI alongside <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/validating-gltf-assets-with-the-khronos-validator/">validating glTF assets with the Khronos validator</a>.</p>
+<h3 id="3-re-centre-vertex-data-behind-a-tile-transform" tabindex="-1"><a class="heading-link" href="#3-re-centre-vertex-data-behind-a-tile-transform"><span>3. Re-centre vertex data behind a tile transform</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> json
+<span class="token keyword">import</span> trimesh
+
+<span class="token keyword">def</span> <span class="token function">recentre_tile</span><span class="token punctuation">(</span>glb_in<span class="token punctuation">,</span> glb_out<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    scene <span class="token operator">=</span> trimesh<span class="token punctuation">.</span>load<span class="token punctuation">(</span>glb_in<span class="token punctuation">,</span> force<span class="token operator">=</span><span class="token string">"scene"</span><span class="token punctuation">,</span> process<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">)</span>
+    mesh <span class="token operator">=</span> scene<span class="token punctuation">.</span>to_geometry<span class="token punctuation">(</span><span class="token punctuation">)</span>                               <span class="token comment"># float64 vertices in the source frame</span>
+    centre <span class="token operator">=</span> <span class="token punctuation">(</span>mesh<span class="token punctuation">.</span>bounds<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span> <span class="token operator">+</span> mesh<span class="token punctuation">.</span>bounds<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token number">2</span>
+    mesh<span class="token punctuation">.</span>vertices <span class="token operator">=</span> mesh<span class="token punctuation">.</span>vertices <span class="token operator">-</span> centre
+    step <span class="token operator">=</span> <span class="token builtin">float</span><span class="token punctuation">(</span>np<span class="token punctuation">.</span>spacing<span class="token punctuation">(</span>np<span class="token punctuation">.</span>float32<span class="token punctuation">(</span>np<span class="token punctuation">.</span><span class="token builtin">abs</span><span class="token punctuation">(</span>mesh<span class="token punctuation">.</span>vertices<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">max</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token keyword">assert</span> step <span class="token operator">&lt;</span> <span class="token number">1e-4</span><span class="token punctuation">,</span> <span class="token string-interpolation"><span class="token string">f"tile still too large after re-centring: step </span><span class="token interpolation"><span class="token punctuation">{</span>step <span class="token operator">*</span> <span class="token number">1000</span><span class="token punctuation">:</span><span class="token format-spec">.2f</span><span class="token punctuation">}</span></span><span class="token string"> mm"</span></span>
+    mesh<span class="token punctuation">.</span>export<span class="token punctuation">(</span>glb_out<span class="token punctuation">)</span>
+    translation <span class="token operator">=</span> np<span class="token punctuation">.</span>eye<span class="token punctuation">(</span><span class="token number">4</span><span class="token punctuation">)</span>
+    translation<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token number">3</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">]</span> <span class="token operator">=</span> centre
+    <span class="token keyword">return</span> translation<span class="token punctuation">.</span>T<span class="token punctuation">.</span>flatten<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span>tolist<span class="token punctuation">(</span><span class="token punctuation">)</span>                  <span class="token comment"># column-major for tileset.json</span>
+
+transform <span class="token operator">=</span> recentre_tile<span class="token punctuation">(</span><span class="token string">"in/tile_8812_5631.glb"</span><span class="token punctuation">,</span> <span class="token string">"out/tile_8812_5631.glb"</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"tile transform translation:"</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token builtin">round</span><span class="token punctuation">(</span>v<span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span> <span class="token keyword">for</span> v <span class="token keyword">in</span> transform<span class="token punctuation">[</span><span class="token number">12</span><span class="token punctuation">:</span><span class="token number">15</span><span class="token punctuation">]</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>The large part of every coordinate moves into the tile’s <code>transform</code>, which is stored in the tileset JSON as float64 and applied by the runtime in double precision. What remains in the buffer is a few hundred metres at most, where float32 is finer than a hundredth of a millimetre. For ECEF data the rotation matters too: a pure translation leaves the local axes aligned with the Earth’s axes rather than with east, north and up, which is harmless for precision but awkward for debugging; the full east-north-up version is in <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/ecef-and-enu-frames-for-tileset-transforms/">ECEF and ENU frames for tileset transforms</a>.</p>
+<p>The re-centring must happen on float64 data. Loading an already-quantised float32 buffer and subtracting its centre only preserves the half-metre grid in smaller numbers. If the only copy of the geometry is the float32 tile, regenerate it from the source rather than re-centring the tile.</p>
+<figure class="diagram">
+<svg viewBox="6 12 748 218" role="img" aria-labelledby="fj-chain-t fj-chain-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="fj-chain-t">Two places precision is lost</title>
+  <desc id="fj-chain-d">The path from source coordinates to pixels has two float32 bottlenecks. The first is storage: absolute coordinates written into a float32 vertex buffer are quantised permanently. The second is transform: a model-view matrix computed in float32 from large model and camera positions loses precision every frame, which causes jitter even when stored vertices are small. Re-centring fixes the first; computing model-view in float64 relative to the eye fixes the second.</desc>
+  <rect class="svg-bg" x="6" y="12" width="748" height="218" fill="#ffffff"/>
+  <defs>
+    <marker id="fj-chain-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
+    </marker>
+  </defs>
+  <rect x="20" y="60" width="140" height="60" rx="8" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <rect x="200" y="60" width="160" height="60" rx="8" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <rect x="400" y="60" width="160" height="60" rx="8" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <rect x="600" y="60" width="140" height="60" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="200" y="160" width="160" height="56" rx="8" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <rect x="400" y="160" width="160" height="56" rx="8" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <g stroke="#5b6471" stroke-width="2" fill="none" marker-end="url(#fj-chain-arrow)">
+    <path d="M160 90 H198"/><path d="M360 90 H398"/><path d="M560 90 H598"/>
+  </g>
+  <g stroke="#4f7a4d" stroke-width="1.5" fill="none" stroke-dasharray="5 4">
+    <path d="M280 122 V158"/><path d="M480 122 V158"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="90" y="86">source</text><text x="90" y="103">float64</text>
+    <text x="280" y="86">vertex buffer</text><text x="280" y="103">float32: storage</text>
+    <text x="480" y="86">model-view</text><text x="480" y="103">float32: transform</text>
+    <text x="670" y="86">clip space</text><text x="670" y="103">pixels</text>
+    <text x="280" y="184">fix: re-centre +</text><text x="280" y="201">tile transform</text>
+    <text x="480" y="184">fix: relative to eye</text><text x="480" y="201">in float64 on CPU</text>
+  </g>
+  <text x="380" y="40" fill="#15384a" font-size="12.5" text-anchor="middle">Quantised storage looks like stair steps; float32 transforms look like shaking.</text>
+</svg>
+<figcaption>The two losses have different signatures. Fixing storage alone still leaves shaking in viewers that build their matrices from large numbers in single precision.</figcaption>
+</figure>
+<h3 id="4-keep-the-render-origin-near-the-camera" tabindex="-1"><a class="heading-link" href="#4-keep-the-render-origin-near-the-camera"><span>4. Keep the render origin near the camera</span></a></h3>
+<p>CesiumJS computes model-view matrices relative to the eye in double precision on the CPU before uploading them, so re-centred tiles are sufficient there. Engines that place the camera at world coordinates in the millions — a common three.js setup when tiles are loaded with absolute positions — need a floating origin.</p>
+<div class="codeblock" data-lang="javascript"><div class="codeblock__bar"><span class="codeblock__lang">javascript</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-javascript" tabindex="0" role="group" aria-label="javascript code sample"><code class="language-javascript"><span class="token comment">// three.js: keep the scene origin within a few km of the camera</span>
+<span class="token keyword">const</span> <span class="token constant">ORIGIN_SHIFT_THRESHOLD</span> <span class="token operator">=</span> <span class="token number">2000</span><span class="token punctuation">;</span>                    <span class="token comment">// metres</span>
+<span class="token keyword">const</span> worldOffset <span class="token operator">=</span> <span class="token keyword">new</span> <span class="token class-name">THREE<span class="token punctuation">.</span>Vector3</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>                <span class="token comment">// float64 in JS, never uploaded directly</span>
+
+<span class="token keyword">function</span> <span class="token function">rebaseOrigin</span><span class="token punctuation">(</span><span class="token parameter">camera<span class="token punctuation">,</span> worldRoot</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+  <span class="token keyword">if</span> <span class="token punctuation">(</span>camera<span class="token punctuation">.</span>position<span class="token punctuation">.</span><span class="token function">length</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">&lt;</span> <span class="token constant">ORIGIN_SHIFT_THRESHOLD</span><span class="token punctuation">)</span> <span class="token keyword">return</span><span class="token punctuation">;</span>
+  <span class="token keyword">const</span> shift <span class="token operator">=</span> camera<span class="token punctuation">.</span>position<span class="token punctuation">.</span><span class="token function">clone</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  worldOffset<span class="token punctuation">.</span><span class="token function">add</span><span class="token punctuation">(</span>shift<span class="token punctuation">)</span><span class="token punctuation">;</span>                                <span class="token comment">// accumulate the true position in float64</span>
+  worldRoot<span class="token punctuation">.</span>position<span class="token punctuation">.</span><span class="token function">sub</span><span class="token punctuation">(</span>shift<span class="token punctuation">)</span><span class="token punctuation">;</span>                         <span class="token comment">// move the world, not the camera</span>
+  camera<span class="token punctuation">.</span>position<span class="token punctuation">.</span><span class="token function">set</span><span class="token punctuation">(</span><span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  camera<span class="token punctuation">.</span><span class="token function">updateMatrixWorld</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  worldRoot<span class="token punctuation">.</span><span class="token function">updateMatrixWorld</span><span class="token punctuation">(</span><span class="token boolean">true</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+
+renderer<span class="token punctuation">.</span><span class="token function">setAnimationLoop</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">=></span> <span class="token punctuation">{</span>
+  controls<span class="token punctuation">.</span><span class="token function">update</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+  <span class="token function">rebaseOrigin</span><span class="token punctuation">(</span>camera<span class="token punctuation">,</span> tilesGroup<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  renderer<span class="token punctuation">.</span><span class="token function">render</span><span class="token punctuation">(</span>scene<span class="token punctuation">,</span> camera<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+</code></pre></div>
+<p>JavaScript numbers are float64, so <code>worldOffset</code> holds the camera’s true position exactly; only small, camera-relative values reach the GPU’s float32 uniforms. Any code that converts screen picks back to geographic coordinates must add <code>worldOffset</code> before transforming to EPSG:4978 or EPSG:32618. Also make sure vertex shaders declare <code>precision highp float;</code> — on mobile GPUs <code>mediump</code> can be a 16-bit float, which reintroduces jitter at only a few hundred metres from the origin.</p>
+<h2 id="expected-output-verification" tabindex="-1"><a class="heading-link" href="#expected-output-verification"><span>Expected Output &amp; Verification</span></a></h2>
+<div class="codeblock" data-lang="text"><div class="codeblock__bar"><span class="codeblock__lang">text</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-text" tabindex="0" role="group" aria-label="text code sample"><code class="language-text">local tile, 200 m           200.0  float32 step      0.015 mm
+district, 5 km            5,000.0  float32 step      0.488 mm
+UTM easting             585,412.0  float32 step     62.500 mm
+UTM northing          4,511,203.0  float32 step    500.000 mm
+ECEF                  6,378,137.0  float32 step    500.000 mm
+1284 tiles store positions with float32 steps above 1 mm [('tile_8812_5631.glb', 4511261, 500.0, False), …]
+tile transform translation: [585412.318, 4511228.44, 11.84]
+</code></pre></div>
+<p>Verify both halves. For storage, reload a re-centred tile, add the transform translation back in float64 and compare every vertex with the float64 source: the maximum difference should be below a tenth of a millimetre. For the runtime, record a slow orbit around a building at street level before and after the fix and difference consecutive frames of a static region — a jittering scene shows non-zero differences in stationary geometry, a fixed one does not.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python">src <span class="token operator">=</span> trimesh<span class="token punctuation">.</span>load<span class="token punctuation">(</span><span class="token string">"in/tile_8812_5631_float64.ply"</span><span class="token punctuation">,</span> process<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">)</span>
+out <span class="token operator">=</span> trimesh<span class="token punctuation">.</span>load<span class="token punctuation">(</span><span class="token string">"out/tile_8812_5631.glb"</span><span class="token punctuation">,</span> force<span class="token operator">=</span><span class="token string">"mesh"</span><span class="token punctuation">,</span> process<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">)</span>
+restored <span class="token operator">=</span> out<span class="token punctuation">.</span>vertices<span class="token punctuation">.</span>astype<span class="token punctuation">(</span>np<span class="token punctuation">.</span>float64<span class="token punctuation">)</span> <span class="token operator">+</span> np<span class="token punctuation">.</span>array<span class="token punctuation">(</span>transform<span class="token punctuation">[</span><span class="token number">12</span><span class="token punctuation">:</span><span class="token number">15</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+err <span class="token operator">=</span> np<span class="token punctuation">.</span><span class="token builtin">abs</span><span class="token punctuation">(</span>restored <span class="token operator">-</span> src<span class="token punctuation">.</span>vertices<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">max</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"max round-trip error </span><span class="token interpolation"><span class="token punctuation">{</span>err <span class="token operator">*</span> <span class="token number">1000</span><span class="token punctuation">:</span><span class="token format-spec">.4f</span><span class="token punctuation">}</span></span><span class="token string"> mm"</span></span><span class="token punctuation">)</span>
+<span class="token keyword">assert</span> err <span class="token operator">&lt;</span> <span class="token number">1e-4</span>
+</code></pre></div>
+<figure class="diagram">
+<svg viewBox="26 26 488 182" role="img" aria-labelledby="fj-fix-t fj-fix-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="fj-fix-t">Maximum vertex error before and after re-centring</title>
+  <desc id="fj-fix-d">Two bars on a log scale compare the maximum vertex position error for the same building tile. With absolute UTM coordinates in a float32 buffer the error is 250 millimetres. After re-centring behind a tile transform the error is 0.004 millimetres, about sixty thousand times smaller.</desc>
+  <rect class="svg-bg" x="26" y="26" width="488" height="182" fill="#ffffff"/>
+  <path d="M40 20 V160" fill="none" stroke="#5b6471" stroke-width="1.5"/>
+  <rect x="40" y="40" width="460" height="40" fill="#f7dfdc" stroke="#b0413e" stroke-width="1.5"/>
+  <rect x="40" y="100" width="24" height="40" fill="#eef5e9" stroke="#4f7a4d" stroke-width="1.5"/>
+  <text x="270" y="65" fill="#1f2937" font-size="12.5" text-anchor="middle">absolute UTM in float32 — 250 mm</text>
+  <text x="76" y="125" fill="#1f2937" font-size="12.5" text-anchor="start">re-centred + tile transform — 0.004 mm</text>
+  <text x="280" y="190" fill="#15384a" font-size="12.5" text-anchor="middle">maximum vertex error for one building tile (log scale)</text>
+</svg>
+<figcaption>Re-centring costs one float64 subtraction per vertex at export and removes the error entirely for practical purposes.</figcaption>
+</figure>
+<h2 id="common-errors" tabindex="-1"><a class="heading-link" href="#common-errors"><span>Common Errors</span></a></h2>
+<p><strong>Geometry is stable but picked coordinates are off by up to half a metre.</strong> Picking reads back depth or positions through float32 GPU buffers and reconstructs world coordinates from them. Re-add the float64 tile transform or world offset on the CPU after picking instead of reconstructing from GPU values.</p>
+<p><strong>Cracks appear between neighbouring re-centred tiles.</strong> Each tile was re-centred correctly, but the shared edge vertices were quantised or decimated independently before re-centring. Snap shared boundary vertices in float64 across tiles first, then re-centre.</p>
+<p><strong>Jitter persists in CesiumJS after re-centring.</strong> Some geometry bypasses the tileset — an entity, a custom primitive or a model loaded with absolute positions. Check <code>CESIUM_RTC</code> or a <code>modelMatrix</code> on those objects; the tileset content itself is no longer the source.</p>
+<h2 id="frequently-asked-questions" tabindex="-1"><a class="heading-link" href="#frequently-asked-questions"><span>Frequently Asked Questions</span></a></h2>
+<h3 id="does-khr_mesh_quantization-make-this-worse" tabindex="-1"><a class="heading-link" href="#does-khr_mesh_quantization-make-this-worse"><span>Does KHR_mesh_quantization make this worse?</span></a></h3>
+<p>It makes it explicit. Quantised positions are integers scaled into a bounding box, so precision depends on the box size and bit depth, not on the absolute magnitude — which is why quantisation must happen after re-centring, with a box sized to the tile rather than the city.</p>
+<h3 id="is-cesium_rtc-an-acceptable-alternative-to-a-tile-transform" tabindex="-1"><a class="heading-link" href="#is-cesium_rtc-an-acceptable-alternative-to-a-tile-transform"><span>Is CESIUM_RTC an acceptable alternative to a tile transform?</span></a></h3>
+<p>It solves the storage problem for runtimes that support it, mostly CesiumJS. A tile <code>transform</code> in the tileset is part of the 3D Tiles specification and portable across runtimes, so prefer it for new content.</p>
+<h3 id="why-not-use-float64-vertex-buffers" tabindex="-1"><a class="heading-link" href="#why-not-use-float64-vertex-buffers"><span>Why not use float64 vertex buffers?</span></a></h3>
+<p>glTF does not allow double-precision vertex attributes, and WebGL cannot upload them as vertex data. Precision has to come from structure — small local coordinates plus double-precision transforms — rather than from a wider type.</p>
+<h2 id="related-guides" tabindex="-1"><a class="heading-link" href="#related-guides"><span>Related Guides</span></a></h2>
+<ul>
+<li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/diagnosing-crs-drift-causing-lod-seams/">Diagnosing CRS Drift Causing LOD Seams</a> — seams from inconsistent transformations rather than precision</li>
+<li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/tracking-down-z-fighting-between-terrain-and-buildings/">Tracking Down Z-Fighting Between Terrain and Buildings</a> — the depth-buffer relative of this problem</li>
+<li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/transforming-ifc-coordinates-to-ecef-for-3d-tiles/">Transforming IFC Coordinates to ECEF for 3D Tiles</a> — doing the re-centring as part of BIM ingestion</li>
+</ul>
+<p>Back to <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/">Cross-Section Failure Modes in Digital Twins</a>.</p>
+
+
+      
+      
+
+      <div class="related-nav">
+        
+
+        
+          <div>
+            <h3>Related</h3>
+            <div class="related-grid">
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/diagnosing-crs-drift-causing-lod-seams/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Diagnosing CRS Drift Causing LOD Seams</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/fixing-memory-oom-in-city-scale-decimation/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Fixing Memory OOM in City-Scale Decimation</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/tracking-down-z-fighting-between-terrain-and-buildings/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Tracking Down Z-Fighting Between Terrain and Buildings</span>
+                </a>
+              
+            </div>
+          </div>
+        
+      </div>
+    </article>
+
+    
+    <aside class="toc" aria-label="On this page" data-toc hidden>
+      <h4>On this page</h4>
+      <ul></ul>
+    </aside>
+  </div>
+</div>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+  <div class="container site-footer__inner">
+    <div class="site-footer__brand">
+      <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+        <img src="/assets/img/logo-mark.svg" alt="" class="brand__mark" width="36" height="36">
+        <span class="brand__name">
+          3D Geospatial
+          <small>Digital Twin Automation</small>
+        </span>
+      </a>
+      <p>Engineering-grade guides on point cloud processing, mesh pipelines, LOD strategies, and CI/CD automation for digital twin platforms.</p>
+      <a class="footer-social" href="https://github.com/3d-geospatial" aria-label="3D Geospatial on GitHub" rel="noopener" target="_blank">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+          <path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.53-1.34-1.3-1.7-1.3-1.7-1.06-.72.08-.71.08-.71 1.17.08 1.79 1.2 1.79 1.2 1.04 1.79 2.73 1.27 3.4.97.1-.75.4-1.27.73-1.56-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.19-3.08-.12-.3-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.75.11 3.05.74.8 1.19 1.83 1.19 3.08 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.07.78 2.15v3.18c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5Z"/>
+        </svg>
+        <span>GitHub</span>
+      </a>
+    </div>
+
+    <div class="site-footer__col">
+      <h4>Sections</h4>
+      <ul>
+        <li><a href="https://www.3d-geospatial.com/">Home</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management &amp; Optimization</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/">Point Cloud &amp; Mesh Pipelines</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/">Troubleshooting &amp; Reliability</a></li>
+        
+      </ul>
+    </div>
+
+    
+      <div class="site-footer__col">
+        <h4>3D Geospatial Fundamentals</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/">3D Format Standards Comparison</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/">BIM and IFC Georeferencing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems for 3D Assets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/">Digital Elevation Model Workflows</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/">Spatial Indexing and Tiling Schemes for 3D Data</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>LOD Management &amp; Optimization</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/">Automated Tile Generation for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/">Cesium ion Upload Automation for 3D Tilesets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/">glTF LOD Generation With Draco Compression</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/">Streaming Sync Patterns for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/">Tileset Metadata and 3D Tiles Next</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Point Cloud &amp; Mesh Pipelines</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/">Automated Mesh Decimation for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/">Change Detection Between LiDAR Scan Epochs</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/">CI/CD Automation for Spatial Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">LiDAR Classification and Ground Extraction</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/">Point Cloud Filtering Techniques</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/">Surface Reconstruction for Geospatial Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/">Texture Mapping Workflows for Digital Twins</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Troubleshooting &amp; Reliability</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/">Cross-Section Failure Modes in Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/">Data Validation &amp; QA Gates for 3D Tiles</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/">Performance Profiling and Benchmarking</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/">Streaming &amp; Runtime Diagnostics for 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+  </div>
+  <div class="container site-footer__bottom">
+    <span>© 2026 3D Geospatial &amp; Digital Twin Automation</span>
+    <span>Built with Eleventy · PWA-enabled</span>
+  </div>
+</footer>
+
+
+  <script src="/assets/js/site.js?v=b99aa9f971" defer></script>
+  
+</body>
+</html>

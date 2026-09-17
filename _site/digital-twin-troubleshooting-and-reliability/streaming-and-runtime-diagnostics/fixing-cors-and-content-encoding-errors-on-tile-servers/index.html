@@ -1,0 +1,680 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <title>Fixing CORS and Content-Encoding Errors on Tile Servers — 3D Geospatial</title>
+  <meta name="description" content="Diagnose tilesets that fail in the browser but download fine: CORS preflights, Vary: Origin caching, gzip stored without headers, double compression and tile MIME types.">
+  <meta name="keywords" content="3D geospatial, digital twin, point cloud, mesh pipeline, LOD, 3D Tiles, Cesium, PDAL, Open3D, Python, CI/CD">
+  <meta name="author" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta name="theme-color" content="#1f6b8a" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f171d" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+
+  
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem("theme");
+        var theme = (stored === "dark" || stored === "light") ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    })();
+  </script>
+  <meta name="generator" content="Eleventy">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="googlebot" content="index,follow,max-image-preview:large">
+
+  
+  <link rel="canonical" href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/fixing-cors-and-content-encoding-errors-on-tile-servers/">
+  <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">
+
+  
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/icon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+
+  
+  <link rel="apple-touch-icon" href="/assets/img/icon-180.png">
+  <link rel="mask-icon" href="/assets/img/logo.svg" color="#1f6b8a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="3D Geospatial">
+  <meta name="application-name" content="3D Geospatial">
+
+  
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Fixing CORS and Content-Encoding Errors on Tile Servers — 3D Geospatial">
+  <meta property="og:description" content="Diagnose tilesets that fail in the browser but download fine: CORS preflights, Vary: Origin caching, gzip stored without headers, double compression and tile MIME types.">
+  <meta property="og:url" content="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/fixing-cors-and-content-encoding-errors-on-tile-servers/">
+  <meta property="og:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+  <meta property="og:site_name" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta property="og:locale" content="en_US">
+  
+  <meta property="article:published_time" content="2026-09-17T17:12:46.433Z">
+  <meta property="article:modified_time" content="2026-09-17T17:12:46.433Z">
+  <meta property="article:publisher" content="https://www.3d-geospatial.com/">
+  
+
+  
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Fixing CORS and Content-Encoding Errors on Tile Servers — 3D Geospatial">
+  <meta name="twitter:description" content="Diagnose tilesets that fail in the browser but download fine: CORS preflights, Vary: Origin caching, gzip stored without headers, double compression and tile MIME types.">
+  <meta name="twitter:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta name="twitter:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+
+  
+  <link rel="preload" href="/assets/css/styles.css?v=8c46394d6c" as="style">
+  
+
+  <link rel="stylesheet" href="/assets/css/styles.css?v=8c46394d6c">
+
+  
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.3d-geospatial.com/#organization",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "url": "https://www.3d-geospatial.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/icon-512.png",
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://www.3d-geospatial.com/#website",
+      "url": "https://www.3d-geospatial.com/",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "description": "Build reliable 3D spatial data pipelines for digital twins — point clouds, meshes, LOD strategies, Python processing, and CI/CD automation.",
+      "inLanguage": "en",
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      }
+    },
+    {
+      "@type": "TechArticle",
+      "@id": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/fixing-cors-and-content-encoding-errors-on-tile-servers/#article",
+      "isPartOf": {
+        "@id": "https://www.3d-geospatial.com/#website"
+      },
+      "headline": "Fixing CORS and Content-Encoding Errors on Tile Servers",
+      "name": "Fixing CORS and Content-Encoding Errors on Tile Servers",
+      "description": "Diagnose tilesets that fail in the browser but download fine: CORS preflights, Vary: Origin caching, gzip stored without headers, double compression and tile MIME types.",
+      "url": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/fixing-cors-and-content-encoding-errors-on-tile-servers/",
+      "mainEntityOfPage": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/fixing-cors-and-content-encoding-errors-on-tile-servers/",
+      "inLanguage": "en",
+      "datePublished": "2026-09-17T17:12:46.433Z",
+      "dateModified": "2026-09-17T17:12:46.433Z",
+      "author": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "image": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/og-cover.png",
+        "width": 1200,
+        "height": 630
+      },
+      "breadcrumb": {
+        "@id": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/fixing-cors-and-content-encoding-errors-on-tile-servers/#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/fixing-cors-and-content-encoding-errors-on-tile-servers/#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://www.3d-geospatial.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Digital Twin Troubleshooting And Reliability",
+          "item": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Streaming And Runtime Diagnostics",
+          "item": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "name": "Fixing Cors And Content Encoding Errors On Tile Servers",
+          "item": "https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/fixing-cors-and-content-encoding-errors-on-tile-servers/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  
+<header class="site-header" role="banner">
+  <div class="container site-header__inner">
+    <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+      <img src="/assets/img/logo.svg" alt="" class="brand__mark" width="36" height="36">
+      <span class="brand__name">
+        3D Geospatial
+        <small>Digital Twin Automation</small>
+      </span>
+    </a>
+
+    <button class="theme-toggle" type="button" data-theme-toggle
+            aria-label="Switch to dark theme" title="Switch to dark theme">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4.2"/>
+        <path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/>
+      </svg>
+    </button>
+
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>
+      <span class="nav-toggle__icon" aria-hidden="true"><span></span></span>
+      Menu
+    </button>
+
+    <nav class="primary-nav" id="primary-nav" aria-label="Primary">
+      
+      <a href="https://www.3d-geospatial.com/" >
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/>
+        </svg>
+        Home
+      </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2 3 7l9 5 9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 17l9 5 9-5"/>
+            </svg>
+          
+          3D Geospatial Fundamentals
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+          
+          LOD Management &amp; Optimization
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="6" cy="6" r="1.5"/><circle cx="12" cy="6" r="1.5"/><circle cx="18" cy="6" r="1.5"/>
+              <circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/>
+              <circle cx="6" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="18" cy="18" r="1.5"/>
+            </svg>
+          
+          Point Cloud &amp; Mesh Pipelines
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/" aria-current="page">
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <path d="M12 9v4"/><path d="M12 17h.01"/>
+            </svg>
+          
+          Troubleshooting &amp; Reliability
+        </a>
+      
+    </nav>
+  </div>
+</header>
+
+
+  <main id="main">
+    
+
+
+<div class="container">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    
+      
+        <a href="https://www.3d-geospatial.com/">Home</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/">Digital Twin Troubleshooting And Reliability</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/">Streaming And Runtime Diagnostics</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <span class="current">Fixing Cors And Content Encoding Errors On Tile Servers</span>
+      
+    
+  </nav>
+
+  <div class="content-page">
+    <article class="article">
+      <h1 id="fixing-cors-and-content-encoding-errors-on-tile-servers" tabindex="-1"><a class="heading-link" href="#fixing-cors-and-content-encoding-errors-on-tile-servers"><span>Fixing CORS and Content-Encoding Errors on Tile Servers</span></a></h1>
+<p>This page diagnoses the family of tileset failures where every file downloads perfectly with <code>curl</code> and nothing renders in the browser — missing or cached-away CORS headers, preflight requests the server rejects, pre-compressed tiles served without <code>Content-Encoding</code>, tiles compressed twice, and MIME types that make a CDN or proxy mangle binary content — with a Python probe that inspects the raw bytes and headers exactly as a browser would receive them.</p>
+<h2 id="why-you-hit-this" tabindex="-1"><a class="heading-link" href="#why-you-hit-this"><span>Why you hit this</span></a></h2>
+<p>A tileset is dozens to millions of small files fetched cross-origin by JavaScript, which is the combination that triggers every browser security rule and every CDN optimisation at once. Moving tiles from a local dev server to object storage behind a CDN is when these errors appear, and they are confusing because they are intermittent (a CDN edge cached a bad response for one region), origin-dependent (the staging viewer works and production does not), or reported far from the cause (<code>RangeError: Invalid typed array length</code> for what is actually a gzip header problem). The deployment itself is covered in <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/automated-3d-tiles-deployment-to-cdn/">automated 3D Tiles deployment to CDN</a>.</p>
+<h2 id="prerequisites" tabindex="-1"><a class="heading-link" href="#prerequisites"><span>Prerequisites</span></a></h2>
+<ul>
+<li>Python 3.10+ with <code>requests&gt;=2.31</code> and, for S3-hosted tiles, <code>boto3&gt;=1.34</code>.</li>
+<li>The tileset URL, one content URL at each level of the tree, and the exact origin of the viewer page, for example <code>https://twin.example.org</code>.</li>
+<li>Access to the browser’s developer tools network panel with “Disable cache” available.</li>
+</ul>
+<h2 id="step-by-step" tabindex="-1"><a class="heading-link" href="#step-by-step"><span>Step-by-Step</span></a></h2>
+<h3 id="1-probe-a-tile-the-way-the-browser-requests-it" tabindex="-1"><a class="heading-link" href="#1-probe-a-tile-the-way-the-browser-requests-it"><span>1. Probe a tile the way the browser requests it</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> requests
+
+VIEWER_ORIGIN <span class="token operator">=</span> <span class="token string">"https://twin.example.org"</span>
+MAGIC <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token string">b"glTF"</span><span class="token punctuation">:</span> <span class="token string">"glb"</span><span class="token punctuation">,</span> <span class="token string">b"b3dm"</span><span class="token punctuation">:</span> <span class="token string">"b3dm"</span><span class="token punctuation">,</span> <span class="token string">b"pnts"</span><span class="token punctuation">:</span> <span class="token string">"pnts"</span><span class="token punctuation">,</span> <span class="token string">b"i3dm"</span><span class="token punctuation">:</span> <span class="token string">"i3dm"</span><span class="token punctuation">,</span>
+         <span class="token string">b"cmpt"</span><span class="token punctuation">:</span> <span class="token string">"cmpt"</span><span class="token punctuation">,</span> <span class="token string">b"subt"</span><span class="token punctuation">:</span> <span class="token string">"subtree"</span><span class="token punctuation">,</span> <span class="token string">b"\x1f\x8b\x08\x00"</span><span class="token punctuation">:</span> <span class="token string">"gzip!"</span><span class="token punctuation">,</span> <span class="token string">b"{\n  \""</span><span class="token punctuation">:</span> <span class="token string">"json"</span><span class="token punctuation">}</span>
+
+<span class="token keyword">def</span> <span class="token function">probe</span><span class="token punctuation">(</span>url<span class="token punctuation">,</span> origin<span class="token operator">=</span>VIEWER_ORIGIN<span class="token punctuation">,</span> auth<span class="token operator">=</span><span class="token boolean">None</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    headers <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token string">"Origin"</span><span class="token punctuation">:</span> origin<span class="token punctuation">,</span> <span class="token string">"Accept-Encoding"</span><span class="token punctuation">:</span> <span class="token string">"gzip, br"</span><span class="token punctuation">}</span>
+    <span class="token keyword">if</span> auth<span class="token punctuation">:</span>
+        headers<span class="token punctuation">[</span><span class="token string">"Authorization"</span><span class="token punctuation">]</span> <span class="token operator">=</span> auth
+    r <span class="token operator">=</span> requests<span class="token punctuation">.</span>get<span class="token punctuation">(</span>url<span class="token punctuation">,</span> headers<span class="token operator">=</span>headers<span class="token punctuation">,</span> stream<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> timeout<span class="token operator">=</span><span class="token number">20</span><span class="token punctuation">)</span>
+    head <span class="token operator">=</span> r<span class="token punctuation">.</span>raw<span class="token punctuation">.</span>read<span class="token punctuation">(</span><span class="token number">4</span><span class="token punctuation">,</span> decode_content<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">)</span>            <span class="token comment"># the bytes on the wire, not decoded</span>
+    body <span class="token operator">=</span> requests<span class="token punctuation">.</span>get<span class="token punctuation">(</span>url<span class="token punctuation">,</span> headers<span class="token operator">=</span>headers<span class="token punctuation">,</span> timeout<span class="token operator">=</span><span class="token number">20</span><span class="token punctuation">)</span><span class="token punctuation">.</span>content<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token number">4</span><span class="token punctuation">]</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token string">"status"</span><span class="token punctuation">:</span> r<span class="token punctuation">.</span>status_code<span class="token punctuation">,</span>
+        <span class="token string">"content-type"</span><span class="token punctuation">:</span> r<span class="token punctuation">.</span>headers<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"Content-Type"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"content-encoding"</span><span class="token punctuation">:</span> r<span class="token punctuation">.</span>headers<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"Content-Encoding"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"acao"</span><span class="token punctuation">:</span> r<span class="token punctuation">.</span>headers<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"Access-Control-Allow-Origin"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"vary"</span><span class="token punctuation">:</span> r<span class="token punctuation">.</span>headers<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"Vary"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"cache"</span><span class="token punctuation">:</span> r<span class="token punctuation">.</span>headers<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"CF-Cache-Status"</span><span class="token punctuation">)</span> <span class="token keyword">or</span> r<span class="token punctuation">.</span>headers<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"X-Cache"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"wire_magic"</span><span class="token punctuation">:</span> MAGIC<span class="token punctuation">.</span>get<span class="token punctuation">(</span>head<span class="token punctuation">,</span> head<span class="token punctuation">.</span><span class="token builtin">hex</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"decoded_magic"</span><span class="token punctuation">:</span> MAGIC<span class="token punctuation">.</span>get<span class="token punctuation">(</span>body<span class="token punctuation">,</span> body<span class="token punctuation">.</span><span class="token builtin">hex</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+
+<span class="token keyword">for</span> u <span class="token keyword">in</span> <span class="token punctuation">(</span><span class="token string">"https://tiles.example.org/city/tileset.json"</span><span class="token punctuation">,</span>
+          <span class="token string">"https://tiles.example.org/city/content/0/0/0.glb"</span><span class="token punctuation">,</span>
+          <span class="token string">"https://tiles.example.org/city/content/14/8812/5631.glb"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span>u<span class="token punctuation">.</span>rsplit<span class="token punctuation">(</span><span class="token string">"/"</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token operator">-</span><span class="token number">3</span><span class="token punctuation">:</span><span class="token punctuation">]</span><span class="token punctuation">,</span> probe<span class="token punctuation">(</span>u<span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Two readings of the first bytes are compared. <code>wire_magic</code> reads the stream without decompression, which is what the network carried; <code>decoded_magic</code> lets <code>requests</code> decode according to <code>Content-Encoding</code>, which is what <code>fetch()</code> hands to the tileset loader. A healthy compressed tile shows <code>gzip!</code> on the wire and <code>glb</code> after decoding. A tile whose decoded bytes still start with <code>1f 8b</code> was stored gzipped without the header, and the loader receives compressed garbage.</p>
+<h3 id="2-read-the-cors-result-correctly" tabindex="-1"><a class="heading-link" href="#2-read-the-cors-result-correctly"><span>2. Read the CORS result correctly</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">cors_verdict</span><span class="token punctuation">(</span>p<span class="token punctuation">,</span> origin<span class="token operator">=</span>VIEWER_ORIGIN<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">if</span> p<span class="token punctuation">[</span><span class="token string">"acao"</span><span class="token punctuation">]</span> <span class="token keyword">is</span> <span class="token boolean">None</span><span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token string">"blocked: no Access-Control-Allow-Origin"</span>
+    <span class="token keyword">if</span> p<span class="token punctuation">[</span><span class="token string">"acao"</span><span class="token punctuation">]</span> <span class="token keyword">not</span> <span class="token keyword">in</span> <span class="token punctuation">(</span><span class="token string">"*"</span><span class="token punctuation">,</span> origin<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token string-interpolation"><span class="token string">f"blocked: header allows </span><span class="token interpolation"><span class="token punctuation">{</span>p<span class="token punctuation">[</span><span class="token string">'acao'</span><span class="token punctuation">]</span><span class="token punctuation">}</span></span><span class="token string">, page is </span><span class="token interpolation"><span class="token punctuation">{</span>origin<span class="token punctuation">}</span></span><span class="token string">"</span></span>
+    <span class="token keyword">if</span> p<span class="token punctuation">[</span><span class="token string">"acao"</span><span class="token punctuation">]</span> <span class="token operator">!=</span> <span class="token string">"*"</span> <span class="token keyword">and</span> <span class="token punctuation">(</span>p<span class="token punctuation">[</span><span class="token string">"vary"</span><span class="token punctuation">]</span> <span class="token keyword">is</span> <span class="token boolean">None</span> <span class="token keyword">or</span> <span class="token string">"origin"</span> <span class="token keyword">not</span> <span class="token keyword">in</span> p<span class="token punctuation">[</span><span class="token string">"vary"</span><span class="token punctuation">]</span><span class="token punctuation">.</span>lower<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token string">"fragile: origin echoed without Vary: Origin — a CDN can serve it to other origins"</span>
+    <span class="token keyword">return</span> <span class="token string">"ok"</span>
+
+p <span class="token operator">=</span> probe<span class="token punctuation">(</span><span class="token string">"https://tiles.example.org/city/content/14/8812/5631.glb"</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span>cors_verdict<span class="token punctuation">(</span>p<span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Probe from outside the network the tile server sits in, and ideally from more than one region. A CDN answers from the edge nearest the client, and each edge keeps its own cache, so a probe from the build server in one region can report a clean response while users on another continent receive a stale, broken one. Running the same probe through two or three regions — a CI runner, a small cloud function elsewhere, a colleague’s laptop — is the cheapest way to see whether a failure is global or tied to particular edges.</p>
+<p>The third case is the intermittent one. When a server echoes the requesting origin back in <code>Access-Control-Allow-Origin</code> but does not send <code>Vary: Origin</code>, a CDN caches the first response and serves it to everyone. The first viewer to request a tile after a purge decides which origin every other viewer is allowed to be; staging works on Monday and production fails, then the reverse after the next deploy.</p>
+<figure class="diagram">
+<svg viewBox="6 16 748 250" role="img" aria-labelledby="cors-vary-t cors-vary-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="cors-vary-t">How a missing Vary header poisons a CDN cache</title>
+  <desc id="cors-vary-d">A staging viewer requests a tile first. The origin server echoes its origin in Access-Control-Allow-Origin without Vary Origin, and the CDN caches that response. When the production viewer then requests the same tile, the CDN serves the cached response allowing only the staging origin, and the browser blocks it.</desc>
+  <rect class="svg-bg" x="6" y="16" width="748" height="250" fill="#ffffff"/>
+  <defs>
+    <marker id="cors-vary-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
+    </marker>
+  </defs>
+  <rect x="20" y="30" width="150" height="50" rx="8" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <rect x="20" y="170" width="150" height="50" rx="8" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <rect x="300" y="100" width="160" height="50" rx="8" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <rect x="590" y="100" width="150" height="50" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <g stroke="#5b6471" stroke-width="2" fill="none" marker-end="url(#cors-vary-arrow)">
+    <path d="M170 55 L298 110"/>
+    <path d="M460 118 H588"/>
+    <path d="M298 140 L172 195"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="95" y="52">staging viewer</text>
+    <text x="95" y="69">requests first</text>
+    <text x="95" y="192">production viewer</text>
+    <text x="95" y="209">blocked</text>
+    <text x="380" y="122">CDN caches</text>
+    <text x="380" y="139">one response</text>
+    <text x="665" y="122">origin echoes</text>
+    <text x="665" y="139">no Vary: Origin</text>
+  </g>
+  <text x="525" y="104" fill="#5b6471" font-size="11.5" text-anchor="middle">miss</text>
+  <text x="250" y="190" fill="#b0413e" font-size="12" text-anchor="start">ACAO: https://staging…</text>
+  <text x="380" y="248" fill="#15384a" font-size="12.5" text-anchor="middle">Either send Access-Control-Allow-Origin: * for public tiles, or always send Vary: Origin.</text>
+</svg>
+<figcaption>The cache key does not include the Origin header unless the response says it should, so one origin's permission is replayed to all.</figcaption>
+</figure>
+<h3 id="3-check-the-preflight-when-the-viewer-sends-custom-headers" tabindex="-1"><a class="heading-link" href="#3-check-the-preflight-when-the-viewer-sends-custom-headers"><span>3. Check the preflight when the viewer sends custom headers</span></a></h3>
+<p>A plain <code>GET</code> needs no preflight. Adding an <code>Authorization</code> header — for token-protected tilesets — makes every request “non-simple”, and the browser first sends an <code>OPTIONS</code> request that the server must answer.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">preflight</span><span class="token punctuation">(</span>url<span class="token punctuation">,</span> origin<span class="token operator">=</span>VIEWER_ORIGIN<span class="token punctuation">,</span> request_headers<span class="token operator">=</span><span class="token string">"authorization"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    r <span class="token operator">=</span> requests<span class="token punctuation">.</span>options<span class="token punctuation">(</span>url<span class="token punctuation">,</span> headers<span class="token operator">=</span><span class="token punctuation">{</span>
+        <span class="token string">"Origin"</span><span class="token punctuation">:</span> origin<span class="token punctuation">,</span>
+        <span class="token string">"Access-Control-Request-Method"</span><span class="token punctuation">:</span> <span class="token string">"GET"</span><span class="token punctuation">,</span>
+        <span class="token string">"Access-Control-Request-Headers"</span><span class="token punctuation">:</span> request_headers<span class="token punctuation">,</span>
+    <span class="token punctuation">}</span><span class="token punctuation">,</span> timeout<span class="token operator">=</span><span class="token number">20</span><span class="token punctuation">)</span>
+    allowed <span class="token operator">=</span> <span class="token punctuation">(</span>r<span class="token punctuation">.</span>headers<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"Access-Control-Allow-Headers"</span><span class="token punctuation">)</span> <span class="token keyword">or</span> <span class="token string">""</span><span class="token punctuation">)</span><span class="token punctuation">.</span>lower<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>
+        <span class="token string">"status"</span><span class="token punctuation">:</span> r<span class="token punctuation">.</span>status_code<span class="token punctuation">,</span>
+        <span class="token string">"allow_origin"</span><span class="token punctuation">:</span> r<span class="token punctuation">.</span>headers<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"Access-Control-Allow-Origin"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"allow_methods"</span><span class="token punctuation">:</span> r<span class="token punctuation">.</span>headers<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"Access-Control-Allow-Methods"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"allow_headers_ok"</span><span class="token punctuation">:</span> <span class="token builtin">all</span><span class="token punctuation">(</span>h<span class="token punctuation">.</span>strip<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">in</span> allowed <span class="token keyword">or</span> allowed <span class="token operator">==</span> <span class="token string">"*"</span> <span class="token keyword">for</span> h <span class="token keyword">in</span> request_headers<span class="token punctuation">.</span>split<span class="token punctuation">(</span><span class="token string">","</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token string">"max_age"</span><span class="token punctuation">:</span> r<span class="token punctuation">.</span>headers<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"Access-Control-Max-Age"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+
+<span class="token keyword">print</span><span class="token punctuation">(</span>preflight<span class="token punctuation">(</span><span class="token string">"https://tiles.example.org/city/content/14/8812/5631.glb"</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Object storage rejects <code>OPTIONS</code> with <code>403</code> until a CORS rule allows the method and header, and the browser reports this as a CORS error on the <code>GET</code> that never happened. <code>Access-Control-Max-Age</code> deserves attention for tilesets: without it, some browsers repeat the preflight for every one of thousands of tile URLs, doubling request count. Setting it to an hour or more removes that overhead. Note also that <code>Access-Control-Allow-Headers: *</code> does not cover <code>Authorization</code> in current browsers, which must be named explicitly.</p>
+<h3 id="4-fix-the-storage-configuration" tabindex="-1"><a class="heading-link" href="#4-fix-the-storage-configuration"><span>4. Fix the storage configuration</span></a></h3>
+<p>For S3 or an S3-compatible store, set CORS and object metadata at upload time rather than patching responses in the CDN.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> boto3
+<span class="token keyword">from</span> pathlib <span class="token keyword">import</span> Path
+
+s3 <span class="token operator">=</span> boto3<span class="token punctuation">.</span>client<span class="token punctuation">(</span><span class="token string">"s3"</span><span class="token punctuation">)</span>
+BUCKET <span class="token operator">=</span> <span class="token string">"twin-tiles-prod"</span>
+
+s3<span class="token punctuation">.</span>put_bucket_cors<span class="token punctuation">(</span>Bucket<span class="token operator">=</span>BUCKET<span class="token punctuation">,</span> CORSConfiguration<span class="token operator">=</span><span class="token punctuation">{</span><span class="token string">"CORSRules"</span><span class="token punctuation">:</span> <span class="token punctuation">[</span><span class="token punctuation">{</span>
+    <span class="token string">"AllowedOrigins"</span><span class="token punctuation">:</span> <span class="token punctuation">[</span><span class="token string">"https://twin.example.org"</span><span class="token punctuation">,</span> <span class="token string">"https://staging.twin.example.org"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+    <span class="token string">"AllowedMethods"</span><span class="token punctuation">:</span> <span class="token punctuation">[</span><span class="token string">"GET"</span><span class="token punctuation">,</span> <span class="token string">"HEAD"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+    <span class="token string">"AllowedHeaders"</span><span class="token punctuation">:</span> <span class="token punctuation">[</span><span class="token string">"Authorization"</span><span class="token punctuation">,</span> <span class="token string">"Range"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+    <span class="token string">"ExposeHeaders"</span><span class="token punctuation">:</span> <span class="token punctuation">[</span><span class="token string">"Content-Length"</span><span class="token punctuation">,</span> <span class="token string">"Content-Range"</span><span class="token punctuation">,</span> <span class="token string">"ETag"</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+    <span class="token string">"MaxAgeSeconds"</span><span class="token punctuation">:</span> <span class="token number">86400</span><span class="token punctuation">,</span>
+<span class="token punctuation">}</span><span class="token punctuation">]</span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+
+TYPES <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token string">".json"</span><span class="token punctuation">:</span> <span class="token string">"application/json"</span><span class="token punctuation">,</span> <span class="token string">".glb"</span><span class="token punctuation">:</span> <span class="token string">"model/gltf-binary"</span><span class="token punctuation">,</span> <span class="token string">".b3dm"</span><span class="token punctuation">:</span> <span class="token string">"application/octet-stream"</span><span class="token punctuation">,</span>
+         <span class="token string">".pnts"</span><span class="token punctuation">:</span> <span class="token string">"application/octet-stream"</span><span class="token punctuation">,</span> <span class="token string">".subtree"</span><span class="token punctuation">:</span> <span class="token string">"application/octet-stream"</span><span class="token punctuation">}</span>
+
+<span class="token keyword">def</span> <span class="token function">upload</span><span class="token punctuation">(</span>path<span class="token punctuation">,</span> key<span class="token punctuation">,</span> gzipped<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    extra <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token string">"ContentType"</span><span class="token punctuation">:</span> TYPES<span class="token punctuation">.</span>get<span class="token punctuation">(</span>Path<span class="token punctuation">(</span>path<span class="token punctuation">)</span><span class="token punctuation">.</span>suffix<span class="token punctuation">,</span> <span class="token string">"application/octet-stream"</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+             <span class="token string">"CacheControl"</span><span class="token punctuation">:</span> <span class="token string">"public, max-age=31536000, immutable"</span><span class="token punctuation">}</span>
+    <span class="token keyword">if</span> gzipped<span class="token punctuation">:</span>
+        extra<span class="token punctuation">[</span><span class="token string">"ContentEncoding"</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token string">"gzip"</span>
+    s3<span class="token punctuation">.</span>upload_file<span class="token punctuation">(</span><span class="token builtin">str</span><span class="token punctuation">(</span>path<span class="token punctuation">)</span><span class="token punctuation">,</span> BUCKET<span class="token punctuation">,</span> key<span class="token punctuation">,</span> ExtraArgs<span class="token operator">=</span>extra<span class="token punctuation">)</span>
+</code></pre></div>
+<p>S3 answers CORS per request by matching the <code>Origin</code> against the rule and adds <code>Vary: Origin</code> itself, which makes it safe behind a CDN that honours <code>Vary</code>. Changing CORS rules or object metadata does not change what edges already cached. After fixing the origin, purge the tileset path on the CDN, or publish the corrected tiles under a new version prefix so that no cached response can match; the versioned approach also makes rollback trivial and is the one to prefer for production tilesets.</p>
+<p><code>ContentEncoding</code> must be set exactly when — and only when — the stored bytes are gzip; a pipeline that gzips some tiles and not others has to decide per file from the bytes, not from a naming convention.</p>
+<figure class="diagram">
+<svg viewBox="6 6 748 250" role="img" aria-labelledby="cors-enc-t cors-enc-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="cors-enc-t">Stored bytes, header and what the loader receives</title>
+  <desc id="cors-enc-d">Four rows. Plain glTF bytes with no encoding header arrive as glTF. Gzipped bytes with Content-Encoding gzip are decompressed by the browser and arrive as glTF. Gzipped bytes without the header arrive still compressed and fail with invalid magic. Gzipped bytes that the CDN compresses again, with a single gzip header, arrive compressed once and also fail.</desc>
+  <rect class="svg-bg" x="6" y="6" width="748" height="250" fill="#ffffff"/>
+  <g stroke-width="1.5">
+    <rect x="20" y="20" width="200" height="40" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="220" y="20" width="260" height="40" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="480" y="20" width="260" height="40" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="20" y="70" width="200" height="40" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="220" y="70" width="260" height="40" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="480" y="70" width="260" height="40" fill="#eef5e9" stroke="#4f7a4d"/>
+    <rect x="20" y="120" width="200" height="40" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="220" y="120" width="260" height="40" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="480" y="120" width="260" height="40" fill="#f7dfdc" stroke="#b0413e"/>
+    <rect x="20" y="170" width="200" height="40" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="220" y="170" width="260" height="40" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="480" y="170" width="260" height="40" fill="#f7dfdc" stroke="#b0413e"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="120" y="45">glTF bytes</text><text x="350" y="45">no Content-Encoding</text><text x="610" y="45">loader gets glTF</text>
+    <text x="120" y="95">gzip bytes</text><text x="350" y="95">Content-Encoding: gzip</text><text x="610" y="95">browser inflates → glTF</text>
+    <text x="120" y="145">gzip bytes</text><text x="350" y="145">no Content-Encoding</text><text x="610" y="145">1f 8b … invalid magic</text>
+    <text x="120" y="195">gzip bytes</text><text x="350" y="195">CDN gzips again, one header</text><text x="610" y="195">still gzip after inflate</text>
+  </g>
+  <text x="380" y="238" fill="#15384a" font-size="12.5" text-anchor="middle">The header must describe the bytes exactly once.</text>
+</svg>
+<figcaption>Only the first two rows work. The third and fourth produce the same symptom in the viewer, and the probe's wire and decoded magic bytes tell them apart.</figcaption>
+</figure>
+<h2 id="expected-output-verification" tabindex="-1"><a class="heading-link" href="#expected-output-verification"><span>Expected Output &amp; Verification</span></a></h2>
+<p>A broken and a fixed probe of the same deep tile:</p>
+<div class="codeblock" data-lang="text"><div class="codeblock__bar"><span class="codeblock__lang">text</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-text" tabindex="0" role="group" aria-label="text code sample"><code class="language-text">before: {'status': 200, 'content-type': 'binary/octet-stream', 'content-encoding': None, 'acao': 'https://staging.twin.example.org',
+         'vary': None, 'cache': 'HIT', 'wire_magic': 'gzip!', 'decoded_magic': 'gzip!'}
+        blocked: header allows https://staging.twin.example.org, page is https://twin.example.org
+after:  {'status': 200, 'content-type': 'model/gltf-binary', 'content-encoding': 'gzip', 'acao': 'https://twin.example.org',
+         'vary': 'Origin, Accept-Encoding', 'cache': 'MISS', 'wire_magic': 'gzip!', 'decoded_magic': 'glb'}
+        ok
+</code></pre></div>
+<p>Verify from both origins and after a CDN purge, since the poisoning case only appears on the second request. Probe the same URL with the staging origin, then the production origin, twice each; every response must carry the requesting origin or <code>*</code>. Then load the viewer with the network panel open and “Disable cache” off, pan until a few hundred tiles have loaded, and filter for failed requests — there should be none, and the preflight count should be a handful rather than one per tile.</p>
+<figure class="diagram">
+<svg viewBox="26 26 631 182" role="img" aria-labelledby="cors-pre-t cors-pre-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="cors-pre-t">Preflight requests with and without Max-Age</title>
+  <desc id="cors-pre-d">For a view that loads 400 tiles with an Authorization header, a server without Access-Control-Max-Age causes up to 400 preflight OPTIONS requests in addition to 400 GET requests. With a Max-Age of one day, a handful of preflights cover all tiles from the same path pattern, and the request count is close to 400.</desc>
+  <rect class="svg-bg" x="26" y="26" width="631" height="182" fill="#ffffff"/>
+  <rect x="40" y="40" width="260" height="40" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="1.5"/>
+  <rect x="300" y="40" width="260" height="40" fill="#f7dfdc" stroke="#b0413e" stroke-width="1.5"/>
+  <rect x="40" y="110" width="260" height="40" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="1.5"/>
+  <rect x="300" y="110" width="8" height="40" fill="#f7dfdc" stroke="#b0413e" stroke-width="1.5"/>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="170" y="65">400 GET</text><text x="430" y="65">up to 400 OPTIONS</text>
+    <text x="170" y="135">400 GET</text>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="start">
+    <text x="572" y="65">no Max-Age</text>
+    <text x="320" y="135">a few OPTIONS · Max-Age 86400</text>
+  </g>
+  <text x="360" y="190" fill="#15384a" font-size="12.5" text-anchor="middle">requests for one view of 400 authorised tiles</text>
+</svg>
+<figcaption>Preflight caching is a performance fix as much as a correctness one for token-protected tilesets.</figcaption>
+</figure>
+<h2 id="common-errors" tabindex="-1"><a class="heading-link" href="#common-errors"><span>Common Errors</span></a></h2>
+<p><strong><code>Access to fetch at '…/tileset.json' from origin '…' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present</code>.</strong> No CORS rule matches, or the rule exists and the CDN serves a cached response from before it was added. Probe with a cache-busting query string to separate the two, then purge.</p>
+<p><strong><code>RangeError: Invalid typed array length</code> or <code>Invalid glTF magic</code>.</strong> The loader received bytes that are not a tile — almost always gzip without a <code>Content-Encoding</code> header, occasionally an HTML error page returned with status 200 by a single-page-app fallback. The probe’s <code>decoded_magic</code> shows which.</p>
+<p><strong>Tiles load on desktop and fail on some mobile networks.</strong> A carrier or corporate proxy recompressed a response it believed was text, because the MIME type was <code>binary/octet-stream</code> or missing. Serve explicit binary types and <code>Cache-Control: no-transform</code> for tile content.</p>
+<h2 id="frequently-asked-questions" tabindex="-1"><a class="heading-link" href="#frequently-asked-questions"><span>Frequently Asked Questions</span></a></h2>
+<h3 id="is-access-control-allow-origin-safe-for-tiles" tabindex="-1"><a class="heading-link" href="#is-access-control-allow-origin-safe-for-tiles"><span>Is Access-Control-Allow-Origin: * safe for tiles?</span></a></h3>
+<p>For public tilesets, yes — it is the simplest correct configuration and CDN-friendly. It cannot be combined with credentialed requests using cookies; token-in-header authentication works with it only if the server does not also send <code>Access-Control-Allow-Credentials: true</code>.</p>
+<h3 id="should-i-pre-compress-tiles-or-let-the-cdn-compress" tabindex="-1"><a class="heading-link" href="#should-i-pre-compress-tiles-or-let-the-cdn-compress"><span>Should I pre-compress tiles or let the CDN compress?</span></a></h3>
+<p>Pre-compress JSON and uncompressed binary content with Brotli or gzip at build time for predictable results and lower CDN cost, and set the header accordingly. Do not compress content that is already compressed internally with Draco, meshopt or KTX2 — the gain is small — unless measurements show otherwise.</p>
+<h3 id="do-range-requests-matter-for-3d-tiles" tabindex="-1"><a class="heading-link" href="#do-range-requests-matter-for-3d-tiles"><span>Do range requests matter for 3D Tiles?</span></a></h3>
+<p>Not for ordinary tile files, which are fetched whole. They matter for COPC and for large subtree or glTF files some loaders read partially; allow the <code>Range</code> header in CORS and expose <code>Content-Range</code>, as in step 4.</p>
+<h2 id="related-guides" tabindex="-1"><a class="heading-link" href="#related-guides"><span>Related Guides</span></a></h2>
+<ul>
+<li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/eliminating-tile-popping-and-pop-in/">Eliminating Tile Popping and Pop-In</a> — the next problem once tiles load at all</li>
+<li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/cache-invalidation-for-versioned-tilesets/">Cache Invalidation for Versioned Tilesets</a> — cache headers that avoid needing purges</li>
+<li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/fixing-tilesets-that-never-refine-past-the-root/">Fixing Tilesets That Never Refine Past the Root</a> — when loading succeeds but detail never arrives</li>
+</ul>
+<p>Back to <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/">Streaming &amp; Runtime Diagnostics for 3D Tiles</a>.</p>
+
+
+      
+      
+
+      <div class="related-nav">
+        
+
+        
+          <div>
+            <h3>Related</h3>
+            <div class="related-grid">
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/eliminating-tile-popping-and-pop-in/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Eliminating Tile Popping and Pop-In</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/fixing-tilesets-that-never-refine-past-the-root/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Fixing Tilesets That Never Refine Past the Root</span>
+                </a>
+              
+            </div>
+          </div>
+        
+      </div>
+    </article>
+
+    
+    <aside class="toc" aria-label="On this page" data-toc hidden>
+      <h4>On this page</h4>
+      <ul></ul>
+    </aside>
+  </div>
+</div>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+  <div class="container site-footer__inner">
+    <div class="site-footer__brand">
+      <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+        <img src="/assets/img/logo-mark.svg" alt="" class="brand__mark" width="36" height="36">
+        <span class="brand__name">
+          3D Geospatial
+          <small>Digital Twin Automation</small>
+        </span>
+      </a>
+      <p>Engineering-grade guides on point cloud processing, mesh pipelines, LOD strategies, and CI/CD automation for digital twin platforms.</p>
+      <a class="footer-social" href="https://github.com/3d-geospatial" aria-label="3D Geospatial on GitHub" rel="noopener" target="_blank">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+          <path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.53-1.34-1.3-1.7-1.3-1.7-1.06-.72.08-.71.08-.71 1.17.08 1.79 1.2 1.79 1.2 1.04 1.79 2.73 1.27 3.4.97.1-.75.4-1.27.73-1.56-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.19-3.08-.12-.3-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.75.11 3.05.74.8 1.19 1.83 1.19 3.08 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.07.78 2.15v3.18c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5Z"/>
+        </svg>
+        <span>GitHub</span>
+      </a>
+    </div>
+
+    <div class="site-footer__col">
+      <h4>Sections</h4>
+      <ul>
+        <li><a href="https://www.3d-geospatial.com/">Home</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management &amp; Optimization</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/">Point Cloud &amp; Mesh Pipelines</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/">Troubleshooting &amp; Reliability</a></li>
+        
+      </ul>
+    </div>
+
+    
+      <div class="site-footer__col">
+        <h4>3D Geospatial Fundamentals</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/">3D Format Standards Comparison</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/">BIM and IFC Georeferencing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems for 3D Assets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/">Digital Elevation Model Workflows</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/">Spatial Indexing and Tiling Schemes for 3D Data</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>LOD Management &amp; Optimization</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/">Automated Tile Generation for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/">Cesium ion Upload Automation for 3D Tilesets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/">glTF LOD Generation With Draco Compression</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/">Streaming Sync Patterns for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/">Tileset Metadata and 3D Tiles Next</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Point Cloud &amp; Mesh Pipelines</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/">Automated Mesh Decimation for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/">Change Detection Between LiDAR Scan Epochs</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/">CI/CD Automation for Spatial Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">LiDAR Classification and Ground Extraction</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/">Point Cloud Filtering Techniques</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/">Surface Reconstruction for Geospatial Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/">Texture Mapping Workflows for Digital Twins</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Troubleshooting &amp; Reliability</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/">Cross-Section Failure Modes in Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/">Data Validation &amp; QA Gates for 3D Tiles</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/">Performance Profiling and Benchmarking</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/">Streaming &amp; Runtime Diagnostics for 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+  </div>
+  <div class="container site-footer__bottom">
+    <span>© 2026 3D Geospatial &amp; Digital Twin Automation</span>
+    <span>Built with Eleventy · PWA-enabled</span>
+  </div>
+</footer>
+
+
+  <script src="/assets/js/site.js?v=b99aa9f971" defer></script>
+  
+</body>
+</html>

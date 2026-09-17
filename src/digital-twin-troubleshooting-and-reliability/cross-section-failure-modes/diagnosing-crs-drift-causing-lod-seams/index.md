@@ -151,7 +151,7 @@ Expect `EPSG:32618` projected in metres, `EPSG:4979` geographic in degrees, `EPS
     <rect x="620" y="196" width="90" height="28" rx="4"/>
   </g>
   <text x="60" y="52" fill="#b0413e" font-size="12.5" text-anchor="start" font-weight="600">transform-chain drift — offset grows with the coordinate</text>
-  <text x="60" y="170" fill="#c46a3d" font-size="12.5" text-anchor="start" font-weight="600">vertical datum mismatch — offset is the same everywhere</text>
+  <text x="60" y="170" fill="#9a4f26" font-size="12.5" text-anchor="start" font-weight="600">vertical datum mismatch — offset is the same everywhere</text>
   <g fill="#5b6471" font-size="11.5" text-anchor="middle">
     <text x="125" y="140">2 mm</text>
     <text x="265" y="140">9 mm</text>

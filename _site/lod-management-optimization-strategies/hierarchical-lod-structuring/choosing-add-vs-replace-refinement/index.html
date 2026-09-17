@@ -1,0 +1,706 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <title>Choosing ADD vs REPLACE Refinement for 3D Tiles — 3D Geospatial</title>
+  <meta name="description" content="Decide between ADD and REPLACE refinement per 3D Tiles subtree: what each renders, memory and draw cost, the holes and duplicates each risks, and an audit script.">
+  <meta name="keywords" content="3D geospatial, digital twin, point cloud, mesh pipeline, LOD, 3D Tiles, Cesium, PDAL, Open3D, Python, CI/CD">
+  <meta name="author" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta name="theme-color" content="#1f6b8a" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f171d" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+
+  
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem("theme");
+        var theme = (stored === "dark" || stored === "light") ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    })();
+  </script>
+  <meta name="generator" content="Eleventy">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="googlebot" content="index,follow,max-image-preview:large">
+
+  
+  <link rel="canonical" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/choosing-add-vs-replace-refinement/">
+  <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">
+
+  
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/icon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+
+  
+  <link rel="apple-touch-icon" href="/assets/img/icon-180.png">
+  <link rel="mask-icon" href="/assets/img/logo.svg" color="#1f6b8a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="3D Geospatial">
+  <meta name="application-name" content="3D Geospatial">
+
+  
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Choosing ADD vs REPLACE Refinement for 3D Tiles — 3D Geospatial">
+  <meta property="og:description" content="Decide between ADD and REPLACE refinement per 3D Tiles subtree: what each renders, memory and draw cost, the holes and duplicates each risks, and an audit script.">
+  <meta property="og:url" content="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/choosing-add-vs-replace-refinement/">
+  <meta property="og:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+  <meta property="og:site_name" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta property="og:locale" content="en_US">
+  
+  <meta property="article:published_time" content="2026-09-17T17:13:00.691Z">
+  <meta property="article:modified_time" content="2026-09-17T17:13:00.691Z">
+  <meta property="article:publisher" content="https://www.3d-geospatial.com/">
+  
+
+  
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Choosing ADD vs REPLACE Refinement for 3D Tiles — 3D Geospatial">
+  <meta name="twitter:description" content="Decide between ADD and REPLACE refinement per 3D Tiles subtree: what each renders, memory and draw cost, the holes and duplicates each risks, and an audit script.">
+  <meta name="twitter:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta name="twitter:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+
+  
+  <link rel="preload" href="/assets/css/styles.css?v=8c46394d6c" as="style">
+  
+
+  <link rel="stylesheet" href="/assets/css/styles.css?v=8c46394d6c">
+
+  
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.3d-geospatial.com/#organization",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "url": "https://www.3d-geospatial.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/icon-512.png",
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://www.3d-geospatial.com/#website",
+      "url": "https://www.3d-geospatial.com/",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "description": "Build reliable 3D spatial data pipelines for digital twins — point clouds, meshes, LOD strategies, Python processing, and CI/CD automation.",
+      "inLanguage": "en",
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      }
+    },
+    {
+      "@type": "TechArticle",
+      "@id": "https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/choosing-add-vs-replace-refinement/#article",
+      "isPartOf": {
+        "@id": "https://www.3d-geospatial.com/#website"
+      },
+      "headline": "Choosing ADD vs REPLACE Refinement for 3D Tiles",
+      "name": "Choosing ADD vs REPLACE Refinement for 3D Tiles",
+      "description": "Decide between ADD and REPLACE refinement per 3D Tiles subtree: what each renders, memory and draw cost, the holes and duplicates each risks, and an audit script.",
+      "url": "https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/choosing-add-vs-replace-refinement/",
+      "mainEntityOfPage": "https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/choosing-add-vs-replace-refinement/",
+      "inLanguage": "en",
+      "datePublished": "2026-09-17T17:13:00.691Z",
+      "dateModified": "2026-09-17T17:13:00.691Z",
+      "author": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "image": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/og-cover.png",
+        "width": 1200,
+        "height": 630
+      },
+      "breadcrumb": {
+        "@id": "https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/choosing-add-vs-replace-refinement/#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/choosing-add-vs-replace-refinement/#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://www.3d-geospatial.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "LOD Management Optimization Strategies",
+          "item": "https://www.3d-geospatial.com/lod-management-optimization-strategies/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Hierarchical LOD Structuring",
+          "item": "https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "name": "Choosing Add Vs Replace Refinement",
+          "item": "https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/choosing-add-vs-replace-refinement/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  
+<header class="site-header" role="banner">
+  <div class="container site-header__inner">
+    <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+      <img src="/assets/img/logo.svg" alt="" class="brand__mark" width="36" height="36">
+      <span class="brand__name">
+        3D Geospatial
+        <small>Digital Twin Automation</small>
+      </span>
+    </a>
+
+    <button class="theme-toggle" type="button" data-theme-toggle
+            aria-label="Switch to dark theme" title="Switch to dark theme">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4.2"/>
+        <path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/>
+      </svg>
+    </button>
+
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>
+      <span class="nav-toggle__icon" aria-hidden="true"><span></span></span>
+      Menu
+    </button>
+
+    <nav class="primary-nav" id="primary-nav" aria-label="Primary">
+      
+      <a href="https://www.3d-geospatial.com/" >
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/>
+        </svg>
+        Home
+      </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2 3 7l9 5 9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 17l9 5 9-5"/>
+            </svg>
+          
+          3D Geospatial Fundamentals
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/" aria-current="page">
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+          
+          LOD Management &amp; Optimization
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="6" cy="6" r="1.5"/><circle cx="12" cy="6" r="1.5"/><circle cx="18" cy="6" r="1.5"/>
+              <circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/>
+              <circle cx="6" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="18" cy="18" r="1.5"/>
+            </svg>
+          
+          Point Cloud &amp; Mesh Pipelines
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <path d="M12 9v4"/><path d="M12 17h.01"/>
+            </svg>
+          
+          Troubleshooting &amp; Reliability
+        </a>
+      
+    </nav>
+  </div>
+</header>
+
+
+  <main id="main">
+    
+
+
+<div class="container">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    
+      
+        <a href="https://www.3d-geospatial.com/">Home</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management Optimization Strategies</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <span class="current">Choosing Add Vs Replace Refinement</span>
+      
+    
+  </nav>
+
+  <div class="content-page">
+    <article class="article">
+      <h1 id="choosing-add-vs-replace-refinement-for-3d-tiles" tabindex="-1"><a class="heading-link" href="#choosing-add-vs-replace-refinement-for-3d-tiles"><span>Choosing ADD vs REPLACE Refinement for 3D Tiles</span></a></h1>
+<p>This page decides between the two refinement modes in 3D Tiles — <code>ADD</code>, where a tile’s children are drawn on top of it, and <code>REPLACE</code>, where they are drawn instead of it — for each kind of content a digital twin streams, and audits an existing <code>tileset.json</code> for the failure each mode invites: holes under <code>REPLACE</code> when children do not cover their parent, and duplicated geometry under <code>ADD</code> when a child repeats what its parent already drew.</p>
+<h2 id="why-you-hit-this" tabindex="-1"><a class="heading-link" href="#why-you-hit-this"><span>Why you hit this</span></a></h2>
+<p>Refinement is one word in a tile’s JSON and it changes what the runtime draws, how much memory it holds and what visual defects appear. Point cloud tilers emit <code>ADD</code> because a coarse node holds a sample and children hold the rest. Mesh tilers emit <code>REPLACE</code> because a coarse node is a simplified copy of what its children contain. Trouble starts when content is merged, hand-edited or produced by a pipeline that did not think about it: a building tileset marked <code>ADD</code> that draws every LOD at once and z-fights with itself, or a <code>REPLACE</code> tileset with an empty child quadrant that leaves a hole in the city as soon as the camera comes close. The hierarchy these settings apply to is built in <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/implementing-quadtree-lod-for-urban-models/">implementing quadtree LOD for urban models</a>.</p>
+<h2 id="prerequisites" tabindex="-1"><a class="heading-link" href="#prerequisites"><span>Prerequisites</span></a></h2>
+<ul>
+<li>Python 3.10+ with <code>numpy&gt;=1.24</code>; the audit reads tileset JSON and glTF with the standard library plus <code>pygltflib&gt;=1.16</code>.</li>
+<li>A tileset whose bounding volumes are <code>region</code>s in radians (EPSG:4979) or <code>box</code>es in a consistent frame; the audit converts both to axis-aligned extents for coverage checks.</li>
+<li>Content that carries stable feature identifiers — <code>EXT_mesh_features</code> feature IDs or a batch table <code>building_id</code> — if you want the duplicate check to name the duplicated objects.</li>
+</ul>
+<h2 id="what-each-mode-draws" tabindex="-1"><a class="heading-link" href="#what-each-mode-draws"><span>What Each Mode Draws</span></a></h2>
+<p>With <code>REPLACE</code>, once the runtime decides a tile is not detailed enough, it loads the children and stops drawing the parent. CesiumJS by default keeps drawing the parent until <em>all</em> renderable children are loaded, so the view never shows a gap during loading; the price is that a child that fails to load keeps its parent on screen indefinitely. With <code>ADD</code>, the parent keeps drawing and each child adds its content on top as it arrives, which suits content where the parent is a genuine subset of the final picture.</p>
+<p><code>refine</code> is inherited: a tile without its own value uses its parent’s, and the root must declare one. A single tileset can therefore switch modes between subtrees — <code>REPLACE</code> for building meshes, <code>ADD</code> for a subtree of vegetation instances attached under the same parent.</p>
+<figure class="diagram">
+<svg viewBox="6 6 748 256" role="img" aria-labelledby="ar-draw-t ar-draw-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="ar-draw-t">What is drawn after refinement in each mode</title>
+  <desc id="ar-draw-d">Two panels showing a parent tile and four children after refinement. Under REPLACE, only the four children are drawn and the parent's simplified geometry disappears. Under ADD, the parent's sparse sample stays on screen and each child adds more points in its quadrant, so the final picture is the union of all levels.</desc>
+  <rect class="svg-bg" x="6" y="6" width="748" height="256" fill="#ffffff"/>
+  <rect x="20" y="20" width="340" height="200" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="400" y="20" width="340" height="200" rx="8" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <g stroke="#5b6471" stroke-width="1.5" fill="#ffffff">
+    <rect x="60" y="60" width="130" height="70"/><rect x="190" y="60" width="130" height="70"/>
+    <rect x="60" y="130" width="130" height="70"/><rect x="190" y="130" width="130" height="70"/>
+    <rect x="440" y="60" width="130" height="70"/><rect x="570" y="60" width="130" height="70"/>
+    <rect x="440" y="130" width="130" height="70"/><rect x="570" y="130" width="130" height="70"/>
+  </g>
+  <g fill="#1f6b8a">
+    <path d="M80 110 h30 v-30 h20 v30 h40 v-15 h-10 v15 Z"/><path d="M210 110 h40 v-35 h30 v35 Z"/>
+    <path d="M80 180 h60 v-25 h30 v25 Z"/><path d="M210 180 h25 v-40 h45 v40 Z"/>
+  </g>
+  <g fill="#1f2937">
+    <circle cx="470" cy="80" r="3"/><circle cx="530" cy="110" r="3"/><circle cx="610" cy="90" r="3"/><circle cx="660" cy="170" r="3"/><circle cx="480" cy="170" r="3"/>
+  </g>
+  <g fill="#4f7a4d">
+    <circle cx="455" cy="95" r="2"/><circle cx="500" cy="75" r="2"/><circle cx="545" cy="120" r="2"/><circle cx="590" cy="75" r="2"/><circle cx="640" cy="110" r="2"/>
+    <circle cx="680" cy="80" r="2"/><circle cx="460" cy="150" r="2"/><circle cx="520" cy="185" r="2"/><circle cx="600" cy="150" r="2"/><circle cx="690" cy="190" r="2"/>
+    <circle cx="555" cy="160" r="2"/><circle cx="625" cy="185" r="2"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="190" y="44">REPLACE: children only</text>
+    <text x="570" y="44">ADD: parent sample + children</text>
+  </g>
+  <text x="190" y="244" fill="#15384a" font-size="12.5" text-anchor="middle">parent mesh hidden once children load</text>
+  <text x="570" y="244" fill="#15384a" font-size="12.5" text-anchor="middle">black: parent points · green: child points</text>
+</svg>
+<figcaption>REPLACE swaps one representation for a finer one; ADD accumulates, so every level has to contain only what the levels above it do not.</figcaption>
+</figure>
+<h2 id="step-by-step" tabindex="-1"><a class="heading-link" href="#step-by-step"><span>Step-by-Step</span></a></h2>
+<h3 id="1-match-the-mode-to-how-the-content-was-built" tabindex="-1"><a class="heading-link" href="#1-match-the-mode-to-how-the-content-was-built"><span>1. Match the mode to how the content was built</span></a></h3>
+<div class="table-wrap" tabindex="0" role="group" aria-label="Table, scroll horizontally to see more"><table>
+<thead>
+<tr>
+<th>Content</th>
+<th>Built as</th>
+<th>Mode</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Point clouds</td>
+<td>disjoint samples per octree node</td>
+<td><code>ADD</code></td>
+<td>each node holds different points</td>
+</tr>
+<tr>
+<td>Building meshes with decimated parents</td>
+<td>simplified copies of children</td>
+<td><code>REPLACE</code></td>
+<td>parent duplicates child geometry</td>
+</tr>
+<tr>
+<td>Photogrammetry meshes</td>
+<td>simplified copies</td>
+<td><code>REPLACE</code></td>
+<td>as above</td>
+</tr>
+<tr>
+<td>Terrain meshes</td>
+<td>simplified copies</td>
+<td><code>REPLACE</code></td>
+<td>as above</td>
+</tr>
+<tr>
+<td>Instanced trees, street furniture</td>
+<td>new objects per level</td>
+<td><code>ADD</code></td>
+<td>finer levels add smaller objects</td>
+</tr>
+<tr>
+<td>Coarse massing + detailed façades</td>
+<td>façade detail only in children</td>
+<td><code>ADD</code></td>
+<td>child adds what parent lacks</td>
+</tr>
+</tbody>
+</table>
+</div><p>The rule behind the table is a single question: does the parent’s content still belong on screen when the children are visible? If the parent is a lower-detail <em>version</em> of the children, the answer is no and the mode is <code>REPLACE</code>. If the parent is a <em>part</em> of the final picture, the answer is yes and the mode is <code>ADD</code>.</p>
+<h3 id="2-load-the-tree-and-resolve-inherited-refinement" tabindex="-1"><a class="heading-link" href="#2-load-the-tree-and-resolve-inherited-refinement"><span>2. Load the tree and resolve inherited refinement</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> json
+<span class="token keyword">from</span> pathlib <span class="token keyword">import</span> Path
+
+<span class="token keyword">def</span> <span class="token function">walk</span><span class="token punctuation">(</span>node<span class="token punctuation">,</span> parent_refine<span class="token operator">=</span><span class="token boolean">None</span><span class="token punctuation">,</span> depth<span class="token operator">=</span><span class="token number">0</span><span class="token punctuation">,</span> base<span class="token operator">=</span>Path<span class="token punctuation">(</span><span class="token string">"."</span><span class="token punctuation">)</span><span class="token punctuation">,</span> path<span class="token operator">=</span><span class="token string">"root"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    refine <span class="token operator">=</span> node<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"refine"</span><span class="token punctuation">,</span> parent_refine<span class="token punctuation">)</span>
+    <span class="token keyword">assert</span> refine <span class="token keyword">in</span> <span class="token punctuation">(</span><span class="token string">"ADD"</span><span class="token punctuation">,</span> <span class="token string">"REPLACE"</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>path<span class="token punctuation">}</span></span><span class="token string">: no refine and nothing to inherit"</span></span>
+    <span class="token keyword">yield</span> path<span class="token punctuation">,</span> node<span class="token punctuation">,</span> refine<span class="token punctuation">,</span> depth<span class="token punctuation">,</span> base
+    <span class="token keyword">for</span> i<span class="token punctuation">,</span> child <span class="token keyword">in</span> <span class="token builtin">enumerate</span><span class="token punctuation">(</span>node<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"children"</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">yield</span> <span class="token keyword">from</span> walk<span class="token punctuation">(</span>child<span class="token punctuation">,</span> refine<span class="token punctuation">,</span> depth <span class="token operator">+</span> <span class="token number">1</span><span class="token punctuation">,</span> base<span class="token punctuation">,</span> <span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>path<span class="token punctuation">}</span></span><span class="token string">/</span><span class="token interpolation"><span class="token punctuation">{</span>i<span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+
+tileset_path <span class="token operator">=</span> Path<span class="token punctuation">(</span><span class="token string">"tiles/city/tileset.json"</span><span class="token punctuation">)</span>
+ts <span class="token operator">=</span> json<span class="token punctuation">.</span>loads<span class="token punctuation">(</span>tileset_path<span class="token punctuation">.</span>read_text<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+nodes <span class="token operator">=</span> <span class="token builtin">list</span><span class="token punctuation">(</span>walk<span class="token punctuation">(</span>ts<span class="token punctuation">[</span><span class="token string">"root"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> base<span class="token operator">=</span>tileset_path<span class="token punctuation">.</span>parent<span class="token punctuation">)</span><span class="token punctuation">)</span>
+modes <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token punctuation">}</span>
+<span class="token keyword">for</span> _<span class="token punctuation">,</span> _<span class="token punctuation">,</span> refine<span class="token punctuation">,</span> depth<span class="token punctuation">,</span> _ <span class="token keyword">in</span> nodes<span class="token punctuation">:</span>
+    modes<span class="token punctuation">.</span>setdefault<span class="token punctuation">(</span>depth<span class="token punctuation">,</span> <span class="token builtin">set</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">.</span>add<span class="token punctuation">(</span>refine<span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token punctuation">{</span>d<span class="token punctuation">:</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span>m<span class="token punctuation">)</span> <span class="token keyword">for</span> d<span class="token punctuation">,</span> m <span class="token keyword">in</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span>modes<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Seeing modes per depth is a quick sanity check. A mesh tileset should report <code>REPLACE</code> at every depth; a point cloud <code>ADD</code> at every depth; a mixed tileset should switch at an identifiable level, not flicker between modes at random nodes, which usually means two tools wrote parts of the tree.</p>
+<h3 id="3-check-replace-nodes-for-coverage-holes" tabindex="-1"><a class="heading-link" href="#3-check-replace-nodes-for-coverage-holes"><span>3. Check REPLACE nodes for coverage holes</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> math
+
+<span class="token keyword">def</span> <span class="token function">extent</span><span class="token punctuation">(</span>bv<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">if</span> <span class="token string">"region"</span> <span class="token keyword">in</span> bv<span class="token punctuation">:</span>
+        w<span class="token punctuation">,</span> s<span class="token punctuation">,</span> e<span class="token punctuation">,</span> n<span class="token punctuation">,</span> lo<span class="token punctuation">,</span> hi <span class="token operator">=</span> bv<span class="token punctuation">[</span><span class="token string">"region"</span><span class="token punctuation">]</span>
+        <span class="token keyword">return</span> <span class="token punctuation">(</span>w<span class="token punctuation">,</span> s<span class="token punctuation">,</span> e<span class="token punctuation">,</span> n<span class="token punctuation">)</span>
+    <span class="token keyword">raise</span> ValueError<span class="token punctuation">(</span><span class="token string">"audit expects region bounding volumes"</span><span class="token punctuation">)</span>
+
+<span class="token keyword">def</span> <span class="token function">covered_fraction</span><span class="token punctuation">(</span>parent<span class="token punctuation">,</span> children<span class="token punctuation">,</span> samples<span class="token operator">=</span><span class="token number">40</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    w<span class="token punctuation">,</span> s<span class="token punctuation">,</span> e<span class="token punctuation">,</span> n <span class="token operator">=</span> extent<span class="token punctuation">(</span>parent<span class="token punctuation">[</span><span class="token string">"boundingVolume"</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    boxes <span class="token operator">=</span> <span class="token punctuation">[</span>extent<span class="token punctuation">(</span>c<span class="token punctuation">[</span><span class="token string">"boundingVolume"</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token keyword">for</span> c <span class="token keyword">in</span> children <span class="token keyword">if</span> <span class="token string">"content"</span> <span class="token keyword">in</span> c <span class="token keyword">or</span> c<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"children"</span><span class="token punctuation">)</span><span class="token punctuation">]</span>
+    hit <span class="token operator">=</span> <span class="token number">0</span>
+    <span class="token keyword">for</span> i <span class="token keyword">in</span> <span class="token builtin">range</span><span class="token punctuation">(</span>samples<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">for</span> j <span class="token keyword">in</span> <span class="token builtin">range</span><span class="token punctuation">(</span>samples<span class="token punctuation">)</span><span class="token punctuation">:</span>
+            lon <span class="token operator">=</span> w <span class="token operator">+</span> <span class="token punctuation">(</span>i <span class="token operator">+</span> <span class="token number">0.5</span><span class="token punctuation">)</span> <span class="token operator">*</span> <span class="token punctuation">(</span>e <span class="token operator">-</span> w<span class="token punctuation">)</span> <span class="token operator">/</span> samples
+            lat <span class="token operator">=</span> s <span class="token operator">+</span> <span class="token punctuation">(</span>j <span class="token operator">+</span> <span class="token number">0.5</span><span class="token punctuation">)</span> <span class="token operator">*</span> <span class="token punctuation">(</span>n <span class="token operator">-</span> s<span class="token punctuation">)</span> <span class="token operator">/</span> samples
+            <span class="token keyword">if</span> <span class="token builtin">any</span><span class="token punctuation">(</span>b<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span> <span class="token operator">&lt;=</span> lon <span class="token operator">&lt;=</span> b<span class="token punctuation">[</span><span class="token number">2</span><span class="token punctuation">]</span> <span class="token keyword">and</span> b<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span> <span class="token operator">&lt;=</span> lat <span class="token operator">&lt;=</span> b<span class="token punctuation">[</span><span class="token number">3</span><span class="token punctuation">]</span> <span class="token keyword">for</span> b <span class="token keyword">in</span> boxes<span class="token punctuation">)</span><span class="token punctuation">:</span>
+                hit <span class="token operator">+=</span> <span class="token number">1</span>
+    <span class="token keyword">return</span> hit <span class="token operator">/</span> samples <span class="token operator">**</span> <span class="token number">2</span>
+
+holes <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+<span class="token keyword">for</span> path<span class="token punctuation">,</span> node<span class="token punctuation">,</span> refine<span class="token punctuation">,</span> depth<span class="token punctuation">,</span> _ <span class="token keyword">in</span> nodes<span class="token punctuation">:</span>
+    kids <span class="token operator">=</span> node<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"children"</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    <span class="token keyword">if</span> refine <span class="token operator">==</span> <span class="token string">"REPLACE"</span> <span class="token keyword">and</span> <span class="token string">"content"</span> <span class="token keyword">in</span> node <span class="token keyword">and</span> kids<span class="token punctuation">:</span>
+        frac <span class="token operator">=</span> covered_fraction<span class="token punctuation">(</span>node<span class="token punctuation">,</span> kids<span class="token punctuation">)</span>
+        <span class="token keyword">if</span> frac <span class="token operator">&lt;</span> <span class="token number">0.98</span><span class="token punctuation">:</span>
+            holes<span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">(</span>path<span class="token punctuation">,</span> depth<span class="token punctuation">,</span> <span class="token builtin">round</span><span class="token punctuation">(</span>frac<span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span><span class="token builtin">len</span><span class="token punctuation">(</span>holes<span class="token punctuation">)</span><span class="token punctuation">}</span></span><span class="token string"> REPLACE nodes whose children leave part of the parent uncovered"</span></span><span class="token punctuation">,</span> holes<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token number">5</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>A <code>REPLACE</code> parent is hidden when it refines, so any area of the parent’s footprint that no child covers disappears from the screen. Children without content and without descendants are ignored in the coverage test, because they contribute nothing to draw. The sampling approach is coarse and fast; a flagged node is worth a closer look, not an automatic failure — a parent whose content genuinely stops at a coastline can have uncovered water.</p>
+<figure class="diagram">
+<svg viewBox="26 16 688 224" role="img" aria-labelledby="ar-hole-t ar-hole-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="ar-hole-t">A REPLACE hole from a missing child</title>
+  <desc id="ar-hole-d">At a distance, the parent tile draws the whole district. After refinement under REPLACE, three children draw their quadrants but the fourth child was never written because the tiler found no buildings above its minimum size there. The parent is hidden, so the small buildings in that quadrant vanish as the camera approaches.</desc>
+  <rect class="svg-bg" x="26" y="16" width="688" height="224" fill="#ffffff"/>
+  <rect x="40" y="30" width="260" height="160" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <g stroke="#1f6b8a" stroke-width="2">
+    <rect x="440" y="30" width="130" height="80" fill="#e3f0f4"/>
+    <rect x="570" y="30" width="130" height="80" fill="#e3f0f4"/>
+    <rect x="440" y="110" width="130" height="80" fill="#e3f0f4"/>
+  </g>
+  <rect x="570" y="110" width="130" height="80" fill="#f7dfdc" stroke="#b0413e" stroke-width="2" stroke-dasharray="6 4"/>
+  <path d="M320 110 H420" fill="none" stroke="#5b6471" stroke-width="2"/>
+  <path d="M410 104 L420 110 L410 116" fill="none" stroke="#5b6471" stroke-width="2"/>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="170" y="114">parent: whole district</text>
+    <text x="505" y="74">child 0</text><text x="635" y="74">child 1</text><text x="505" y="154">child 2</text>
+  </g>
+  <text x="635" y="146" fill="#b0413e" font-size="12.5" text-anchor="middle">no child 3</text>
+  <text x="635" y="164" fill="#b0413e" font-size="12.5" text-anchor="middle">→ hole</text>
+  <text x="370" y="96" fill="#5b6471" font-size="12" text-anchor="middle">refine</text>
+  <text x="380" y="222" fill="#15384a" font-size="12.5" text-anchor="middle">Fix: write child 3 containing the parent's content for that quadrant, even if it is small.</text>
+</svg>
+<figcaption>Under REPLACE, a quadrant with too little content to justify its own tile still needs one, or its content exists only at the coarser level.</figcaption>
+</figure>
+<h3 id="4-check-add-subtrees-for-duplicated-content" tabindex="-1"><a class="heading-link" href="#4-check-add-subtrees-for-duplicated-content"><span>4. Check ADD subtrees for duplicated content</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">from</span> collections <span class="token keyword">import</span> Counter
+<span class="token keyword">from</span> pygltflib <span class="token keyword">import</span> GLTF2
+
+<span class="token keyword">def</span> <span class="token function">feature_ids</span><span class="token punctuation">(</span>glb_path<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    g <span class="token operator">=</span> GLTF2<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span>load_binary<span class="token punctuation">(</span><span class="token builtin">str</span><span class="token punctuation">(</span>glb_path<span class="token punctuation">)</span><span class="token punctuation">)</span>
+    ids <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    <span class="token keyword">for</span> mesh <span class="token keyword">in</span> g<span class="token punctuation">.</span>meshes<span class="token punctuation">:</span>
+        <span class="token keyword">for</span> prim <span class="token keyword">in</span> mesh<span class="token punctuation">.</span>primitives<span class="token punctuation">:</span>
+            <span class="token keyword">if</span> prim<span class="token punctuation">.</span>extras <span class="token keyword">and</span> <span class="token string">"building_ids"</span> <span class="token keyword">in</span> prim<span class="token punctuation">.</span>extras<span class="token punctuation">:</span>
+                ids<span class="token punctuation">.</span>extend<span class="token punctuation">(</span>prim<span class="token punctuation">.</span>extras<span class="token punctuation">[</span><span class="token string">"building_ids"</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> ids
+
+seen <span class="token operator">=</span> Counter<span class="token punctuation">(</span><span class="token punctuation">)</span>
+<span class="token keyword">for</span> path<span class="token punctuation">,</span> node<span class="token punctuation">,</span> refine<span class="token punctuation">,</span> depth<span class="token punctuation">,</span> base <span class="token keyword">in</span> nodes<span class="token punctuation">:</span>
+    uri <span class="token operator">=</span> node<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"content"</span><span class="token punctuation">,</span> <span class="token punctuation">{</span><span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">"uri"</span><span class="token punctuation">)</span>
+    <span class="token keyword">if</span> refine <span class="token operator">==</span> <span class="token string">"ADD"</span> <span class="token keyword">and</span> uri <span class="token keyword">and</span> uri<span class="token punctuation">.</span>endswith<span class="token punctuation">(</span><span class="token string">".glb"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">for</span> bid <span class="token keyword">in</span> <span class="token builtin">set</span><span class="token punctuation">(</span>feature_ids<span class="token punctuation">(</span>base <span class="token operator">/</span> uri<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+            seen<span class="token punctuation">[</span>bid<span class="token punctuation">]</span> <span class="token operator">+=</span> <span class="token number">1</span>
+dupes <span class="token operator">=</span> <span class="token punctuation">{</span>bid<span class="token punctuation">:</span> n <span class="token keyword">for</span> bid<span class="token punctuation">,</span> n <span class="token keyword">in</span> seen<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">if</span> n <span class="token operator">></span> <span class="token number">1</span><span class="token punctuation">}</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span><span class="token builtin">len</span><span class="token punctuation">(</span>dupes<span class="token punctuation">)</span><span class="token punctuation">}</span></span><span class="token string"> objects appear in more than one ADD level"</span></span><span class="token punctuation">,</span> <span class="token builtin">list</span><span class="token punctuation">(</span>dupes<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token number">5</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Under <code>ADD</code>, an object present in both a parent and a child is drawn twice at the same position — a reliable source of z-fighting and of doubled triangle counts. The script looks for identifiers stored in primitive <code>extras</code>; adapt <code>feature_ids</code> to wherever your pipeline records them, such as a property table in <code>EXT_structural_metadata</code>, described in <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/attaching-ext-structural-metadata-to-building-tiles/">attaching EXT_structural_metadata to building tiles</a>.</p>
+<h2 id="expected-output-verification" tabindex="-1"><a class="heading-link" href="#expected-output-verification"><span>Expected Output &amp; Verification</span></a></h2>
+<div class="codeblock" data-lang="text"><div class="codeblock__bar"><span class="codeblock__lang">text</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-text" tabindex="0" role="group" aria-label="text code sample"><code class="language-text">{0: ['REPLACE'], 1: ['REPLACE'], 2: ['REPLACE'], 3: ['REPLACE'], 4: ['ADD'], 5: ['ADD']}
+3 REPLACE nodes whose children leave part of the parent uncovered [('root/2/1/3', 3, 0.75), ('root/0/3/0', 3, 0.5), ('root/3/3/2', 3, 0.875)]
+0 objects appear in more than one ADD level []
+</code></pre></div>
+<p>Verify visually and numerically in the runtime. For each flagged <code>REPLACE</code> node, fly the camera to the uncovered quadrant and step in until the parent refines; content that disappears confirms the hole. For <code>ADD</code> subtrees, compare the triangle count the runtime reports for a view with the sum of unique triangles in the loaded tiles — a ratio well above 1 means duplication the identifier check missed.</p>
+<figure class="diagram">
+<svg viewBox="26 36 548 182" role="img" aria-labelledby="ar-cost-t ar-cost-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="ar-cost-t">Triangles drawn for the same view under each mode</title>
+  <desc id="ar-cost-d">Bars compare triangles drawn for a close-up street view of a building mesh tileset. With correct REPLACE refinement, about 1.1 million triangles are drawn. The same tileset wrongly marked ADD draws every ancestor as well, about 1.9 million triangles, and shows z-fighting where ancestor and child surfaces coincide.</desc>
+  <rect class="svg-bg" x="26" y="36" width="548" height="182" fill="#ffffff"/>
+  <path d="M40 30 V170" fill="none" stroke="#5b6471" stroke-width="1.5"/>
+  <rect x="40" y="50" width="300" height="44" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="1.5"/>
+  <rect x="40" y="120" width="300" height="44" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="1.5"/>
+  <rect x="340" y="120" width="220" height="44" fill="#f7dfdc" stroke="#b0413e" stroke-width="1.5"/>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="190" y="77">REPLACE — leaves: 1.1 M</text>
+    <text x="190" y="147">wrongly ADD — leaves: 1.1 M</text>
+    <text x="450" y="147">ancestors: +0.8 M</text>
+  </g>
+  <text x="300" y="200" fill="#15384a" font-size="12.5" text-anchor="middle">Every ancestor of a visible leaf is drawn again, at the same place.</text>
+</svg>
+<figcaption>A mesh hierarchy marked ADD pays for every level at once and gets z-fighting in return.</figcaption>
+</figure>
+<h2 id="common-errors" tabindex="-1"><a class="heading-link" href="#common-errors"><span>Common Errors</span></a></h2>
+<p><strong>Buildings flicker between two shapes when zooming.</strong> A mesh subtree is marked <code>ADD</code>, so a decimated parent and its detailed child overlap. Set <code>REPLACE</code> on the subtree root and let children inherit it.</p>
+<p><strong>A district stays coarse forever in one corner.</strong> One child of a <code>REPLACE</code> node fails to load — a 404 or a decode error — and CesiumJS keeps the parent visible until all children are ready. Check the network panel for the missing child; the refinement setting is doing its job.</p>
+<p><strong>Point cloud density jumps when the camera moves slightly.</strong> The point cloud was written with <code>REPLACE</code>, so every refinement drops the parent’s sample and draws only the child’s. Point cloud octrees built as disjoint samples need <code>ADD</code>.</p>
+<h2 id="frequently-asked-questions" tabindex="-1"><a class="heading-link" href="#frequently-asked-questions"><span>Frequently Asked Questions</span></a></h2>
+<h3 id="does-skiplevelofdetail-change-how-replace-behaves" tabindex="-1"><a class="heading-link" href="#does-skiplevelofdetail-change-how-replace-behaves"><span>Does skipLevelOfDetail change how REPLACE behaves?</span></a></h3>
+<p>Yes. With <code>skipLevelOfDetail</code> enabled, CesiumJS may jump directly to deeper descendants without loading intermediate levels and can briefly draw a mix of levels. It reduces bandwidth for fast zooms and makes coverage holes and loading gaps more visible, so audit coverage before enabling it.</p>
+<h3 id="can-implicit-tilesets-mix-modes" tabindex="-1"><a class="heading-link" href="#can-implicit-tilesets-mix-modes"><span>Can implicit tilesets mix modes?</span></a></h3>
+<p>An implicit tileset’s refinement is declared once at the implicit root and applies to the whole generated subtree. To mix modes, place separate implicit subtrees under explicit parent tiles with different <code>refine</code> values.</p>
+<h3 id="is-add-always-cheaper-in-bandwidth" tabindex="-1"><a class="heading-link" href="#is-add-always-cheaper-in-bandwidth"><span>Is ADD always cheaper in bandwidth?</span></a></h3>
+<p>Only when levels are truly disjoint. A point cloud stored with <code>ADD</code> transmits each point once; a mesh wrongly stored with <code>ADD</code> still transmits every level and then draws them all.</p>
+<h2 id="related-guides" tabindex="-1"><a class="heading-link" href="#related-guides"><span>Related Guides</span></a></h2>
+<ul>
+<li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/computing-geometric-error-for-3d-tiles-levels/">Computing Geometric Error for 3D Tiles Levels</a> — when each level refines</li>
+<li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/tuning-maximum-screen-space-error-in-cesium/">Tuning Maximum Screen Space Error in Cesium</a> — how far refinement goes</li>
+<li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/tracking-down-z-fighting-between-terrain-and-buildings/">Tracking Down Z-Fighting Between Terrain and Buildings</a> — the other common source of flicker</li>
+</ul>
+<p>Back to <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring for Digital Twins</a>.</p>
+
+
+      
+      
+
+      <div class="related-nav">
+        
+
+        
+          <div>
+            <h3>Related</h3>
+            <div class="related-grid">
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/computing-geometric-error-for-3d-tiles-levels/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Computing Geometric Error for 3D Tiles Levels</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/implementing-quadtree-lod-for-urban-models/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Implementing Quadtree LOD for Urban Models</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/tuning-maximum-screen-space-error-in-cesium/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Tuning Maximum Screen Space Error in Cesium</span>
+                </a>
+              
+            </div>
+          </div>
+        
+      </div>
+    </article>
+
+    
+    <aside class="toc" aria-label="On this page" data-toc hidden>
+      <h4>On this page</h4>
+      <ul></ul>
+    </aside>
+  </div>
+</div>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+  <div class="container site-footer__inner">
+    <div class="site-footer__brand">
+      <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+        <img src="/assets/img/logo-mark.svg" alt="" class="brand__mark" width="36" height="36">
+        <span class="brand__name">
+          3D Geospatial
+          <small>Digital Twin Automation</small>
+        </span>
+      </a>
+      <p>Engineering-grade guides on point cloud processing, mesh pipelines, LOD strategies, and CI/CD automation for digital twin platforms.</p>
+      <a class="footer-social" href="https://github.com/3d-geospatial" aria-label="3D Geospatial on GitHub" rel="noopener" target="_blank">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+          <path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.53-1.34-1.3-1.7-1.3-1.7-1.06-.72.08-.71.08-.71 1.17.08 1.79 1.2 1.79 1.2 1.04 1.79 2.73 1.27 3.4.97.1-.75.4-1.27.73-1.56-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.19-3.08-.12-.3-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.75.11 3.05.74.8 1.19 1.83 1.19 3.08 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.07.78 2.15v3.18c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5Z"/>
+        </svg>
+        <span>GitHub</span>
+      </a>
+    </div>
+
+    <div class="site-footer__col">
+      <h4>Sections</h4>
+      <ul>
+        <li><a href="https://www.3d-geospatial.com/">Home</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management &amp; Optimization</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/">Point Cloud &amp; Mesh Pipelines</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/">Troubleshooting &amp; Reliability</a></li>
+        
+      </ul>
+    </div>
+
+    
+      <div class="site-footer__col">
+        <h4>3D Geospatial Fundamentals</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/">3D Format Standards Comparison</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/">BIM and IFC Georeferencing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems for 3D Assets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/">Digital Elevation Model Workflows</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/">Spatial Indexing and Tiling Schemes for 3D Data</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>LOD Management &amp; Optimization</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/">Automated Tile Generation for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/">Cesium ion Upload Automation for 3D Tilesets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/">glTF LOD Generation With Draco Compression</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/">Streaming Sync Patterns for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/">Tileset Metadata and 3D Tiles Next</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Point Cloud &amp; Mesh Pipelines</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/">Automated Mesh Decimation for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/">Change Detection Between LiDAR Scan Epochs</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/">CI/CD Automation for Spatial Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">LiDAR Classification and Ground Extraction</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/">Point Cloud Filtering Techniques</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/">Surface Reconstruction for Geospatial Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/">Texture Mapping Workflows for Digital Twins</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Troubleshooting &amp; Reliability</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/">Cross-Section Failure Modes in Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/">Data Validation &amp; QA Gates for 3D Tiles</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/">Performance Profiling and Benchmarking</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/">Streaming &amp; Runtime Diagnostics for 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+  </div>
+  <div class="container site-footer__bottom">
+    <span>© 2026 3D Geospatial &amp; Digital Twin Automation</span>
+    <span>Built with Eleventy · PWA-enabled</span>
+  </div>
+</footer>
+
+
+  <script src="/assets/js/site.js?v=b99aa9f971" defer></script>
+  
+</body>
+</html>

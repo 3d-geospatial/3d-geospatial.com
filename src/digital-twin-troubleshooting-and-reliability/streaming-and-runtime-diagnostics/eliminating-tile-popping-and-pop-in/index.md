@@ -92,7 +92,7 @@ print(f"{len(sets['visible'])} visible, {len(sets['prefetch'])} prefetched ahead
   <path d="M420 56 V222" fill="none" stroke="#b0413e" stroke-width="2" stroke-dasharray="6 4"/>
   <text x="420" y="48" fill="#b0413e" font-size="12" text-anchor="middle">past here you are paying for nothing</text>
   <text x="180" y="132" fill="#4f7a4d" font-size="12" text-anchor="start">pop events / min</text>
-  <text x="530" y="140" fill="#c46a3d" font-size="12" text-anchor="middle">bandwidth</text>
+  <text x="530" y="140" fill="#9a4f26" font-size="12" text-anchor="middle">bandwidth</text>
   <g fill="#1f2937" font-size="11.5" text-anchor="middle">
     <text x="100" y="238">32</text><text x="180" y="238">24</text><text x="260" y="238">16</text>
     <text x="340" y="238">12</text><text x="420" y="238">8</text><text x="500" y="238">6</text>

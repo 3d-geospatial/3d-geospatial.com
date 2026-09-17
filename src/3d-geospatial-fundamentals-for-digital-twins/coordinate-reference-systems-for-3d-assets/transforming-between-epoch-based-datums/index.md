@@ -181,7 +181,7 @@ Recording the metadata alongside the coordinates is what makes the transform rev
   <text x="680" y="144" fill="#b0413e" font-size="12" text-anchor="end">5 cm survey tolerance</text>
   <polyline points="100,186 200,142 300,98 400,54" fill="none" stroke="#c46a3d" stroke-width="2.5"/>
   <polyline points="100,188 220,172 340,156 460,140 580,124 660,113" fill="none" stroke="#1f6b8a" stroke-width="2.5"/>
-  <text x="410" y="50" fill="#c46a3d" font-size="12" text-anchor="start">Australia, 7 cm/yr</text>
+  <text x="410" y="50" fill="#9a4f26" font-size="12" text-anchor="start">Australia, 7 cm/yr</text>
   <text x="600" y="106" fill="#1f6b8a" font-size="12" text-anchor="end">Europe, 2.5 cm/yr</text>
   <g fill="#1f2937" font-size="11.5" text-anchor="middle">
     <text x="100" y="212">0</text><text x="220" y="212">4</text><text x="340" y="212">8</text>

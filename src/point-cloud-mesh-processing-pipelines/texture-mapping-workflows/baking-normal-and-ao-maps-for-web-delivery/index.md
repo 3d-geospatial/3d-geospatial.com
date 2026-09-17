@@ -127,14 +127,14 @@ normals /= np.linalg.norm(normals, axis=1, keepdims=True)
         fill="none" stroke="#c46a3d" stroke-width="2.5"/>
   <path d="M60 128 H680" fill="none" stroke="#4f7a4d" stroke-width="2" stroke-dasharray="6 4"/>
   <g stroke="#5b6471" stroke-width="1.5" marker-end="url(#bk-cage-a)">
-    <path d="M120 188 V132"/>
-    <path d="M240 188 V132"/>
-    <path d="M360 188 V132"/>
-    <path d="M480 188 V132"/>
-    <path d="M600 188 V132"/>
+    <path fill="none" d="M120 188 V132"/>
+    <path fill="none" d="M240 188 V132"/>
+    <path fill="none" d="M360 188 V132"/>
+    <path fill="none" d="M480 188 V132"/>
+    <path fill="none" d="M600 188 V132"/>
   </g>
   <text x="66" y="208" fill="#1f6b8a" font-size="12" text-anchor="start">low-poly surface — where the UVs live</text>
-  <text x="66" y="146" fill="#c46a3d" font-size="12" text-anchor="start">high-poly detail</text>
+  <text x="66" y="146" fill="#9a4f26" font-size="12" text-anchor="start">high-poly detail</text>
   <text x="66" y="120" fill="#4f7a4d" font-size="12" text-anchor="start">cage — the maximum ray distance</text>
   <text x="370" y="240" fill="#15384a" font-size="12.5" text-anchor="middle">Too tight and recessed detail never gets hit; too loose and a ray finds the wall behind the balcony</text>
   <text x="370" y="262" fill="#5b6471" font-size="12" text-anchor="middle">Start at 1.5× the largest peak-to-valley distance you measured between the two meshes, then tighten</text>

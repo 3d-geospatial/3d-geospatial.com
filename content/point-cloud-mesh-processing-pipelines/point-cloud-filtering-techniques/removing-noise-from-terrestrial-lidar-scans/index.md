@@ -105,7 +105,7 @@ print(f"SOR removed {removed_sor:,} points "
   <path d="M474 54 V222" fill="none" stroke="#b0413e" stroke-width="2" stroke-dasharray="6 4"/>
   <path d="M330 54 V222" fill="none" stroke="#c46a3d" stroke-width="2" stroke-dasharray="6 4"/>
   <text x="474" y="48" fill="#b0413e" font-size="12" text-anchor="middle">sor_std = 2.0 — cuts 1.1%</text>
-  <text x="300" y="48" fill="#c46a3d" font-size="12" text-anchor="middle">sor_std = 1.0 — cuts 19%</text>
+  <text x="300" y="48" fill="#9a4f26" font-size="12" text-anchor="middle">sor_std = 1.0 — cuts 19%</text>
   <g fill="#1f2937" font-size="11" text-anchor="middle">
     <text x="108" y="234">0.02</text>
     <text x="156" y="234">0.04</text>

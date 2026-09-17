@@ -64,7 +64,7 @@ A compound CRS such as EPSG:32618+5703 names both halves in one string and remov
     <text x="600" y="207"><tspan x="600" dy="0">EPSG:32618+5703</tspan><tspan x="600" dy="16">E, N, orthometric H</tspan></text>
   </g>
   <text x="700" y="60" fill="#1f6b8a" font-size="12" text-anchor="middle">ellipsoid</text>
-  <text x="700" y="140" fill="#c46a3d" font-size="12" text-anchor="middle">geoid</text>
+  <text x="700" y="140" fill="#9a4f26" font-size="12" text-anchor="middle">geoid</text>
 </svg>
 <figcaption>Ellipsoidal height h and orthometric height H differ by the geoid undulation N; the chain below resolves N with a named grid into a compound CRS.</figcaption>
 </figure>

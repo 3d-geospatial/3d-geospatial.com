@@ -408,6 +408,7 @@ Yes. Persist only two small artifacts between runs: `manifest.prev.json` and the
 
 ## Related Guides
 
+- [Merging Shard Tilesets into a Root Tileset](https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/merging-shard-tilesets-into-a-root-tileset/) — combine thousands of independently built shard tilesets into one 3D Tiles root
 - [Automated Tile Generation for 3D Geospatial](https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/) — the single-tileset internals (geometricError, box volumes, ECEF transform) this pipeline schedules at scale
 - [Parallel b3dm Encoding with Process Pools](https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/parallel-b3dm-encoding-with-process-pools/) — fanning the per-shard encode across CPU cores deterministically
 - [Implementing Quadtree LOD for Urban Models](https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/implementing-quadtree-lod-for-urban-models/) — the within-shard tree each external tileset carries

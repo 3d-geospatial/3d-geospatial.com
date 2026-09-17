@@ -93,7 +93,7 @@ A scale factor within roughly 1:10,000 (100 ppm) over the whole footprint is the
   <text x="270" y="228" fill="#4f7a4d" font-size="11.5" text-anchor="middle">k = 1</text>
   <text x="450" y="228" fill="#4f7a4d" font-size="11.5" text-anchor="middle">k = 1</text>
   <text x="240" y="268" fill="#4f7a4d" font-size="12" text-anchor="middle">City A, astride the central meridian: −40 ppm</text>
-  <text x="520" y="268" fill="#c46a3d" font-size="12" text-anchor="middle">City B, near the zone edge: +390 ppm</text>
+  <text x="520" y="268" fill="#9a4f26" font-size="12" text-anchor="middle">City B, near the zone edge: +390 ppm</text>
   <text x="360" y="294" fill="#5b6471" font-size="12" text-anchor="middle">Distortion is a property of where you sit in the zone, never of the zone's name</text>
 </svg>
 <figcaption>Two cities, one zone, an order of magnitude between their distortions. This is why the number has to be measured at your bounding box rather than inferred from the EPSG code.</figcaption>

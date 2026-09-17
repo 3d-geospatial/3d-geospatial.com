@@ -150,7 +150,7 @@ print(f"acceptance (<=5% sparse): {status}")
   <text x="250" y="38" fill="#1f6b8a" font-size="12" text-anchor="middle">bridge deck</text>
   <text x="560" y="42" fill="#5b6471" font-size="12" text-anchor="middle">conductor pair</text>
   <text x="250" y="200" fill="#b0413e" font-size="12" text-anchor="middle">0 returns — the deck occludes the sensor</text>
-  <text x="520" y="222" fill="#c46a3d" font-size="12" text-anchor="middle">thin — the wire intercepts the pulses beneath it</text>
+  <text x="520" y="222" fill="#9a4f26" font-size="12" text-anchor="middle">thin — the wire intercepts the pulses beneath it</text>
   <text x="370" y="256" fill="#1f2937" font-size="12.5" text-anchor="middle">Neither run is a density problem. One needs an oblique pass, the other needs the clearance measured off the wire itself.</text>
   <text x="370" y="280" fill="#5b6471" font-size="12" text-anchor="middle">1 m cells along the corridor centreline</text>
 </svg>

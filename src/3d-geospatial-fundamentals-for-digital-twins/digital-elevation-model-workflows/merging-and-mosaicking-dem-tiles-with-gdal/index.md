@@ -172,7 +172,7 @@ The two numbers separate the two causes. A median step with a small spread is a 
   <polyline points="90,182 150,124 210,176 270,132 330,168 390,126 450,180 510,134 570,172 650,140"
             fill="none" stroke="#c46a3d" stroke-width="2.5"/>
   <text x="672" y="92" fill="#b0413e" font-size="12" text-anchor="end">datum: +33 cm everywhere</text>
-  <text x="672" y="206" fill="#c46a3d" font-size="12" text-anchor="end">edge interpolation: mean ≈ 0, spread ±25 cm</text>
+  <text x="672" y="206" fill="#9a4f26" font-size="12" text-anchor="end">edge interpolation: mean ≈ 0, spread ±25 cm</text>
   <text x="46" y="152" fill="#5b6471" font-size="11.5" text-anchor="middle">0</text>
   <text x="385" y="240" fill="#5b6471" font-size="12" text-anchor="middle">position along the seam</text>
   <text x="380" y="34" fill="#1f2937" font-size="13" text-anchor="middle" font-weight="600">Height difference across the join, sampled along its whole length</text>

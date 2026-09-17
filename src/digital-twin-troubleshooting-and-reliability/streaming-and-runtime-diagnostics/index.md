@@ -161,7 +161,7 @@ Raising `maximumScreenSpaceError` from 16 toward 24–32 cuts refinement count d
   <path d="M70 56 V214 H690" fill="none" stroke="#5b6471" stroke-width="1.5"/>
   <polyline points="90,206 170,186 250,162 330,140 410,118 490,96 570,76 650,62" fill="none" stroke="#c46a3d" stroke-width="2.5"/>
   <polyline points="90,208 170,196 250,190 330,186 410,184 490,183 570,182 650,182" fill="none" stroke="#4f7a4d" stroke-width="2.5"/>
-  <text x="600" y="52" fill="#c46a3d" font-size="12" text-anchor="middle">bytes downloaded</text>
+  <text x="600" y="52" fill="#9a4f26" font-size="12" text-anchor="middle">bytes downloaded</text>
   <text x="600" y="200" fill="#4f7a4d" font-size="12" text-anchor="middle">triangles drawn</text>
   <text x="380" y="244" fill="#5b6471" font-size="12" text-anchor="middle">seconds of camera movement</text>
   <text x="370" y="34" fill="#1f2937" font-size="13" text-anchor="middle" font-weight="600">Bytes rising while drawn geometry stays flat is over-fetching, not a slow link</text>
@@ -372,6 +372,8 @@ Instrument these five measurements once and leave them in. They cost a few micro
 
 ## Related Guides
 
+- [Fixing CORS and Content-Encoding Errors on Tile Servers](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/fixing-cors-and-content-encoding-errors-on-tile-servers/) — diagnose tilesets that fail in the browser but download fine
+- [Fixing Tilesets That Never Refine Past the Root](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/fixing-tilesets-that-never-refine-past-the-root/) — find why a 3D Tiles tileset stays at its coarsest level
 - [Eliminating Tile Popping and Pop-In](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/eliminating-tile-popping-and-pop-in/) — predictive prefetch and LOD crossfade in depth
 - [Data Validation & QA Gates](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/) — proving the geometry is sound before blaming the client
 - [Streaming Sync Patterns for 3D Geospatial](https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/) — the SSE queue, prefetch, and eviction model these diagnostics probe

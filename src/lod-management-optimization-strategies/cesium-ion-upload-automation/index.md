@@ -378,6 +378,7 @@ The hosted asset is always in EPSG:4978, geocentric WGS84 ECEF, because that is 
 
 ## Related Guides
 
+- [Polling Cesium ion Asset Status and Handling Tiling Errors](https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/polling-ion-asset-status-and-handling-tiling-errors/) — wait for Cesium ion tiling jobs reliably
 - [Automated Tile Generation for 3D Geospatial](https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/) — produce the validated tileset this workflow uploads
 - [3D Tiles Batch Tiling Pipelines](https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/) — fan this per-asset publish out across many tilesets
 - [Automating ion Tileset Uploads with the REST API](https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/automating-ion-tileset-uploads-with-the-rest-api/) — the full runnable script behind this workflow

@@ -172,9 +172,9 @@ for ci, cam in enumerate(cameras):
   <path d="M150 82 h34 v20 h-34 Z" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
   <path d="M300 232 h34 v20 h-34 Z" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
   <g stroke="#5b6471" stroke-width="2" marker-end="url(#tx-score-a)">
-    <path d="M156 158 L466 152"/>
-    <path d="M186 96 L466 132"/>
-    <path d="M336 240 L466 206"/>
+    <path fill="none" d="M156 158 L466 152"/>
+    <path fill="none" d="M186 96 L466 132"/>
+    <path fill="none" d="M336 240 L466 206"/>
   </g>
   <g fill="#1f2937" font-size="12" text-anchor="start">
     <text x="40" y="132">camera A — 18 m, 8° off normal</text>
@@ -350,6 +350,7 @@ Match triangle size to the ground sampling distance (GSD) of the source photos. 
 
 ## Related Guides
 
+- [Colorizing LiDAR from Orthophotos with PDAL](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/colorizing-lidar-from-orthophotos-with-pdal/) — assign RGB to LAZ points from an orthophoto with PDAL filters.colorization
 - [Aligning Photogrammetry Textures with Point Clouds](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/aligning-photogrammetry-textures-with-point-clouds/) — registering imagery to 3D point data before projection
 - [Surface Reconstruction for Geospatial Twins](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/) — generating the mesh you texture
 - [Automated Mesh Decimation for Digital Twins](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/) — matching triangle density to image GSD

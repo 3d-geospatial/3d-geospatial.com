@@ -80,7 +80,7 @@ Two facts fall out of that. Spacing along the scan line grows linearly with rang
     <circle cx="460" cy="154" r="2"/><circle cx="502" cy="154" r="2"/><circle cx="544" cy="154" r="2"/><circle cx="586" cy="154" r="2"/><circle cx="628" cy="154" r="2"/><circle cx="670" cy="154" r="2"/>
   </g>
   <text x="102" y="48" fill="#1f6b8a" font-size="12.5" text-anchor="middle" font-weight="600">2 m — 40:1 anisotropic</text>
-  <text x="565" y="48" fill="#c46a3d" font-size="12.5" text-anchor="middle" font-weight="600">40 m — 2:1, sparse both ways</text>
+  <text x="565" y="48" fill="#9a4f26" font-size="12.5" text-anchor="middle" font-weight="600">40 m — 2:1, sparse both ways</text>
   <text x="102" y="192" fill="#1f2937" font-size="12" text-anchor="middle">dense stripes, wide gaps between them</text>
   <text x="565" y="192" fill="#1f2937" font-size="12" text-anchor="middle">an even grid, and nothing small survives it</text>
   <text x="370" y="228" fill="#15384a" font-size="12.5" text-anchor="middle">A planimetric density reports the same number for both patterns, and the left one reconstructs a kerb while the right one does not</text>

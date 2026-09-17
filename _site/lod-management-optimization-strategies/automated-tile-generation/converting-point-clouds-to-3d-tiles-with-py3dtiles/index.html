@@ -1,0 +1,662 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <title>Converting Point Clouds to 3D Tiles with py3dtiles — 3D Geospatial</title>
+  <meta name="description" content="Tile LAS/LAZ point clouds into 3D Tiles with py3dtiles: PDAL preparation, ellipsoidal heights, EPSG:4978 output, memory and job tuning, and a point-count audit.">
+  <meta name="keywords" content="3D geospatial, digital twin, point cloud, mesh pipeline, LOD, 3D Tiles, Cesium, PDAL, Open3D, Python, CI/CD">
+  <meta name="author" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta name="theme-color" content="#1f6b8a" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f171d" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+
+  
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem("theme");
+        var theme = (stored === "dark" || stored === "light") ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    })();
+  </script>
+  <meta name="generator" content="Eleventy">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="googlebot" content="index,follow,max-image-preview:large">
+
+  
+  <link rel="canonical" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/converting-point-clouds-to-3d-tiles-with-py3dtiles/">
+  <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">
+
+  
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/icon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+
+  
+  <link rel="apple-touch-icon" href="/assets/img/icon-180.png">
+  <link rel="mask-icon" href="/assets/img/logo.svg" color="#1f6b8a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="3D Geospatial">
+  <meta name="application-name" content="3D Geospatial">
+
+  
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Converting Point Clouds to 3D Tiles with py3dtiles — 3D Geospatial">
+  <meta property="og:description" content="Tile LAS/LAZ point clouds into 3D Tiles with py3dtiles: PDAL preparation, ellipsoidal heights, EPSG:4978 output, memory and job tuning, and a point-count audit.">
+  <meta property="og:url" content="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/converting-point-clouds-to-3d-tiles-with-py3dtiles/">
+  <meta property="og:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+  <meta property="og:site_name" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta property="og:locale" content="en_US">
+  
+  <meta property="article:published_time" content="2026-09-17T17:12:52.588Z">
+  <meta property="article:modified_time" content="2026-09-17T17:12:52.588Z">
+  <meta property="article:publisher" content="https://www.3d-geospatial.com/">
+  
+
+  
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Converting Point Clouds to 3D Tiles with py3dtiles — 3D Geospatial">
+  <meta name="twitter:description" content="Tile LAS/LAZ point clouds into 3D Tiles with py3dtiles: PDAL preparation, ellipsoidal heights, EPSG:4978 output, memory and job tuning, and a point-count audit.">
+  <meta name="twitter:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta name="twitter:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+
+  
+  <link rel="preload" href="/assets/css/styles.css?v=8c46394d6c" as="style">
+  
+
+  <link rel="stylesheet" href="/assets/css/styles.css?v=8c46394d6c">
+
+  
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.3d-geospatial.com/#organization",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "url": "https://www.3d-geospatial.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/icon-512.png",
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://www.3d-geospatial.com/#website",
+      "url": "https://www.3d-geospatial.com/",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "description": "Build reliable 3D spatial data pipelines for digital twins — point clouds, meshes, LOD strategies, Python processing, and CI/CD automation.",
+      "inLanguage": "en",
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      }
+    },
+    {
+      "@type": "TechArticle",
+      "@id": "https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/converting-point-clouds-to-3d-tiles-with-py3dtiles/#article",
+      "isPartOf": {
+        "@id": "https://www.3d-geospatial.com/#website"
+      },
+      "headline": "Converting Point Clouds to 3D Tiles with py3dtiles",
+      "name": "Converting Point Clouds to 3D Tiles with py3dtiles",
+      "description": "Tile LAS/LAZ point clouds into 3D Tiles with py3dtiles: PDAL preparation, ellipsoidal heights, EPSG:4978 output, memory and job tuning, and a point-count audit.",
+      "url": "https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/converting-point-clouds-to-3d-tiles-with-py3dtiles/",
+      "mainEntityOfPage": "https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/converting-point-clouds-to-3d-tiles-with-py3dtiles/",
+      "inLanguage": "en",
+      "datePublished": "2026-09-17T17:12:52.588Z",
+      "dateModified": "2026-09-17T17:12:52.588Z",
+      "author": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "image": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/og-cover.png",
+        "width": 1200,
+        "height": 630
+      },
+      "breadcrumb": {
+        "@id": "https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/converting-point-clouds-to-3d-tiles-with-py3dtiles/#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/converting-point-clouds-to-3d-tiles-with-py3dtiles/#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://www.3d-geospatial.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "LOD Management Optimization Strategies",
+          "item": "https://www.3d-geospatial.com/lod-management-optimization-strategies/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Automated Tile Generation",
+          "item": "https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "name": "Converting Point Clouds To 3D Tiles With Py3dtiles",
+          "item": "https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/converting-point-clouds-to-3d-tiles-with-py3dtiles/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  
+<header class="site-header" role="banner">
+  <div class="container site-header__inner">
+    <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+      <img src="/assets/img/logo.svg" alt="" class="brand__mark" width="36" height="36">
+      <span class="brand__name">
+        3D Geospatial
+        <small>Digital Twin Automation</small>
+      </span>
+    </a>
+
+    <button class="theme-toggle" type="button" data-theme-toggle
+            aria-label="Switch to dark theme" title="Switch to dark theme">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4.2"/>
+        <path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/>
+      </svg>
+    </button>
+
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>
+      <span class="nav-toggle__icon" aria-hidden="true"><span></span></span>
+      Menu
+    </button>
+
+    <nav class="primary-nav" id="primary-nav" aria-label="Primary">
+      
+      <a href="https://www.3d-geospatial.com/" >
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/>
+        </svg>
+        Home
+      </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2 3 7l9 5 9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 17l9 5 9-5"/>
+            </svg>
+          
+          3D Geospatial Fundamentals
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/" aria-current="page">
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+          
+          LOD Management &amp; Optimization
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="6" cy="6" r="1.5"/><circle cx="12" cy="6" r="1.5"/><circle cx="18" cy="6" r="1.5"/>
+              <circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/>
+              <circle cx="6" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="18" cy="18" r="1.5"/>
+            </svg>
+          
+          Point Cloud &amp; Mesh Pipelines
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <path d="M12 9v4"/><path d="M12 17h.01"/>
+            </svg>
+          
+          Troubleshooting &amp; Reliability
+        </a>
+      
+    </nav>
+  </div>
+</header>
+
+
+  <main id="main">
+    
+
+
+<div class="container">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    
+      
+        <a href="https://www.3d-geospatial.com/">Home</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management Optimization Strategies</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/">Automated Tile Generation</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <span class="current">Converting Point Clouds To 3D Tiles With Py3dtiles</span>
+      
+    
+  </nav>
+
+  <div class="content-page">
+    <article class="article">
+      <h1 id="converting-point-clouds-to-3d-tiles-with-py3dtiles" tabindex="-1"><a class="heading-link" href="#converting-point-clouds-to-3d-tiles-with-py3dtiles"><span>Converting Point Clouds to 3D Tiles with py3dtiles</span></a></h1>
+<p>This page converts classified LAZ point clouds into a streamable 3D Tiles point cloud tileset with <code>py3dtiles</code> — preparing the input with PDAL so heights are ellipsoidal before the converter sees them, running the conversion from UTM 18N (EPSG:32618) to Earth-centred EPSG:4978, sizing jobs and cache for the machine, and auditing the output <code>.pnts</code> files so every input point is accounted for.</p>
+<h2 id="why-you-hit-this" tabindex="-1"><a class="heading-link" href="#why-you-hit-this"><span>Why you hit this</span></a></h2>
+<p>A browser cannot open a 40 GB LAZ collection, and a digital twin should not ask it to. Point cloud tilesets split the cloud into an octree of small binary tiles that a viewer streams by screen-space error, which is how Cesium, iTwin and <a href="http://deck.gl">deck.gl</a> display city-scale scans. <code>py3dtiles</code> is the most direct open-source route from LAS to that format in a Python pipeline. Its defaults are good; what goes wrong is almost always the input — mixed CRSs across files, orthometric heights treated as ellipsoidal, noise points that stretch the octree’s bounding box a kilometre into the sky. The octree addressing underneath the output is covered in <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/octree-indexing-point-clouds-with-morton-codes/">octree indexing point clouds with Morton codes</a>.</p>
+<h2 id="prerequisites" tabindex="-1"><a class="heading-link" href="#prerequisites"><span>Prerequisites</span></a></h2>
+<ul>
+<li><code>py3dtiles&gt;=7.0</code> with LAZ support (<code>pip install &quot;py3dtiles[las]&quot;</code>), <code>pdal&gt;=3.4</code> Python bindings on PDAL 2.6+, <code>pyproj&gt;=3.6</code>, <code>numpy&gt;=1.24</code>.</li>
+<li>Input LAZ in EPSG:32618 with NAVD88 heights (compound EPSG:32618+5703), classified to ASPRS codes.</li>
+<li>The GEOID18 grid available to PROJ (<code>us_noaa_g2018u0.tif</code>), via <code>PROJ_NETWORK=ON</code> or a local copy.</li>
+<li>Free disk of roughly the input LAZ size: py3dtiles writes uncompressed intermediate node files while it builds the tree.</li>
+</ul>
+<h2 id="step-by-step" tabindex="-1"><a class="heading-link" href="#step-by-step"><span>Step-by-Step</span></a></h2>
+<h3 id="1-prepare-the-input-with-pdal-drop-noise-make-heights-ellipsoidal" tabindex="-1"><a class="heading-link" href="#1-prepare-the-input-with-pdal-drop-noise-make-heights-ellipsoidal"><span>1. Prepare the input with PDAL: drop noise, make heights ellipsoidal</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> json
+<span class="token keyword">from</span> pathlib <span class="token keyword">import</span> Path
+<span class="token keyword">import</span> pdal
+
+RAW <span class="token operator">=</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span>Path<span class="token punctuation">(</span><span class="token string">"raw"</span><span class="token punctuation">)</span><span class="token punctuation">.</span>glob<span class="token punctuation">(</span><span class="token string">"*.laz"</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+PREP <span class="token operator">=</span> Path<span class="token punctuation">(</span><span class="token string">"prep"</span><span class="token punctuation">)</span><span class="token punctuation">;</span> PREP<span class="token punctuation">.</span>mkdir<span class="token punctuation">(</span>exist_ok<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+
+<span class="token keyword">for</span> src <span class="token keyword">in</span> RAW<span class="token punctuation">:</span>
+    pipeline <span class="token operator">=</span> <span class="token punctuation">{</span>
+        <span class="token string">"pipeline"</span><span class="token punctuation">:</span> <span class="token punctuation">[</span>
+            <span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"readers.las"</span><span class="token punctuation">,</span> <span class="token string">"filename"</span><span class="token punctuation">:</span> <span class="token builtin">str</span><span class="token punctuation">(</span>src<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"override_srs"</span><span class="token punctuation">:</span> <span class="token string">"EPSG:32618+5703"</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+            <span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"filters.range"</span><span class="token punctuation">,</span> <span class="token string">"limits"</span><span class="token punctuation">:</span> <span class="token string">"Classification![7:7],Classification![18:18]"</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+            <span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"filters.reprojection"</span><span class="token punctuation">,</span>
+             <span class="token string">"in_srs"</span><span class="token punctuation">:</span> <span class="token string">"EPSG:32618+5703"</span><span class="token punctuation">,</span>
+             <span class="token string">"out_srs"</span><span class="token punctuation">:</span> <span class="token string">"+proj=utm +zone=18 +datum=WGS84 +units=m +type=crs"</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+            <span class="token punctuation">{</span><span class="token string">"type"</span><span class="token punctuation">:</span> <span class="token string">"writers.las"</span><span class="token punctuation">,</span> <span class="token string">"filename"</span><span class="token punctuation">:</span> <span class="token builtin">str</span><span class="token punctuation">(</span>PREP <span class="token operator">/</span> src<span class="token punctuation">.</span>name<span class="token punctuation">)</span><span class="token punctuation">,</span>
+             <span class="token string">"a_srs"</span><span class="token punctuation">:</span> <span class="token string">"EPSG:32618"</span><span class="token punctuation">,</span> <span class="token string">"compression"</span><span class="token punctuation">:</span> <span class="token string">"laszip"</span><span class="token punctuation">,</span> <span class="token string">"forward"</span><span class="token punctuation">:</span> <span class="token string">"all"</span><span class="token punctuation">,</span>
+             <span class="token string">"scale_x"</span><span class="token punctuation">:</span> <span class="token number">0.001</span><span class="token punctuation">,</span> <span class="token string">"scale_y"</span><span class="token punctuation">:</span> <span class="token number">0.001</span><span class="token punctuation">,</span> <span class="token string">"scale_z"</span><span class="token punctuation">:</span> <span class="token number">0.001</span><span class="token punctuation">,</span> <span class="token string">"offset_x"</span><span class="token punctuation">:</span> <span class="token string">"auto"</span><span class="token punctuation">,</span>
+             <span class="token string">"offset_y"</span><span class="token punctuation">:</span> <span class="token string">"auto"</span><span class="token punctuation">,</span> <span class="token string">"offset_z"</span><span class="token punctuation">:</span> <span class="token string">"auto"</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+        <span class="token punctuation">]</span>
+    <span class="token punctuation">}</span>
+    count <span class="token operator">=</span> pdal<span class="token punctuation">.</span>Pipeline<span class="token punctuation">(</span>json<span class="token punctuation">.</span>dumps<span class="token punctuation">(</span>pipeline<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">.</span>execute<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>src<span class="token punctuation">.</span>name<span class="token punctuation">}</span></span><span class="token string">: </span><span class="token interpolation"><span class="token punctuation">{</span>count<span class="token punctuation">:</span><span class="token format-spec">,</span><span class="token punctuation">}</span></span><span class="token string"> points written"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Two things happen here that py3dtiles cannot do for you. Classes 7 and 18 — low and high noise — are removed, because a single bird return 900 m above the city expands the root bounding volume and pushes every real point one or two octree levels deeper than necessary. And the NAVD88 heights are converted to heights above the WGS84 ellipsoid: the output CRS is UTM 18N with no vertical component, which PROJ treats as ellipsoidal. The converter’s transformation to EPSG:4978 then starts from the height it assumes. Skip this and the whole tileset floats or sinks by the geoid separation — about 33 m below where it should be in New York.</p>
+<figure class="diagram">
+<svg viewBox="26 18 708 236" role="img" aria-labelledby="p3t-h-t p3t-h-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="p3t-h-t">Why heights must be ellipsoidal before conversion</title>
+  <desc id="p3t-h-d">A cross-section showing the geoid about 33 metres below the WGS84 ellipsoid in New York. A LiDAR point with an orthometric NAVD88 height of 12 metres lies 12 metres above the geoid, which is minus 21 metres relative to the ellipsoid. If the converter treats 12 as an ellipsoidal height, the point is placed 33 metres too high.</desc>
+  <rect class="svg-bg" x="26" y="18" width="708" height="236" fill="#ffffff"/>
+  <path d="M40 80 C220 72 520 72 720 80" fill="none" stroke="#1f6b8a" stroke-width="2.5"/>
+  <path d="M40 170 C220 164 520 168 720 172" fill="none" stroke="#4f7a4d" stroke-width="2.5"/>
+  <path d="M40 206 H720" fill="none" stroke="#5b6471" stroke-width="1.5" stroke-dasharray="4 4"/>
+  <circle cx="330" cy="140" r="7" fill="#1f2937"/>
+  <circle cx="330" cy="50" r="7" fill="#b0413e"/>
+  <path d="M330 168 V148" fill="none" stroke="#1f2937" stroke-width="2"/>
+  <path d="M470 78 V168" fill="none" stroke="#9a4f26" stroke-width="2"/>
+  <path d="M330 58 V132" fill="none" stroke="#b0413e" stroke-width="1.5" stroke-dasharray="5 4"/>
+  <text x="700" y="66" fill="#1f6b8a" font-size="12.5" text-anchor="end">WGS84 ellipsoid, h = 0</text>
+  <text x="700" y="192" fill="#4f7a4d" font-size="12.5" text-anchor="end">geoid, NAVD88 H = 0</text>
+  <text x="484" y="128" fill="#9a4f26" font-size="12.5" text-anchor="start">N ≈ −33 m</text>
+  <g fill="#1f2937" font-size="12.5" text-anchor="end">
+    <text x="318" y="144">true point: H = 12 m, h = −21 m</text>
+  </g>
+  <text x="344" y="46" fill="#b0413e" font-size="12.5" text-anchor="start">H read as h: 33 m too high</text>
+  <text x="380" y="236" fill="#15384a" font-size="12.5" text-anchor="middle">not to scale · the geoid lies below the ellipsoid along the US East Coast</text>
+</svg>
+<figcaption>py3dtiles transforms whatever z it receives as an ellipsoidal height. Converting in PDAL, where the vertical CRS is explicit, is the only place the geoid is applied.</figcaption>
+</figure>
+<h3 id="2-confirm-every-prepared-file-shares-one-crs-and-sensible-bounds" tabindex="-1"><a class="heading-link" href="#2-confirm-every-prepared-file-shares-one-crs-and-sensible-bounds"><span>2. Confirm every prepared file shares one CRS and sensible bounds</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> laspy
+<span class="token keyword">import</span> numpy <span class="token keyword">as</span> np
+
+mins<span class="token punctuation">,</span> maxs<span class="token punctuation">,</span> crss <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token builtin">set</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+<span class="token keyword">for</span> f <span class="token keyword">in</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span>PREP<span class="token punctuation">.</span>glob<span class="token punctuation">(</span><span class="token string">"*.laz"</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">with</span> laspy<span class="token punctuation">.</span><span class="token builtin">open</span><span class="token punctuation">(</span>f<span class="token punctuation">)</span> <span class="token keyword">as</span> r<span class="token punctuation">:</span>
+        h <span class="token operator">=</span> r<span class="token punctuation">.</span>header
+        crss<span class="token punctuation">.</span>add<span class="token punctuation">(</span>h<span class="token punctuation">.</span>parse_crs<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span>to_epsg<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+        mins<span class="token punctuation">.</span>append<span class="token punctuation">(</span>h<span class="token punctuation">.</span>mins<span class="token punctuation">)</span><span class="token punctuation">;</span> maxs<span class="token punctuation">.</span>append<span class="token punctuation">(</span>h<span class="token punctuation">.</span>maxs<span class="token punctuation">)</span>
+mins<span class="token punctuation">,</span> maxs <span class="token operator">=</span> np<span class="token punctuation">.</span><span class="token builtin">min</span><span class="token punctuation">(</span>mins<span class="token punctuation">,</span> axis<span class="token operator">=</span><span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">,</span> np<span class="token punctuation">.</span><span class="token builtin">max</span><span class="token punctuation">(</span>maxs<span class="token punctuation">,</span> axis<span class="token operator">=</span><span class="token number">0</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"CRS:"</span><span class="token punctuation">,</span> crss<span class="token punctuation">,</span> <span class="token string">"| extent (m):"</span><span class="token punctuation">,</span> <span class="token punctuation">(</span>maxs <span class="token operator">-</span> mins<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">round</span><span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"| z range:"</span><span class="token punctuation">,</span> mins<span class="token punctuation">[</span><span class="token number">2</span><span class="token punctuation">]</span><span class="token punctuation">.</span><span class="token builtin">round</span><span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">,</span> maxs<span class="token punctuation">[</span><span class="token number">2</span><span class="token punctuation">]</span><span class="token punctuation">.</span><span class="token builtin">round</span><span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+<span class="token keyword">assert</span> crss <span class="token operator">==</span> <span class="token punctuation">{</span><span class="token number">32618</span><span class="token punctuation">}</span><span class="token punctuation">,</span> <span class="token string">"all inputs must share one horizontal CRS"</span>
+<span class="token keyword">assert</span> maxs<span class="token punctuation">[</span><span class="token number">2</span><span class="token punctuation">]</span> <span class="token operator">-</span> mins<span class="token punctuation">[</span><span class="token number">2</span><span class="token punctuation">]</span> <span class="token operator">&lt;</span> <span class="token number">600</span><span class="token punctuation">,</span> <span class="token string">"z range too large: noise survived filtering"</span>
+</code></pre></div>
+<p>The z-range assertion is tuned to the site. A coastal city with buildings under 450 m has no business spanning 600 m vertically; a mountain valley would need a larger limit. The point is to have one, because the bounding volume of the root tile is exactly this extent.</p>
+<h3 id="3-run-the-conversion" tabindex="-1"><a class="heading-link" href="#3-run-the-conversion"><span>3. Run the conversion</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> os
+<span class="token keyword">import</span> subprocess
+
+jobs <span class="token operator">=</span> <span class="token builtin">max</span><span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">,</span> os<span class="token punctuation">.</span>cpu_count<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">-</span> <span class="token number">2</span><span class="token punctuation">)</span>
+cmd <span class="token operator">=</span> <span class="token punctuation">[</span>
+    <span class="token string">"py3dtiles"</span><span class="token punctuation">,</span> <span class="token string">"convert"</span><span class="token punctuation">,</span> <span class="token operator">*</span><span class="token punctuation">[</span><span class="token builtin">str</span><span class="token punctuation">(</span>p<span class="token punctuation">)</span> <span class="token keyword">for</span> p <span class="token keyword">in</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span>PREP<span class="token punctuation">.</span>glob<span class="token punctuation">(</span><span class="token string">"*.laz"</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+    <span class="token string">"--out"</span><span class="token punctuation">,</span> <span class="token string">"tiles/harbour_pc"</span><span class="token punctuation">,</span>
+    <span class="token string">"--overwrite"</span><span class="token punctuation">,</span>
+    <span class="token string">"--srs_in"</span><span class="token punctuation">,</span> <span class="token string">"32618"</span><span class="token punctuation">,</span>
+    <span class="token string">"--srs_out"</span><span class="token punctuation">,</span> <span class="token string">"4978"</span><span class="token punctuation">,</span>
+    <span class="token string">"--jobs"</span><span class="token punctuation">,</span> <span class="token builtin">str</span><span class="token punctuation">(</span>jobs<span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token string">"--cache_size"</span><span class="token punctuation">,</span> <span class="token string">"6000"</span><span class="token punctuation">,</span>
+<span class="token punctuation">]</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">" "</span><span class="token punctuation">.</span>join<span class="token punctuation">(</span>cmd<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token number">4</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string">"…"</span><span class="token punctuation">)</span>
+subprocess<span class="token punctuation">.</span>run<span class="token punctuation">(</span>cmd<span class="token punctuation">,</span> check<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p><code>--srs_out 4978</code> makes py3dtiles transform points to Earth-centred coordinates and store them relative to per-tile centres, so the viewer needs no further georeferencing. <code>--jobs</code> sets the number of worker processes; leave a core or two for the main process that reads and dispatches points, or it becomes the bottleneck. <code>--cache_size</code> is in megabytes and bounds how many points are held in memory before nodes are flushed to disk — raise it on a machine with plenty of RAM and the conversion does far less intermediate I/O.</p>
+<figure class="diagram">
+<svg viewBox="-4 46 768 136" role="img" aria-labelledby="p3t-flow-t p3t-flow-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="p3t-flow-t">From raw LAZ to a validated point cloud tileset</title>
+  <desc id="p3t-flow-d">Raw LAZ files in EPSG:32618 plus NAVD88 go through PDAL, which removes noise classes and converts heights to ellipsoidal. A CRS and bounds check follows. py3dtiles converts to 3D Tiles in EPSG:4978 with a pnts file per octree node. A point-count audit compares the sum of points in all pnts files with the prepared input before publishing.</desc>
+  <rect class="svg-bg" x="-4" y="46" width="768" height="136" fill="#ffffff"/>
+  <defs>
+    <marker id="p3t-flow-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
+    </marker>
+  </defs>
+  <rect x="10" y="60" width="120" height="66" rx="8" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <rect x="160" y="60" width="130" height="66" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="320" y="60" width="120" height="66" rx="8" fill="#ffffff" stroke="#5b6471" stroke-width="1.5"/>
+  <rect x="470" y="60" width="130" height="66" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="630" y="60" width="120" height="66" rx="8" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <g stroke="#5b6471" stroke-width="2" fill="none" marker-end="url(#p3t-flow-arrow)">
+    <path d="M130 93 H158"/><path d="M290 93 H318"/><path d="M440 93 H468"/><path d="M600 93 H628"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="70" y="86">raw LAZ</text><text x="70" y="104">32618+5703</text>
+    <text x="225" y="86">PDAL: noise out,</text><text x="225" y="104">h ellipsoidal</text>
+    <text x="380" y="86">CRS + bounds</text><text x="380" y="104">assertions</text>
+    <text x="535" y="86">py3dtiles</text><text x="535" y="104">→ EPSG:4978</text>
+    <text x="690" y="86">point-count</text><text x="690" y="104">audit</text>
+  </g>
+  <text x="380" y="164" fill="#15384a" font-size="12.5" text-anchor="middle">Only the fourth box is the converter; the other four decide whether its output is right.</text>
+</svg>
+<figcaption>The conversion itself is one command. Preparation before it and an audit after it are what make the tileset trustworthy.</figcaption>
+</figure>
+<h3 id="4-audit-the-output-every-point-accounted-for" tabindex="-1"><a class="heading-link" href="#4-audit-the-output-every-point-accounted-for"><span>4. Audit the output: every point accounted for</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> struct
+
+<span class="token keyword">def</span> <span class="token function">pnts_points</span><span class="token punctuation">(</span>path<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">with</span> <span class="token builtin">open</span><span class="token punctuation">(</span>path<span class="token punctuation">,</span> <span class="token string">"rb"</span><span class="token punctuation">)</span> <span class="token keyword">as</span> f<span class="token punctuation">:</span>
+        header <span class="token operator">=</span> f<span class="token punctuation">.</span>read<span class="token punctuation">(</span><span class="token number">28</span><span class="token punctuation">)</span>
+        magic<span class="token punctuation">,</span> version<span class="token punctuation">,</span> byte_len<span class="token punctuation">,</span> ft_json_len<span class="token punctuation">,</span> ft_bin_len<span class="token punctuation">,</span> bt_json_len<span class="token punctuation">,</span> bt_bin_len <span class="token operator">=</span> struct<span class="token punctuation">.</span>unpack<span class="token punctuation">(</span><span class="token string">"&lt;4s6I"</span><span class="token punctuation">,</span> header<span class="token punctuation">)</span>
+        <span class="token keyword">assert</span> magic <span class="token operator">==</span> <span class="token string">b"pnts"</span><span class="token punctuation">,</span> <span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>path<span class="token punctuation">}</span></span><span class="token string">: not a pnts file"</span></span>
+        feature_table <span class="token operator">=</span> json<span class="token punctuation">.</span>loads<span class="token punctuation">(</span>f<span class="token punctuation">.</span>read<span class="token punctuation">(</span>ft_json_len<span class="token punctuation">)</span><span class="token punctuation">.</span>rstrip<span class="token punctuation">(</span><span class="token string">b" \x00"</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> feature_table<span class="token punctuation">[</span><span class="token string">"POINTS_LENGTH"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token string">"RTC_CENTER"</span> <span class="token keyword">in</span> feature_table
+
+out <span class="token operator">=</span> Path<span class="token punctuation">(</span><span class="token string">"tiles/harbour_pc"</span><span class="token punctuation">)</span>
+tiles <span class="token operator">=</span> <span class="token builtin">list</span><span class="token punctuation">(</span>out<span class="token punctuation">.</span>rglob<span class="token punctuation">(</span><span class="token string">"*.pnts"</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+counts <span class="token operator">=</span> <span class="token punctuation">[</span>pnts_points<span class="token punctuation">(</span>p<span class="token punctuation">)</span> <span class="token keyword">for</span> p <span class="token keyword">in</span> tiles<span class="token punctuation">]</span>
+total <span class="token operator">=</span> <span class="token builtin">sum</span><span class="token punctuation">(</span>c <span class="token keyword">for</span> c<span class="token punctuation">,</span> _ <span class="token keyword">in</span> counts<span class="token punctuation">)</span>
+
+prepared <span class="token operator">=</span> <span class="token number">0</span>
+<span class="token keyword">for</span> f <span class="token keyword">in</span> PREP<span class="token punctuation">.</span>glob<span class="token punctuation">(</span><span class="token string">"*.laz"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">with</span> laspy<span class="token punctuation">.</span><span class="token builtin">open</span><span class="token punctuation">(</span>f<span class="token punctuation">)</span> <span class="token keyword">as</span> r<span class="token punctuation">:</span>
+        prepared <span class="token operator">+=</span> r<span class="token punctuation">.</span>header<span class="token punctuation">.</span>point_count
+
+tileset <span class="token operator">=</span> json<span class="token punctuation">.</span>loads<span class="token punctuation">(</span><span class="token punctuation">(</span>out <span class="token operator">/</span> <span class="token string">"tileset.json"</span><span class="token punctuation">)</span><span class="token punctuation">.</span>read_text<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span><span class="token builtin">len</span><span class="token punctuation">(</span>tiles<span class="token punctuation">)</span><span class="token punctuation">:</span><span class="token format-spec">,</span><span class="token punctuation">}</span></span><span class="token string"> pnts files, </span><span class="token interpolation"><span class="token punctuation">{</span>total<span class="token punctuation">:</span><span class="token format-spec">,</span><span class="token punctuation">}</span></span><span class="token string"> points in tiles, </span><span class="token interpolation"><span class="token punctuation">{</span>prepared<span class="token punctuation">:</span><span class="token format-spec">,</span><span class="token punctuation">}</span></span><span class="token string"> prepared, "</span></span>
+      <span class="token string-interpolation"><span class="token string">f"refine=</span><span class="token interpolation"><span class="token punctuation">{</span>tileset<span class="token punctuation">[</span><span class="token string">'root'</span><span class="token punctuation">]</span><span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token string">'refine'</span><span class="token punctuation">)</span><span class="token punctuation">}</span></span><span class="token string">, all RTC: </span><span class="token interpolation"><span class="token punctuation">{</span><span class="token builtin">all</span><span class="token punctuation">(</span>r <span class="token keyword">for</span> _<span class="token punctuation">,</span> r <span class="token keyword">in</span> counts<span class="token punctuation">)</span><span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+<span class="token keyword">assert</span> total <span class="token operator">==</span> prepared<span class="token punctuation">,</span> <span class="token string">"points were lost or duplicated during conversion"</span>
+</code></pre></div>
+<p>A <code>.pnts</code> file starts with a 28-byte header — the magic, a version and five byte lengths — followed by a JSON feature table whose <code>POINTS_LENGTH</code> gives the count. py3dtiles builds an additive octree: every input point is written exactly once, in one node, with coarse nodes holding a sparse subset and finer nodes the remainder. That makes the audit exact. A total below the prepared count means a worker failed quietly or the disk filled; above it means an input file was listed twice.</p>
+<h2 id="expected-output-verification" tabindex="-1"><a class="heading-link" href="#expected-output-verification"><span>Expected Output &amp; Verification</span></a></h2>
+<div class="codeblock" data-lang="text"><div class="codeblock__bar"><span class="codeblock__lang">text</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-text" tabindex="0" role="group" aria-label="text code sample"><code class="language-text">h_2026_0412.laz: 18,402,110 points written
+CRS: {32618} | extent (m): [2488.4 2490.1  311.7] | z range: -38.2 273.5
+14,862 pnts files, 212,730,556 points in tiles, 212,730,556 prepared, refine=ADD, all RTC: True
+</code></pre></div>
+<p>The negative minimum z is the check that the datum conversion ran: ground at a few metres above NAVD88 near the harbour becomes around −30 m above the ellipsoid. Then verify placement against something independent. Pick a surveyed control point — a benchmark or a corner of a known building — and confirm its ECEF position, computed with <code>pyproj</code> from EPSG:32618+5703, lies within a few centimetres of the nearest point in the tile that contains it after applying that tile’s <code>RTC_CENTER</code>.</p>
+<figure class="diagram">
+<svg viewBox="26 6 584 242" role="img" aria-labelledby="p3t-add-t p3t-add-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="p3t-add-t">Points per octree level in an additive tileset</title>
+  <desc id="p3t-add-d">Stacked horizontal bars show where points end up by octree level. The root and first levels hold a small, evenly spaced subset, and each deeper level holds more, with most points in the deepest few levels. Because refinement is additive, the sum across all levels equals the input count exactly.</desc>
+  <rect class="svg-bg" x="26" y="6" width="584" height="242" fill="#ffffff"/>
+  <g stroke-width="1.5">
+    <rect x="40" y="20" width="8" height="24" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="40" y="52" width="30" height="24" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="40" y="84" width="96" height="24" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="40" y="116" width="250" height="24" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="40" y="148" width="470" height="24" fill="#e3f0f4" stroke="#1f6b8a"/>
+    <rect x="40" y="180" width="330" height="24" fill="#e3f0f4" stroke="#1f6b8a"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="start">
+    <text x="58" y="37">level 0 · 0.2 M</text>
+    <text x="80" y="69">level 2 · 1.4 M</text>
+    <text x="146" y="101">level 4 · 9 M</text>
+    <text x="300" y="133">level 6 · 44 M</text>
+    <text x="520" y="165">level 8 · 96 M</text>
+    <text x="380" y="197">level 10+ · 62 M</text>
+  </g>
+  <text x="340" y="230" fill="#15384a" font-size="12.5" text-anchor="middle">sum of all levels = 212.7 M = input count, because each point is stored once</text>
+</svg>
+<figcaption>Additive refinement is what makes an exact count audit possible: coarse levels are samples of the data, not copies of it.</figcaption>
+</figure>
+<h2 id="common-errors" tabindex="-1"><a class="heading-link" href="#common-errors"><span>Common Errors</span></a></h2>
+<p><strong>The tileset renders 33 m in the air, or under the terrain.</strong> Heights reached py3dtiles as NAVD88 orthometric values. Confirm the PDAL step ran with the compound <code>in_srs</code> and that PROJ found the GEOID18 grid — <code>projinfo -s EPSG:32618+5703 -t EPSG:4979</code> should list a GEOID18 operation, not a ballpark one.</p>
+<p><strong><code>pyproj.exceptions.CRSError</code> or points placed at the wrong zone.</strong> Some inputs carry no CRS in their header and py3dtiles was not told <code>--srs_in</code>. Always pass it explicitly, and assert header CRSs in step 2 so missing ones fail before a two-hour conversion.</p>
+<p><strong>Conversion slows to a crawl halfway through.</strong> The cache filled and workers are flushing to a slow disk. Raise <code>--cache_size</code>, reduce <code>--jobs</code> so the dispatcher keeps up, or put the output directory on local SSD rather than network storage.</p>
+<h2 id="frequently-asked-questions" tabindex="-1"><a class="heading-link" href="#frequently-asked-questions"><span>Frequently Asked Questions</span></a></h2>
+<h3 id="should-i-use-py3dtiles-or-pdals-writerscopc-for-streaming" tabindex="-1"><a class="heading-link" href="#should-i-use-py3dtiles-or-pdals-writerscopc-for-streaming"><span>Should I use py3dtiles or PDAL’s writers.copc for streaming?</span></a></h3>
+<p>They target different viewers. COPC is a single LAZ file streamed by byte range, read by Potree, QGIS and web COPC viewers; 3D Tiles is what Cesium-family runtimes and many twin platforms load natively. Pipelines serving both often write both from the same prepared input.</p>
+<h3 id="how-do-i-keep-classification-and-intensity" tabindex="-1"><a class="heading-link" href="#how-do-i-keep-classification-and-intensity"><span>How do I keep classification and intensity?</span></a></h3>
+<p>py3dtiles writes classification and intensity into the batch table by default in recent versions; check the flags on your installed version with <code>py3dtiles convert --help</code>, and confirm by reading a <code>.pnts</code> batch table JSON after conversion.</p>
+<h3 id="can-i-convert-tile-by-tile-and-merge-later" tabindex="-1"><a class="heading-link" href="#can-i-convert-tile-by-tile-and-merge-later"><span>Can I convert tile by tile and merge later?</span></a></h3>
+<p>Yes, and for very large collections it is easier to operate. Convert each shard to its own tileset and combine them as described in <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/merging-shard-tilesets-into-a-root-tileset/">merging shard tilesets into a root tileset</a>. Expect slightly more points at shard edges to be visible at coarse levels, because each shard builds its own sample.</p>
+<h3 id="how-long-should-a-city-scale-conversion-take" tabindex="-1"><a class="heading-link" href="#how-long-should-a-city-scale-conversion-take"><span>How long should a city-scale conversion take?</span></a></h3>
+<p>Throughput is dominated by LAZ decompression and disk writes, not by the tree building. As a planning figure, a 16-core machine with local NVMe converts in the region of 20 to 40 million points per minute from prepared LAZ; a 200-million-point district is a ten-minute job, and a whole city of several billion points is an overnight one. If a run is an order of magnitude slower than that, look at the storage first — network file systems and container overlay filesystems are the usual culprits.</p>
+<h3 id="does-the-output-need-draco-or-other-compression" tabindex="-1"><a class="heading-link" href="#does-the-output-need-draco-or-other-compression"><span>Does the output need Draco or other compression?</span></a></h3>
+<p>Point cloud tiles compress well, and Cesium supports Draco-compressed <code>.pnts</code> through the <code>3DTILES_draco_point_compression</code> extension. py3dtiles writes uncompressed tiles, which are simple to audit; compress in a separate post-processing step once the count audit has passed, so the audit always runs on tiles you can read with twenty lines of Python.</p>
+<h2 id="related-guides" tabindex="-1"><a class="heading-link" href="#related-guides"><span>Related Guides</span></a></h2>
+<ul>
+<li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/incremental-retiling-of-changed-city-blocks/">Incremental Retiling of Changed City Blocks</a> — rebuilding only what changed</li>
+<li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/handling-vertical-datums-and-geoid-separation/">Handling Vertical Datums and Geoid Separation</a> — the height conversion in depth</li>
+<li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/reclassifying-noise-and-overlap-points-with-pdal/">Reclassifying Noise and Overlap Points with PDAL</a> — making classes 7 and 18 trustworthy</li>
+</ul>
+<p>Back to <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/">Automated Tile Generation for 3D Geospatial</a>.</p>
+
+
+      
+      
+
+      <div class="related-nav">
+        
+
+        
+          <div>
+            <h3>Related</h3>
+            <div class="related-grid">
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/incremental-retiling-of-changed-city-blocks/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Incremental Retiling of Changed City Blocks</span>
+                </a>
+              
+            </div>
+          </div>
+        
+      </div>
+    </article>
+
+    
+    <aside class="toc" aria-label="On this page" data-toc hidden>
+      <h4>On this page</h4>
+      <ul></ul>
+    </aside>
+  </div>
+</div>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+  <div class="container site-footer__inner">
+    <div class="site-footer__brand">
+      <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+        <img src="/assets/img/logo-mark.svg" alt="" class="brand__mark" width="36" height="36">
+        <span class="brand__name">
+          3D Geospatial
+          <small>Digital Twin Automation</small>
+        </span>
+      </a>
+      <p>Engineering-grade guides on point cloud processing, mesh pipelines, LOD strategies, and CI/CD automation for digital twin platforms.</p>
+      <a class="footer-social" href="https://github.com/3d-geospatial" aria-label="3D Geospatial on GitHub" rel="noopener" target="_blank">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+          <path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.53-1.34-1.3-1.7-1.3-1.7-1.06-.72.08-.71.08-.71 1.17.08 1.79 1.2 1.79 1.2 1.04 1.79 2.73 1.27 3.4.97.1-.75.4-1.27.73-1.56-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.19-3.08-.12-.3-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.75.11 3.05.74.8 1.19 1.83 1.19 3.08 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.07.78 2.15v3.18c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5Z"/>
+        </svg>
+        <span>GitHub</span>
+      </a>
+    </div>
+
+    <div class="site-footer__col">
+      <h4>Sections</h4>
+      <ul>
+        <li><a href="https://www.3d-geospatial.com/">Home</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management &amp; Optimization</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/">Point Cloud &amp; Mesh Pipelines</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/">Troubleshooting &amp; Reliability</a></li>
+        
+      </ul>
+    </div>
+
+    
+      <div class="site-footer__col">
+        <h4>3D Geospatial Fundamentals</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/">3D Format Standards Comparison</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/">BIM and IFC Georeferencing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems for 3D Assets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/">Digital Elevation Model Workflows</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/">Spatial Indexing and Tiling Schemes for 3D Data</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>LOD Management &amp; Optimization</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/">Automated Tile Generation for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/">Cesium ion Upload Automation for 3D Tilesets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/">glTF LOD Generation With Draco Compression</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/">Streaming Sync Patterns for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/">Tileset Metadata and 3D Tiles Next</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Point Cloud &amp; Mesh Pipelines</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/">Automated Mesh Decimation for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/">Change Detection Between LiDAR Scan Epochs</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/">CI/CD Automation for Spatial Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">LiDAR Classification and Ground Extraction</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/">Point Cloud Filtering Techniques</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/">Surface Reconstruction for Geospatial Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/">Texture Mapping Workflows for Digital Twins</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Troubleshooting &amp; Reliability</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/">Cross-Section Failure Modes in Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/">Data Validation &amp; QA Gates for 3D Tiles</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/">Performance Profiling and Benchmarking</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/">Streaming &amp; Runtime Diagnostics for 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+  </div>
+  <div class="container site-footer__bottom">
+    <span>© 2026 3D Geospatial &amp; Digital Twin Automation</span>
+    <span>Built with Eleventy · PWA-enabled</span>
+  </div>
+</footer>
+
+
+  <script src="/assets/js/site.js?v=b99aa9f971" defer></script>
+  
+</body>
+</html>

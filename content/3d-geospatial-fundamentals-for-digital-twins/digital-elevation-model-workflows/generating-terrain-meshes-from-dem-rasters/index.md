@@ -165,7 +165,7 @@ The index arithmetic is mechanical, but the diagonal is not. Splitting every cel
   <path d="M400 240 L620 90" fill="none" stroke="#fdf3e0" stroke-width="12"/>
   <path d="M400 240 L620 90" fill="none" stroke="#c46a3d" stroke-width="2.5" stroke-dasharray="7 4"/>
   <path d="M400 90 L620 240" fill="none" stroke="#b0413e" stroke-width="2"/>
-  <text x="510" y="76" fill="#c46a3d" font-size="12" text-anchor="middle">terrain ridge crest</text>
+  <text x="510" y="76" fill="#9a4f26" font-size="12" text-anchor="middle">terrain ridge crest</text>
   <text x="510" y="264" fill="#4f7a4d" font-size="12" text-anchor="middle">a diagonal along the crest keeps its height</text>
   <text x="510" y="282" fill="#b0413e" font-size="12" text-anchor="middle">the other diagonal averages it away — up to 0.4 m lost</text>
 </svg>

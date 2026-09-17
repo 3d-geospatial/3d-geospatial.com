@@ -338,6 +338,7 @@ In the database if the data lives there and queries are ad hoc; in the applicati
 
 ## Related Guides
 
+- [Octree Indexing Point Clouds with Morton Codes](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/octree-indexing-point-clouds-with-morton-codes/) — build an octree over a LiDAR point cloud in NumPy with 3D Morton codes
 - [Computing Quadkeys and Tile Bounds in Python](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/computing-quadkeys-and-tile-bounds-in-python/) — the tile arithmetic in full
 - [Choosing Between S2, H3 and Geohash for 3D Data](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/choosing-between-s2-h3-and-geohash-for-3d-data/) — the decision, measured on real extents
 - [Building an R-tree Index for 3D Tile Lookup](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/building-an-r-tree-index-for-3d-tile-lookup/) — bulk loading, capacity tuning and staleness

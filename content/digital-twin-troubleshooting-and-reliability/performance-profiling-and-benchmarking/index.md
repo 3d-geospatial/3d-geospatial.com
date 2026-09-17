@@ -236,7 +236,7 @@ The `--benchmark-compare-fail` threshold is what makes it a gate rather than a r
   <polyline points="100,152 160,118 220,168 280,110 340,172 400,124 460,164 520,106 580,170 640,130"
             fill="none" stroke="#c46a3d" stroke-width="2.5"/>
   <text x="120" y="186" fill="#4f7a4d" font-size="12" text-anchor="start">dedicated runner — ±3%</text>
-  <text x="120" y="88" fill="#c46a3d" font-size="12" text-anchor="start">shared runner — ±18%, crosses the line on noise alone</text>
+  <text x="120" y="88" fill="#9a4f26" font-size="12" text-anchor="start">shared runner — ±18%, crosses the line on noise alone</text>
   <text x="380" y="224" fill="#5b6471" font-size="12" text-anchor="middle">consecutive CI runs of the same commit</text>
   <text x="370" y="252" fill="#15384a" font-size="12.5" text-anchor="middle">Measure your runner's variance first, then set the threshold above it — otherwise the gate trains people to ignore it</text>
 </svg>

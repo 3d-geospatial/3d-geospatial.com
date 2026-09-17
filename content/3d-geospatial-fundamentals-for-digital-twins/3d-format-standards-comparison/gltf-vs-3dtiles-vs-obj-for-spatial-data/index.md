@@ -95,12 +95,12 @@ np.save("origin_utm.npy", origin_utm)   # the bytes you will re-add at tiling ti
   <rect class="svg-bg" x="46" y="0" width="668" height="268" fill="#ffffff"/>
   <text x="380" y="28" fill="#1f2937" font-size="13" text-anchor="middle" font-weight="600">float32 carries about seven significant digits — where you spend them decides what they buy</text>
   <line x1="60" y1="102" x2="700" y2="102" stroke="#b0413e" stroke-width="2"/>
-  <path d="M60 94 V110 M140 94 V110 M220 94 V110 M300 94 V110 M380 94 V110 M460 94 V110 M540 94 V110 M620 94 V110 M700 94 V110"
+  <path fill="none" d="M60 94 V110 M140 94 V110 M220 94 V110 M300 94 V110 M380 94 V110 M460 94 V110 M540 94 V110 M620 94 V110 M700 94 V110"
         stroke="#b0413e" stroke-width="2"/>
   <text x="60" y="80" fill="#b0413e" font-size="12.5" text-anchor="start">raw UTM easting, about 585 016 m</text>
   <text x="60" y="132" fill="#1f2937" font-size="12" text-anchor="start">representable values land ~6 cm apart — vertices visibly wobble as the camera moves</text>
   <line x1="60" y1="196" x2="700" y2="196" stroke="#4f7a4d" stroke-width="2"/>
-  <path d="M60 189 V203 M76 189 V203 M92 189 V203 M108 189 V203 M124 189 V203 M140 189 V203 M156 189 V203 M172 189 V203 M188 189 V203 M204 189 V203 M220 189 V203 M236 189 V203 M252 189 V203 M268 189 V203 M284 189 V203 M300 189 V203 M316 189 V203 M332 189 V203 M348 189 V203 M364 189 V203 M380 189 V203 M396 189 V203 M412 189 V203 M428 189 V203 M444 189 V203 M460 189 V203 M476 189 V203 M492 189 V203 M508 189 V203 M524 189 V203 M540 189 V203 M556 189 V203 M572 189 V203 M588 189 V203 M604 189 V203 M620 189 V203 M636 189 V203 M652 189 V203 M668 189 V203 M684 189 V203 M700 189 V203"
+  <path fill="none" d="M60 189 V203 M76 189 V203 M92 189 V203 M108 189 V203 M124 189 V203 M140 189 V203 M156 189 V203 M172 189 V203 M188 189 V203 M204 189 V203 M220 189 V203 M236 189 V203 M252 189 V203 M268 189 V203 M284 189 V203 M300 189 V203 M316 189 V203 M332 189 V203 M348 189 V203 M364 189 V203 M380 189 V203 M396 189 V203 M412 189 V203 M428 189 V203 M444 189 V203 M460 189 V203 M476 189 V203 M492 189 V203 M508 189 V203 M524 189 V203 M540 189 V203 M556 189 V203 M572 189 V203 M588 189 V203 M604 189 V203 M620 189 V203 M636 189 V203 M652 189 V203 M668 189 V203 M684 189 V203 M700 189 V203"
         stroke="#4f7a4d" stroke-width="1.5"/>
   <text x="60" y="174" fill="#4f7a4d" font-size="12.5" text-anchor="start">local metres after the centroid shift, about 16 m</text>
   <text x="60" y="226" fill="#1f2937" font-size="12" text-anchor="start">representable values land ~1 µm apart — the shift buys back four orders of magnitude</text>

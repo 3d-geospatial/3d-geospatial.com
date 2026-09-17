@@ -115,19 +115,19 @@ assert pcd.has_normals(), "normals missing — Poisson/BPA will fail"
   </defs>
   <path d="M40 170 C 120 120 220 120 300 170" fill="none" stroke="#5b6471" stroke-width="2.5"/>
   <g stroke="#b0413e" stroke-width="2" marker-end="url(#sr-norm-a)">
-    <path d="M74 148 L64 118"/>
-    <path d="M120 130 L114 98"/>
-    <path d="M170 124 L170 92"/>
-    <path d="M220 130 L232 160"/>
-    <path d="M266 148 L280 176"/>
+    <path fill="none" d="M74 148 L64 118"/>
+    <path fill="none" d="M120 130 L114 98"/>
+    <path fill="none" d="M170 124 L170 92"/>
+    <path fill="none" d="M220 130 L232 160"/>
+    <path fill="none" d="M266 148 L280 176"/>
   </g>
   <path d="M420 170 C 500 120 600 120 680 170" fill="none" stroke="#5b6471" stroke-width="2.5"/>
   <g stroke="#4f7a4d" stroke-width="2" marker-end="url(#sr-norm-b)">
-    <path d="M454 148 L444 118"/>
-    <path d="M500 130 L494 98"/>
-    <path d="M550 124 L550 92"/>
-    <path d="M600 130 L612 100"/>
-    <path d="M646 148 L660 120"/>
+    <path fill="none" d="M454 148 L444 118"/>
+    <path fill="none" d="M500 130 L494 98"/>
+    <path fill="none" d="M550 124 L550 92"/>
+    <path fill="none" d="M600 130 L612 100"/>
+    <path fill="none" d="M646 148 L660 120"/>
   </g>
   <text x="170" y="52" fill="#b0413e" font-size="12.5" text-anchor="middle" font-weight="600">estimated, not oriented</text>
   <text x="550" y="52" fill="#4f7a4d" font-size="12.5" text-anchor="middle" font-weight="600">oriented by a spanning-tree walk</text>
@@ -184,7 +184,7 @@ mesh_poisson.remove_non_manifold_edges()
   </g>
   <polyline points="470,200 505,196 540,202 551,168 575,197 608,186 614,150 612,112 616,76"
             fill="none" stroke="#4f7a4d" stroke-width="2.5"/>
-  <text x="150" y="46" fill="#c46a3d" font-size="12.5" text-anchor="middle" font-weight="600">Poisson — implicit, averaging</text>
+  <text x="150" y="46" fill="#9a4f26" font-size="12.5" text-anchor="middle" font-weight="600">Poisson — implicit, averaging</text>
   <text x="550" y="46" fill="#4f7a4d" font-size="12.5" text-anchor="middle" font-weight="600">ball pivoting — interpolating</text>
   <text x="150" y="240" fill="#1f2937" font-size="12" text-anchor="middle">noise absorbed, corner rounded, always closed</text>
   <text x="550" y="240" fill="#1f2937" font-size="12" text-anchor="middle">corner kept, the stray point kept with it, open where data is</text>
@@ -310,6 +310,7 @@ Both algorithms need *oriented* normals — direction and a consistent outward s
 
 ## Related Guides
 
+- [Ball Pivoting Reconstruction for Building Facades](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/ball-pivoting-reconstruction-for-building-facades/) — mesh building facades from terrestrial or mobile LiDAR with Open3D ball pivoting
 - [Poisson Surface Reconstruction Parameters](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/poisson-surface-reconstruction-parameters/) — depth, scale, and density-trim tuning in detail
 - [Point Cloud Filtering Techniques](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/) — outlier removal and classification before reconstruction
 - [Automated Mesh Decimation](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/) — reduce reconstructed triangle counts to a polygon budget

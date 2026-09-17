@@ -146,13 +146,13 @@ The foundational layer of any geospatial digital twin is the terrain surface. De
         fill="none" stroke="#c46a3d" stroke-width="2.5" stroke-dasharray="7 4"/>
   <text x="242" y="122" fill="#5b6471" font-size="11" text-anchor="middle">roof</text>
   <text x="460" y="128" fill="#5b6471" font-size="11" text-anchor="middle">canopy</text>
-  <text x="70" y="228" fill="#4f7a4d" font-size="11" text-anchor="start">bare earth carries on beneath both</text>
+  <text x="70" y="228" fill="#1f2937" font-size="11" text-anchor="start">bare earth carries on beneath both</text>
   <g stroke-width="2.5">
     <line x1="60" y1="272" x2="100" y2="272" stroke="#4f7a4d"/>
     <line x1="330" y1="272" x2="370" y2="272" stroke="#c46a3d" stroke-dasharray="7 4"/>
   </g>
   <text x="110" y="276" fill="#4f7a4d" font-size="12" text-anchor="start">DTM — bare earth</text>
-  <text x="380" y="276" fill="#c46a3d" font-size="12" text-anchor="start">DSM — first surface (roofs and canopy)</text>
+  <text x="380" y="276" fill="#9a4f26" font-size="12" text-anchor="start">DSM — first surface (roofs and canopy)</text>
   <text x="390" y="300" fill="#5b6471" font-size="12" text-anchor="middle">A flood model built on the dashed surface dams itself behind the building</text>
 </svg>
 <figcaption>The same site as a DTM and a DSM. Because &quot;DEM&quot; is silent about which filtering produced it, the product name is never enough — record the classification codes the raster was built from.</figcaption>
@@ -235,7 +235,7 @@ Embed semantic attributes (material, construction year, asset ID) as custom vert
 Digital twins rarely live in a single file format. Engineering teams must move data between CAD, GIS, BIM, and web-visualization environments, and format interoperability is the single largest bottleneck in automated twin pipelines. Common formats serve distinct purposes:
 
 - **CityGML:** Semantic, hierarchical urban modeling with strict schema validation and explicit levels of detail (LOD0–LOD4). Ideal for municipal planning and regulatory compliance.
-- **IFC:** Open BIM standard for the building lifecycle. Preserves rich metadata but has no native geospatial CRS handling, so georeferencing must be applied explicitly on import.
+- **IFC:** Open BIM standard for the building lifecycle. Preserves rich metadata but places buildings in a local engineering frame, so georeferencing must be read and applied explicitly on import — see [BIM and IFC georeferencing](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/).
 - **3D Tiles / glTF:** Optimized for streaming and real-time web rendering. 3D Tiles add spatial indexing and hierarchical LOD, making them the de facto standard for browser-based twins; glTF (with Draco/meshopt) is the payload inside the tiles.
 - **GeoPackage / 3D GeoJSON:** Lightweight, database-friendly formats for attribute-rich spatial queries and API delivery.
 
@@ -249,7 +249,17 @@ Units are the interoperability failure that survives every schema check, because
 
 ---
 
-## 6. Cross-Section Integration
+## 6. BIM and IFC Georeferencing
+
+Building information models are the richest source of geometry and semantics a twin will ever receive, and the least georeferenced. An IFC model is authored in millimetres around a site origin, with its x-axis along the structural grid, and connects to the map only through an `IfcMapConversion` entity: an easting, northing and orthometric height for the origin, a rotation measured from grid north, and a scale that has to reconcile the project's length unit with the map's. IFC2x3 files, still the most common handover schema, have no such entity at all, and carry either buildingSMART's `ePSet_MapConversion` property sets, a single latitude and longitude on `IfcSite`, or nothing.
+
+Getting this wrong produces the most visible class of twin defect — a hospital rotated by the meridian convergence across a road, a campus 47 m above the terrain because orthometric heights were treated as ellipsoidal, a building shrunk to a point because `Scale = 0.001` was applied to geometry that IfcOpenShell had already converted to metres. [BIM and IFC Georeferencing for Digital Twins](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/) walks the full chain with `ifcopenshell` and `pyproj`; the defensive reader is in [reading IfcMapConversion with IfcOpenShell](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/reading-ifcmapconversion-with-ifcopenshell/), the older schema in [georeferencing IFC2x3 models without IfcMapConversion](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/georeferencing-ifc2x3-models-without-map-conversion/), and delivery as tiles in [transforming IFC coordinates to ECEF for 3D Tiles](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/transforming-ifc-coordinates-to-ecef-for-3d-tiles/).
+
+**Key Practice:** Prove BIM placement against surveyed control points, never against the parameters that produced it. Apply the map conversion to four well-spread corners, require horizontal residuals under 5 cm in the target EPSG code, and read the residual pattern: a uniform offset is the translation, a rotation about the origin is grid versus true north, and radial growth is the scale.
+
+---
+
+## 7. Cross-Section Integration
 
 The fundamentals are the input contract for the two production sections. Outputs from this layer flow downstream in a predictable order, and most pipeline failures trace back to a contract being violated at the boundary between them:
 
@@ -261,7 +271,7 @@ The fundamentals are the input contract for the two production sections. Outputs
 
 ---
 
-## 7. Production Validation & Troubleshooting Matrix
+## 8. Production Validation & Troubleshooting Matrix
 
 A digital twin is only as reliable as its validation pipeline. Automated spatial checks must run at every ingestion, transformation, and export stage. The matrix below maps the failure modes that span these fundamentals to their usual root cause and the concrete fix.
 
@@ -276,7 +286,7 @@ A digital twin is only as reliable as its validation pipeline. Automated spatial
 
 ---
 
-## 8. Implementation Checklist for Engineering Teams
+## 9. Implementation Checklist for Engineering Teams
 
 Deploying a spatially rigorous digital twin requires disciplined engineering practice. Use this checklist as a release gate before production rollout:
 
@@ -323,5 +333,6 @@ No. A void under a bridge deck or over open water is a measurement, and filling 
 - [Digital Elevation Model Workflows](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/) — automated raster generation from classified returns
 - [Point Cloud Density Standards](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/) — density targets per asset class
 - [Mesh Topology Basics](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/) — manifold rules and repair
+- [BIM and IFC Georeferencing](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/) — placing building models on the map
 - [Point Cloud & Mesh Processing Pipelines](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/) — the downstream processing section
 - [LOD Management & Optimization Strategies](https://www.3d-geospatial.com/lod-management-optimization-strategies/) — streaming and level-of-detail

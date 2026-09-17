@@ -163,7 +163,7 @@ print("contains:", contains("1202", qk), contains("1203", qk))
     <text x="100" y="235">2</text>
   </g>
   <text x="250" y="285" fill="#1f6b8a" font-size="13" text-anchor="middle" font-weight="600">3</text>
-  <text x="190" y="200" fill="#4f7a4d" font-size="12" text-anchor="middle" font-weight="600">30</text>
+  <text x="190" y="200" fill="#1f2937" font-size="12" text-anchor="middle" font-weight="600">30</text>
   <g fill="#1f2937" font-size="12.5" text-anchor="start">
     <text x="340" y="88">the shaded cell at level 1 is quadkey &quot;3&quot;</text>
     <text x="340" y="118">its first child at level 2 is &quot;30&quot;</text>

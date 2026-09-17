@@ -1,0 +1,706 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <title>Flagging Changed Buildings for Retiling — 3D Geospatial</title>
+  <meta name="description" content="Turn LiDAR change polygons into a retiling work list: match them to building footprints with Shapely, classify new, altered and demolished, and map to dirty shards.">
+  <meta name="keywords" content="3D geospatial, digital twin, point cloud, mesh pipeline, LOD, 3D Tiles, Cesium, PDAL, Open3D, Python, CI/CD">
+  <meta name="author" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta name="theme-color" content="#1f6b8a" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f171d" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+
+  
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem("theme");
+        var theme = (stored === "dark" || stored === "light") ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    })();
+  </script>
+  <meta name="generator" content="Eleventy">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="googlebot" content="index,follow,max-image-preview:large">
+
+  
+  <link rel="canonical" href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/flagging-changed-buildings-for-retiling/">
+  <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">
+
+  
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/icon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+
+  
+  <link rel="apple-touch-icon" href="/assets/img/icon-180.png">
+  <link rel="mask-icon" href="/assets/img/logo.svg" color="#1f6b8a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="3D Geospatial">
+  <meta name="application-name" content="3D Geospatial">
+
+  
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Flagging Changed Buildings for Retiling — 3D Geospatial">
+  <meta property="og:description" content="Turn LiDAR change polygons into a retiling work list: match them to building footprints with Shapely, classify new, altered and demolished, and map to dirty shards.">
+  <meta property="og:url" content="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/flagging-changed-buildings-for-retiling/">
+  <meta property="og:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+  <meta property="og:site_name" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta property="og:locale" content="en_US">
+  
+  <meta property="article:published_time" content="2026-09-17T17:08:20.289Z">
+  <meta property="article:modified_time" content="2026-09-17T17:08:20.289Z">
+  <meta property="article:publisher" content="https://www.3d-geospatial.com/">
+  
+
+  
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Flagging Changed Buildings for Retiling — 3D Geospatial">
+  <meta name="twitter:description" content="Turn LiDAR change polygons into a retiling work list: match them to building footprints with Shapely, classify new, altered and demolished, and map to dirty shards.">
+  <meta name="twitter:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta name="twitter:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+
+  
+  <link rel="preload" href="/assets/css/styles.css?v=8c46394d6c" as="style">
+  
+
+  <link rel="stylesheet" href="/assets/css/styles.css?v=8c46394d6c">
+
+  
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.3d-geospatial.com/#organization",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "url": "https://www.3d-geospatial.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/icon-512.png",
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://www.3d-geospatial.com/#website",
+      "url": "https://www.3d-geospatial.com/",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "description": "Build reliable 3D spatial data pipelines for digital twins — point clouds, meshes, LOD strategies, Python processing, and CI/CD automation.",
+      "inLanguage": "en",
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      }
+    },
+    {
+      "@type": "TechArticle",
+      "@id": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/flagging-changed-buildings-for-retiling/#article",
+      "isPartOf": {
+        "@id": "https://www.3d-geospatial.com/#website"
+      },
+      "headline": "Flagging Changed Buildings for Retiling",
+      "name": "Flagging Changed Buildings for Retiling",
+      "description": "Turn LiDAR change polygons into a retiling work list: match them to building footprints with Shapely, classify new, altered and demolished, and map to dirty shards.",
+      "url": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/flagging-changed-buildings-for-retiling/",
+      "mainEntityOfPage": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/flagging-changed-buildings-for-retiling/",
+      "inLanguage": "en",
+      "datePublished": "2026-09-17T17:08:20.289Z",
+      "dateModified": "2026-09-17T17:08:20.289Z",
+      "author": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "image": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/og-cover.png",
+        "width": 1200,
+        "height": 630
+      },
+      "breadcrumb": {
+        "@id": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/flagging-changed-buildings-for-retiling/#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/flagging-changed-buildings-for-retiling/#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://www.3d-geospatial.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Point Cloud Mesh Processing Pipelines",
+          "item": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Change Detection Between Scan Epochs",
+          "item": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "name": "Flagging Changed Buildings For Retiling",
+          "item": "https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/flagging-changed-buildings-for-retiling/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  
+<header class="site-header" role="banner">
+  <div class="container site-header__inner">
+    <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+      <img src="/assets/img/logo.svg" alt="" class="brand__mark" width="36" height="36">
+      <span class="brand__name">
+        3D Geospatial
+        <small>Digital Twin Automation</small>
+      </span>
+    </a>
+
+    <button class="theme-toggle" type="button" data-theme-toggle
+            aria-label="Switch to dark theme" title="Switch to dark theme">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4.2"/>
+        <path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/>
+      </svg>
+    </button>
+
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>
+      <span class="nav-toggle__icon" aria-hidden="true"><span></span></span>
+      Menu
+    </button>
+
+    <nav class="primary-nav" id="primary-nav" aria-label="Primary">
+      
+      <a href="https://www.3d-geospatial.com/" >
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/>
+        </svg>
+        Home
+      </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2 3 7l9 5 9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 17l9 5 9-5"/>
+            </svg>
+          
+          3D Geospatial Fundamentals
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+          
+          LOD Management &amp; Optimization
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/" aria-current="page">
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="6" cy="6" r="1.5"/><circle cx="12" cy="6" r="1.5"/><circle cx="18" cy="6" r="1.5"/>
+              <circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/>
+              <circle cx="6" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="18" cy="18" r="1.5"/>
+            </svg>
+          
+          Point Cloud &amp; Mesh Pipelines
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <path d="M12 9v4"/><path d="M12 17h.01"/>
+            </svg>
+          
+          Troubleshooting &amp; Reliability
+        </a>
+      
+    </nav>
+  </div>
+</header>
+
+
+  <main id="main">
+    
+
+
+<div class="container">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    
+      
+        <a href="https://www.3d-geospatial.com/">Home</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/">Point Cloud Mesh Processing Pipelines</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/">Change Detection Between Scan Epochs</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <span class="current">Flagging Changed Buildings For Retiling</span>
+      
+    
+  </nav>
+
+  <div class="content-page">
+    <article class="article">
+      <h1 id="flagging-changed-buildings-for-retiling" tabindex="-1"><a class="heading-link" href="#flagging-changed-buildings-for-retiling"><span>Flagging Changed Buildings for Retiling</span></a></h1>
+<p>This page converts the change polygons produced by epoch-to-epoch LiDAR comparison into a retiling work list: matching each polygon to building footprints with a Shapely <code>STRtree</code>, classifying buildings as new, altered or demolished from the sign and extent of the change, and mapping the affected footprints to the quadkey shards an incremental tiling job has to rebuild — all in EPSG:32618 with an explicit hand-off to EPSG:4326 for tile addressing.</p>
+<h2 id="why-you-hit-this" tabindex="-1"><a class="heading-link" href="#why-you-hit-this"><span>Why you hit this</span></a></h2>
+<p>Change detection answers “where did the ground surface move?”, and a tiling pipeline asks “which shards are stale?”. Between them sits a translation step that is easy to get subtly wrong. Use raw change polygons as the dirty set and every parked lorry and regraded verge triggers a rebuild; use only the building register and the new warehouse that has not been registered yet never appears. The detection side is in <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/m3c2-change-detection-with-py4dgeo/">M3C2 change detection with py4dgeo</a>; the rebuild side is in <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/incremental-retiling-of-changed-city-blocks/">incremental retiling of changed city blocks</a>. This page is the join.</p>
+<h2 id="prerequisites" tabindex="-1"><a class="heading-link" href="#prerequisites"><span>Prerequisites</span></a></h2>
+<ul>
+<li><code>shapely&gt;=2.0</code>, <code>pyproj&gt;=3.6</code>, <code>mercantile&gt;=1.2</code>, <code>numpy&gt;=1.24</code>.</li>
+<li>Change polygons as GeoJSON in EPSG:32618 with <code>mean_dz</code>, <code>area_m2</code> and a gain/loss sign — the output of the change-detection workflow.</li>
+<li>Building footprints for the same area in EPSG:32618 with a stable <code>building_id</code>, from the municipal register or from <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/extracting-building-footprints-from-classified-lidar/">extracting building footprints from classified LiDAR</a>.</li>
+<li>The tiling job’s shard zoom level; zoom 16 cells are roughly 380 m across at 40° N.</li>
+</ul>
+<h2 id="step-by-step" tabindex="-1"><a class="heading-link" href="#step-by-step"><span>Step-by-Step</span></a></h2>
+<h3 id="1-load-polygons-and-footprints-into-an-index" tabindex="-1"><a class="heading-link" href="#1-load-polygons-and-footprints-into-an-index"><span>1. Load polygons and footprints into an index</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> json
+<span class="token keyword">from</span> shapely <span class="token keyword">import</span> STRtree
+<span class="token keyword">from</span> shapely<span class="token punctuation">.</span>geometry <span class="token keyword">import</span> shape
+
+<span class="token keyword">def</span> <span class="token function">load_features</span><span class="token punctuation">(</span>path<span class="token punctuation">,</span> id_field<span class="token operator">=</span><span class="token boolean">None</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    fc <span class="token operator">=</span> json<span class="token punctuation">.</span>load<span class="token punctuation">(</span><span class="token builtin">open</span><span class="token punctuation">(</span>path<span class="token punctuation">)</span><span class="token punctuation">)</span>
+    geoms <span class="token operator">=</span> <span class="token punctuation">[</span>shape<span class="token punctuation">(</span>f<span class="token punctuation">[</span><span class="token string">"geometry"</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token keyword">for</span> f <span class="token keyword">in</span> fc<span class="token punctuation">[</span><span class="token string">"features"</span><span class="token punctuation">]</span><span class="token punctuation">]</span>
+    props <span class="token operator">=</span> <span class="token punctuation">[</span>f<span class="token punctuation">[</span><span class="token string">"properties"</span><span class="token punctuation">]</span> <span class="token keyword">for</span> f <span class="token keyword">in</span> fc<span class="token punctuation">[</span><span class="token string">"features"</span><span class="token punctuation">]</span><span class="token punctuation">]</span>
+    <span class="token keyword">if</span> id_field<span class="token punctuation">:</span>
+        <span class="token keyword">assert</span> <span class="token builtin">len</span><span class="token punctuation">(</span><span class="token punctuation">{</span>p<span class="token punctuation">[</span>id_field<span class="token punctuation">]</span> <span class="token keyword">for</span> p <span class="token keyword">in</span> props<span class="token punctuation">}</span><span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token builtin">len</span><span class="token punctuation">(</span>props<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>id_field<span class="token punctuation">}</span></span><span class="token string"> is not unique"</span></span>
+    <span class="token keyword">return</span> geoms<span class="token punctuation">,</span> props
+
+change_geoms<span class="token punctuation">,</span> change_props <span class="token operator">=</span> load_features<span class="token punctuation">(</span><span class="token string">"changes_2025-06_2026-06.geojson"</span><span class="token punctuation">)</span>
+bldg_geoms<span class="token punctuation">,</span> bldg_props <span class="token operator">=</span> load_features<span class="token punctuation">(</span><span class="token string">"footprints_2025.geojson"</span><span class="token punctuation">,</span> id_field<span class="token operator">=</span><span class="token string">"building_id"</span><span class="token punctuation">)</span>
+
+<span class="token keyword">for</span> g <span class="token keyword">in</span> change_geoms <span class="token operator">+</span> bldg_geoms<span class="token punctuation">:</span>
+    <span class="token keyword">assert</span> g<span class="token punctuation">.</span>is_valid<span class="token punctuation">,</span> <span class="token string">"repair invalid geometry with shapely.make_valid before indexing"</span>
+
+tree <span class="token operator">=</span> STRtree<span class="token punctuation">(</span>bldg_geoms<span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span><span class="token builtin">len</span><span class="token punctuation">(</span>change_geoms<span class="token punctuation">)</span><span class="token punctuation">}</span></span><span class="token string"> change polygons, </span><span class="token interpolation"><span class="token punctuation">{</span><span class="token builtin">len</span><span class="token punctuation">(</span>bldg_geoms<span class="token punctuation">)</span><span class="token punctuation">}</span></span><span class="token string"> footprints indexed"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>Both files have to be in the same projected CRS, EPSG:32618 here, because overlap is measured as area. A footprint file in EPSG:4326 would load without error and produce overlap fractions computed in square degrees — tiny, meaningless numbers that make every building look unchanged.</p>
+<h3 id="2-measure-how-much-of-each-building-changed" tabindex="-1"><a class="heading-link" href="#2-measure-how-much-of-each-building-changed"><span>2. Measure how much of each building changed</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">from</span> collections <span class="token keyword">import</span> defaultdict
+
+overlap <span class="token operator">=</span> defaultdict<span class="token punctuation">(</span><span class="token keyword">lambda</span><span class="token punctuation">:</span> <span class="token punctuation">{</span><span class="token string">"gain"</span><span class="token punctuation">:</span> <span class="token number">0.0</span><span class="token punctuation">,</span> <span class="token string">"loss"</span><span class="token punctuation">:</span> <span class="token number">0.0</span><span class="token punctuation">,</span> <span class="token string">"dz"</span><span class="token punctuation">:</span> <span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+
+<span class="token keyword">for</span> cg<span class="token punctuation">,</span> cp <span class="token keyword">in</span> <span class="token builtin">zip</span><span class="token punctuation">(</span>change_geoms<span class="token punctuation">,</span> change_props<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    kind <span class="token operator">=</span> <span class="token string">"gain"</span> <span class="token keyword">if</span> cp<span class="token punctuation">[</span><span class="token string">"mean_dz"</span><span class="token punctuation">]</span> <span class="token operator">></span> <span class="token number">0</span> <span class="token keyword">else</span> <span class="token string">"loss"</span>
+    <span class="token keyword">for</span> i <span class="token keyword">in</span> tree<span class="token punctuation">.</span>query<span class="token punctuation">(</span>cg<span class="token punctuation">,</span> predicate<span class="token operator">=</span><span class="token string">"intersects"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        shared <span class="token operator">=</span> cg<span class="token punctuation">.</span>intersection<span class="token punctuation">(</span>bldg_geoms<span class="token punctuation">[</span>i<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">.</span>area
+        <span class="token keyword">if</span> shared <span class="token operator">></span> <span class="token number">0</span><span class="token punctuation">:</span>
+            rec <span class="token operator">=</span> overlap<span class="token punctuation">[</span>i<span class="token punctuation">]</span>
+            rec<span class="token punctuation">[</span>kind<span class="token punctuation">]</span> <span class="token operator">+=</span> shared
+            rec<span class="token punctuation">[</span><span class="token string">"dz"</span><span class="token punctuation">]</span><span class="token punctuation">.</span>append<span class="token punctuation">(</span><span class="token punctuation">(</span>cp<span class="token punctuation">[</span><span class="token string">"mean_dz"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> shared<span class="token punctuation">)</span><span class="token punctuation">)</span>
+
+<span class="token keyword">for</span> i<span class="token punctuation">,</span> rec <span class="token keyword">in</span> <span class="token builtin">list</span><span class="token punctuation">(</span>overlap<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token number">3</span><span class="token punctuation">]</span><span class="token punctuation">:</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span>bldg_props<span class="token punctuation">[</span>i<span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token string">"building_id"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token punctuation">{</span>k<span class="token punctuation">:</span> <span class="token builtin">round</span><span class="token punctuation">(</span>v<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span> <span class="token keyword">for</span> k<span class="token punctuation">,</span> v <span class="token keyword">in</span> rec<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token keyword">if</span> k <span class="token operator">!=</span> <span class="token string">"dz"</span><span class="token punctuation">}</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p><code>STRtree.query</code> with <code>predicate=&quot;intersects&quot;</code> returns indices of footprints that genuinely intersect, not merely whose bounding boxes overlap, so the loop body only computes real intersections. Recording the area-weighted <code>mean_dz</code> per building lets the next step tell a new storey (a large positive change over most of the roof) from a rooftop plant installation (a small positive change over a few percent).</p>
+<h3 id="3-classify-buildings-including-ones-the-register-does-not-know" tabindex="-1"><a class="heading-link" href="#3-classify-buildings-including-ones-the-register-does-not-know"><span>3. Classify buildings, including ones the register does not know</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python">new_buildings <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+status <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token punctuation">}</span>
+
+<span class="token keyword">for</span> i<span class="token punctuation">,</span> rec <span class="token keyword">in</span> overlap<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    area <span class="token operator">=</span> bldg_geoms<span class="token punctuation">[</span>i<span class="token punctuation">]</span><span class="token punctuation">.</span>area
+    loss_frac<span class="token punctuation">,</span> gain_frac <span class="token operator">=</span> rec<span class="token punctuation">[</span><span class="token string">"loss"</span><span class="token punctuation">]</span> <span class="token operator">/</span> area<span class="token punctuation">,</span> rec<span class="token punctuation">[</span><span class="token string">"gain"</span><span class="token punctuation">]</span> <span class="token operator">/</span> area
+    w <span class="token operator">=</span> <span class="token builtin">sum</span><span class="token punctuation">(</span>a <span class="token keyword">for</span> _<span class="token punctuation">,</span> a <span class="token keyword">in</span> rec<span class="token punctuation">[</span><span class="token string">"dz"</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    mean_dz <span class="token operator">=</span> <span class="token builtin">sum</span><span class="token punctuation">(</span>d <span class="token operator">*</span> a <span class="token keyword">for</span> d<span class="token punctuation">,</span> a <span class="token keyword">in</span> rec<span class="token punctuation">[</span><span class="token string">"dz"</span><span class="token punctuation">]</span><span class="token punctuation">)</span> <span class="token operator">/</span> w
+    <span class="token keyword">if</span> loss_frac <span class="token operator">></span> <span class="token number">0.6</span> <span class="token keyword">and</span> mean_dz <span class="token operator">&lt;</span> <span class="token operator">-</span><span class="token number">2.5</span><span class="token punctuation">:</span>
+        status<span class="token punctuation">[</span>i<span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token string">"demolished"</span>
+    <span class="token keyword">elif</span> <span class="token builtin">max</span><span class="token punctuation">(</span>loss_frac<span class="token punctuation">,</span> gain_frac<span class="token punctuation">)</span> <span class="token operator">></span> <span class="token number">0.1</span> <span class="token keyword">and</span> <span class="token builtin">abs</span><span class="token punctuation">(</span>mean_dz<span class="token punctuation">)</span> <span class="token operator">></span> <span class="token number">0.5</span><span class="token punctuation">:</span>
+        status<span class="token punctuation">[</span>i<span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token string">"altered"</span>
+
+footprint_union <span class="token operator">=</span> STRtree<span class="token punctuation">(</span>bldg_geoms<span class="token punctuation">)</span>
+<span class="token keyword">for</span> cg<span class="token punctuation">,</span> cp <span class="token keyword">in</span> <span class="token builtin">zip</span><span class="token punctuation">(</span>change_geoms<span class="token punctuation">,</span> change_props<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">if</span> cp<span class="token punctuation">[</span><span class="token string">"mean_dz"</span><span class="token punctuation">]</span> <span class="token operator">></span> <span class="token number">2.5</span> <span class="token keyword">and</span> cp<span class="token punctuation">[</span><span class="token string">"area_m2"</span><span class="token punctuation">]</span> <span class="token operator">></span> <span class="token number">30</span><span class="token punctuation">:</span>
+        hits <span class="token operator">=</span> footprint_union<span class="token punctuation">.</span>query<span class="token punctuation">(</span>cg<span class="token punctuation">,</span> predicate<span class="token operator">=</span><span class="token string">"intersects"</span><span class="token punctuation">)</span>
+        covered <span class="token operator">=</span> <span class="token builtin">sum</span><span class="token punctuation">(</span>cg<span class="token punctuation">.</span>intersection<span class="token punctuation">(</span>bldg_geoms<span class="token punctuation">[</span>j<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">.</span>area <span class="token keyword">for</span> j <span class="token keyword">in</span> hits<span class="token punctuation">)</span>
+        <span class="token keyword">if</span> covered <span class="token operator">/</span> cg<span class="token punctuation">.</span>area <span class="token operator">&lt;</span> <span class="token number">0.2</span><span class="token punctuation">:</span>
+            new_buildings<span class="token punctuation">.</span>append<span class="token punctuation">(</span>cg<span class="token punctuation">)</span>
+
+counts <span class="token operator">=</span> <span class="token punctuation">{</span>s<span class="token punctuation">:</span> <span class="token builtin">list</span><span class="token punctuation">(</span>status<span class="token punctuation">.</span>values<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">.</span>count<span class="token punctuation">(</span>s<span class="token punctuation">)</span> <span class="token keyword">for</span> s <span class="token keyword">in</span> <span class="token punctuation">(</span><span class="token string">"demolished"</span><span class="token punctuation">,</span> <span class="token string">"altered"</span><span class="token punctuation">)</span><span class="token punctuation">}</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span>counts<span class="token punctuation">,</span> <span class="token string">"new:"</span><span class="token punctuation">,</span> <span class="token builtin">len</span><span class="token punctuation">(</span>new_buildings<span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>The thresholds encode building-scale judgement and are worth stating in plain terms. A demolition removes most of the footprint and drops the surface by at least a storey’s height. An alteration changes at least a tenth of the roof by more than half a metre, which excludes antennas and solar panels. A new building is a gain of more than a storey over more than 30 m² that is mostly outside every known footprint. Put these numbers in configuration, not code, so a city with many low sheds can tune them without a release.</p>
+<figure class="diagram">
+<svg viewBox="6 16 743 260" role="img" aria-labelledby="fcb-class-t fcb-class-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="fcb-class-t">How overlap and height change classify a building</title>
+  <desc id="fcb-class-d">Four footprint scenarios. A loss polygon covering most of a footprint with a drop of several metres is a demolition. A gain polygon over a part of a roof with a rise of a storey is an alteration. A small gain over a few percent of a roof is ignored as rooftop equipment. A gain polygon with no footprint beneath it is a new building the register does not yet contain.</desc>
+  <rect class="svg-bg" x="6" y="16" width="743" height="260" fill="#ffffff"/>
+  <rect x="20" y="30" width="160" height="150" rx="6" fill="#ffffff" stroke="#5b6471" stroke-width="1.5"/>
+  <rect x="205" y="30" width="160" height="150" rx="6" fill="#ffffff" stroke="#5b6471" stroke-width="1.5"/>
+  <rect x="390" y="30" width="160" height="150" rx="6" fill="#ffffff" stroke="#5b6471" stroke-width="1.5"/>
+  <rect x="575" y="30" width="160" height="150" rx="6" fill="#ffffff" stroke="#5b6471" stroke-width="1.5"/>
+  <path d="M45 60 h110 v90 h-110 Z" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <path d="M40 56 h116 v84 h-116 Z" fill="#f7dfdc" stroke="#b0413e" stroke-width="2" fill-opacity="0.8"/>
+  <path d="M230 60 h110 v90 h-110 Z" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <path d="M290 60 h50 v50 h-50 Z" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <path d="M415 60 h110 v90 h-110 Z" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <path d="M495 70 h16 v14 h-16 Z" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <path d="M610 62 h90 v80 h-90 Z" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="100" y="206">demolished</text>
+    <text x="285" y="206">altered</text>
+    <text x="470" y="206">ignored</text>
+    <text x="655" y="206">new</text>
+  </g>
+  <g fill="#5b6471" font-size="11.5" text-anchor="middle">
+    <text x="100" y="226">loss &gt; 60%, dZ &lt; −2.5 m</text>
+    <text x="285" y="226">&gt; 10% of roof, |dZ| &gt; 0.5 m</text>
+    <text x="470" y="226">3% of roof: plant</text>
+    <text x="655" y="226">gain, &lt; 20% on footprints</text>
+  </g>
+  <text x="380" y="258" fill="#15384a" font-size="12.5" text-anchor="middle">blue: registered footprint · green: gain polygon · red: loss polygon</text>
+</svg>
+<figcaption>The same change polygon means different things depending on how much of a footprint it covers and how far the surface moved.</figcaption>
+</figure>
+<h3 id="4-map-affected-buildings-to-shards" tabindex="-1"><a class="heading-link" href="#4-map-affected-buildings-to-shards"><span>4. Map affected buildings to shards</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> mercantile
+<span class="token keyword">from</span> pyproj <span class="token keyword">import</span> Transformer
+
+SHARD_ZOOM <span class="token operator">=</span> <span class="token number">16</span>
+to_wgs84 <span class="token operator">=</span> Transformer<span class="token punctuation">.</span>from_crs<span class="token punctuation">(</span><span class="token string">"EPSG:32618"</span><span class="token punctuation">,</span> <span class="token string">"EPSG:4326"</span><span class="token punctuation">,</span> always_xy<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+
+<span class="token keyword">def</span> <span class="token function">shards_for</span><span class="token punctuation">(</span>geom<span class="token punctuation">,</span> buffer_m<span class="token operator">=</span><span class="token number">5.0</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    minx<span class="token punctuation">,</span> miny<span class="token punctuation">,</span> maxx<span class="token punctuation">,</span> maxy <span class="token operator">=</span> geom<span class="token punctuation">.</span><span class="token builtin">buffer</span><span class="token punctuation">(</span>buffer_m<span class="token punctuation">)</span><span class="token punctuation">.</span>bounds
+    lons<span class="token punctuation">,</span> lats <span class="token operator">=</span> to_wgs84<span class="token punctuation">.</span>transform<span class="token punctuation">(</span><span class="token punctuation">[</span>minx<span class="token punctuation">,</span> maxx<span class="token punctuation">,</span> maxx<span class="token punctuation">,</span> minx<span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token punctuation">[</span>miny<span class="token punctuation">,</span> miny<span class="token punctuation">,</span> maxy<span class="token punctuation">,</span> maxy<span class="token punctuation">]</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> <span class="token punctuation">{</span>mercantile<span class="token punctuation">.</span>quadkey<span class="token punctuation">(</span>t<span class="token punctuation">)</span> <span class="token keyword">for</span> t <span class="token keyword">in</span>
+            mercantile<span class="token punctuation">.</span>tiles<span class="token punctuation">(</span><span class="token builtin">min</span><span class="token punctuation">(</span>lons<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token builtin">min</span><span class="token punctuation">(</span>lats<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token builtin">max</span><span class="token punctuation">(</span>lons<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token builtin">max</span><span class="token punctuation">(</span>lats<span class="token punctuation">)</span><span class="token punctuation">,</span> SHARD_ZOOM<span class="token punctuation">)</span><span class="token punctuation">}</span>
+
+dirty <span class="token operator">=</span> defaultdict<span class="token punctuation">(</span><span class="token builtin">set</span><span class="token punctuation">)</span>
+<span class="token keyword">for</span> i<span class="token punctuation">,</span> s <span class="token keyword">in</span> status<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">for</span> qk <span class="token keyword">in</span> shards_for<span class="token punctuation">(</span>bldg_geoms<span class="token punctuation">[</span>i<span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        dirty<span class="token punctuation">[</span>qk<span class="token punctuation">]</span><span class="token punctuation">.</span>add<span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>s<span class="token punctuation">}</span></span><span class="token string">:</span><span class="token interpolation"><span class="token punctuation">{</span>bldg_props<span class="token punctuation">[</span>i<span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token string">'building_id'</span><span class="token punctuation">]</span><span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+<span class="token keyword">for</span> n<span class="token punctuation">,</span> g <span class="token keyword">in</span> <span class="token builtin">enumerate</span><span class="token punctuation">(</span>new_buildings<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">for</span> qk <span class="token keyword">in</span> shards_for<span class="token punctuation">(</span>g<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        dirty<span class="token punctuation">[</span>qk<span class="token punctuation">]</span><span class="token punctuation">.</span>add<span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"new:candidate-</span><span class="token interpolation"><span class="token punctuation">{</span>n<span class="token punctuation">:</span><span class="token format-spec">04d</span><span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span><span class="token builtin">len</span><span class="token punctuation">(</span>dirty<span class="token punctuation">)</span><span class="token punctuation">}</span></span><span class="token string"> dirty shards at z</span><span class="token interpolation"><span class="token punctuation">{</span>SHARD_ZOOM<span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>All four corners of the buffered bounding box are transformed, not just two. A UTM rectangle is not a rectangle in longitude and latitude — its edges converge slightly — so transforming only the lower-left and upper-right corners can miss a sliver of a neighbouring shard at the top-left. The five-metre buffer does the same job for geometry: a building whose wall sits exactly on a shard boundary has its eaves, and its tile content, in the neighbour.</p>
+<figure class="diagram">
+<svg viewBox="66 6 628 278" role="img" aria-labelledby="fcb-shard-t fcb-shard-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="fcb-shard-t">A building on a shard boundary dirties both shards</title>
+  <desc id="fcb-shard-d">A three by two grid of shards. An altered building lies close to the boundary between two shards. Its footprint touches only the left one, but the five metre buffer crosses the boundary, so both shards are marked dirty. A demolished building in the middle of another shard dirties only that shard.</desc>
+  <rect class="svg-bg" x="66" y="6" width="628" height="278" fill="#ffffff"/>
+  <rect x="80" y="20" width="200" height="110" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <rect x="280" y="20" width="200" height="110" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <rect x="480" y="20" width="200" height="110" fill="#ffffff" stroke="#5b6471" stroke-width="1.5"/>
+  <rect x="80" y="130" width="200" height="110" fill="#ffffff" stroke="#5b6471" stroke-width="1.5"/>
+  <rect x="280" y="130" width="200" height="110" fill="#ffffff" stroke="#5b6471" stroke-width="1.5"/>
+  <rect x="480" y="130" width="200" height="110" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <path d="M206 50 h66 v50 h-66 Z" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <path d="M198 42 h82 v66 h-82 Z" fill="none" stroke="#1f6b8a" stroke-width="1.2" stroke-dasharray="4 3"/>
+  <path d="M282 42 h8 v66 h-8" fill="none" stroke="#1f6b8a" stroke-width="1.2" stroke-dasharray="4 3"/>
+  <path d="M550 160 h60 v50 h-60 Z" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
+  <g fill="#1f2937" font-size="12" text-anchor="middle">
+    <text x="130" y="80">dirty</text>
+    <text x="400" y="80">dirty: buffer</text>
+    <text x="580" y="80">clean</text>
+    <text x="180" y="190">clean</text>
+    <text x="380" y="190">clean</text>
+    <text x="580" y="230">dirty</text>
+  </g>
+  <text x="239" y="124" fill="#1f6b8a" font-size="11.5" text-anchor="middle">altered</text>
+  <text x="580" y="152" fill="#b0413e" font-size="11.5" text-anchor="middle">demolished</text>
+  <text x="380" y="266" fill="#15384a" font-size="12.5" text-anchor="middle">Buffering by the eave overhang catches content that crosses the shard edge.</text>
+</svg>
+<figcaption>Shard membership is decided by the tile content, which extends past the footprint; the buffer makes the dirty set match what the tiler actually writes.</figcaption>
+</figure>
+<h3 id="5-write-the-work-list" tabindex="-1"><a class="heading-link" href="#5-write-the-work-list"><span>5. Write the work list</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python">worklist <span class="token operator">=</span> <span class="token punctuation">{</span>
+    <span class="token string">"comparison"</span><span class="token punctuation">:</span> <span class="token punctuation">{</span><span class="token string">"t0"</span><span class="token punctuation">:</span> <span class="token string">"2025-06"</span><span class="token punctuation">,</span> <span class="token string">"t1"</span><span class="token punctuation">:</span> <span class="token string">"2026-06"</span><span class="token punctuation">,</span> <span class="token string">"crs"</span><span class="token punctuation">:</span> <span class="token string">"EPSG:32618+5703"</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+    <span class="token string">"shard_zoom"</span><span class="token punctuation">:</span> SHARD_ZOOM<span class="token punctuation">,</span>
+    <span class="token string">"thresholds"</span><span class="token punctuation">:</span> <span class="token punctuation">{</span><span class="token string">"demolish_loss_frac"</span><span class="token punctuation">:</span> <span class="token number">0.6</span><span class="token punctuation">,</span> <span class="token string">"alter_frac"</span><span class="token punctuation">:</span> <span class="token number">0.1</span><span class="token punctuation">,</span> <span class="token string">"new_min_area_m2"</span><span class="token punctuation">:</span> <span class="token number">30</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+    <span class="token string">"shards"</span><span class="token punctuation">:</span> <span class="token punctuation">{</span>qk<span class="token punctuation">:</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span>reasons<span class="token punctuation">)</span> <span class="token keyword">for</span> qk<span class="token punctuation">,</span> reasons <span class="token keyword">in</span> <span class="token builtin">sorted</span><span class="token punctuation">(</span>dirty<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">}</span><span class="token punctuation">,</span>
+    <span class="token string">"new_building_candidates"</span><span class="token punctuation">:</span> <span class="token punctuation">[</span>json<span class="token punctuation">.</span>loads<span class="token punctuation">(</span>json<span class="token punctuation">.</span>dumps<span class="token punctuation">(</span>g<span class="token punctuation">.</span>__geo_interface__<span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token keyword">for</span> g <span class="token keyword">in</span> new_buildings<span class="token punctuation">]</span><span class="token punctuation">,</span>
+<span class="token punctuation">}</span>
+<span class="token keyword">with</span> <span class="token builtin">open</span><span class="token punctuation">(</span><span class="token string">"retile_worklist_2026-06.json"</span><span class="token punctuation">,</span> <span class="token string">"w"</span><span class="token punctuation">)</span> <span class="token keyword">as</span> f<span class="token punctuation">:</span>
+    json<span class="token punctuation">.</span>dump<span class="token punctuation">(</span>worklist<span class="token punctuation">,</span> f<span class="token punctuation">,</span> indent<span class="token operator">=</span><span class="token number">2</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>The thresholds are written into the file alongside the result for the same reason a test report records its configuration. When next year’s comparison flags twice as many alterations, the first question is whether the city changed or the settings did, and the work list should answer that without anyone opening the code history.</p>
+<p>Recording the reasons against each shard — which building, which classification — is what makes the work list reviewable. A rebuild of 40 shards that someone can read is approved; one that says only “40 shards” is questioned. The new-building candidates go to the register team as well as the tiler, because until they have an identifier they cannot carry attributes in the twin.</p>
+<h2 id="expected-output-verification" tabindex="-1"><a class="heading-link" href="#expected-output-verification"><span>Expected Output &amp; Verification</span></a></h2>
+<div class="codeblock" data-lang="text"><div class="codeblock__bar"><span class="codeblock__lang">text</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-text" tabindex="0" role="group" aria-label="text code sample"><code class="language-text">212 change polygons, 18,406 footprints indexed
+{'demolished': 7, 'altered': 41} new: 5
+63 dirty shards at z16
+</code></pre></div>
+<p>Verify against independent records rather than the change data. Demolition and building-permit registers for the comparison period should account for most <code>demolished</code> and <code>new</code> entries; a permitted demolition that is missing points at an occlusion or a too-strict threshold, and an unpermitted one is worth a human look before it is published. Then check the multiplier: dirty shards per changed building should sit between 1 and about 1.5 at zoom 16. A much higher ratio means the buffer is too large or a huge change polygon — typically a regraded site — is being attributed to every footprint it touches.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python">changed <span class="token operator">=</span> <span class="token builtin">len</span><span class="token punctuation">(</span>status<span class="token punctuation">)</span> <span class="token operator">+</span> <span class="token builtin">len</span><span class="token punctuation">(</span>new_buildings<span class="token punctuation">)</span>
+ratio <span class="token operator">=</span> <span class="token builtin">len</span><span class="token punctuation">(</span>dirty<span class="token punctuation">)</span> <span class="token operator">/</span> <span class="token builtin">max</span><span class="token punctuation">(</span>changed<span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>ratio<span class="token punctuation">:</span><span class="token format-spec">.2f</span><span class="token punctuation">}</span></span><span class="token string"> shards per changed building"</span></span><span class="token punctuation">)</span>
+<span class="token keyword">assert</span> ratio <span class="token operator">&lt;</span> <span class="token number">2.0</span><span class="token punctuation">,</span> <span class="token string">"dirty set is inflated: check buffer size and oversized change polygons"</span>
+</code></pre></div>
+<figure class="diagram">
+<svg viewBox="-4 6 768 198" role="img" aria-labelledby="fcb-flow-t fcb-flow-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="fcb-flow-t">From change polygons to a retiling work list</title>
+  <desc id="fcb-flow-d">Change polygons and building footprints are joined with a spatial index, buildings are classified as demolished, altered or new, their buffered extents are transformed from UTM to longitude and latitude and mapped to zoom 16 quadkeys, and the resulting work list feeds both the incremental tiler and the building register.</desc>
+  <rect class="svg-bg" x="-4" y="6" width="768" height="198" fill="#ffffff"/>
+  <defs>
+    <marker id="fcb-flow-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
+    </marker>
+  </defs>
+  <rect x="10" y="20" width="120" height="50" rx="8" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <rect x="10" y="100" width="120" height="50" rx="8" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <rect x="170" y="60" width="120" height="50" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="330" y="60" width="120" height="50" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="490" y="60" width="120" height="50" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="650" y="20" width="100" height="50" rx="8" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <rect x="650" y="100" width="100" height="50" rx="8" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <g stroke="#5b6471" stroke-width="2" fill="none" marker-end="url(#fcb-flow-arrow)">
+    <path d="M130 45 L168 76"/>
+    <path d="M130 125 L168 94"/>
+    <path d="M290 85 H328"/>
+    <path d="M450 85 H488"/>
+    <path d="M610 76 L648 50"/>
+    <path d="M610 94 L648 120"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="70" y="42">change</text><text x="70" y="59">polygons</text>
+    <text x="70" y="122">footprints</text><text x="70" y="139">EPSG:32618</text>
+    <text x="230" y="82">STRtree</text><text x="230" y="99">overlap</text>
+    <text x="390" y="82">classify</text><text x="390" y="99">buildings</text>
+    <text x="550" y="82">UTM → 4326</text><text x="550" y="99">quadkeys z16</text>
+    <text x="700" y="42">incremental</text><text x="700" y="59">tiler</text>
+    <text x="700" y="122">building</text><text x="700" y="139">register</text>
+  </g>
+  <text x="380" y="186" fill="#15384a" font-size="12.5" text-anchor="middle">Areas are measured in metres; only shard addressing crosses into longitude and latitude.</text>
+</svg>
+<figcaption>Keeping every area computation in the projected CRS and transforming only for addressing avoids the most common silent error in this join.</figcaption>
+</figure>
+<h2 id="common-errors" tabindex="-1"><a class="heading-link" href="#common-errors"><span>Common Errors</span></a></h2>
+<p><strong>Every overlap fraction is zero or near zero.</strong> One of the two files is in EPSG:4326. Check <code>bldg_geoms[0].bounds</code>: values under 180 are degrees. Reproject before indexing.</p>
+<p><strong><code>GEOSException: TopologyException: Input geom 1 is invalid</code>.</strong> A footprint has a self-intersection, common in digitised registers. Run <code>shapely.make_valid</code> on both layers before building the tree, and log how many were repaired.</p>
+<p><strong>Hundreds of shards dirty after a routine resurvey.</strong> A regraded construction site produced one enormous change polygon that intersects many footprints at small fractions. Cap change polygon area before the join, or split large polygons on the shard grid first so each piece is classified on its own.</p>
+<h2 id="frequently-asked-questions" tabindex="-1"><a class="heading-link" href="#frequently-asked-questions"><span>Frequently Asked Questions</span></a></h2>
+<h3 id="why-not-retile-every-shard-any-change-polygon-touches" tabindex="-1"><a class="heading-link" href="#why-not-retile-every-shard-any-change-polygon-touches"><span>Why not retile every shard any change polygon touches?</span></a></h3>
+<p>Because most change is not building change: earthworks, vegetation that survived filtering, vehicles, stockpiles. Filtering through footprints keeps the rebuild proportional to what the building tiles actually contain. Terrain tiles are a separate layer with their own, simpler rule — any significant ground change dirties the shard.</p>
+<h3 id="what-zoom-should-the-shards-be" tabindex="-1"><a class="heading-link" href="#what-zoom-should-the-shards-be"><span>What zoom should the shards be?</span></a></h3>
+<p>Whatever the tiler uses; the join must not invent its own. Zoom 15 to 17 is typical for building content, trading rebuild granularity against shard count.</p>
+<h3 id="how-do-i-handle-a-building-that-is-both-altered-and-partly-demolished" tabindex="-1"><a class="heading-link" href="#how-do-i-handle-a-building-that-is-both-altered-and-partly-demolished"><span>How do I handle a building that is both altered and partly demolished?</span></a></h3>
+<p>Treat it as altered and rebuild it from the new epoch. The classification decides priority and reporting, not what the tiler does — any listed building is regenerated from current data.</p>
+<h2 id="related-guides" tabindex="-1"><a class="heading-link" href="#related-guides"><span>Related Guides</span></a></h2>
+<ul>
+<li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/m3c2-change-detection-with-py4dgeo/">M3C2 Change Detection with py4dgeo</a> — producing the change polygons</li>
+<li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/incremental-retiling-of-changed-city-blocks/">Incremental Retiling of Changed City Blocks</a> — consuming the work list</li>
+<li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/computing-quadkeys-and-tile-bounds-in-python/">Computing Quadkeys and Tile Bounds in Python</a> — the addressing scheme used for shards</li>
+</ul>
+<p>Back to <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/">Change Detection Between LiDAR Scan Epochs</a>.</p>
+
+
+      
+      
+
+      <div class="related-nav">
+        
+
+        
+          <div>
+            <h3>Related</h3>
+            <div class="related-grid">
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/cloud-to-cloud-distance-with-open3d/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Cloud-to-Cloud Distance with Open3D</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/m3c2-change-detection-with-py4dgeo/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">M3C2 Change Detection with py4dgeo</span>
+                </a>
+              
+            </div>
+          </div>
+        
+      </div>
+    </article>
+
+    
+    <aside class="toc" aria-label="On this page" data-toc hidden>
+      <h4>On this page</h4>
+      <ul></ul>
+    </aside>
+  </div>
+</div>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+  <div class="container site-footer__inner">
+    <div class="site-footer__brand">
+      <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+        <img src="/assets/img/logo-mark.svg" alt="" class="brand__mark" width="36" height="36">
+        <span class="brand__name">
+          3D Geospatial
+          <small>Digital Twin Automation</small>
+        </span>
+      </a>
+      <p>Engineering-grade guides on point cloud processing, mesh pipelines, LOD strategies, and CI/CD automation for digital twin platforms.</p>
+      <a class="footer-social" href="https://github.com/3d-geospatial" aria-label="3D Geospatial on GitHub" rel="noopener" target="_blank">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+          <path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.53-1.34-1.3-1.7-1.3-1.7-1.06-.72.08-.71.08-.71 1.17.08 1.79 1.2 1.79 1.2 1.04 1.79 2.73 1.27 3.4.97.1-.75.4-1.27.73-1.56-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.19-3.08-.12-.3-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.75.11 3.05.74.8 1.19 1.83 1.19 3.08 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.07.78 2.15v3.18c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5Z"/>
+        </svg>
+        <span>GitHub</span>
+      </a>
+    </div>
+
+    <div class="site-footer__col">
+      <h4>Sections</h4>
+      <ul>
+        <li><a href="https://www.3d-geospatial.com/">Home</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management &amp; Optimization</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/">Point Cloud &amp; Mesh Pipelines</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/">Troubleshooting &amp; Reliability</a></li>
+        
+      </ul>
+    </div>
+
+    
+      <div class="site-footer__col">
+        <h4>3D Geospatial Fundamentals</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/">3D Format Standards Comparison</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/">BIM and IFC Georeferencing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems for 3D Assets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/">Digital Elevation Model Workflows</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/">Spatial Indexing and Tiling Schemes for 3D Data</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>LOD Management &amp; Optimization</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/">Automated Tile Generation for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/">Cesium ion Upload Automation for 3D Tilesets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/">glTF LOD Generation With Draco Compression</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/">Streaming Sync Patterns for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/">Tileset Metadata and 3D Tiles Next</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Point Cloud &amp; Mesh Pipelines</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/">Automated Mesh Decimation for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/">Change Detection Between LiDAR Scan Epochs</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/">CI/CD Automation for Spatial Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">LiDAR Classification and Ground Extraction</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/">Point Cloud Filtering Techniques</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/">Surface Reconstruction for Geospatial Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/">Texture Mapping Workflows for Digital Twins</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Troubleshooting &amp; Reliability</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/">Cross-Section Failure Modes in Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/">Data Validation &amp; QA Gates for 3D Tiles</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/">Performance Profiling and Benchmarking</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/">Streaming &amp; Runtime Diagnostics for 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+  </div>
+  <div class="container site-footer__bottom">
+    <span>© 2026 3D Geospatial &amp; Digital Twin Automation</span>
+    <span>Built with Eleventy · PWA-enabled</span>
+  </div>
+</footer>
+
+
+  <script src="/assets/js/site.js?v=b99aa9f971" defer></script>
+  
+</body>
+</html>

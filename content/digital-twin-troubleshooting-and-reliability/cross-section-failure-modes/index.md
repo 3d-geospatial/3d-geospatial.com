@@ -305,6 +305,7 @@ A closing note on where these assertions belong. Putting them in the pipeline me
 
 ## Related Guides
 
+- [Resolving Float32 Precision Jitter in Large-Coordinate Meshes](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/resolving-float32-precision-jitter-in-large-coordinate-meshes/) — stop vertices shaking and tiles cracking when geometry uses UTM or ECEF coordinates
 - [Diagnosing CRS Drift Causing LOD Seams](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/diagnosing-crs-drift-causing-lod-seams/) — the seam defect, step by step with pyproj
 - [Fixing Memory OOM in City-Scale Decimation](https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/fixing-memory-oom-in-city-scale-decimation/) — streaming and bounded workers for large surveys
 - [Coordinate Reference Systems for 3D Assets](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/) — the CRS contract these checks enforce

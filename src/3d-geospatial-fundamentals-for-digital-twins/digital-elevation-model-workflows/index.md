@@ -44,7 +44,7 @@ A point cloud stores elevation at scattered XY locations; a DEM stores it on a r
     <text x="120" y="62">surface vs ground</text>
   </g>
   <g font-size="14" text-anchor="start">
-    <text x="40" y="232" fill="#c46a3d">DSM — top of features</text>
+    <text x="40" y="232" fill="#9a4f26">DSM — top of features</text>
     <text x="360" y="232" fill="#1f6b8a">DTM — bare earth</text>
   </g>
 </svg>
@@ -334,6 +334,7 @@ The tiles do not share identical elevations along their common edge, usually bec
 
 ## Related Guides
 
+- [Resampling DEMs Without Stair-Step Artifacts](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/resampling-dems-without-stair-step-artifacts/) — resample elevation rasters with rasterio without terraces or blocks
 - [Coordinate Reference Systems for 3D Assets](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/) — vertical datum and geoid handling for the heights in your DEM
 - [Point Cloud Density Standards](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/) — pick a cell size the cloud can actually support
 - [Point Cloud Filtering Techniques](https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/) — ground-classify raw returns before rasterizing

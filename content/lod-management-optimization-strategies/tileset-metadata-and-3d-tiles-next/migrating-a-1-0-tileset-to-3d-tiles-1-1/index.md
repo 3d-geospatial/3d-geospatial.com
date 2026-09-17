@@ -186,15 +186,15 @@ Choose the shallowest level at which the tree becomes uniform, and root the impl
     <rect x="540" y="180" width="140" height="46" rx="6"/>
   </g>
   <g stroke="#5b6471" stroke-width="2" marker-end="url(#mg-hy-a)">
-    <path d="M340 74 C 300 84 250 90 212 100"/>
-    <path d="M400 74 C 440 84 490 90 528 100"/>
-    <path d="M180 136 C 160 152 150 162 132 178"/>
-    <path d="M240 136 C 260 152 272 162 288 178"/>
-    <path d="M500 136 C 480 152 468 162 452 178"/>
-    <path d="M560 136 C 580 152 592 162 608 178"/>
+    <path fill="none" d="M340 74 C 300 84 250 90 212 100"/>
+    <path fill="none" d="M400 74 C 440 84 490 90 528 100"/>
+    <path fill="none" d="M180 136 C 160 152 150 162 132 178"/>
+    <path fill="none" d="M240 136 C 260 152 272 162 288 178"/>
+    <path fill="none" d="M500 136 C 480 152 468 162 452 178"/>
+    <path fill="none" d="M560 136 C 580 152 592 162 608 178"/>
   </g>
   <path d="M20 158 H720" fill="none" stroke="#c46a3d" stroke-width="2" stroke-dasharray="7 4"/>
-  <text x="20" y="150" fill="#c46a3d" font-size="12" text-anchor="start">cut level — implicit below here</text>
+  <text x="20" y="150" fill="#9a4f26" font-size="12" text-anchor="start">cut level — implicit below here</text>
   <g fill="#1f2937" font-size="11.5" text-anchor="middle">
     <text x="370" y="62">root, explicit</text>
     <text x="210" y="124">district, explicit</text>

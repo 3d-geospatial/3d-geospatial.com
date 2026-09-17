@@ -94,7 +94,7 @@ The `coplanar` case is the one people misdiagnose. Two triangles in the same pla
   <path d="M540 78 L650 78 L595 168 Z" fill="#f7dfdc" stroke="#b0413e" stroke-width="2"/>
   <path d="M560 160 L690 96 L640 62 Z" fill="none" stroke="#b0413e" stroke-width="2.5"/>
   <text x="140" y="196" fill="#4f7a4d" font-size="12.5" text-anchor="middle">adjacent — not a defect</text>
-  <text x="360" y="196" fill="#c46a3d" font-size="12.5" text-anchor="middle">coplanar overlap — deduplicate</text>
+  <text x="360" y="196" fill="#9a4f26" font-size="12.5" text-anchor="middle">coplanar overlap — deduplicate</text>
   <text x="615" y="196" fill="#b0413e" font-size="12.5" text-anchor="middle">crossing — repair geometrically</text>
   <text x="370" y="228" fill="#15384a" font-size="12.5" text-anchor="middle">A detector that does not separate these reports thousands of defects on a healthy mesh and buries the handful that matter</text>
 </svg>

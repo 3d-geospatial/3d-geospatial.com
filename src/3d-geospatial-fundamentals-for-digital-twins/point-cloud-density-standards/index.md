@@ -184,7 +184,7 @@ print(density_by_stratum("survey_2024.laz"))
     <circle cx="273" cy="182" r="6"/>
     <circle cx="340" cy="236" r="6"/>
   </g>
-  <g fill="#c46a3d" font-size="11.5" text-anchor="start">
+  <g fill="#9a4f26" font-size="11.5" text-anchor="start">
     <text x="150" y="144">return 1 — canopy top</text>
     <text x="290" y="196">return 2 — lower branch</text>
     <text x="352" y="232">return 3 — bare ground</text>

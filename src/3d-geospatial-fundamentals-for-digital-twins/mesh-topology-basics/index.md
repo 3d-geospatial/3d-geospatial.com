@@ -315,6 +315,7 @@ Both. Validate before decimation so you decimate a clean mesh, and again afterwa
 
 ## Related Guides
 
+- [Making Meshes Watertight for Volume Calculations](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/making-meshes-watertight-for-volume-calculations/) — get trustworthy volumes from reconstructed meshes with trimesh
 - [Fixing Non-Manifold Edges in 3D Meshes](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/fixing-non-manifold-edges-in-3d-meshes/) — step-by-step repair of multi-face edges and T-junctions
 - [Coordinate Reference Systems for 3D Assets](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/) — datum handling and the precision shifts behind micro-gaps
 - [Digital Elevation Model Workflows](https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/) — TIN generation and the winding artifacts it produces

@@ -37,7 +37,7 @@ You hit this when a survey lands and you need one authoritative density figure b
     <text x="445" y="255">hexbin aggregate</text>
     <text x="680" y="135"><tspan x="680" dy="0">density (ppsm)</tspan><tspan x="680" dy="18">+ boundary</tspan><tspan x="680" dy="18">with holes</tspan></text>
   </g>
-  <text x="520" y="245" fill="#c46a3d" font-size="12" text-anchor="middle">gap = hole</text>
+  <text x="520" y="245" fill="#9a4f26" font-size="12" text-anchor="middle">gap = hole</text>
 </svg>
 <figcaption>filters.hexbin aggregates points into hexagons, reports density per square metre, and returns a boundary polygon whose interior holes are the coverage gaps.</figcaption>
 </figure>

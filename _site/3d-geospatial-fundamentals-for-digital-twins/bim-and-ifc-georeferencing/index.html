@@ -1,0 +1,786 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+  <title>BIM and IFC Georeferencing for Digital Twins — 3D Geospatial</title>
+  <meta name="description" content="Place IFC building models correctly in a city twin: IfcMapConversion, project units, grid vs true north, ECEF transforms and the checks that prove the fit.">
+  <meta name="keywords" content="3D geospatial, digital twin, point cloud, mesh pipeline, LOD, 3D Tiles, Cesium, PDAL, Open3D, Python, CI/CD">
+  <meta name="author" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta name="theme-color" content="#1f6b8a" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f171d" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+
+  
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem("theme");
+        var theme = (stored === "dark" || stored === "light") ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) {
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    })();
+  </script>
+  <meta name="generator" content="Eleventy">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="googlebot" content="index,follow,max-image-preview:large">
+
+  
+  <link rel="canonical" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/">
+  <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml">
+
+  
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/assets/img/logo.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/icon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+
+  
+  <link rel="apple-touch-icon" href="/assets/img/icon-180.png">
+  <link rel="mask-icon" href="/assets/img/logo.svg" color="#1f6b8a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="3D Geospatial">
+  <meta name="application-name" content="3D Geospatial">
+
+  
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="BIM and IFC Georeferencing for Digital Twins — 3D Geospatial">
+  <meta property="og:description" content="Place IFC building models correctly in a city twin: IfcMapConversion, project units, grid vs true north, ECEF transforms and the checks that prove the fit.">
+  <meta property="og:url" content="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/">
+  <meta property="og:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+  <meta property="og:site_name" content="3D Geospatial &amp; Digital Twin Automation">
+  <meta property="og:locale" content="en_US">
+  
+  <meta property="article:published_time" content="2026-09-17T16:36:46.932Z">
+  <meta property="article:modified_time" content="2026-09-17T16:36:46.932Z">
+  <meta property="article:publisher" content="https://www.3d-geospatial.com/">
+  
+
+  
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="BIM and IFC Georeferencing for Digital Twins — 3D Geospatial">
+  <meta name="twitter:description" content="Place IFC building models correctly in a city twin: IfcMapConversion, project units, grid vs true north, ECEF transforms and the checks that prove the fit.">
+  <meta name="twitter:image" content="https://www.3d-geospatial.com/assets/img/og-cover.png">
+  <meta name="twitter:image:alt" content="3D Geospatial &amp; Digital Twin Automation — point clouds, meshes, LOD, CI/CD">
+
+  
+  <link rel="preload" href="/assets/css/styles.css?v=8c46394d6c" as="style">
+  
+
+  <link rel="stylesheet" href="/assets/css/styles.css?v=8c46394d6c">
+
+  
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://www.3d-geospatial.com/#organization",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "url": "https://www.3d-geospatial.com/",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/icon-512.png",
+        "width": 512,
+        "height": 512
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://www.3d-geospatial.com/#website",
+      "url": "https://www.3d-geospatial.com/",
+      "name": "3D Geospatial & Digital Twin Automation",
+      "description": "Build reliable 3D spatial data pipelines for digital twins — point clouds, meshes, LOD strategies, Python processing, and CI/CD automation.",
+      "inLanguage": "en",
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      }
+    },
+    {
+      "@type": "TechArticle",
+      "@id": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/#article",
+      "isPartOf": {
+        "@id": "https://www.3d-geospatial.com/#website"
+      },
+      "headline": "BIM and IFC Georeferencing for Digital Twins",
+      "name": "BIM and IFC Georeferencing for Digital Twins",
+      "description": "Place IFC building models correctly in a city twin: IfcMapConversion, project units, grid vs true north, ECEF transforms and the checks that prove the fit.",
+      "url": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/",
+      "mainEntityOfPage": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/",
+      "inLanguage": "en",
+      "datePublished": "2026-09-17T16:36:46.932Z",
+      "dateModified": "2026-09-17T16:36:46.932Z",
+      "author": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "publisher": {
+        "@id": "https://www.3d-geospatial.com/#organization"
+      },
+      "image": {
+        "@type": "ImageObject",
+        "url": "https://www.3d-geospatial.com/assets/img/og-cover.png",
+        "width": 1200,
+        "height": 630
+      },
+      "breadcrumb": {
+        "@id": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/#breadcrumb"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://www.3d-geospatial.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "3D Geospatial Fundamentals For Digital Twins",
+          "item": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Bim And Ifc Georeferencing",
+          "item": "https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  
+<header class="site-header" role="banner">
+  <div class="container site-header__inner">
+    <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+      <img src="/assets/img/logo.svg" alt="" class="brand__mark" width="36" height="36">
+      <span class="brand__name">
+        3D Geospatial
+        <small>Digital Twin Automation</small>
+      </span>
+    </a>
+
+    <button class="theme-toggle" type="button" data-theme-toggle
+            aria-label="Switch to dark theme" title="Switch to dark theme">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4.2"/>
+        <path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/>
+      </svg>
+    </button>
+
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>
+      <span class="nav-toggle__icon" aria-hidden="true"><span></span></span>
+      Menu
+    </button>
+
+    <nav class="primary-nav" id="primary-nav" aria-label="Primary">
+      
+      <a href="https://www.3d-geospatial.com/" >
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/>
+        </svg>
+        Home
+      </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/" aria-current="page">
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2 3 7l9 5 9-5z"/><path d="M3 12l9 5 9-5"/><path d="M3 17l9 5 9-5"/>
+            </svg>
+          
+          3D Geospatial Fundamentals
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+          
+          LOD Management &amp; Optimization
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="6" cy="6" r="1.5"/><circle cx="12" cy="6" r="1.5"/><circle cx="18" cy="6" r="1.5"/>
+              <circle cx="6" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="18" cy="12" r="1.5"/>
+              <circle cx="6" cy="18" r="1.5"/><circle cx="12" cy="18" r="1.5"/><circle cx="18" cy="18" r="1.5"/>
+            </svg>
+          
+          Point Cloud &amp; Mesh Pipelines
+        </a>
+      
+        
+        <a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/" >
+          
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <path d="M12 9v4"/><path d="M12 17h.01"/>
+            </svg>
+          
+          Troubleshooting &amp; Reliability
+        </a>
+      
+    </nav>
+  </div>
+</header>
+
+
+  <main id="main">
+    
+
+
+<div class="container">
+  <nav class="breadcrumbs" aria-label="Breadcrumb">
+    
+      
+        <a href="https://www.3d-geospatial.com/">Home</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals For Digital Twins</a>
+        <span class="sep" aria-hidden="true">›</span>
+      
+    
+      
+        <span class="current">Bim And Ifc Georeferencing</span>
+      
+    
+  </nav>
+
+  <div class="content-page">
+    <article class="article">
+      <h1 id="bim-and-ifc-georeferencing-for-digital-twins" tabindex="-1"><a class="heading-link" href="#bim-and-ifc-georeferencing-for-digital-twins"><span>BIM and IFC Georeferencing for Digital Twins</span></a></h1>
+<p>A BIM model arrives in engineering coordinates: millimetres, an origin somewhere near the site hut, and an x-axis that follows the building grid rather than any map. A city twin lives in a projected or Earth-centred frame measured in metres. Getting the first into the second is not a file conversion, it is a coordinate transformation with at least five parameters, and every one of them is a place where a hospital ends up rotated eleven degrees across a road or floating forty metres above the terrain. This guide covers how IFC stores georeferencing, how to read and apply it in Python with IfcOpenShell and <code>pyproj</code>, how to handle the models that arrive without it, and the validation that proves a building sits where the survey says it does.</p>
+<p>The work sits between two areas of this site. Upstream is <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">coordinate reference systems for 3D assets</a>, which covers the target frames themselves; downstream is <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles batch tiling</a>, which expects every building to already be in a known CRS before it is sharded. A BIM model that skips this step is the single most common reason a tiling job produces a building in the Gulf of Guinea, at latitude and longitude zero.</p>
+<h2 id="prerequisites" tabindex="-1"><a class="heading-link" href="#prerequisites"><span>Prerequisites</span></a></h2>
+<ul>
+<li><strong>Python 3.10+</strong> with <code>ifcopenshell&gt;=0.8.0</code>, <code>pyproj&gt;=3.6</code>, <code>numpy&gt;=1.24</code> and <code>trimesh&gt;=4.0</code>. IfcOpenShell installs from PyPI (<code>pip install ifcopenshell</code>) or conda-forge.</li>
+<li><strong>PROJ 9.3+</strong> with network grids enabled or the relevant national geoid grid downloaded, because building heights are almost always orthometric.</li>
+<li><strong>An IFC file in IFC4, IFC4X3 or IFC2X3.</strong> The schema decides where georeferencing lives, so read <code>model.schema</code> before anything else.</li>
+<li><strong>The project’s target CRS as an EPSG code</strong>, horizontal and vertical — for example EPSG:25832 with DHHN2016 heights (EPSG:7837), written as the compound EPSG:25832+7837, or EPSG:32618+5703 for UTM 18N with NAVD88.</li>
+<li><strong>At least three surveyed control points</strong> on the building — corners, a slab edge, a column base — with coordinates in the target CRS. Without them the result can be internally consistent and still wrong.</li>
+</ul>
+<h2 id="concept" tabindex="-1"><a class="heading-link" href="#concept"><span>Concept</span></a></h2>
+<p>IFC separates the building’s own frame from the map frame and connects them with a single conformal transformation. In IFC4 and later that transformation is an <code>IfcMapConversion</code> entity, attached to the model’s geometric representation context and pointing at an <code>IfcProjectedCRS</code> that names the target system.</p>
+<p><code>IfcMapConversion</code> carries six numbers. <code>Eastings</code>, <code>Northings</code> and <code>OrthogonalHeight</code> place the IFC origin in the target CRS. <code>XAxisAbscissa</code> and <code>XAxisOrdinate</code> are the components of the IFC x-axis expressed in the map’s easting and northing directions, so the rotation angle is <code>atan2(XAxisOrdinate, XAxisAbscissa)</code>. <code>Scale</code> converts IFC length units into map units and, where needed, absorbs the projection’s scale factor. A local point <code>(x, y, z)</code> maps to:</p>
+<ul>
+<li><code>E = Scale · (x·cos θ − y·sin θ) + Eastings</code></li>
+<li><code>N = Scale · (x·sin θ + y·cos θ) + Northings</code></li>
+<li><code>H = Scale · z + OrthogonalHeight</code></li>
+</ul>
+<p>That is a Helmert transformation without the out-of-plane rotations, and the missing rotations are deliberate: buildings are levelled to gravity, so tilt is not a free parameter.</p>
+<figure class="diagram">
+<svg viewBox="6 26 748 268" role="img" aria-labelledby="bim-frames-t bim-frames-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="bim-frames-t">From the IFC building frame to the map frame</title>
+  <desc id="bim-frames-d">The building frame has its own origin and an x-axis along the structural grid. IfcMapConversion rotates it by the angle between the building x-axis and grid east, scales millimetres to metres, and translates the origin to the stated easting, northing and height in the projected CRS.</desc>
+  <rect class="svg-bg" x="6" y="26" width="748" height="268" fill="#ffffff"/>
+  <defs>
+    <marker id="bim-frames-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
+    </marker>
+  </defs>
+  <rect x="20" y="40" width="230" height="200" rx="8" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <rect x="510" y="40" width="230" height="200" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="280" y="100" width="200" height="84" rx="8" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <path fill="none" d="M60 200 H200" stroke="#c46a3d" stroke-width="2.5" marker-end="url(#bim-frames-arrow)"/>
+  <path fill="none" d="M60 200 V80" stroke="#c46a3d" stroke-width="2.5" marker-end="url(#bim-frames-arrow)"/>
+  <path d="M90 170 h80 v-60 h-80 Z" fill="none" stroke="#5b6471" stroke-width="1.5"/>
+  <path fill="none" d="M560 205 L690 150" stroke="#1f6b8a" stroke-width="2.5" marker-end="url(#bim-frames-arrow)"/>
+  <path fill="none" d="M560 205 H700" stroke="#5b6471" stroke-width="1.2" stroke-dasharray="5 4"/>
+  <path fill="none" d="M251 142 H278" stroke="#5b6471" stroke-width="2" marker-end="url(#bim-frames-arrow)"/>
+  <path fill="none" d="M481 142 H508" stroke="#5b6471" stroke-width="2" marker-end="url(#bim-frames-arrow)"/>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="135" y="62">IFC building frame</text>
+    <text x="130" y="145">grid A–D</text>
+    <text x="135" y="226">x along grid, mm</text>
+    <text x="625" y="62">Projected CRS</text>
+    <text x="625" y="226">E, N, H in metres</text>
+    <text x="380" y="128">IfcMapConversion</text>
+    <text x="380" y="148">rotate θ · scale</text>
+    <text x="380" y="168">translate E0, N0, H0</text>
+  </g>
+  <text x="640" y="200" fill="#5b6471" font-size="11.5" text-anchor="middle">grid east</text>
+  <text x="640" y="136" fill="#1f6b8a" font-size="11.5" text-anchor="middle">IFC x-axis, θ</text>
+  <text x="380" y="276" fill="#15384a" font-size="12.5" text-anchor="middle">Three translations, one rotation, one scale — and nothing tilts.</text>
+</svg>
+<figcaption>IfcMapConversion is a levelled conformal transformation: the building frame is rotated about the vertical, scaled from project units, and shifted onto the map.</figcaption>
+</figure>
+<p>Two details cause most of the damage. The first is that the rotation is to <strong>grid north</strong>, the north of the projection, not true north. In a UTM zone the two differ by the meridian convergence, which reaches about three degrees near the zone edge — enough to move a corner of a 100 m building by five metres. IFC separately stores <code>TrueNorth</code> on the representation context for solar studies, and models regularly confuse the two. The second is units: an IFC4 model in millimetres needs <code>Scale = 0.001</code> to land in metres, and a surprising share of exported files leave <code>Scale</code> empty, which the standard defines as 1.0.</p>
+<p>IFC2X3 has no <code>IfcMapConversion</code>. Georeferencing in those files is either absent, approximated by <code>IfcSite.RefLatitude</code>, <code>RefLongitude</code> and <code>RefElevation</code>, or carried in the <code>ePSet_MapConversion</code> and <code>ePSet_ProjectedCRS</code> property sets that buildingSMART’s georeferencing guidance defined as a stop-gap. A reader has to handle all three.</p>
+<h3 id="who-owns-each-number" tabindex="-1"><a class="heading-link" href="#who-owns-each-number"><span>Who owns each number</span></a></h3>
+<p>It helps to know where the parameters come from in a real project, because that tells you which of them to distrust. The easting, northing and height of the origin are normally set once, early, by the surveyor who establishes site control, and they are usually right. The rotation is set by whoever aligned the structural grid to the site plan — often an architect working from a drawing with a north arrow — and that is where the grid-north and true-north confusion enters. The scale is set by the export dialog of the authoring tool, which is why it disagrees with the project units so often: the person exporting rarely sees it.</p>
+<p>The practical consequence is an order of suspicion. When a model lands in the wrong place, check the scale first, because it fails silently and by factors of a thousand. Check the rotation second, because it fails by the convergence and looks nearly right. Check the translation last, because survey-derived numbers are rarely wrong by more than a typing error, and a typing error in an easting moves the building by a round power of ten that is obvious on a map.</p>
+<p>A digital twin programme that ingests many buildings should also decide who is allowed to <em>change</em> these numbers. A pipeline that silently corrects a bad rotation fixes the twin and leaves the source model wrong for every other consumer — the facilities team, the energy modeller, the next contractor. The durable fix is to report the discrepancy against the delivery specification and have the model corrected at source, with the pipeline refusing the model until it is.</p>
+<h2 id="step-by-step-workflow" tabindex="-1"><a class="heading-link" href="#step-by-step-workflow"><span>Step-by-Step Workflow</span></a></h2>
+<h3 id="1-open-the-model-and-find-where-the-georeferencing-lives" tabindex="-1"><a class="heading-link" href="#1-open-the-model-and-find-where-the-georeferencing-lives"><span>1. Open the model and find where the georeferencing lives</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> ifcopenshell
+
+model <span class="token operator">=</span> ifcopenshell<span class="token punctuation">.</span><span class="token builtin">open</span><span class="token punctuation">(</span><span class="token string">"site_b_hospital.ifc"</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"schema:"</span><span class="token punctuation">,</span> model<span class="token punctuation">.</span>schema<span class="token punctuation">)</span>
+
+<span class="token keyword">def</span> <span class="token function">georef_source</span><span class="token punctuation">(</span>model<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">if</span> model<span class="token punctuation">.</span>schema <span class="token operator">!=</span> <span class="token string">"IFC2X3"</span> <span class="token keyword">and</span> model<span class="token punctuation">.</span>by_type<span class="token punctuation">(</span><span class="token string">"IfcMapConversion"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token string">"IfcMapConversion"</span>
+    <span class="token keyword">for</span> pset <span class="token keyword">in</span> model<span class="token punctuation">.</span>by_type<span class="token punctuation">(</span><span class="token string">"IfcPropertySet"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">if</span> pset<span class="token punctuation">.</span>Name <span class="token operator">==</span> <span class="token string">"ePSet_MapConversion"</span><span class="token punctuation">:</span>
+            <span class="token keyword">return</span> <span class="token string">"ePSet_MapConversion"</span>
+    site <span class="token operator">=</span> model<span class="token punctuation">.</span>by_type<span class="token punctuation">(</span><span class="token string">"IfcSite"</span><span class="token punctuation">)</span>
+    <span class="token keyword">if</span> site <span class="token keyword">and</span> site<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">.</span>RefLatitude <span class="token keyword">and</span> site<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">.</span>RefLongitude<span class="token punctuation">:</span>
+        <span class="token keyword">return</span> <span class="token string">"IfcSite.RefLatitude"</span>
+    <span class="token keyword">return</span> <span class="token boolean">None</span>
+
+source <span class="token operator">=</span> georef_source<span class="token punctuation">(</span>model<span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"georeferencing from:"</span><span class="token punctuation">,</span> source<span class="token punctuation">)</span>
+<span class="token keyword">if</span> source <span class="token keyword">is</span> <span class="token boolean">None</span><span class="token punctuation">:</span>
+    <span class="token keyword">raise</span> SystemExit<span class="token punctuation">(</span><span class="token string">"no georeferencing: register against control points instead"</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>The order of the checks encodes a preference. <code>IfcMapConversion</code> is exact and authoritative; the property sets are exact but non-standard; <code>RefLatitude</code> is a single point with no rotation, which pins the model but leaves it free to spin about that point.</p>
+<h3 id="2-read-the-conversion-parameters-and-the-target-crs" tabindex="-1"><a class="heading-link" href="#2-read-the-conversion-parameters-and-the-target-crs"><span>2. Read the conversion parameters and the target CRS</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> math
+<span class="token keyword">import</span> ifcopenshell<span class="token punctuation">.</span>util<span class="token punctuation">.</span>unit
+
+conv <span class="token operator">=</span> model<span class="token punctuation">.</span>by_type<span class="token punctuation">(</span><span class="token string">"IfcMapConversion"</span><span class="token punctuation">)</span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span>
+crs <span class="token operator">=</span> conv<span class="token punctuation">.</span>TargetCRS
+
+params <span class="token operator">=</span> <span class="token punctuation">{</span>
+    <span class="token string">"epsg"</span><span class="token punctuation">:</span> crs<span class="token punctuation">.</span>Name<span class="token punctuation">,</span>                      <span class="token comment"># e.g. "EPSG:25832"</span>
+    <span class="token string">"vertical"</span><span class="token punctuation">:</span> crs<span class="token punctuation">.</span>VerticalDatum<span class="token punctuation">,</span>         <span class="token comment"># e.g. "DHHN2016"</span>
+    <span class="token string">"e0"</span><span class="token punctuation">:</span> conv<span class="token punctuation">.</span>Eastings<span class="token punctuation">,</span>
+    <span class="token string">"n0"</span><span class="token punctuation">:</span> conv<span class="token punctuation">.</span>Northings<span class="token punctuation">,</span>
+    <span class="token string">"h0"</span><span class="token punctuation">:</span> conv<span class="token punctuation">.</span>OrthogonalHeight<span class="token punctuation">,</span>
+    <span class="token string">"theta"</span><span class="token punctuation">:</span> math<span class="token punctuation">.</span>atan2<span class="token punctuation">(</span>conv<span class="token punctuation">.</span>XAxisOrdinate <span class="token keyword">or</span> <span class="token number">0.0</span><span class="token punctuation">,</span> conv<span class="token punctuation">.</span>XAxisAbscissa <span class="token keyword">or</span> <span class="token number">1.0</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token string">"scale"</span><span class="token punctuation">:</span> conv<span class="token punctuation">.</span>Scale <span class="token keyword">if</span> conv<span class="token punctuation">.</span>Scale <span class="token keyword">is</span> <span class="token keyword">not</span> <span class="token boolean">None</span> <span class="token keyword">else</span> <span class="token number">1.0</span><span class="token punctuation">,</span>
+<span class="token punctuation">}</span>
+
+unit_to_m <span class="token operator">=</span> ifcopenshell<span class="token punctuation">.</span>util<span class="token punctuation">.</span>unit<span class="token punctuation">.</span>calculate_unit_scale<span class="token punctuation">(</span>model<span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span>params<span class="token punctuation">,</span> <span class="token string">"project length unit → metres:"</span><span class="token punctuation">,</span> unit_to_m<span class="token punctuation">)</span>
+</code></pre></div>
+<p><code>calculate_unit_scale</code> returns the factor from the project’s length unit to metres — 0.001 for a millimetre model. Compare it with <code>Scale</code> before trusting either: when the model is in millimetres and <code>Scale</code> is 1.0, the conversion was authored assuming the geometry would already be in metres, which is true of IfcOpenShell’s geometry output but not of the raw placement coordinates.</p>
+<h3 id="3-extract-world-coordinate-geometry" tabindex="-1"><a class="heading-link" href="#3-extract-world-coordinate-geometry"><span>3. Extract world-coordinate geometry</span></a></h3>
+<p>IfcOpenShell resolves the chain of local placements for you and returns vertices in metres.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> multiprocessing
+<span class="token keyword">import</span> numpy <span class="token keyword">as</span> np
+<span class="token keyword">import</span> ifcopenshell<span class="token punctuation">.</span>geom
+
+settings <span class="token operator">=</span> ifcopenshell<span class="token punctuation">.</span>geom<span class="token punctuation">.</span>settings<span class="token punctuation">(</span><span class="token punctuation">)</span>
+settings<span class="token punctuation">.</span><span class="token builtin">set</span><span class="token punctuation">(</span><span class="token string">"use-world-coords"</span><span class="token punctuation">,</span> <span class="token boolean">True</span><span class="token punctuation">)</span>
+
+iterator <span class="token operator">=</span> ifcopenshell<span class="token punctuation">.</span>geom<span class="token punctuation">.</span>iterator<span class="token punctuation">(</span>settings<span class="token punctuation">,</span> model<span class="token punctuation">,</span> multiprocessing<span class="token punctuation">.</span>cpu_count<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+meshes <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token punctuation">}</span>
+<span class="token keyword">if</span> iterator<span class="token punctuation">.</span>initialize<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">while</span> <span class="token boolean">True</span><span class="token punctuation">:</span>
+        shape <span class="token operator">=</span> iterator<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token punctuation">)</span>
+        verts <span class="token operator">=</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>shape<span class="token punctuation">.</span>geometry<span class="token punctuation">.</span>verts<span class="token punctuation">,</span> dtype<span class="token operator">=</span>np<span class="token punctuation">.</span>float64<span class="token punctuation">)</span><span class="token punctuation">.</span>reshape<span class="token punctuation">(</span><span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span>
+        faces <span class="token operator">=</span> np<span class="token punctuation">.</span>asarray<span class="token punctuation">(</span>shape<span class="token punctuation">.</span>geometry<span class="token punctuation">.</span>faces<span class="token punctuation">,</span> dtype<span class="token operator">=</span>np<span class="token punctuation">.</span>int64<span class="token punctuation">)</span><span class="token punctuation">.</span>reshape<span class="token punctuation">(</span><span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">)</span>
+        meshes<span class="token punctuation">[</span>shape<span class="token punctuation">.</span>guid<span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token punctuation">(</span>verts<span class="token punctuation">,</span> faces<span class="token punctuation">)</span>
+        <span class="token keyword">if</span> <span class="token keyword">not</span> iterator<span class="token punctuation">.</span><span class="token builtin">next</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+            <span class="token keyword">break</span>
+
+all_v <span class="token operator">=</span> np<span class="token punctuation">.</span>vstack<span class="token punctuation">(</span><span class="token punctuation">[</span>v <span class="token keyword">for</span> v<span class="token punctuation">,</span> _ <span class="token keyword">in</span> meshes<span class="token punctuation">.</span>values<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span><span class="token builtin">len</span><span class="token punctuation">(</span>meshes<span class="token punctuation">)</span><span class="token punctuation">}</span></span><span class="token string"> elements, local bbox </span><span class="token interpolation"><span class="token punctuation">{</span>all_v<span class="token punctuation">.</span><span class="token builtin">min</span><span class="token punctuation">(</span><span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">round</span><span class="token punctuation">(</span><span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">}</span></span><span class="token string"> → </span><span class="token interpolation"><span class="token punctuation">{</span>all_v<span class="token punctuation">.</span><span class="token builtin">max</span><span class="token punctuation">(</span><span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">round</span><span class="token punctuation">(</span><span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>The local bounding box is the first sanity check. A hospital should span tens to a few hundred metres. A box a thousand times larger means the geometry came back in millimetres; a box whose minimum is already near <code>(500000, 5300000)</code> means the authoring tool baked map coordinates into the placements and the map conversion must not be applied a second time.</p>
+<h3 id="4-apply-the-map-conversion" tabindex="-1"><a class="heading-link" href="#4-apply-the-map-conversion"><span>4. Apply the map conversion</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">def</span> <span class="token function">ifc_to_map</span><span class="token punctuation">(</span>verts_m<span class="token punctuation">,</span> p<span class="token punctuation">,</span> unit_to_m<span class="token operator">=</span>unit_to_m<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Local IFC coordinates (metres) → projected E, N, orthometric H."""</span>
+    s <span class="token operator">=</span> p<span class="token punctuation">[</span><span class="token string">"scale"</span><span class="token punctuation">]</span> <span class="token operator">/</span> unit_to_m     <span class="token comment"># Scale converts project units; the geometry is already metric</span>
+    <span class="token keyword">if</span> <span class="token keyword">not</span> <span class="token number">0.99</span> <span class="token operator">&lt;</span> s <span class="token operator">&lt;</span> <span class="token number">1.01</span><span class="token punctuation">:</span>
+        <span class="token keyword">raise</span> ValueError<span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"effective scale </span><span class="token interpolation"><span class="token punctuation">{</span>s<span class="token punctuation">:</span><span class="token format-spec">.6f</span><span class="token punctuation">}</span></span><span class="token string">: Scale and project units disagree"</span></span><span class="token punctuation">)</span>
+    c<span class="token punctuation">,</span> sn <span class="token operator">=</span> math<span class="token punctuation">.</span>cos<span class="token punctuation">(</span>p<span class="token punctuation">[</span><span class="token string">"theta"</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">,</span> math<span class="token punctuation">.</span>sin<span class="token punctuation">(</span>p<span class="token punctuation">[</span><span class="token string">"theta"</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    x<span class="token punctuation">,</span> y<span class="token punctuation">,</span> z <span class="token operator">=</span> verts_m<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">,</span> verts_m<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">,</span> verts_m<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">]</span>
+    e <span class="token operator">=</span> s <span class="token operator">*</span> <span class="token punctuation">(</span>x <span class="token operator">*</span> c <span class="token operator">-</span> y <span class="token operator">*</span> sn<span class="token punctuation">)</span> <span class="token operator">+</span> p<span class="token punctuation">[</span><span class="token string">"e0"</span><span class="token punctuation">]</span>
+    n <span class="token operator">=</span> s <span class="token operator">*</span> <span class="token punctuation">(</span>x <span class="token operator">*</span> sn <span class="token operator">+</span> y <span class="token operator">*</span> c<span class="token punctuation">)</span> <span class="token operator">+</span> p<span class="token punctuation">[</span><span class="token string">"n0"</span><span class="token punctuation">]</span>
+    h <span class="token operator">=</span> s <span class="token operator">*</span> z <span class="token operator">+</span> p<span class="token punctuation">[</span><span class="token string">"h0"</span><span class="token punctuation">]</span>
+    <span class="token keyword">return</span> np<span class="token punctuation">.</span>column_stack<span class="token punctuation">(</span><span class="token punctuation">[</span>e<span class="token punctuation">,</span> n<span class="token punctuation">,</span> h<span class="token punctuation">]</span><span class="token punctuation">)</span>
+
+mapped <span class="token operator">=</span> <span class="token punctuation">{</span>guid<span class="token punctuation">:</span> <span class="token punctuation">(</span>ifc_to_map<span class="token punctuation">(</span>v<span class="token punctuation">,</span> params<span class="token punctuation">)</span><span class="token punctuation">,</span> f<span class="token punctuation">)</span> <span class="token keyword">for</span> guid<span class="token punctuation">,</span> <span class="token punctuation">(</span>v<span class="token punctuation">,</span> f<span class="token punctuation">)</span> <span class="token keyword">in</span> meshes<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">}</span>
+</code></pre></div>
+<p>Dividing by the unit factor is the line that earns its keep. <code>Scale</code> in IFC4 is documented as the factor between IFC length units and map units, so a millimetre model correctly carries 0.001 — and applying it unchanged to IfcOpenShell’s already-metric output shrinks the building a thousandfold, to a point at the origin coordinates. What survives the division is the projection scale factor, if the author included one, and the range check refuses anything that is not plausibly one: an empty <code>Scale</code> on a millimetre model yields 1000 and stops the job instead of producing a building the size of a county.</p>
+<h3 id="5-check-grid-north-against-true-north" tabindex="-1"><a class="heading-link" href="#5-check-grid-north-against-true-north"><span>5. Check grid north against true north</span></a></h3>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">from</span> pyproj <span class="token keyword">import</span> CRS<span class="token punctuation">,</span> Transformer<span class="token punctuation">,</span> Proj
+
+proj <span class="token operator">=</span> Proj<span class="token punctuation">(</span>CRS<span class="token punctuation">.</span>from_user_input<span class="token punctuation">(</span>params<span class="token punctuation">[</span><span class="token string">"epsg"</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+to_geo <span class="token operator">=</span> Transformer<span class="token punctuation">.</span>from_crs<span class="token punctuation">(</span>params<span class="token punctuation">[</span><span class="token string">"epsg"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token string">"EPSG:4326"</span><span class="token punctuation">,</span> always_xy<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+lon<span class="token punctuation">,</span> lat <span class="token operator">=</span> to_geo<span class="token punctuation">.</span>transform<span class="token punctuation">(</span>params<span class="token punctuation">[</span><span class="token string">"e0"</span><span class="token punctuation">]</span><span class="token punctuation">,</span> params<span class="token punctuation">[</span><span class="token string">"n0"</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+convergence <span class="token operator">=</span> proj<span class="token punctuation">.</span>get_factors<span class="token punctuation">(</span>lon<span class="token punctuation">,</span> lat<span class="token punctuation">)</span><span class="token punctuation">.</span>meridian_convergence
+
+ctx <span class="token operator">=</span> <span class="token builtin">next</span><span class="token punctuation">(</span>c <span class="token keyword">for</span> c <span class="token keyword">in</span> model<span class="token punctuation">.</span>by_type<span class="token punctuation">(</span><span class="token string">"IfcGeometricRepresentationContext"</span><span class="token punctuation">)</span>
+           <span class="token keyword">if</span> c<span class="token punctuation">.</span>ContextType <span class="token operator">==</span> <span class="token string">"Model"</span><span class="token punctuation">)</span>
+true_north <span class="token operator">=</span> ctx<span class="token punctuation">.</span>TrueNorth<span class="token punctuation">.</span>DirectionRatios <span class="token keyword">if</span> ctx<span class="token punctuation">.</span>TrueNorth <span class="token keyword">else</span> <span class="token punctuation">(</span><span class="token number">0.0</span><span class="token punctuation">,</span> <span class="token number">1.0</span><span class="token punctuation">)</span>
+tn_angle <span class="token operator">=</span> math<span class="token punctuation">.</span>degrees<span class="token punctuation">(</span>math<span class="token punctuation">.</span>atan2<span class="token punctuation">(</span><span class="token operator">-</span>true_north<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">,</span> true_north<span class="token punctuation">[</span><span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"map rotation </span><span class="token interpolation"><span class="token punctuation">{</span>math<span class="token punctuation">.</span>degrees<span class="token punctuation">(</span>params<span class="token punctuation">[</span><span class="token string">'theta'</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">:</span><span class="token format-spec">.3f</span><span class="token punctuation">}</span></span><span class="token string">°, true north </span><span class="token interpolation"><span class="token punctuation">{</span>tn_angle<span class="token punctuation">:</span><span class="token format-spec">.3f</span><span class="token punctuation">}</span></span><span class="token string">°, "</span></span>
+      <span class="token string-interpolation"><span class="token string">f"convergence </span><span class="token interpolation"><span class="token punctuation">{</span>convergence<span class="token punctuation">:</span><span class="token format-spec">.3f</span><span class="token punctuation">}</span></span><span class="token string">°"</span></span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>When the map rotation and the true-north angle differ by almost exactly the convergence, the model is consistent. When they are equal, somebody set one from the other and the building is rotated by the convergence — the signature of a model placed against a north arrow rather than a survey.</p>
+<figure class="diagram">
+<svg viewBox="51 13 703 255" role="img" aria-labelledby="bim-north-t bim-north-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="bim-north-t">Grid north, true north and the building axis</title>
+  <desc id="bim-north-d">Three directions meet at the building origin: grid north of the projection, true north, which differs from grid north by the meridian convergence, and the building's own y-axis. IfcMapConversion measures its rotation from grid north; TrueNorth on the representation context measures from true north. Mixing them rotates the building by the convergence.</desc>
+  <rect class="svg-bg" x="51" y="13" width="703" height="255" fill="#ffffff"/>
+  <defs>
+    <marker id="bim-north-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#5b6471"/>
+    </marker>
+  </defs>
+  <path fill="none" d="M200 220 V50" stroke="#1f6b8a" stroke-width="2.5" marker-end="url(#bim-north-arrow)"/>
+  <path fill="none" d="M200 220 L225 52" stroke="#4f7a4d" stroke-width="2.5" marker-end="url(#bim-north-arrow)"/>
+  <path fill="none" d="M200 220 L290 66" stroke="#c46a3d" stroke-width="2.5" marker-end="url(#bim-north-arrow)"/>
+  <rect x="420" y="40" width="320" height="56" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="420" y="108" width="320" height="56" rx="8" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <rect x="420" y="176" width="320" height="56" rx="8" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <text x="180" y="44" fill="#1f6b8a" font-size="12" text-anchor="middle">grid N</text>
+  <text x="240" y="40" fill="#4f7a4d" font-size="12" text-anchor="middle">true N</text>
+  <text x="318" y="62" fill="#9a4f26" font-size="12" text-anchor="middle">building y</text>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="580" y="64">Grid north: projection axis</text>
+    <text x="580" y="82">IfcMapConversion rotates from here</text>
+    <text x="580" y="132">True north: differs by convergence</text>
+    <text x="580" y="150">IfcGeometricRepresentationContext.TrueNorth</text>
+    <text x="580" y="200">Building y-axis: structural grid</text>
+    <text x="580" y="218">what the architect drew</text>
+  </g>
+  <text x="200" y="250" fill="#15384a" font-size="12" text-anchor="middle">convergence ≈ 1.2° here, 3° at a UTM zone edge</text>
+</svg>
+<figcaption>The rotation in IfcMapConversion is measured from grid north. A model rotated from true north instead is off by the meridian convergence at the site.</figcaption>
+</figure>
+<h3 id="6-transform-to-the-delivery-frame" tabindex="-1"><a class="heading-link" href="#6-transform-to-the-delivery-frame"><span>6. Transform to the delivery frame</span></a></h3>
+<p>Tilesets want Earth-centred coordinates, EPSG:4978, with orthometric heights converted to ellipsoidal ones on the way.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python">to_ecef_tf <span class="token operator">=</span> Transformer<span class="token punctuation">.</span>from_crs<span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>params<span class="token punctuation">[</span><span class="token string">'epsg'</span><span class="token punctuation">]</span><span class="token punctuation">}</span></span><span class="token string">+7837"</span></span><span class="token punctuation">,</span> <span class="token string">"EPSG:4978"</span><span class="token punctuation">,</span> always_xy<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+
+<span class="token keyword">def</span> <span class="token function">to_ecef</span><span class="token punctuation">(</span>enh<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    x<span class="token punctuation">,</span> y<span class="token punctuation">,</span> z <span class="token operator">=</span> to_ecef_tf<span class="token punctuation">.</span>transform<span class="token punctuation">(</span>enh<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">,</span> enh<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">,</span> enh<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+    <span class="token keyword">return</span> np<span class="token punctuation">.</span>column_stack<span class="token punctuation">(</span><span class="token punctuation">[</span>x<span class="token punctuation">,</span> y<span class="token punctuation">,</span> z<span class="token punctuation">]</span><span class="token punctuation">)</span>
+
+ecef <span class="token operator">=</span> <span class="token punctuation">{</span>guid<span class="token punctuation">:</span> <span class="token punctuation">(</span>to_ecef<span class="token punctuation">(</span>v<span class="token punctuation">)</span><span class="token punctuation">,</span> f<span class="token punctuation">)</span> <span class="token keyword">for</span> guid<span class="token punctuation">,</span> <span class="token punctuation">(</span>v<span class="token punctuation">,</span> f<span class="token punctuation">)</span> <span class="token keyword">in</span> mapped<span class="token punctuation">.</span>items<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">}</span>
+centre <span class="token operator">=</span> np<span class="token punctuation">.</span>vstack<span class="token punctuation">(</span><span class="token punctuation">[</span>v <span class="token keyword">for</span> v<span class="token punctuation">,</span> _ <span class="token keyword">in</span> ecef<span class="token punctuation">.</span>values<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">.</span>mean<span class="token punctuation">(</span>axis<span class="token operator">=</span><span class="token number">0</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"ECEF centre:"</span><span class="token punctuation">,</span> centre<span class="token punctuation">.</span><span class="token builtin">round</span><span class="token punctuation">(</span><span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre></div>
+<p>The vertical datum EPSG code must match what the model’s <code>OrthogonalHeight</code> was measured against — DHHN2016 (EPSG:7837) in this German example, NAVD88 (EPSG:5703) in the United States. Omit it and PROJ treats the heights as ellipsoidal, which lifts or sinks the building by the local geoid separation: around 47 m in Bavaria, around −33 m in New York. The mechanics of storing the result relative to a tile centre are in <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/transforming-ifc-coordinates-to-ecef-for-3d-tiles/">transforming IFC coordinates to ECEF for 3D Tiles</a>.</p>
+<h2 id="validation-verification" tabindex="-1"><a class="heading-link" href="#validation-verification"><span>Validation &amp; Verification</span></a></h2>
+<p>Georeferencing is proven against independent measurements, never against the parameters that produced it.</p>
+<div class="codeblock" data-lang="python"><div class="codeblock__bar"><span class="codeblock__lang">python</span><button type="button" class="codeblock__copy" aria-label="Copy code to clipboard">Copy</button></div><pre class="codeblock__pre language-python" tabindex="0" role="group" aria-label="python code sample"><code class="language-python"><span class="token keyword">import</span> numpy <span class="token keyword">as</span> np
+
+<span class="token comment"># Control points: IFC local coordinates (metres) and surveyed E, N, H in EPSG:25832+7837</span>
+local <span class="token operator">=</span> np<span class="token punctuation">.</span>array<span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token punctuation">[</span><span class="token number">0.0</span><span class="token punctuation">,</span> <span class="token number">0.0</span><span class="token punctuation">,</span> <span class="token number">0.0</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token number">84.6</span><span class="token punctuation">,</span> <span class="token number">0.0</span><span class="token punctuation">,</span> <span class="token number">0.0</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token number">84.6</span><span class="token punctuation">,</span> <span class="token number">52.2</span><span class="token punctuation">,</span> <span class="token number">0.0</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token punctuation">[</span><span class="token number">0.0</span><span class="token punctuation">,</span> <span class="token number">52.2</span><span class="token punctuation">,</span> <span class="token number">0.0</span><span class="token punctuation">]</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+survey <span class="token operator">=</span> np<span class="token punctuation">.</span>array<span class="token punctuation">(</span><span class="token punctuation">[</span>
+    <span class="token punctuation">[</span><span class="token number">691204.412</span><span class="token punctuation">,</span> <span class="token number">5335818.221</span><span class="token punctuation">,</span> <span class="token number">519.31</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+    <span class="token punctuation">[</span><span class="token number">691286.901</span><span class="token punctuation">,</span> <span class="token number">5335836.978</span><span class="token punctuation">,</span> <span class="token number">519.29</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+    <span class="token punctuation">[</span><span class="token number">691275.305</span><span class="token punctuation">,</span> <span class="token number">5335887.874</span><span class="token punctuation">,</span> <span class="token number">519.33</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+    <span class="token punctuation">[</span><span class="token number">691192.799</span><span class="token punctuation">,</span> <span class="token number">5335869.108</span><span class="token punctuation">,</span> <span class="token number">519.30</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+<span class="token punctuation">]</span><span class="token punctuation">)</span>
+
+residuals <span class="token operator">=</span> ifc_to_map<span class="token punctuation">(</span>local<span class="token punctuation">,</span> params<span class="token punctuation">)</span> <span class="token operator">-</span> survey
+horiz <span class="token operator">=</span> np<span class="token punctuation">.</span>hypot<span class="token punctuation">(</span>residuals<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">,</span> residuals<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"horizontal residuals (m):"</span><span class="token punctuation">,</span> horiz<span class="token punctuation">.</span><span class="token builtin">round</span><span class="token punctuation">(</span><span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+<span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"vertical residuals (m):"</span><span class="token punctuation">,</span> residuals<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">]</span><span class="token punctuation">.</span><span class="token builtin">round</span><span class="token punctuation">(</span><span class="token number">3</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+<span class="token keyword">assert</span> horiz<span class="token punctuation">.</span><span class="token builtin">max</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">&lt;</span> <span class="token number">0.05</span><span class="token punctuation">,</span> <span class="token string">"horizontal misfit exceeds 5 cm"</span>
+<span class="token keyword">assert</span> np<span class="token punctuation">.</span><span class="token builtin">abs</span><span class="token punctuation">(</span>residuals<span class="token punctuation">[</span><span class="token punctuation">:</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">max</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">&lt;</span> <span class="token number">0.05</span><span class="token punctuation">,</span> <span class="token string">"vertical misfit exceeds 5 cm"</span>
+</code></pre></div>
+<p>Read the residual pattern as well as its size. Uniform offsets point at the translation. Residuals that grow with distance from the origin and rotate around it point at θ — usually the convergence. Residuals that grow radially outward mean <code>Scale</code> is wrong, often by the projection’s scale factor, 0.9996 on a UTM central meridian, which is 4 cm per 100 m.</p>
+<figure class="diagram">
+<svg viewBox="6 16 748 240" role="img" aria-labelledby="bim-resid-t bim-resid-d" xmlns="http://www.w3.org/2000/svg">
+  <title id="bim-resid-t">Residual patterns and what they diagnose</title>
+  <desc id="bim-resid-d">Three panels of control-point residual arrows. Equal parallel arrows mean a translation error. Arrows perpendicular to the direction from the origin, growing with distance, mean a rotation error. Arrows pointing radially outward and growing with distance mean a scale error.</desc>
+  <rect class="svg-bg" x="6" y="16" width="748" height="240" fill="#ffffff"/>
+  <defs>
+    <marker id="bim-resid-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#b0413e"/>
+    </marker>
+  </defs>
+  <rect x="20" y="30" width="220" height="160" rx="8" fill="#fdf3e0" stroke="#c46a3d" stroke-width="2"/>
+  <rect x="270" y="30" width="220" height="160" rx="8" fill="#e3f0f4" stroke="#1f6b8a" stroke-width="2"/>
+  <rect x="520" y="30" width="220" height="160" rx="8" fill="#eef5e9" stroke="#4f7a4d" stroke-width="2"/>
+  <g stroke="#b0413e" stroke-width="2" marker-end="url(#bim-resid-arrow)">
+    <path fill="none" d="M70 80 l24 -10"/><path fill="none" d="M180 80 l24 -10"/><path fill="none" d="M70 150 l24 -10"/><path fill="none" d="M180 150 l24 -10"/>
+    <path fill="none" d="M330 80 l-8 -14"/><path fill="none" d="M430 80 l14 -8"/><path fill="none" d="M430 150 l8 14"/><path fill="none" d="M330 150 l-14 8"/>
+    <path fill="none" d="M580 80 l-18 -12"/><path fill="none" d="M680 80 l18 -12"/><path fill="none" d="M680 150 l18 12"/><path fill="none" d="M580 150 l-18 12"/>
+  </g>
+  <g fill="#5b6471">
+    <circle cx="130" cy="115" r="4"/><circle cx="380" cy="115" r="4"/><circle cx="630" cy="115" r="4"/>
+  </g>
+  <g fill="#1f2937" font-size="12.5" text-anchor="middle">
+    <text x="130" y="212">translation: E0, N0, H0</text>
+    <text x="380" y="212">rotation: θ or convergence</text>
+    <text x="630" y="212">scale: units or k</text>
+  </g>
+  <text x="380" y="238" fill="#15384a" font-size="12" text-anchor="middle">Four well-spread control points are enough to tell these apart.</text>
+</svg>
+<figcaption>The shape of the control-point residuals names the wrong parameter, which is faster than re-deriving all six.</figcaption>
+</figure>
+<p>Two further checks belong in the same job. Drape the building footprint over the terrain model and confirm the ground-floor slab sits within a few centimetres of the DTM at its entrances. And overlay the footprint on the municipal cadastre in the same EPSG code: a building that fits its survey points but straddles a parcel boundary has a control-point problem, not a model problem.</p>
+<h2 id="performance-scale" tabindex="-1"><a class="heading-link" href="#performance-scale"><span>Performance &amp; Scale</span></a></h2>
+<p>Geometry extraction dominates. IfcOpenShell’s iterator triangulates every element through OpenCASCADE, and a 400 MB hospital model with detailed MEP can take ten to twenty minutes on eight cores; the transformation itself is a vectorised affine map that runs over tens of millions of vertices in under a second.</p>
+<ul>
+<li><strong>Filter elements before triangulating.</strong> A city twin rarely needs ducts, fasteners or furniture. Passing <code>exclude=model.by_type(&quot;IfcDistributionElement&quot;) + model.by_type(&quot;IfcFurnishingElement&quot;)</code> to <code>ifcopenshell.geom.iterator</code> cuts extraction time by half or more on MEP-heavy models.</li>
+<li><strong>Cache per GUID.</strong> Element GUIDs are stable between model revisions, so hash each element’s geometry and reuse the triangulation for unchanged elements — the same content-hashing idea as <a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/incremental-retiling-of-changed-city-blocks/">incremental retiling of changed city blocks</a>.</li>
+<li><strong>Transform in float64, store in float32 relative to a centre.</strong> Projected coordinates need eight significant digits before the decimal point; float32 has seven. Subtract a local centre before downcasting.</li>
+<li><strong>Run pyproj once per building, not per element.</strong> Stack vertices, transform once, split by offsets. Per-element transformer calls on a model with 60,000 elements cost more than the geometry.</li>
+</ul>
+<h2 id="failure-modes-gotchas" tabindex="-1"><a class="heading-link" href="#failure-modes-gotchas"><span>Failure Modes &amp; Gotchas</span></a></h2>
+<p><strong>The building is at the right place and 1,000 times too small.</strong> <code>Scale = 0.001</code> was applied to IfcOpenShell’s metric output without dividing by the project unit factor. Step 4 exists for exactly this.</p>
+<p><strong>The building is rotated by one to three degrees.</strong> θ was derived from <code>TrueNorth</code> instead of <code>XAxisAbscissa</code> and <code>XAxisOrdinate</code>, or the authoring tool wrote true north into the map conversion. The residual pattern is a pure rotation around the origin; the correction is the meridian convergence.</p>
+<p><strong>The building floats 40–50 m above the terrain.</strong> <code>OrthogonalHeight</code> is orthometric and was treated as ellipsoidal in the ECEF transform. Add the vertical EPSG code to the source CRS so PROJ applies the geoid.</p>
+<p><strong>The building sits correctly but its interior is offset.</strong> Some authoring tools write a site placement with a non-zero offset <em>and</em> a map conversion that assumes a zero origin, double-counting the translation for elements placed relative to the site. Compare the world-coordinate bounding box from step 3 with the local one: if its minimum is already hundreds of metres from zero, a placement offset is in play.</p>
+<p><strong>IFC2X3 models placed from <code>RefLatitude</code> spin.</strong> A single reference point has no rotation, so the model is pinned at one corner and free to rotate. Use the property-set route or register against control points — see <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/georeferencing-ifc2x3-models-without-map-conversion/">georeferencing IFC2x3 models without IfcMapConversion</a>.</p>
+<h2 id="frequently-asked-questions" tabindex="-1"><a class="heading-link" href="#frequently-asked-questions"><span>Frequently Asked Questions</span></a></h2>
+<h3 id="should-the-ifc-model-or-the-pipeline-own-the-georeferencing" tabindex="-1"><a class="heading-link" href="#should-the-ifc-model-or-the-pipeline-own-the-georeferencing"><span>Should the IFC model or the pipeline own the georeferencing?</span></a></h3>
+<p>The model, whenever possible. A map conversion written into the file travels with every revision and every consumer; one applied only in a pipeline is lost the moment someone opens the file in another tool. Pipelines should read and verify it, and write it back when they have to derive it from control points.</p>
+<h3 id="can-i-use-the-sites-latitude-and-longitude-from-ifcsite-directly" tabindex="-1"><a class="heading-link" href="#can-i-use-the-sites-latitude-and-longitude-from-ifcsite-directly"><span>Can I use the site’s latitude and longitude from IfcSite directly?</span></a></h3>
+<p>Only as a coarse locator. It carries no rotation and is often the address geocode rather than a surveyed point. Use it to confirm the map conversion is in the right city, not to place geometry.</p>
+<h3 id="what-accuracy-should-i-expect-from-a-well-georeferenced-model" tabindex="-1"><a class="heading-link" href="#what-accuracy-should-i-expect-from-a-well-georeferenced-model"><span>What accuracy should I expect from a well-georeferenced model?</span></a></h3>
+<p>Two to five centimetres horizontally at control points is typical for a model set out from a survey, which is also the tolerance at which facades stop visibly disagreeing with photogrammetry. Anything above 20 cm is a parameter error, not measurement noise.</p>
+<h3 id="does-ifc4x3-change-any-of-this" tabindex="-1"><a class="heading-link" href="#does-ifc4x3-change-any-of-this"><span>Does IFC4X3 change any of this?</span></a></h3>
+<p>It adds <code>IfcMapConversionScaled</code>, with separate <code>FactorX</code>, <code>FactorY</code> and <code>FactorZ</code>, and <code>IfcRigidOperation</code> for non-projected targets. The reading code needs a branch for the scaled variant; the transformation logic is unchanged.</p>
+<h3 id="how-do-i-handle-a-model-delivered-in-a-local-site-grid-rather-than-a-national-crs" tabindex="-1"><a class="heading-link" href="#how-do-i-handle-a-model-delivered-in-a-local-site-grid-rather-than-a-national-crs"><span>How do I handle a model delivered in a local site grid rather than a national CRS?</span></a></h3>
+<p>Treat the site grid as an engineering CRS and register it to the national one with a Helmert fit against the survey control, then write the resulting parameters into <code>IfcMapConversion</code>. A site grid never belongs in the delivered tileset.</p>
+<h2 id="related-guides" tabindex="-1"><a class="heading-link" href="#related-guides"><span>Related Guides</span></a></h2>
+<ul>
+<li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/reading-ifcmapconversion-with-ifcopenshell/">Reading IfcMapConversion with IfcOpenShell</a> — every schema variant of the parameters</li>
+<li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/transforming-ifc-coordinates-to-ecef-for-3d-tiles/">Transforming IFC Coordinates to ECEF for 3D Tiles</a> — from map coordinates to a tile transform</li>
+<li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/georeferencing-ifc2x3-models-without-map-conversion/">Georeferencing IFC2x3 Models Without IfcMapConversion</a> — property sets and control-point fits</li>
+<li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/handling-vertical-datums-and-geoid-separation/">Handling Vertical Datums and Geoid Separation</a> — the height half of the problem</li>
+<li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/citygml-vs-3d-tiles-for-municipal-twin-delivery/">CityGML vs 3D Tiles for Municipal Twin Delivery</a> — where the placed building goes next</li>
+</ul>
+<p>Back to <a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals for Digital Twins</a>.</p>
+
+
+      
+      
+
+      <div class="related-nav">
+        
+          <div>
+            <h3>Explore further</h3>
+            <div class="related-grid">
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/georeferencing-ifc2x3-models-without-map-conversion/">
+                  <span class="related-card__label">In this section</span>
+                  <span class="related-card__title">Georeferencing IFC2x3 Models Without IfcMapConversion</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/reading-ifcmapconversion-with-ifcopenshell/">
+                  <span class="related-card__label">In this section</span>
+                  <span class="related-card__title">Reading IfcMapConversion with IfcOpenShell</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/transforming-ifc-coordinates-to-ecef-for-3d-tiles/">
+                  <span class="related-card__label">In this section</span>
+                  <span class="related-card__title">Transforming IFC Coordinates to ECEF for 3D Tiles</span>
+                </a>
+              
+            </div>
+          </div>
+        
+
+        
+          <div>
+            <h3>Related</h3>
+            <div class="related-grid">
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">3D Format Standards Comparison</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Coordinate Reference Systems for 3D Assets</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Digital Elevation Model Workflows</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Mesh Topology Basics for Digital Twins</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Point Cloud Density Standards</span>
+                </a>
+              
+                <a class="related-card" href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/">
+                  <span class="related-card__label">Sibling topic</span>
+                  <span class="related-card__title">Spatial Indexing and Tiling Schemes for 3D Data</span>
+                </a>
+              
+            </div>
+          </div>
+        
+      </div>
+    </article>
+
+    
+    <aside class="toc" aria-label="On this page" data-toc hidden>
+      <h4>On this page</h4>
+      <ul></ul>
+    </aside>
+  </div>
+</div>
+
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+  <div class="container site-footer__inner">
+    <div class="site-footer__brand">
+      <a href="https://www.3d-geospatial.com/" class="brand" aria-label="3D Geospatial &amp; Digital Twin Automation — home">
+        <img src="/assets/img/logo-mark.svg" alt="" class="brand__mark" width="36" height="36">
+        <span class="brand__name">
+          3D Geospatial
+          <small>Digital Twin Automation</small>
+        </span>
+      </a>
+      <p>Engineering-grade guides on point cloud processing, mesh pipelines, LOD strategies, and CI/CD automation for digital twin platforms.</p>
+      <a class="footer-social" href="https://github.com/3d-geospatial" aria-label="3D Geospatial on GitHub" rel="noopener" target="_blank">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true">
+          <path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.53-1.34-1.3-1.7-1.3-1.7-1.06-.72.08-.71.08-.71 1.17.08 1.79 1.2 1.79 1.2 1.04 1.79 2.73 1.27 3.4.97.1-.75.4-1.27.73-1.56-2.55-.29-5.24-1.28-5.24-5.68 0-1.25.45-2.28 1.19-3.08-.12-.3-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.75.11 3.05.74.8 1.19 1.83 1.19 3.08 0 4.41-2.69 5.39-5.25 5.67.41.36.78 1.07.78 2.15v3.18c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5Z"/>
+        </svg>
+        <span>GitHub</span>
+      </a>
+    </div>
+
+    <div class="site-footer__col">
+      <h4>Sections</h4>
+      <ul>
+        <li><a href="https://www.3d-geospatial.com/">Home</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/">3D Geospatial Fundamentals</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/">LOD Management &amp; Optimization</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/">Point Cloud &amp; Mesh Pipelines</a></li>
+        
+          <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/">Troubleshooting &amp; Reliability</a></li>
+        
+      </ul>
+    </div>
+
+    
+      <div class="site-footer__col">
+        <h4>3D Geospatial Fundamentals</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/3d-format-standards-comparison/">3D Format Standards Comparison</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/bim-and-ifc-georeferencing/">BIM and IFC Georeferencing for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/coordinate-reference-systems-for-3d-assets/">Coordinate Reference Systems for 3D Assets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/digital-elevation-model-workflows/">Digital Elevation Model Workflows</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/mesh-topology-basics/">Mesh Topology Basics for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/point-cloud-density-standards/">Point Cloud Density Standards</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/3d-geospatial-fundamentals-for-digital-twins/spatial-indexing-and-tiling-schemes/">Spatial Indexing and Tiling Schemes for 3D Data</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>LOD Management &amp; Optimization</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/3d-tiles-batch-tiling-pipelines/">3D Tiles Batch Tiling Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/automated-tile-generation/">Automated Tile Generation for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/cesium-ion-upload-automation/">Cesium ion Upload Automation for 3D Tilesets</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/gltf-lod-generation-with-draco-compression/">glTF LOD Generation With Draco Compression</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/hierarchical-lod-structuring/">Hierarchical LOD Structuring for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/streaming-sync-patterns/">Streaming Sync Patterns for 3D Geospatial</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/lod-management-optimization-strategies/tileset-metadata-and-3d-tiles-next/">Tileset Metadata and 3D Tiles Next</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Point Cloud &amp; Mesh Pipelines</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/automated-mesh-decimation/">Automated Mesh Decimation for Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/change-detection-between-scan-epochs/">Change Detection Between LiDAR Scan Epochs</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/cicd-automation-for-spatial-pipelines/">CI/CD Automation for Spatial Pipelines</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/lidar-classification-and-ground-extraction/">LiDAR Classification and Ground Extraction</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/point-cloud-filtering-techniques/">Point Cloud Filtering Techniques</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/surface-reconstruction-algorithms/">Surface Reconstruction for Geospatial Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/point-cloud-mesh-processing-pipelines/texture-mapping-workflows/">Texture Mapping Workflows for Digital Twins</a></li>
+          
+        </ul>
+      </div>
+    
+      <div class="site-footer__col">
+        <h4>Troubleshooting &amp; Reliability</h4>
+        <ul>
+          
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/cross-section-failure-modes/">Cross-Section Failure Modes in Digital Twins</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/data-validation-and-qa-gates/">Data Validation &amp; QA Gates for 3D Tiles</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/performance-profiling-and-benchmarking/">Performance Profiling and Benchmarking</a></li>
+          
+            <li><a href="https://www.3d-geospatial.com/digital-twin-troubleshooting-and-reliability/streaming-and-runtime-diagnostics/">Streaming &amp; Runtime Diagnostics for 3D Tiles</a></li>
+          
+        </ul>
+      </div>
+    
+  </div>
+  <div class="container site-footer__bottom">
+    <span>© 2026 3D Geospatial &amp; Digital Twin Automation</span>
+    <span>Built with Eleventy · PWA-enabled</span>
+  </div>
+</footer>
+
+
+  <script src="/assets/js/site.js?v=b99aa9f971" defer></script>
+  
+</body>
+</html>

@@ -139,7 +139,7 @@ This is where the halving heuristic diverges from reality. A parent whose four c
     <text x="459" y="202">0.38 m</text>
     <text x="639" y="202">0.47 m</text>
   </g>
-  <text x="279" y="244" fill="#c46a3d" font-size="12" text-anchor="middle">the worst child sets the parent</text>
+  <text x="279" y="244" fill="#9a4f26" font-size="12" text-anchor="middle">the worst child sets the parent</text>
   <text x="370" y="276" fill="#15384a" font-size="12.5" text-anchor="middle">Average them (0.45) and the client stops refining while one quarter of the block is still 13% worse than it believes</text>
 </svg>
 <figcaption>The maximum is not a conservative choice, it is the definition. A parent stands in for its whole subtree, so its error is the subtree's worst case.</figcaption>
